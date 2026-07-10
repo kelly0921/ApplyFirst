@@ -154,6 +154,7 @@ a {
 .prototype-note,
 .alert-setup-panel,
 .monitoring-readiness-panel,
+.verification-queue-panel,
 .recommendation-guide,
 .insight-band,
 .filter-stack,
@@ -333,6 +334,125 @@ a {
 .monitoring-stats strong {
   color: var(--ink);
   font-size: 1.15rem;
+}
+
+.verification-queue-panel {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 14px;
+  background:
+    linear-gradient(145deg, rgba(195, 74, 104, 0.06), transparent 52%),
+    rgba(255, 255, 255, 0.94);
+}
+
+.queue-heading {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.6fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.queue-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.verification-queue-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.verification-queue-item {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 11px;
+}
+
+.verification-queue-item h3,
+.verification-queue-item p {
+  margin: 0;
+}
+
+.verification-queue-item h3 {
+  margin-top: 7px;
+  font-size: 0.98rem;
+  line-height: 1.22;
+}
+
+.verification-queue-item p {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 740;
+}
+
+.verification-queue-item dl {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+}
+
+.verification-queue-item dt {
+  color: var(--quiet);
+  font-size: 0.65rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.verification-queue-item dd {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 690;
+  line-height: 1.35;
+}
+
+.verification-queue-item button {
+  justify-self: start;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #ffffff;
+  color: var(--ink);
+  padding: 8px 10px;
+  font-weight: 790;
+}
+
+.queue-priority {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 7px;
+  color: var(--ink);
+  font-size: 0.68rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.queue-verify-first {
+  border-color: rgba(177, 74, 99, 0.28);
+  background: var(--rose-soft);
+  color: var(--rose);
+}
+
+.queue-verify-next {
+  border-color: rgba(169, 120, 24, 0.28);
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+
+.queue-backlog {
+  border-color: rgba(36, 87, 214, 0.24);
+  background: var(--blue-soft);
+  color: var(--blue);
 }
 
 .recommendation-guide {
@@ -746,7 +866,7 @@ a {
 
 .icon-status {
   display: inline-grid;
-  width: 20px;
+  width: 24px;
   height: 20px;
   place-items: center;
   border: 1px solid var(--line);
@@ -1123,6 +1243,7 @@ a {
 @media (max-width: 1280px) {
   .command-strip,
   .phase-two-strip,
+  .queue-heading,
   .insight-band,
   .product-grid {
     grid-template-columns: 1fr;
@@ -1178,6 +1299,7 @@ a {
   .alert-controls,
   .alert-preview-summary,
   .monitoring-stats,
+  .verification-queue-list,
   .recommendation-guide,
   .left-rail,
   .record-main,

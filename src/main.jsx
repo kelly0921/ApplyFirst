@@ -13,6 +13,7 @@ import {
   priorityLabels,
   stats,
   statusLabels,
+  verificationQueue,
   verificationLabels,
 } from './opportunities';
 
@@ -140,6 +141,11 @@ function App() {
     setStatus('all');
   };
 
+  const focusOpportunity = (id) => {
+    resetFilters();
+    setSelectedId(id);
+  };
+
   const toggleSaved = (id) => {
     setSavedIds((currentIds) =>
       currentIds.includes(id) ? currentIds.filter((savedId) => savedId !== id) : [...currentIds, id],
@@ -187,6 +193,8 @@ function App() {
           />
           <MonitoringReadinessPanel />
         </section>
+
+        <VerificationQueuePanel onSelect={focusOpportunity} />
 
         <section className="recommendation-guide" aria-label="Recommendation guide">
           <span><strong>Recommended</strong> underclassmen-fit programs with strong career leverage.</span>
@@ -297,12 +305,58 @@ function Header({ savedCount }) {
       <nav aria-label="Page links">
         <a href="#library">Monitor</a>
         <a href="#alerts">Alerts</a>
+        <a href="#verification">Queue</a>
         <a href="https://github.com/zapplyjobs/underclassmen-internships" target="_blank" rel="noreferrer">
           Inspiration
         </a>
         <span>{savedCount} saved</span>
       </nav>
     </header>
+  );
+}
+
+function VerificationQueuePanel({ onSelect }) {
+  const queuePreview = verificationQueue.slice(0, 6);
+
+  return (
+    <section className="verification-queue-panel" id="verification" aria-label="Verification queue">
+      <div className="queue-heading">
+        <div className="panel-heading">
+          <span>Verification queue</span>
+          <h2>What to verify before real alerts</h2>
+        </div>
+        <p>
+          Prioritized by underclassmen fit, recommendation value, source coverage, and missing official-cycle
+          details. These are the records to check before sending public notifications.
+        </p>
+      </div>
+      <div className="verification-queue-list" role="list">
+        {queuePreview.map(({ opportunity, priority, readiness }) => (
+          <article className="verification-queue-item" key={opportunity.id} role="listitem">
+            <div>
+              <span className={`queue-priority queue-${priority.label.toLowerCase().replaceAll(' ', '-')}`}>
+                {priority.label}
+              </span>
+              <h3>{opportunity.name}</h3>
+              <p>{opportunity.organization}</p>
+            </div>
+            <dl>
+              <div>
+                <dt>Blockers</dt>
+                <dd>{readiness.missing.length ? readiness.missing.join(', ') : 'Ready for monitoring'}</dd>
+              </div>
+              <div>
+                <dt>Reason</dt>
+                <dd>{priority.reason}</dd>
+              </div>
+            </dl>
+            <button type="button" onClick={() => onSelect(opportunity.id)}>
+              Review record
+            </button>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -502,7 +556,7 @@ function OpportunityRecord({ opportunity, selected, saved, onSelect, onSave }) {
   const monitorSignal = getMonitorSignal(opportunity);
   const primaryTrack = tracks[0];
   const verificationState = getVerificationState(opportunity);
-  const verificationMark = verificationState === 'verified' ? '✓' : verificationState === 'needsReview' ? '!' : '';
+  const verificationMark = verificationState === 'verified' ? 'OK' : verificationState === 'needsReview' ? '!' : '';
 
   return (
     <article className={`opportunity-record${selected ? ' selected' : ''}`} role="listitem">
@@ -580,6 +634,7 @@ function OpportunityDetail({ opportunity, saved, onSave }) {
   const tracks = getOpportunityTracks(opportunity);
   const monitorSignal = getMonitorSignal(opportunity);
   const verificationState = getVerificationState(opportunity);
+  const readiness = getMonitoringReadiness(opportunity);
 
   return (
     <section className="detail-panel">
@@ -612,6 +667,7 @@ function OpportunityDetail({ opportunity, saved, onSave }) {
       <div className="detail-status-row" aria-label="Program status summary">
         <StatusItem label="Recommendation" value={monitorSignal.priorityLabel} tone={monitorSignal.priority} />
         <StatusItem label="Application Status" value={monitorSignal.actionLabel} />
+        <StatusItem label="Monitoring Readiness" value={readiness.status} tone={readiness.alertable ? 'verified' : 'needsReview'} />
         <StatusItem
           label="Verification"
           value={verificationLabels[verificationState]}

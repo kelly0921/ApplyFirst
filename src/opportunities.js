@@ -191,6 +191,62 @@ export function getMonitoringReadiness(opportunity) {
   };
 }
 
+export function getVerificationPriority(opportunity) {
+  const monitorSignal = getMonitorSignal(opportunity);
+  const readiness = getMonitoringReadiness(opportunity);
+  const tracks = getOpportunityTracks(opportunity);
+  const underclassmenFit =
+    opportunity.classYears.includes('Freshman') || opportunity.classYears.includes('Sophomore');
+  const hasCurrentTiming =
+    opportunity.openDate &&
+    !opportunity.openDate.toLowerCase().includes('watch') &&
+    !opportunity.openDate.toLowerCase().includes('verify');
+  const sourceSignal = getSourceSignal(opportunity);
+  let score = 0;
+
+  if (monitorSignal.priority === 'high') {
+    score += 40;
+  }
+
+  if (underclassmenFit) {
+    score += 24;
+  }
+
+  if (tracks.includes('Software Engineering')) {
+    score += 10;
+  }
+
+  if (tracks.includes('Product Management') || tracks.includes('Quant / Finance')) {
+    score += 8;
+  }
+
+  if (sourceSignal.count > 1) {
+    score += 8;
+  }
+
+  if (!hasCurrentTiming) {
+    score += 6;
+  }
+
+  if (readiness.status === 'Needs Verification') {
+    score += 12;
+  }
+
+  if (opportunity.status === 'verifyManually') {
+    score += 10;
+  }
+
+  return {
+    score,
+    label: score >= 78 ? 'Verify First' : score >= 54 ? 'Verify Next' : 'Backlog',
+    reason: underclassmenFit
+      ? 'Underclassmen-facing record with alert value once official timing is confirmed.'
+      : monitorSignal.priority === 'foundation'
+        ? 'Foundation resource; verify after higher-leverage application programs.'
+        : 'Useful record, but lower urgency than underclassmen-first programs.',
+  };
+}
+
 export function getMonitorSignal(opportunity) {
   const tracks = getOpportunityTracks(opportunity);
   const highLeverageCategory = [
@@ -859,3 +915,12 @@ export const monitoringStats = [
     value: String(opportunities.filter((item) => getMonitoringReadiness(item).status === 'Needs Verification').length),
   },
 ];
+
+export const verificationQueue = opportunities
+  .filter((item) => !getMonitoringReadiness(item).alertable)
+  .map((item) => ({
+    opportunity: item,
+    priority: getVerificationPriority(item),
+    readiness: getMonitoringReadiness(item),
+  }))
+  .sort((a, b) => b.priority.score - a.priority.score || a.opportunity.name.localeCompare(b.opportunity.name));

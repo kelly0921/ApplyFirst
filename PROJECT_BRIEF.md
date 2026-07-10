@@ -236,12 +236,14 @@ The first Phase 2 slice is intentionally local and trust-focused:
 - Save those alert preferences locally in the browser.
 - Compute how many matching programs are actually monitoring-ready.
 - Separate `Monitoring Ready`, `Needs Setup`, and `Needs Verification` records.
+- Prioritize a verification queue by underclassmen fit, recommendation value, source coverage, role relevance, and missing official-cycle details.
+- Let the user jump from a queue item into the full program record for review.
 - Make it clear that public notifications should not launch until official-source verification and monitoring rules are reliable.
 
 Next Phase 2 steps:
 
 1. Create a source-update workflow for official program pages.
-2. Add a verification queue for the records that are high-value but not alert-ready.
+2. Add a verification edit workflow so queue blockers can be resolved without code changes.
 3. Decide the first notification channel: email waitlist, email alerts, or saved-program reminders.
 4. Add a minimal backend only when user preferences or outbound notifications need persistence beyond the browser.
 5. Define trust copy for public alerts so students know what is verified, what is estimated, and what still needs review.

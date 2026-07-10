@@ -50,6 +50,8 @@ The first Phase 2 slice adds:
 
 - Local alert-preference preview by class year, role track, and recommendation level.
 - Monitoring-readiness calculations for records that are safe to alert on later.
+- Prioritized verification queue for records that need official-cycle review before alerts.
+- Direct review flow from queue item to full program detail.
 - A clear split between public prototype behavior and future live notifications.
 
 Real email alerts, accounts, and automated page-change monitoring are intentionally still future work.
