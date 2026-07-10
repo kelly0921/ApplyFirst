@@ -13,12 +13,12 @@ The first version focuses on:
 - Class-year fit for freshmen, sophomores, and all class years.
 - Role-track fit for software engineering, product management, quant / finance, and Access & Prep programs.
 - Special-program categories inspired by underclassmen opportunity lists.
-- Recommendation, application status, and source-coverage labels.
-- Manual verification and confidence labels.
+- Recommendation, application status, and confirmation labels.
+- Maintainer-only source review and confidence labels.
 - Clear notes on why each opportunity matters and how to prepare.
 - A future path toward an Opportunity Signal Tracker.
 
-This version is a public prototype with Phase 2 alert-preview scaffolding, not a live alerting service yet. The app can show the product direction, curated seed set, local alert preferences, and monitoring-readiness model, while outbound notifications should wait for stronger official-source verification.
+This version is a public prototype with Phase 2 alert preference scaffolding, not a live alerting service yet. The app can show the product direction, curated seed set, local alert preferences, and student-facing confirmation model, while outbound notifications should wait for stronger official-source confirmation.
 
 Recommendation is computed from the Phase 1 rules: underclassmen-fit programs in high-leverage categories become Recommended; relevant programs stay on the Watch List; scholarships, conferences, communities, and resources are treated as Foundation opportunities. Duplicate appearances across older curated lists are useful for verification, but they are not treated as proof that a program is better.
 
@@ -48,16 +48,21 @@ npm run build
 
 The first Phase 2 slice adds:
 
-- Local alert-preference preview by class year, role track, and recommendation level.
-- Monitoring-readiness calculations for records that are safe to alert on later.
-- Prioritized verification queue for records that need official-cycle review before alerts.
+- Local alert preference preview by class year, role track, and recommendation level.
+- Confirmation-readiness calculations for records that are safe to alert on later.
+- Prioritized source-review queue for records that need official-cycle review before alerts.
 - Direct review flow from queue item to full program detail.
 - Local verification editor for official URL, previous URL, opening window, deadline, last checked date, confidence, status, and source notes.
 - Readiness and queue updates based on those local verification edits.
 - Source update plan per record, including watched page, check cadence, next check, alert trigger, and meaningful change signals.
+- Local source-check log with checked date, result, and notes.
 - Notification strategy preview with local preview, email waitlist, and saved-program reminder modes.
 - Alert timing preview for openings, deadlines, and preparation windows.
-- Trust copy that separates records ready to alert from records held for verification.
+- Simplified student-facing alert preference section with technical readiness details kept in Maintainer Mode.
+- Trust copy that separates records ready to alert from records that still need confirmation.
+- Public trust policy for Confirmed, Prep Only, and Needs Confirmation records.
+- Local waitlist-intent workflow before accounts, reminders, or real outbound alerts.
+- Maintainer Mode toggle for source-review tools, keeping the default view student-facing.
 - A clear split between public prototype behavior and future live notifications.
 
 Real email alerts, accounts, and automated page-change monitoring are intentionally still future work.

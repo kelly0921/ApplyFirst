@@ -3,19 +3,19 @@ export const statusLabels = {
   watching: 'Watching',
   expectedSoon: 'Opening Soon',
   deadlineSoon: 'Deadline Soon',
-  verifyManually: 'Needs Review',
+  verifyManually: 'Needs Confirmation',
 };
 
 export const confidenceLabels = {
   high: 'High Confidence',
   medium: 'Medium Confidence',
-  needsReview: 'Needs Review',
+  needsReview: 'Needs Confirmation',
 };
 
 export const verificationLabels = {
-  verified: 'Verified',
+  verified: 'Confirmed',
   watchOnly: 'Watch Only',
-  needsReview: 'Needs Review',
+  needsReview: 'Needs Confirmation',
 };
 
 export const priorityLabels = {
@@ -29,7 +29,7 @@ export const alertReadinessLabels = {
   opensSoon: 'Prepare Now',
   watching: 'Watch for Opening',
   deadlineSoon: 'Deadline Soon',
-  verify: 'Needs Verification',
+  verify: 'Needs Confirmation',
   prepare: 'Prepare Now',
 };
 
@@ -186,7 +186,7 @@ export function getMonitoringReadiness(opportunity) {
 
   return {
     alertable,
-    status: alertable ? 'Monitoring Ready' : missing.length <= 2 ? 'Needs Setup' : 'Needs Verification',
+    status: alertable ? 'Monitoring Ready' : missing.length <= 2 ? 'Needs Setup' : 'Needs Confirmation',
     missing,
   };
 }
@@ -228,7 +228,7 @@ export function getVerificationPriority(opportunity) {
     score += 6;
   }
 
-  if (readiness.status === 'Needs Verification') {
+  if (readiness.status === 'Needs Confirmation') {
     score += 12;
   }
 
@@ -942,7 +942,7 @@ export const opportunities = [
 export const stats = [
   { label: 'Programs', value: String(opportunities.length) },
   { label: 'Recommended', value: String(opportunities.filter((item) => getMonitorSignal(item).priority === 'high').length) },
-  { label: 'Verified', value: String(opportunities.filter((item) => getVerificationState(item) === 'verified').length) },
+  { label: 'Confirmed', value: String(opportunities.filter((item) => getVerificationState(item) === 'verified').length) },
   { label: 'Needs review', value: String(opportunities.filter((item) => getMonitorSignal(item).alertReadiness === 'verify').length) },
 ];
 
@@ -957,7 +957,7 @@ export const monitoringStats = [
   },
   {
     label: 'Needs verification',
-    value: String(opportunities.filter((item) => getMonitoringReadiness(item).status === 'Needs Verification').length),
+    value: String(opportunities.filter((item) => getMonitoringReadiness(item).status === 'Needs Confirmation').length),
   },
 ];
 

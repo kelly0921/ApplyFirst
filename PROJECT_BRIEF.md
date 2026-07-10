@@ -214,7 +214,7 @@ Ready to show:
 - Shortlist behavior.
 - Recommendation, application status, and source-coverage framing.
 - Source-confidence framing.
-- Local alert-preference preview.
+- Local alert preference preview.
 - Monitoring-readiness framing for which records are safe to alert on later.
 
 Needs more work before live alerts:
@@ -235,24 +235,39 @@ The first Phase 2 slice is intentionally local and trust-focused:
 - Let students preview the class year, role track, and recommendation level they would want alerts for.
 - Save those alert preferences locally in the browser.
 - Compute how many matching programs are actually monitoring-ready.
-- Separate `Monitoring Ready`, `Needs Setup`, and `Needs Verification` records.
-- Prioritize a verification queue by underclassmen fit, recommendation value, source coverage, role relevance, and missing official-cycle details.
+- Separate `Monitoring Ready`, `Needs Setup`, and `Needs Confirmation` records.
+- Prioritize a source-review queue by underclassmen fit, recommendation value, source coverage, role relevance, and missing official-cycle details.
 - Let the user jump from a queue item into the full program record for review.
 - Edit official URL, previous URL, opening window, deadline, last checked date, confidence, status, and source note locally after checking an official page.
 - Recompute readiness and queue placement from local verification edits.
 - Show a source update plan for each record, including watched page, check cadence, next check, alert trigger, and meaningful change signals.
+- Log manual source checks locally with checked date, result, and note so verification work has an audit trail before backend storage exists.
 - Let users preview a notification strategy: local preview, email waitlist, or saved-program reminders.
 - Let users choose alert timing scope: openings only, openings and deadlines, or prep windows plus openings and deadlines.
-- Explain what would send, what would be held for verification, and why unverified records should not trigger alerts.
+- Explain matching programs, alert readiness, and programs needing confirmation in student-facing language.
+- Keep technical monitoring-readiness details in Maintainer Mode instead of the default public alert surface.
+- Display a public trust policy explaining Confirmed, Prep Only, and Needs Confirmation records, with a hard rule that outbound alerts should not come from unconfirmed records.
+- Use a local waitlist-intent workflow as the first public conversion path before accounts, reminders, or real outbound alerts.
+- Save waitlist intent locally with email, school / major context, notes, selected alert preferences, and saved timestamp.
+- Keep maintainer-only source-review tools behind Maintainer Mode so the default public view stays student-focused.
 - Make it clear that public notifications should not launch until official-source verification and monitoring rules are reliable.
+
+Recommended waitlist fields:
+
+- Email.
+- Class year.
+- Role tracks.
+- Desired alert timing.
+- Programs or categories the student cares about most.
+- Optional school, major, or notes.
 
 Next Phase 2 steps:
 
 1. Decide which local verification edits should be promoted back into the source dataset.
 2. Add a minimal backend only when user preferences or outbound notifications need persistence beyond the browser.
-3. Define production trust copy for public alerts so students know what is verified, what is estimated, and what still needs review.
-4. Design the first lightweight source-check log if manual verification needs an audit trail.
-5. Decide whether the first public conversion path is email waitlist, saved-program reminders, or private beta alerts.
+3. Decide whether local source-check logs should be promoted into a durable admin workflow.
+4. Connect the local waitlist-intent workflow to Tally, Google Forms, Airtable, or a minimal backend when ready.
+5. Design the backend boundary only if alerts need persistence beyond the browser.
 
 ## Scope Guardrails
 

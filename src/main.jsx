@@ -26,6 +26,8 @@ const quickViews = [
 const savedStorageKey = 'applyfirst-shortlist';
 const alertStorageKey = 'applyfirst-alert-preview';
 const verificationStorageKey = 'applyfirst-verification-edits';
+const sourceCheckLogStorageKey = 'applyfirst-source-check-log';
+const waitlistStorageKey = 'applyfirst-waitlist-intent';
 const phaseOneTarget = 25;
 const defaultAlertPrefs = {
   classYear: 'Freshman',
@@ -47,6 +49,21 @@ const sendTimingLabels = {
   prepOpenDeadline: 'Prep, Openings & Deadlines',
 };
 
+const trustPolicyItems = [
+  {
+    label: 'Confirmed',
+    text: 'Official page supports the important timing and eligibility claims.',
+  },
+  {
+    label: 'Prep Only',
+    text: 'Useful for planning, but not enough for outbound alerts.',
+  },
+  {
+    label: 'Needs Confirmation',
+    text: 'Missing official-cycle proof, so it waits before alerts.',
+  },
+];
+
 function App() {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('all');
@@ -57,9 +74,17 @@ function App() {
   const [timing, setTiming] = useState('all');
   const [status, setStatus] = useState('all');
   const [selectedId, setSelectedId] = useState(opportunities[0].id);
+  const [showInternalTools, setShowInternalTools] = useState(false);
   const [verificationEdits, setVerificationEdits] = useState(() => {
     try {
       return JSON.parse(window.localStorage.getItem(verificationStorageKey)) ?? {};
+    } catch {
+      return {};
+    }
+  });
+  const [sourceCheckLog, setSourceCheckLog] = useState(() => {
+    try {
+      return JSON.parse(window.localStorage.getItem(sourceCheckLogStorageKey)) ?? {};
     } catch {
       return {};
     }
@@ -72,6 +97,13 @@ function App() {
       };
     } catch {
       return defaultAlertPrefs;
+    }
+  });
+  const [waitlistIntent, setWaitlistIntent] = useState(() => {
+    try {
+      return JSON.parse(window.localStorage.getItem(waitlistStorageKey)) ?? null;
+    } catch {
+      return null;
     }
   });
   const [savedIds, setSavedIds] = useState(() => {
@@ -100,32 +132,12 @@ function App() {
         value: String(opportunityRecords.filter((item) => getMonitorSignal(item).priority === 'high').length),
       },
       {
-        label: 'Verified',
+        label: 'Confirmed',
         value: String(opportunityRecords.filter((item) => getVerificationState(item) === 'verified').length),
       },
       {
-        label: 'Needs review',
+        label: 'Needs confirmation',
         value: String(opportunityRecords.filter((item) => getMonitorSignal(item).alertReadiness === 'verify').length),
-      },
-    ],
-    [opportunityRecords],
-  );
-
-  const monitoringStats = useMemo(
-    () => [
-      {
-        label: 'Monitoring ready',
-        value: String(opportunityRecords.filter((item) => getMonitoringReadiness(item).alertable).length),
-      },
-      {
-        label: 'Needs setup',
-        value: String(opportunityRecords.filter((item) => getMonitoringReadiness(item).status === 'Needs Setup').length),
-      },
-      {
-        label: 'Needs verification',
-        value: String(
-          opportunityRecords.filter((item) => getMonitoringReadiness(item).status === 'Needs Verification').length,
-        ),
       },
     ],
     [opportunityRecords],
@@ -171,14 +183,14 @@ function App() {
         (!normalizedQuery || searchText.includes(normalizedQuery)) &&
         (roleTrack === 'all' || getOpportunityTracks(opportunity).includes(roleTrack)) &&
         (priority === 'all' || getMonitorSignal(opportunity).priority === priority) &&
-        (verification === 'all' || getVerificationState(opportunity) === verification) &&
+        (!showInternalTools || verification === 'all' || getVerificationState(opportunity) === verification) &&
         (category === 'all' || opportunity.category === category) &&
         (classYear === 'all' || opportunity.classYears.includes(classYear)) &&
         (timing === 'all' || opportunity.timing === timing) &&
         (status === 'all' || opportunity.status === status)
       );
     });
-  }, [category, classYear, opportunityRecords, priority, query, roleTrack, status, timing, verification]);
+  }, [category, classYear, opportunityRecords, priority, query, roleTrack, showInternalTools, status, timing, verification]);
 
   const selectedOpportunity = filtered.find((item) => item.id === selectedId) ?? filtered[0] ?? null;
   const savedOpportunities = opportunityRecords.filter((item) => savedIds.includes(item.id));
@@ -221,6 +233,18 @@ function App() {
     window.localStorage.setItem(verificationStorageKey, JSON.stringify(verificationEdits));
   }, [verificationEdits]);
 
+  useEffect(() => {
+    window.localStorage.setItem(sourceCheckLogStorageKey, JSON.stringify(sourceCheckLog));
+  }, [sourceCheckLog]);
+
+  useEffect(() => {
+    if (waitlistIntent) {
+      window.localStorage.setItem(waitlistStorageKey, JSON.stringify(waitlistIntent));
+    } else {
+      window.localStorage.removeItem(waitlistStorageKey);
+    }
+  }, [waitlistIntent]);
+
   const resetFilters = () => {
     setQuery('');
     setRoleTrack('all');
@@ -261,9 +285,33 @@ function App() {
     });
   };
 
+  const addSourceCheckLogEntry = (id, entry) => {
+    const logEntry = {
+      ...entry,
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      createdAt: new Date().toISOString(),
+    };
+
+    setSourceCheckLog((currentLog) => ({
+      ...currentLog,
+      [id]: [logEntry, ...(currentLog[id] ?? [])].slice(0, 6),
+    }));
+  };
+
+  const saveWaitlistIntent = (intent) => {
+    setWaitlistIntent({
+      ...intent,
+      savedAt: new Date().toISOString(),
+    });
+  };
+
+  const resetWaitlistIntent = () => {
+    setWaitlistIntent(null);
+  };
+
   return (
     <div className="app-shell">
-      <Header savedCount={savedIds.length} />
+      <Header savedCount={savedIds.length} showInternalTools={showInternalTools} />
       <main className="workspace">
         <section className="command-strip" aria-label="Opportunity search command center">
           <label className="global-search">
@@ -289,9 +337,11 @@ function App() {
           <strong>Public prototype</strong>
           <p>
             ApplyFirst is not a job board. It helps students find high-value career-launch programs, prepare
-            before applications open, and see which records still need official verification.
+            before applications open, and avoid relying on programs that have not been confirmed yet.
           </p>
         </section>
+
+        <TrustPolicyPanel />
 
         <section className="phase-two-strip" id="alerts" aria-label="Phase 2 alert setup preview">
           <AlertSetupPanel
@@ -300,16 +350,19 @@ function App() {
             matchCount={alertPreviewMatches.length}
             alertableCount={alertablePreviewCount}
             alertStrategy={alertStrategy}
+            waitlistIntent={waitlistIntent}
+            onWaitlistSave={saveWaitlistIntent}
+            onWaitlistReset={resetWaitlistIntent}
           />
-          <MonitoringReadinessPanel monitoringStats={monitoringStats} />
         </section>
 
-        <VerificationQueuePanel queueItems={verificationQueueItems} onSelect={focusOpportunity} />
+        {showInternalTools ? <VerificationQueuePanel queueItems={verificationQueueItems} onSelect={focusOpportunity} /> : null}
 
         <section className="recommendation-guide" aria-label="Recommendation guide">
-          <span><strong>Recommended</strong> underclassmen-fit programs with strong career leverage.</span>
-          <span><strong>Watch List</strong> relevant programs to keep tracking.</span>
-          <span><strong>Foundation</strong> scholarships, communities, conferences, and prep.</span>
+          <strong>Recommendation guide</strong>
+          <span>Recommended: strongest fit</span>
+          <span>Watch List: worth tracking</span>
+          <span>Foundation: prep and access</span>
         </section>
 
         <section className="insight-band" aria-label="Current program monitor view">
@@ -331,7 +384,7 @@ function App() {
           <MetricTile label="In view" value={filtered.length} tone="blue" />
           <MetricTile label="Recommended" value={recommendedCount} tone="green" />
           <MetricTile label="Ready soon" value={actionCount} tone="green" />
-          <MetricTile label="Needs review" value={verifyCount} tone="rose" />
+          <MetricTile label="Needs confirmation" value={verifyCount} tone="rose" />
         </section>
 
         <section className="product-grid" id="library" aria-label="Opportunity library">
@@ -342,7 +395,12 @@ function App() {
               verifiedCount={verifiedCount}
               target={phaseOneTarget}
             />
+            <ReviewModeControl
+              enabled={showInternalTools}
+              onToggle={() => setShowInternalTools((current) => !current)}
+            />
             <FilterStack
+              showInternalTools={showInternalTools}
               category={category}
               setCategory={setCategory}
               roleTrack={roleTrack}
@@ -388,13 +446,15 @@ function App() {
           </section>
 
           <aside className="right-rail">
-            <NextActionPanel selectedOpportunity={selectedOpportunity} />
             <OpportunityDetail
               opportunity={selectedOpportunity}
               saved={selectedOpportunity ? savedIds.includes(selectedOpportunity.id) : false}
               onSave={() => selectedOpportunity && toggleSaved(selectedOpportunity.id)}
               onVerificationSave={saveVerificationEdit}
               onVerificationReset={resetVerificationEdit}
+              sourceCheckEntries={selectedOpportunity ? sourceCheckLog[selectedOpportunity.id] ?? [] : []}
+              onSourceCheckSave={addSourceCheckLogEntry}
+              showInternalTools={showInternalTools}
             />
             <Shortlist items={savedOpportunities} onSelect={setSelectedId} />
           </aside>
@@ -404,7 +464,7 @@ function App() {
   );
 }
 
-function Header({ savedCount }) {
+function Header({ savedCount, showInternalTools }) {
   return (
     <header className="site-header">
       <a className="brand" href="#library" aria-label="ApplyFirst home">
@@ -417,13 +477,50 @@ function Header({ savedCount }) {
       <nav aria-label="Page links">
         <a href="#library">Monitor</a>
         <a href="#alerts">Alerts</a>
-        <a href="#verification">Queue</a>
-        <a href="https://github.com/zapplyjobs/underclassmen-internships" target="_blank" rel="noreferrer">
-          Inspiration
-        </a>
+        <a href="#waitlist">Waitlist</a>
+        {showInternalTools ? <a href="#verification">Source Review</a> : null}
         <span>{savedCount} saved</span>
+        {showInternalTools ? <span>Maintainer Mode On</span> : null}
       </nav>
     </header>
+  );
+}
+
+function ReviewModeControl({ enabled, onToggle }) {
+  return (
+    <section className="review-mode-control" aria-label="Maintainer mode control">
+      <div>
+        <span>Maintainer</span>
+        <h2>Maintainer Mode</h2>
+        <p>Shows source review, check logs, and local edit tools.</p>
+      </div>
+      <button className={enabled ? 'active' : ''} type="button" onClick={onToggle} aria-pressed={enabled}>
+        {enabled ? 'On' : 'Off'}
+      </button>
+    </section>
+  );
+}
+
+function TrustPolicyPanel() {
+  return (
+    <section className="trust-policy-panel" aria-label="Alert trust policy">
+      <div className="trust-policy-copy">
+        <span>Trust policy</span>
+        <h2>No alerts from unconfirmed programs</h2>
+        <p>
+          ApplyFirst can help students prepare early, but official sources remain the source of truth. Alerts should
+          only ship when a program has current timing, a checked official page, and clear eligibility context.
+        </p>
+      </div>
+      <div className="trust-policy-grid">
+        {trustPolicyItems.map((item) => (
+          <span key={item.label}>
+            <strong>{item.label}</strong>
+            {item.text}
+          </span>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -431,11 +528,11 @@ function VerificationQueuePanel({ queueItems, onSelect }) {
   const queuePreview = queueItems.slice(0, 6);
 
   return (
-    <section className="verification-queue-panel" id="verification" aria-label="Verification queue">
+    <section className="verification-queue-panel" id="verification" aria-label="Source review queue">
       <div className="queue-heading">
         <div className="panel-heading">
-          <span>Verification queue</span>
-          <h2>What to verify before real alerts</h2>
+          <span>Source review</span>
+          <h2>What to confirm before real alerts</h2>
         </div>
         <p>
           Prioritized by underclassmen fit, recommendation value, source coverage, and missing official-cycle
@@ -472,7 +569,16 @@ function VerificationQueuePanel({ queueItems, onSelect }) {
   );
 }
 
-function AlertSetupPanel({ alertPrefs, setAlertPrefs, matchCount, alertableCount, alertStrategy }) {
+function AlertSetupPanel({
+  alertPrefs,
+  setAlertPrefs,
+  matchCount,
+  alertableCount,
+  alertStrategy,
+  waitlistIntent,
+  onWaitlistSave,
+  onWaitlistReset,
+}) {
   const updatePref = (key, value) => {
     setAlertPrefs((currentPrefs) => ({
       ...currentPrefs,
@@ -483,12 +589,12 @@ function AlertSetupPanel({ alertPrefs, setAlertPrefs, matchCount, alertableCount
   return (
     <section className="alert-setup-panel">
       <div className="panel-heading">
-        <span>Phase 2</span>
-        <h2>Alert preview</h2>
+        <span>Alerts</span>
+        <h2>Choose what to watch</h2>
       </div>
       <p>
-        Choose what a student would want monitored. This saves intent locally for now; real outbound alerts come
-        after the official-source workflow and consent flow are reliable.
+        Pick the kinds of programs you care about. ApplyFirst will only use confirmed programs for future alerts,
+        so anything uncertain waits before it can trigger a notification.
       </p>
       <div className="alert-controls">
         <FilterSelect
@@ -525,56 +631,138 @@ function AlertSetupPanel({ alertPrefs, setAlertPrefs, matchCount, alertableCount
           labels={sendTimingLabels}
         />
       </div>
-      <div className="alert-preview-summary" aria-label="Alert preview summary">
+      <div className="alert-summary" aria-label="Alert preference summary">
         <span>
           <strong>{matchCount}</strong>
-          Matching programs
+          Programs matching you
         </span>
         <span>
           <strong>{alertableCount}</strong>
-          Monitoring ready
+          Ready for alerts
         </span>
         <span>
-          <strong>{alertStrategy.modeLabel}</strong>
-          Prototype mode
+          <strong>{Math.max(matchCount - alertableCount, 0)}</strong>
+          Needs confirmation
         </span>
       </div>
       <div className="notification-strategy">
         <div>
-          <span>Would send</span>
+          <span>Future alerts</span>
           <strong>{alertStrategy.sendSummary}</strong>
         </div>
         <div>
-          <span>Would not send</span>
+          <span>Still reviewing</span>
           <strong>{alertStrategy.holdSummary}</strong>
         </div>
         <p>{alertStrategy.trustCopy}</p>
       </div>
+      <WaitlistPanel
+        alertPrefs={alertPrefs}
+        alertStrategy={alertStrategy}
+        waitlistIntent={waitlistIntent}
+        onSave={onWaitlistSave}
+        onReset={onWaitlistReset}
+      />
     </section>
   );
 }
 
-function MonitoringReadinessPanel({ monitoringStats }) {
+function WaitlistPanel({ alertPrefs, alertStrategy, waitlistIntent, onSave, onReset }) {
+  const [draft, setDraft] = useState(() => createWaitlistDraft(alertPrefs));
+
+  useEffect(() => {
+    if (!waitlistIntent) {
+      setDraft(createWaitlistDraft(alertPrefs));
+    }
+  }, [alertPrefs, waitlistIntent]);
+
+  const preferenceSummary = [
+    formatDisplayLabel(alertPrefs.classYear === 'all' ? 'All class years' : alertPrefs.classYear),
+    alertPrefs.roleTrack === 'all' ? 'All Role Tracks' : alertPrefs.roleTrack,
+    priorityLabels[alertPrefs.priority] ?? 'All Recommendations',
+    sendTimingLabels[alertPrefs.sendTiming],
+  ].join(' / ');
+  const updateDraft = (field, value) => {
+    setDraft((currentDraft) => ({
+      ...currentDraft,
+      [field]: value,
+    }));
+  };
+  const saveDraft = (event) => {
+    event.preventDefault();
+    onSave({
+      ...draft,
+      preferenceSummary,
+      notificationMode: alertStrategy.modeLabel,
+    });
+  };
+
   return (
-    <section className="monitoring-readiness-panel">
-      <div className="panel-heading">
-        <span>Monitoring layer</span>
-        <h2>Source readiness</h2>
+    <section className="waitlist-panel" id="waitlist" aria-label="ApplyFirst waitlist">
+      <div className="waitlist-copy">
+        <span>Alert waitlist</span>
+        <h3>{waitlistIntent ? 'Alert preferences saved locally' : 'Join the alert waitlist'}</h3>
+        <p>
+          Choose what you want ApplyFirst to watch. This prototype keeps your preferences in this browser until a
+          real waitlist or account system is connected.
+        </p>
       </div>
-      <p>
-        Records become alert-ready only when the official URL, current timing, and last-checked source details
-        are reliable enough to avoid noisy public notifications.
-      </p>
-      <div className="monitoring-stats">
-        {monitoringStats.map((item) => (
-          <span key={item.label}>
-            <strong>{item.value}</strong>
-            {item.label}
-          </span>
-        ))}
-      </div>
+      <dl>
+        <div>
+          <dt>Watching</dt>
+          <dd>{preferenceSummary}</dd>
+        </div>
+        <div>
+          <dt>Status</dt>
+          <dd>{alertStrategy.modeLabel} before live alerts</dd>
+        </div>
+      </dl>
+      {waitlistIntent ? (
+        <div className="waitlist-saved">
+          <strong>{waitlistIntent.email || 'No email added'}</strong>
+          <span>{waitlistIntent.savedAt ? `Saved ${waitlistIntent.savedAt.slice(0, 10)}` : 'Saved locally'}</span>
+          <p>{waitlistIntent.note || 'No notes added.'}</p>
+          <button type="button" onClick={onReset}>Reset preferences</button>
+        </div>
+      ) : (
+        <form className="waitlist-form" onSubmit={saveDraft}>
+          <label>
+            <span>Email</span>
+            <input
+              type="email"
+              value={draft.email}
+              onChange={(event) => updateDraft('email', event.target.value)}
+              placeholder="you@example.com"
+            />
+          </label>
+          <label>
+            <span>School / major</span>
+            <input
+              value={draft.context}
+              onChange={(event) => updateDraft('context', event.target.value)}
+              placeholder="Optional"
+            />
+          </label>
+          <label className="waitlist-note">
+            <span>What should ApplyFirst watch?</span>
+            <textarea value={draft.note} onChange={(event) => updateDraft('note', event.target.value)} />
+          </label>
+          <button type="submit">Join Waitlist</button>
+        </form>
+      )}
     </section>
   );
+}
+
+function createWaitlistDraft(alertPrefs) {
+  return {
+    email: '',
+    context: '',
+    note:
+      alertPrefs.roleTrack === 'all'
+        ? 'I want alerts for high-signal early-career programs.'
+        : `I want alerts for ${alertPrefs.roleTrack} programs.`,
+  };
 }
 
 function MetricTile({ label, value, tone }) {
@@ -593,22 +781,22 @@ function ReadinessPanel({ readinessPercent, recordCount, verifiedCount, target }
     { label: 'Core filters', complete: true },
     { label: 'Persistent shortlist', complete: true },
     { label: `${target}+ curated records`, complete: recordCount >= target },
-    { label: 'Source verification', complete: verifiedCount >= target },
+    { label: 'Confirmed program checks', complete: verifiedCount >= target },
   ];
 
   return (
     <section className="readiness-panel">
       <div className="panel-heading">
-        <span>Phase 1</span>
-        <h2>{mvpComplete ? 'Prototype MVP ready' : 'Prototype MVP in progress'}</h2>
+        <span>Prototype status</span>
+        <h2>{mvpComplete ? 'Student preview ready' : 'Student preview in progress'}</h2>
       </div>
       <div className="readiness-meter" aria-label={`Phase 1 record target is ${readinessPercent}% complete`}>
         <span style={{ width: `${readinessPercent}%` }} />
       </div>
       <p>
-        {recordCount}/{target} records, {verifiedCount} verified.{' '}
+        {recordCount}/{target} records, {verifiedCount} confirmed.{' '}
         {mvpComplete
-          ? 'The Phase 1 app is usable as a public prototype; live alerts should wait for a deeper source verification pass.'
+          ? 'The app is usable as a public prototype; live alerts should wait until more programs are confirmed.'
           : 'The shell is usable; the seed set still needs expansion before Phase 1 is complete.'}
       </p>
       <ul>
@@ -624,6 +812,7 @@ function ReadinessPanel({ readinessPercent, recordCount, verifiedCount, target }
 }
 
 function FilterStack({
+  showInternalTools,
   category,
   setCategory,
   roleTrack,
@@ -657,13 +846,15 @@ function FilterStack({
         options={filterOptions.priorities}
         labels={priorityLabels}
       />
-      <FilterSelect
-        label="Verification"
-        value={verification}
-        onChange={setVerification}
-        options={filterOptions.verification}
-        labels={verificationLabels}
-      />
+      {showInternalTools ? (
+        <FilterSelect
+          label="Confirmation"
+          value={verification}
+          onChange={setVerification}
+          options={filterOptions.verification}
+          labels={verificationLabels}
+        />
+      ) : null}
       <FilterSelect label="Category" value={category} onChange={setCategory} options={filterOptions.categories} />
       <FilterSelect label="Timing" value={timing} onChange={setTiming} options={filterOptions.timing} />
       <FilterSelect label="Status" value={status} onChange={setStatus} options={filterOptions.status} labels={statusLabels} />
@@ -696,8 +887,7 @@ function OpportunityRecord({ opportunity, selected, saved, onSelect, onSave }) {
   const tracks = getOpportunityTracks(opportunity);
   const monitorSignal = getMonitorSignal(opportunity);
   const primaryTrack = tracks[0];
-  const verificationState = getVerificationState(opportunity);
-  const verificationMark = verificationState === 'verified' ? 'OK' : verificationState === 'needsReview' ? '!' : '';
+  const isConfirmed = getVerificationState(opportunity) === 'verified';
 
   return (
     <article className={`opportunity-record${selected ? ' selected' : ''}`} role="listitem">
@@ -711,18 +901,16 @@ function OpportunityRecord({ opportunity, selected, saved, onSelect, onSave }) {
           <span>{primaryTrack}</span>
           <span>{opportunity.classYears.join(', ')}</span>
           <span>{opportunity.timing}</span>
+          {isConfirmed ? (
+            <span className="record-confirmed" title="Confirmed by official source">
+              Confirmed
+            </span>
+          ) : null}
         </div>
       </button>
       <div className="record-side">
         <span className={`priority-chip priority-${monitorSignal.priority}`}>{monitorSignal.priorityLabel}</span>
         <div className="record-icons">
-          <span
-            className={`icon-status verification-${verificationState}`}
-            aria-label={verificationLabels[verificationState]}
-            title={verificationLabels[verificationState]}
-          >
-            {verificationMark}
-          </span>
           <button
             className={`bookmark-button${saved ? ' saved' : ''}`}
             type="button"
@@ -738,31 +926,16 @@ function OpportunityRecord({ opportunity, selected, saved, onSelect, onSave }) {
   );
 }
 
-function NextActionPanel({ selectedOpportunity }) {
-  if (!selectedOpportunity) {
-    return null;
-  }
-
-  const monitorSignal = getMonitorSignal(selectedOpportunity);
-
-  return (
-    <section className="next-action-panel">
-      <div className="panel-heading">
-        <span>Next step</span>
-        <h2>{monitorSignal.actionLabel}</h2>
-      </div>
-      <p>{monitorSignal.nextAction}</p>
-      <dl>
-        <div>
-          <dt>Opening window</dt>
-          <dd>{selectedOpportunity.openDate}</dd>
-        </div>
-      </dl>
-    </section>
-  );
-}
-
-function OpportunityDetail({ opportunity, saved, onSave, onVerificationSave, onVerificationReset }) {
+function OpportunityDetail({
+  opportunity,
+  saved,
+  onSave,
+  onVerificationSave,
+  onVerificationReset,
+  sourceCheckEntries,
+  onSourceCheckSave,
+  showInternalTools,
+}) {
   if (!opportunity) {
     return (
       <section className="detail-panel empty">
@@ -800,26 +973,30 @@ function OpportunityDetail({ opportunity, saved, onSave, onVerificationSave, onV
           Shortlist
         </button>
       </div>
+      <section className="detail-next-step" aria-label="Recommended next step">
+        <span>Next step</span>
+        <h3>{monitorSignal.actionLabel}</h3>
+        <p>{monitorSignal.nextAction}</p>
+        <strong>{opportunity.openDate}</strong>
+      </section>
+      <div className="detail-status-row" aria-label="Program status summary">
+        <StatusItem value={monitorSignal.priorityLabel} tone={monitorSignal.priority} />
+        <StatusItem value={monitorSignal.actionLabel} />
+        <StatusItem
+          value={verificationState === 'verified' ? 'Confirmed' : verificationState === 'watchOnly' ? 'Watch Only' : 'Needs Confirmation'}
+          tone={verificationState}
+        />
+      </div>
+      <DetailSection title="Why this matters">{opportunity.why}</DetailSection>
+      <DetailSection title="Prep notes">{opportunity.prep}</DetailSection>
       <div className="metric-grid">
         <Metric label="Best for" value={opportunity.classYears.join(', ')} />
         <Metric label="Track" value={tracks.join(' + ')} />
         <Metric label="Timing" value={opportunity.timing} />
         <Metric label="Funding" value={opportunity.funding} />
       </div>
-      <div className="detail-status-row" aria-label="Program status summary">
-        <StatusItem label="Recommendation" value={monitorSignal.priorityLabel} tone={monitorSignal.priority} />
-        <StatusItem label="Application Status" value={monitorSignal.actionLabel} />
-        <StatusItem label="Monitoring Readiness" value={readiness.status} tone={readiness.alertable ? 'verified' : 'needsReview'} />
-        <StatusItem
-          label="Verification"
-          value={verificationLabels[verificationState]}
-          tone={verificationState}
-        />
-      </div>
-      <DetailSection title="Why this matters">{opportunity.why}</DetailSection>
-      <DetailSection title="Prep notes">{opportunity.prep}</DetailSection>
       <div className="tracker-fields">
-        <h3>Monitoring details</h3>
+        <h3>Program details</h3>
         <dl>
           <div>
             <dt>Open date</dt>
@@ -830,14 +1007,6 @@ function OpportunityDetail({ opportunity, saved, onSave, onVerificationSave, onV
             <dd>{formatDisplayLabel(opportunity.category)}</dd>
           </div>
           <div>
-            <dt>Confidence</dt>
-            <dd>{confidenceLabels[opportunity.confidence]}</dd>
-          </div>
-          <div>
-            <dt>Source coverage</dt>
-            <dd>{monitorSignal.sourceSignal.label}</dd>
-          </div>
-          <div>
             <dt>Deadline</dt>
             <dd>{opportunity.deadline}</dd>
           </div>
@@ -845,31 +1014,58 @@ function OpportunityDetail({ opportunity, saved, onSave, onVerificationSave, onV
             <dt>Location</dt>
             <dd>{opportunity.location}</dd>
           </div>
-          <div>
-            <dt>Last checked</dt>
-            <dd>{opportunity.lastChecked || 'Needs verification pass'}</dd>
-          </div>
-          <div>
-            <dt>Previous URL</dt>
-            <dd>{opportunity.previousUrl || 'Not tracked yet'}</dd>
-          </div>
+          {showInternalTools ? (
+            <>
+              <div>
+                <dt>Confidence</dt>
+                <dd>{confidenceLabels[opportunity.confidence]}</dd>
+              </div>
+              <div>
+                <dt>Source coverage</dt>
+                <dd>{monitorSignal.sourceSignal.label}</dd>
+              </div>
+              <div>
+                <dt>Last checked</dt>
+                <dd>{opportunity.lastChecked || 'Needs confirmation pass'}</dd>
+              </div>
+              <div>
+                <dt>Previous URL</dt>
+                <dd>{opportunity.previousUrl || 'Not tracked yet'}</dd>
+              </div>
+            </>
+          ) : null}
         </dl>
       </div>
-      <div className="source-note">
+      {showInternalTools ? <div className="source-note">
         <h3>Source note</h3>
         <p>{opportunity.sourceNote}</p>
-      </div>
-      <SourceUpdatePlan plan={sourceUpdatePlan} />
-      <VerificationEditor
-        opportunity={opportunity}
-        onSave={onVerificationSave}
-        onReset={onVerificationReset}
-      />
-      <div className="tag-list">
-        {opportunity.tags.map((tag) => (
-          <span key={tag}>{formatDisplayLabel(tag)}</span>
-        ))}
-      </div>
+      </div> : null}
+      {showInternalTools ? (
+        <section className="internal-tools-stack" aria-label="Internal monitoring tools">
+          <div className="internal-tools-heading">
+            <span>Internal tools</span>
+            <p>Maintainer-only workflow for verification, source checks, and future alert operations.</p>
+          </div>
+          <SourceUpdatePlan plan={sourceUpdatePlan} />
+          <SourceCheckLog
+            opportunity={opportunity}
+            entries={sourceCheckEntries}
+            onSave={onSourceCheckSave}
+          />
+          <VerificationEditor
+            opportunity={opportunity}
+            onSave={onVerificationSave}
+            onReset={onVerificationReset}
+          />
+        </section>
+      ) : null}
+      {showInternalTools ? (
+        <div className="tag-list" aria-label="Maintainer tags">
+          {opportunity.tags.map((tag) => (
+            <span key={tag}>{formatDisplayLabel(tag)}</span>
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -919,10 +1115,10 @@ function getAlertStrategy(alertPrefs, matches, alertableCount) {
   const heldCount = Math.max(matches.length - alertableCount, 0);
   const channelCopy =
     alertPrefs.notificationMode === 'local'
-      ? 'No outbound messages. Show saved alert intent inside this browser only.'
+      ? 'This stays in your browser for now.'
       : alertPrefs.notificationMode === 'saved'
-        ? 'Send reminders only for shortlisted programs after accounts or email consent exist.'
-        : 'Collect interest first, then send emails only after verified alert rules exist.';
+        ? 'Saved-program reminders would come after accounts or email consent exist.'
+        : 'Join the waitlist first; email alerts come after confirmed alert rules exist.';
   const timingCopy =
     alertPrefs.sendTiming === 'openOnly'
       ? 'program openings'
@@ -932,9 +1128,84 @@ function getAlertStrategy(alertPrefs, matches, alertableCount) {
 
   return {
     modeLabel,
-    sendSummary: `${alertableCount} ${alertableCount === 1 ? 'record' : 'records'} for ${timingCopy}`,
-    holdSummary: `${heldCount} ${heldCount === 1 ? 'record needs' : 'records need'} verification first`,
-    trustCopy: `${modeLabel} / ${timingLabel}: ${channelCopy} Alerts should never go out from unverified records or estimated dates.`,
+    sendSummary: `${alertableCount} ${alertableCount === 1 ? 'program' : 'programs'} could qualify for ${timingCopy}`,
+    holdSummary: `${heldCount} ${heldCount === 1 ? 'program needs' : 'programs need'} confirmation first`,
+    trustCopy: `${modeLabel} / ${timingLabel}: ${channelCopy} Programs that are not confirmed stay out of alerts.`,
+  };
+}
+
+function SourceCheckLog({ opportunity, entries, onSave }) {
+  const [draft, setDraft] = useState(() => createSourceCheckDraft());
+
+  useEffect(() => {
+    setDraft(createSourceCheckDraft());
+  }, [opportunity.id]);
+
+  const updateDraft = (field, value) => {
+    setDraft((currentDraft) => ({
+      ...currentDraft,
+      [field]: value,
+    }));
+  };
+
+  const saveEntry = (event) => {
+    event.preventDefault();
+    onSave(opportunity.id, draft);
+    setDraft(createSourceCheckDraft());
+  };
+
+  return (
+    <section className="source-check-log">
+      <div className="source-check-heading">
+        <div>
+          <h3>Source check log</h3>
+          <p>Record manual checks before deciding whether to update the source fields.</p>
+        </div>
+        <span>{entries.length} saved</span>
+      </div>
+      <form className="source-check-form" onSubmit={saveEntry}>
+        <label>
+          <span>Checked date</span>
+          <input type="date" value={draft.checkedDate} onChange={(event) => updateDraft('checkedDate', event.target.value)} />
+        </label>
+        <label>
+          <span>Result</span>
+          <select value={draft.result} onChange={(event) => updateDraft('result', event.target.value)}>
+            <option value="No material change">No material change</option>
+            <option value="Application opened">Application opened</option>
+            <option value="Dates updated">Dates updated</option>
+            <option value="Eligibility changed">Eligibility changed</option>
+            <option value="Needs follow-up">Needs follow-up</option>
+          </select>
+        </label>
+        <label className="source-check-note">
+          <span>Check note</span>
+          <textarea value={draft.note} onChange={(event) => updateDraft('note', event.target.value)} />
+        </label>
+        <button type="submit">Add source check</button>
+      </form>
+      {entries.length ? (
+        <div className="source-check-entries" role="list">
+          {entries.map((entry) => (
+            <article key={entry.id} role="listitem">
+              <span>{entry.checkedDate}</span>
+              <strong>{entry.result}</strong>
+              <p>{entry.note || 'No note added.'}</p>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <p className="source-check-empty">No source checks logged yet.</p>
+      )}
+    </section>
+  );
+}
+
+function createSourceCheckDraft() {
+  return {
+    checkedDate: new Date().toISOString().slice(0, 10),
+    result: 'No material change',
+    note: '',
   };
 }
 
@@ -1049,8 +1320,9 @@ function BookmarkIcon({ filled }) {
 }
 
 function StatusItem({ label, value, tone = 'neutral' }) {
+  const accessibleText = label ? `${label}: ${value}` : value;
   return (
-    <span className={`status-item status-item-${tone}`} aria-label={`${label}: ${value}`} title={`${label}: ${value}`}>
+    <span className={`status-item status-item-${tone}`} aria-label={accessibleText} title={accessibleText}>
       <strong>{value}</strong>
     </span>
   );
@@ -1127,18 +1399,23 @@ function Shortlist({ items, onSelect }) {
   return (
     <section className="shortlist">
       <div className="panel-heading">
-        <span>Shortlist</span>
-        <h2>Shortlist</h2>
+        <span>Saved</span>
+        <h2>{items.length ? `${items.length} saved` : 'Saved programs'}</h2>
       </div>
       {items.length ? (
-        items.map((item) => (
-          <button key={item.id} type="button" onClick={() => onSelect(item.id)}>
-            <span>{item.name}</span>
-            <em>{item.classYears.join(', ')}</em>
-          </button>
-        ))
+        items.map((item) => {
+          const signal = getMonitorSignal(item);
+
+          return (
+            <button key={item.id} type="button" onClick={() => onSelect(item.id)}>
+              <span>{item.name}</span>
+              <em>{signal.actionLabel}</em>
+              <small>{item.openDate}</small>
+            </button>
+          );
+        })
       ) : (
-        <p>Bookmarked programs appear here for comparison.</p>
+        <p>Bookmark programs to compare next steps and opening windows.</p>
       )}
     </section>
   );
