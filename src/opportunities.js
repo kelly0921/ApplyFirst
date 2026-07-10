@@ -12,6 +12,12 @@ export const confidenceLabels = {
   needsReview: 'Needs review',
 };
 
+export const verificationLabels = {
+  verified: 'Verified',
+  watchOnly: 'Watch only',
+  needsReview: 'Needs review',
+};
+
 export const priorityLabels = {
   high: 'High priority',
   watch: 'Watch',
@@ -30,6 +36,7 @@ export const alertReadinessLabels = {
 export const filterOptions = {
   roleTracks: ['Software engineering', 'Product management', 'Quant / finance', 'Career support'],
   priorities: Object.keys(priorityLabels),
+  verification: Object.keys(verificationLabels),
   categories: [
     'Internship',
     'Externship / insight series',
@@ -128,6 +135,18 @@ export function getSourceSignal(opportunity) {
   };
 }
 
+export function getVerificationState(opportunity) {
+  if (opportunity.confidence === 'high' && opportunity.lastChecked) {
+    return 'verified';
+  }
+
+  if (opportunity.confidence === 'needsReview' || opportunity.status === 'verifyManually') {
+    return 'needsReview';
+  }
+
+  return 'watchOnly';
+}
+
 export function getMonitorSignal(opportunity) {
   const tracks = getOpportunityTracks(opportunity);
   const sourceSignal = getSourceSignal(opportunity);
@@ -173,7 +192,7 @@ export function getMonitorSignal(opportunity) {
     priority,
     priorityLabel: priorityLabels[priority],
     alertReadiness,
-      alertReadinessLabel: alertReadinessLabels[alertReadiness],
+    alertReadinessLabel: alertReadinessLabels[alertReadiness],
     sourceSignal,
     tracks,
     nextAction:
@@ -432,7 +451,7 @@ export const opportunities = [
     category: 'Special program / resource',
     classYears: ['All class years'],
     timing: 'Rolling',
-    status: 'open',
+    status: 'watching',
     confidence: 'high',
     funding: 'Free',
     location: 'Virtual',
@@ -446,6 +465,7 @@ export const opportunities = [
     prep:
       'Use this as exploration and language-building, then convert completed programs into stronger project and interview stories.',
     sourceNote: 'Inspired by the repo special programs and resources section.',
+    lastChecked: '2026-07-10',
   },
   {
     id: 'new-technologists-academy',
@@ -646,7 +666,7 @@ export const opportunities = [
     category: 'Conference funding',
     classYears: ['All class years'],
     timing: 'Rolling',
-    status: 'open',
+    status: 'watching',
     confidence: 'high',
     funding: 'Travel support',
     location: 'Conference travel',
@@ -682,6 +702,7 @@ export const opportunities = [
     prep:
       'Join the community first, then watch the member portal, events calendar, and company programs for higher-leverage opportunities.',
     sourceNote: 'Community as opportunity infrastructure, not just a social group.',
+    lastChecked: '2026-07-10',
   },
   {
     id: 'colorstack-membership',
@@ -690,7 +711,7 @@ export const opportunities = [
     category: 'Technical community',
     classYears: ['All class years'],
     timing: 'Rolling',
-    status: 'open',
+    status: 'watching',
     confidence: 'high',
     funding: 'Free',
     location: 'Virtual community and events',
@@ -703,6 +724,7 @@ export const opportunities = [
       'A strong example of community as opportunity infrastructure: Slack support, workshops, resume visibility, and partner events.',
     prep: 'Join early, keep resume materials updated, and watch monthly opportunities and career fair announcements.',
     sourceNote: 'Strong community resource for students navigating tech without a dense network.',
+    lastChecked: '2026-07-10',
   },
   {
     id: 'nsf-reu-computer-science',
@@ -773,8 +795,8 @@ export const opportunities = [
 ];
 
 export const stats = [
-  { label: 'Seed records', value: String(opportunities.length) },
+  { label: 'Programs', value: String(opportunities.length) },
   { label: 'High priority', value: String(opportunities.filter((item) => getMonitorSignal(item).priority === 'high').length) },
-  { label: 'Underclassmen', value: String(opportunities.filter((item) => item.classYears.includes('Freshman') || item.classYears.includes('Sophomore')).length) },
+  { label: 'Verified', value: String(opportunities.filter((item) => getVerificationState(item) === 'verified').length) },
   { label: 'Verify first', value: String(opportunities.filter((item) => getMonitorSignal(item).alertReadiness === 'verify').length) },
 ];

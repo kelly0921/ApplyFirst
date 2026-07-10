@@ -6,10 +6,12 @@ import {
   filterOptions,
   getMonitorSignal,
   getOpportunityTracks,
+  getVerificationState,
   opportunities,
   priorityLabels,
   stats,
   statusLabels,
+  verificationLabels,
 } from './opportunities';
 
 const quickViews = [
@@ -27,6 +29,7 @@ function App() {
   const [category, setCategory] = useState('all');
   const [roleTrack, setRoleTrack] = useState('all');
   const [priority, setPriority] = useState('all');
+  const [verification, setVerification] = useState('all');
   const [classYear, setClassYear] = useState('all');
   const [timing, setTiming] = useState('all');
   const [status, setStatus] = useState('all');
@@ -54,6 +57,7 @@ function App() {
         getMonitorSignal(opportunity).priorityLabel,
         getMonitorSignal(opportunity).alertReadinessLabel,
         getMonitorSignal(opportunity).sourceSignal.label,
+        verificationLabels[getVerificationState(opportunity)],
         ...getOpportunityTracks(opportunity),
         ...opportunity.tags,
         ...opportunity.classYears,
@@ -65,13 +69,14 @@ function App() {
         (!normalizedQuery || searchText.includes(normalizedQuery)) &&
         (roleTrack === 'all' || getOpportunityTracks(opportunity).includes(roleTrack)) &&
         (priority === 'all' || getMonitorSignal(opportunity).priority === priority) &&
+        (verification === 'all' || getVerificationState(opportunity) === verification) &&
         (category === 'all' || opportunity.category === category) &&
         (classYear === 'all' || opportunity.classYears.includes(classYear)) &&
         (timing === 'all' || opportunity.timing === timing) &&
         (status === 'all' || opportunity.status === status)
       );
     });
-  }, [category, classYear, priority, query, roleTrack, status, timing]);
+  }, [category, classYear, priority, query, roleTrack, status, timing, verification]);
 
   const selectedOpportunity = filtered.find((item) => item.id === selectedId) ?? filtered[0] ?? null;
   const savedOpportunities = opportunities.filter((item) => savedIds.includes(item.id));
@@ -91,6 +96,7 @@ function App() {
     setQuery('');
     setRoleTrack('all');
     setPriority('all');
+    setVerification('all');
     setCategory('all');
     setClassYear('all');
     setTiming('all');
@@ -131,6 +137,14 @@ function App() {
           </div>
         </section>
 
+        <section className="prototype-note" aria-label="Prototype notice">
+          <strong>Public prototype</strong>
+          <p>
+            ApplyFirst is not a job board. It helps students monitor high-signal programs, prepare before
+            applications open, and see which records still need official verification.
+          </p>
+        </section>
+
         <section className="insight-band" aria-label="Current program monitor view">
           <div className="view-controls">
             <span>Class-year view</span>
@@ -168,6 +182,8 @@ function App() {
               setRoleTrack={setRoleTrack}
               priority={priority}
               setPriority={setPriority}
+              verification={verification}
+              setVerification={setVerification}
               timing={timing}
               setTiming={setTiming}
               status={status}
@@ -205,7 +221,6 @@ function App() {
           </section>
 
           <aside className="right-rail">
-            <SignalMap selectedOpportunity={selectedOpportunity} />
             <NextActionPanel selectedOpportunity={selectedOpportunity} />
             <OpportunityDetail
               opportunity={selectedOpportunity}
@@ -291,6 +306,8 @@ function FilterStack({
   setRoleTrack,
   priority,
   setPriority,
+  verification,
+  setVerification,
   timing,
   setTiming,
   status,
@@ -315,6 +332,13 @@ function FilterStack({
         onChange={setPriority}
         options={filterOptions.priorities}
         labels={priorityLabels}
+      />
+      <FilterSelect
+        label="Verification"
+        value={verification}
+        onChange={setVerification}
+        options={filterOptions.verification}
+        labels={verificationLabels}
       />
       <FilterSelect label="Category" value={category} onChange={setCategory} options={filterOptions.categories} />
       <FilterSelect label="Timing" value={timing} onChange={setTiming} options={filterOptions.timing} />
@@ -348,6 +372,7 @@ function OpportunityRecord({ opportunity, selected, saved, onSelect, onSave }) {
   const tracks = getOpportunityTracks(opportunity);
   const monitorSignal = getMonitorSignal(opportunity);
   const primaryTrack = tracks[0];
+  const verificationState = getVerificationState(opportunity);
 
   return (
     <article className={`opportunity-record${selected ? ' selected' : ''}`} role="listitem">
@@ -360,6 +385,9 @@ function OpportunityRecord({ opportunity, selected, saved, onSelect, onSave }) {
         <div className="record-meta">
           <span className={`priority-chip priority-${monitorSignal.priority}`}>{monitorSignal.priorityLabel}</span>
           <span>{monitorSignal.alertReadinessLabel}</span>
+          <span className={`verification-chip verification-${verificationState}`}>
+            {verificationLabels[verificationState]}
+          </span>
           <span>{primaryTrack}</span>
           <span>{opportunity.classYears.join(', ')}</span>
         </div>
@@ -371,31 +399,6 @@ function OpportunityRecord({ opportunity, selected, saved, onSelect, onSave }) {
         </button>
       </div>
     </article>
-  );
-}
-
-function SignalMap({ selectedOpportunity }) {
-  const monitorSignal = selectedOpportunity ? getMonitorSignal(selectedOpportunity) : null;
-
-  return (
-    <section className="signal-map" aria-label="Opportunity signal map">
-      <div className="signal-map-head">
-        <span>Monitor signal</span>
-        <strong>{monitorSignal?.priorityLabel ?? 'Select a program'}</strong>
-      </div>
-      <div className="signal-orbit" aria-hidden="true">
-        <i className="node node-blue" />
-        <i className="node node-green" />
-        <i className="node node-rose" />
-        <i className="node node-gold" />
-        <b />
-      </div>
-      <p>
-        {selectedOpportunity
-          ? `${selectedOpportunity.name} is tagged as ${selectedOpportunity.status === 'verifyManually' ? 'verification needed' : statusLabels[selectedOpportunity.status].toLowerCase()}.`
-          : 'Select a program to inspect its monitoring signal.'}
-      </p>
-    </section>
   );
 }
 
@@ -435,6 +438,7 @@ function OpportunityDetail({ opportunity, saved, onSave }) {
 
   const tracks = getOpportunityTracks(opportunity);
   const monitorSignal = getMonitorSignal(opportunity);
+  const verificationState = getVerificationState(opportunity);
 
   return (
     <section className="detail-panel">
@@ -459,6 +463,7 @@ function OpportunityDetail({ opportunity, saved, onSave }) {
         <Metric label="Timing" value={opportunity.timing} />
         <Metric label="Funding" value={opportunity.funding} />
         <Metric label="Confidence" value={confidenceLabels[opportunity.confidence]} />
+        <Metric label="Verification" value={verificationLabels[verificationState]} />
       </div>
       <DetailSection title="Why this matters">{opportunity.why}</DetailSection>
       <DetailSection title="Prep notes">{opportunity.prep}</DetailSection>
