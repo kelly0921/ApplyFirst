@@ -129,6 +129,7 @@ a {
 .global-search,
 .summary-grid,
 .prototype-note,
+.archetype-guide,
 .insight-band,
 .filter-stack,
 .results-board,
@@ -251,6 +252,102 @@ a {
   color: var(--muted);
   font-size: 0.88rem;
   line-height: 1.4;
+}
+
+.archetype-guide {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 12px;
+}
+
+.archetype-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.archetype-grid button {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 10px;
+  text-align: left;
+}
+
+.archetype-grid button.active {
+  border-color: rgba(36, 87, 214, 0.42);
+  background: var(--blue-soft);
+  box-shadow: 0 0 0 3px rgba(36, 87, 214, 0.08);
+}
+
+.character-mark {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--ink);
+  font-size: 1rem;
+  font-weight: 880;
+}
+
+.character-builder {
+  background: var(--green-soft);
+}
+
+.character-scout {
+  background: var(--blue-soft);
+}
+
+.character-analyst {
+  background: var(--gold-soft);
+}
+
+.character-pathfinder {
+  background: var(--rose-soft);
+}
+
+.archetype-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.archetype-copy strong,
+.archetype-copy em,
+.archetype-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.archetype-copy strong {
+  color: var(--ink);
+  font-size: 0.9rem;
+  line-height: 1.2;
+}
+
+.archetype-copy em {
+  color: var(--blue);
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 820;
+  white-space: nowrap;
+}
+
+.archetype-copy small {
+  display: -webkit-box;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .insight-band {
@@ -913,6 +1010,7 @@ a {
 
   .summary-grid,
   .prototype-note,
+  .archetype-grid,
   .left-rail,
   .record-main,
   .opportunity-record,

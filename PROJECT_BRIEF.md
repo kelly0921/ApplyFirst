@@ -148,6 +148,7 @@ Core Phase 1 features:
 - Monitor-priority filter.
 - Program category filter.
 - Status filter.
+- Character archetypes that help students choose a starting lens.
 - Opportunity detail panel.
 - Saved shortlist.
 - Monitor priority labels.
@@ -157,6 +158,13 @@ Core Phase 1 features:
 - Last checked dates.
 - Notes explaining why an opportunity matters and how to prepare.
 - Next-action guidance for whether to verify, prepare, or act.
+
+Character archetypes:
+
+- Ari, The Builder: software engineering students turning projects, open source, and technical programs into early proof of experience.
+- Mira, The Product Scout: product-minded students looking for customer problems, product exposure, and decision-making practice before formal PM recruiting.
+- Theo, The Market Analyst: quant / finance students tracking trading, finance, math, and early insight programs before competitive pipelines open.
+- Sana, The Pathfinder: students using fellowships, scholarships, communities, and prep programs to build access and momentum.
 
 Phase 1 is successful if the product feels like a useful internal/demo MVP for deciding what to watch, why it matters, and what to do next.
 
@@ -191,6 +199,7 @@ Strong portfolio themes:
 - Personal pain point turned into product direction.
 - Clear market boundary: not another job board.
 - Student-centered UX around eligibility, timing, confidence, and readiness.
+- Character-led archetypes that make role paths easier to understand at a glance.
 - Data modeling for trust: status, confidence, source notes, last checked date, previous URL, and program type.
 - Product roadmap from manual curation to semi-automated monitoring.
 - Practical social impact: helping underclassmen access programs that can shape their career trajectory earlier.
@@ -208,6 +217,7 @@ Ready to show:
 - Standalone website direction.
 - Searchable program monitor.
 - Role-track and class-year filtering.
+- Character archetype cards.
 - Monitor-priority filtering.
 - Program detail view.
 - Shortlist behavior.
@@ -281,6 +291,7 @@ I also shaped the source strategy by deciding which public opportunity repos sho
 - Searchable program monitor for high-signal early-career opportunities.
 - Class-year filtering for freshman, sophomore, and all-year opportunities.
 - Role-track filtering for software engineering, product management, quant / finance, and career support.
+- Character archetype cards that translate role tracks into memorable student personas.
 - Monitor-priority filtering for high-priority, watch, and support programs.
 - Opportunity detail panel with timing, funding, location, confidence, source notes, and preparation guidance.
 - Alert-readiness labels that distinguish programs to verify, prepare for, or act on.
@@ -303,6 +314,7 @@ Architecture and implementation notes:
 
 - Built as a standalone mini-app separate from the personal portfolio, so the product can evolve independently while the portfolio can later link to a case study or demo.
 - Uses a structured local JavaScript data model for opportunity records, including status, confidence, class year, timing, funding, previous URL, last checked date, source note, and prep notes.
+- Uses a lightweight archetype data layer for character-driven role-track navigation.
 - Adds computed helper functions for role-track classification, monitor priority, alert readiness, source-signal labeling, and next-action guidance.
 - Uses client-side filtering and search for a fast Phase 1 MVP without backend complexity.
 - Keeps automation and notifications out of Phase 1 until the data model and source-verification workflow are trustworthy.
@@ -324,6 +336,7 @@ Key decisions:
 - Underclassmen-first, but not underclassmen-only.
 - Special programs over generic postings.
 - Role tracks instead of separate products for SWE, PM, and quant.
+- Character archetypes to help students self-identify with a path before they understand the recruiting landscape.
 - Manual verification before public notifications.
 - Source confidence and last-checked fields to build trust.
 - Next-action guidance so users know what to do, not just what exists.

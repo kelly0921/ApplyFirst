@@ -54,6 +54,41 @@ export const filterOptions = {
   status: Object.keys(statusLabels),
 };
 
+export const archetypes = [
+  {
+    id: 'builder',
+    character: 'Ari',
+    title: 'The Builder',
+    track: 'Software engineering',
+    summary: 'Turns early projects, open-source work, and technical programs into real experience.',
+    cue: 'Best fit for students collecting proof they can build.',
+  },
+  {
+    id: 'scout',
+    character: 'Mira',
+    title: 'The Product Scout',
+    track: 'Product management',
+    summary: 'Looks for customer problems, product exposure, and programs that build decision-making range.',
+    cue: 'Best fit for students exploring product before formal PM recruiting.',
+  },
+  {
+    id: 'analyst',
+    character: 'Theo',
+    title: 'The Market Analyst',
+    track: 'Quant / finance',
+    summary: 'Tracks trading, finance, math, and early insight programs before competitive pipelines open.',
+    cue: 'Best fit for students testing whether finance-tech environments match them.',
+  },
+  {
+    id: 'pathfinder',
+    character: 'Sana',
+    title: 'The Pathfinder',
+    track: 'Career support',
+    summary: 'Uses fellowships, scholarships, communities, and prep programs to create access and momentum.',
+    cue: 'Best fit for students building support systems alongside applications.',
+  },
+];
+
 export function getOpportunityTracks(opportunity) {
   const signal = [
     opportunity.name,

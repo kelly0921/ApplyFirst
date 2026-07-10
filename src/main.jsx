@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 import {
+  archetypes,
   confidenceLabels,
   filterOptions,
   getMonitorSignal,
@@ -145,6 +146,8 @@ function App() {
           </p>
         </section>
 
+        <ArchetypeGuide activeTrack={roleTrack} onSelectTrack={setRoleTrack} />
+
         <section className="insight-band" aria-label="Current program monitor view">
           <div className="view-controls">
             <span>Class-year view</span>
@@ -259,6 +262,36 @@ function MetricTile({ label, value, tone }) {
       <strong>{value}</strong>
       <span>{label}</span>
     </div>
+  );
+}
+
+function ArchetypeGuide({ activeTrack, onSelectTrack }) {
+  return (
+    <section className="archetype-guide" aria-label="Student archetypes">
+      <div className="panel-heading">
+        <span>Archetypes</span>
+        <h2>Find your starting lens</h2>
+      </div>
+      <div className="archetype-grid">
+        {archetypes.map((archetype) => (
+          <button
+            className={activeTrack === archetype.track ? 'active' : ''}
+            key={archetype.id}
+            type="button"
+            onClick={() => onSelectTrack(activeTrack === archetype.track ? 'all' : archetype.track)}
+          >
+            <span className={`character-mark character-${archetype.id}`} aria-hidden="true">
+              {archetype.character.slice(0, 1)}
+            </span>
+            <span className="archetype-copy">
+              <strong>{archetype.title}</strong>
+              <em>{archetype.character} - {archetype.track}</em>
+              <small>{archetype.summary}</small>
+            </span>
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }
 
