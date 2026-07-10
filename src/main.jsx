@@ -7,13 +7,12 @@ import {
   getMonitorSignal,
   getMonitoringReadiness,
   getOpportunityTracks,
+  getSourceUpdatePlan,
+  getVerificationPriority,
   getVerificationState,
-  monitoringStats,
   opportunities,
   priorityLabels,
-  stats,
   statusLabels,
-  verificationQueue,
   verificationLabels,
 } from './opportunities';
 
@@ -26,7 +25,27 @@ const quickViews = [
 
 const savedStorageKey = 'applyfirst-shortlist';
 const alertStorageKey = 'applyfirst-alert-preview';
+const verificationStorageKey = 'applyfirst-verification-edits';
 const phaseOneTarget = 25;
+const defaultAlertPrefs = {
+  classYear: 'Freshman',
+  roleTrack: 'Software Engineering',
+  priority: 'high',
+  notificationMode: 'waitlist',
+  sendTiming: 'openAndDeadline',
+};
+
+const notificationModeLabels = {
+  local: 'Local Preview',
+  waitlist: 'Email Waitlist',
+  saved: 'Saved Program Reminders',
+};
+
+const sendTimingLabels = {
+  openOnly: 'Openings Only',
+  openAndDeadline: 'Openings & Deadlines',
+  prepOpenDeadline: 'Prep, Openings & Deadlines',
+};
 
 function App() {
   const [query, setQuery] = useState('');
@@ -38,19 +57,21 @@ function App() {
   const [timing, setTiming] = useState('all');
   const [status, setStatus] = useState('all');
   const [selectedId, setSelectedId] = useState(opportunities[0].id);
+  const [verificationEdits, setVerificationEdits] = useState(() => {
+    try {
+      return JSON.parse(window.localStorage.getItem(verificationStorageKey)) ?? {};
+    } catch {
+      return {};
+    }
+  });
   const [alertPrefs, setAlertPrefs] = useState(() => {
     try {
-      return JSON.parse(window.localStorage.getItem(alertStorageKey)) ?? {
-        classYear: 'Freshman',
-        roleTrack: 'Software Engineering',
-        priority: 'high',
+      return {
+        ...defaultAlertPrefs,
+        ...(JSON.parse(window.localStorage.getItem(alertStorageKey)) ?? {}),
       };
     } catch {
-      return {
-        classYear: 'Freshman',
-        roleTrack: 'Software Engineering',
-        priority: 'high',
-      };
+      return defaultAlertPrefs;
     }
   });
   const [savedIds, setSavedIds] = useState(() => {
@@ -61,10 +82,72 @@ function App() {
     }
   });
 
+  const opportunityRecords = useMemo(
+    () =>
+      opportunities.map((opportunity) => ({
+        ...opportunity,
+        ...(verificationEdits[opportunity.id] ?? {}),
+        hasLocalVerificationEdit: Boolean(verificationEdits[opportunity.id]),
+      })),
+    [verificationEdits],
+  );
+
+  const libraryStats = useMemo(
+    () => [
+      { label: 'Programs', value: String(opportunityRecords.length) },
+      {
+        label: 'Recommended',
+        value: String(opportunityRecords.filter((item) => getMonitorSignal(item).priority === 'high').length),
+      },
+      {
+        label: 'Verified',
+        value: String(opportunityRecords.filter((item) => getVerificationState(item) === 'verified').length),
+      },
+      {
+        label: 'Needs review',
+        value: String(opportunityRecords.filter((item) => getMonitorSignal(item).alertReadiness === 'verify').length),
+      },
+    ],
+    [opportunityRecords],
+  );
+
+  const monitoringStats = useMemo(
+    () => [
+      {
+        label: 'Monitoring ready',
+        value: String(opportunityRecords.filter((item) => getMonitoringReadiness(item).alertable).length),
+      },
+      {
+        label: 'Needs setup',
+        value: String(opportunityRecords.filter((item) => getMonitoringReadiness(item).status === 'Needs Setup').length),
+      },
+      {
+        label: 'Needs verification',
+        value: String(
+          opportunityRecords.filter((item) => getMonitoringReadiness(item).status === 'Needs Verification').length,
+        ),
+      },
+    ],
+    [opportunityRecords],
+  );
+
+  const verificationQueueItems = useMemo(
+    () =>
+      opportunityRecords
+        .filter((item) => !getMonitoringReadiness(item).alertable)
+        .map((item) => ({
+          opportunity: item,
+          priority: getVerificationPriority(item),
+          readiness: getMonitoringReadiness(item),
+        }))
+        .sort((a, b) => b.priority.score - a.priority.score || a.opportunity.name.localeCompare(b.opportunity.name)),
+    [opportunityRecords],
+  );
+
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
-    return opportunities.filter((opportunity) => {
+    return opportunityRecords.filter((opportunity) => {
       const searchText = [
         opportunity.name,
         opportunity.organization,
@@ -95,13 +178,13 @@ function App() {
         (status === 'all' || opportunity.status === status)
       );
     });
-  }, [category, classYear, priority, query, roleTrack, status, timing, verification]);
+  }, [category, classYear, opportunityRecords, priority, query, roleTrack, status, timing, verification]);
 
   const selectedOpportunity = filtered.find((item) => item.id === selectedId) ?? filtered[0] ?? null;
-  const savedOpportunities = opportunities.filter((item) => savedIds.includes(item.id));
+  const savedOpportunities = opportunityRecords.filter((item) => savedIds.includes(item.id));
   const alertPreviewMatches = useMemo(
     () =>
-      opportunities.filter((opportunity) => {
+      opportunityRecords.filter((opportunity) => {
         const tracks = getOpportunityTracks(opportunity);
         const signal = getMonitorSignal(opportunity);
 
@@ -111,16 +194,20 @@ function App() {
           (alertPrefs.priority === 'all' || signal.priority === alertPrefs.priority)
         );
       }),
-    [alertPrefs],
+    [alertPrefs, opportunityRecords],
   );
   const alertablePreviewCount = alertPreviewMatches.filter((item) => getMonitoringReadiness(item).alertable).length;
+  const alertStrategy = useMemo(
+    () => getAlertStrategy(alertPrefs, alertPreviewMatches, alertablePreviewCount),
+    [alertPrefs, alertPreviewMatches, alertablePreviewCount],
+  );
   const actionCount = filtered.filter((item) =>
     ['open', 'expectedSoon', 'deadlineSoon'].includes(item.status),
   ).length;
   const verifyCount = filtered.filter((item) => item.status === 'verifyManually').length;
   const recommendedCount = filtered.filter((item) => getMonitorSignal(item).priority === 'high').length;
-  const verifiedCount = opportunities.filter((item) => item.confidence === 'high').length;
-  const readinessPercent = Math.min(Math.round((opportunities.length / phaseOneTarget) * 100), 100);
+  const verifiedCount = opportunityRecords.filter((item) => item.confidence === 'high').length;
+  const readinessPercent = Math.min(Math.round((opportunityRecords.length / phaseOneTarget) * 100), 100);
 
   useEffect(() => {
     window.localStorage.setItem(savedStorageKey, JSON.stringify(savedIds));
@@ -129,6 +216,10 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem(alertStorageKey, JSON.stringify(alertPrefs));
   }, [alertPrefs]);
+
+  useEffect(() => {
+    window.localStorage.setItem(verificationStorageKey, JSON.stringify(verificationEdits));
+  }, [verificationEdits]);
 
   const resetFilters = () => {
     setQuery('');
@@ -152,6 +243,24 @@ function App() {
     );
   };
 
+  const saveVerificationEdit = (id, updates) => {
+    setVerificationEdits((currentEdits) => ({
+      ...currentEdits,
+      [id]: {
+        ...(currentEdits[id] ?? {}),
+        ...updates,
+      },
+    }));
+  };
+
+  const resetVerificationEdit = (id) => {
+    setVerificationEdits((currentEdits) => {
+      const nextEdits = { ...currentEdits };
+      delete nextEdits[id];
+      return nextEdits;
+    });
+  };
+
   return (
     <div className="app-shell">
       <Header savedCount={savedIds.length} />
@@ -167,7 +276,7 @@ function App() {
             />
           </label>
           <div className="summary-grid" aria-label="Library summary">
-            {stats.map((stat) => (
+            {libraryStats.map((stat) => (
               <span key={stat.label}>
                 <strong>{stat.value}</strong>
                 {stat.label}
@@ -190,11 +299,12 @@ function App() {
             setAlertPrefs={setAlertPrefs}
             matchCount={alertPreviewMatches.length}
             alertableCount={alertablePreviewCount}
+            alertStrategy={alertStrategy}
           />
-          <MonitoringReadinessPanel />
+          <MonitoringReadinessPanel monitoringStats={monitoringStats} />
         </section>
 
-        <VerificationQueuePanel onSelect={focusOpportunity} />
+        <VerificationQueuePanel queueItems={verificationQueueItems} onSelect={focusOpportunity} />
 
         <section className="recommendation-guide" aria-label="Recommendation guide">
           <span><strong>Recommended</strong> underclassmen-fit programs with strong career leverage.</span>
@@ -228,7 +338,7 @@ function App() {
           <aside className="left-rail">
             <ReadinessPanel
               readinessPercent={readinessPercent}
-              recordCount={opportunities.length}
+              recordCount={opportunityRecords.length}
               verifiedCount={verifiedCount}
               target={phaseOneTarget}
             />
@@ -283,6 +393,8 @@ function App() {
               opportunity={selectedOpportunity}
               saved={selectedOpportunity ? savedIds.includes(selectedOpportunity.id) : false}
               onSave={() => selectedOpportunity && toggleSaved(selectedOpportunity.id)}
+              onVerificationSave={saveVerificationEdit}
+              onVerificationReset={resetVerificationEdit}
             />
             <Shortlist items={savedOpportunities} onSelect={setSelectedId} />
           </aside>
@@ -315,8 +427,8 @@ function Header({ savedCount }) {
   );
 }
 
-function VerificationQueuePanel({ onSelect }) {
-  const queuePreview = verificationQueue.slice(0, 6);
+function VerificationQueuePanel({ queueItems, onSelect }) {
+  const queuePreview = queueItems.slice(0, 6);
 
   return (
     <section className="verification-queue-panel" id="verification" aria-label="Verification queue">
@@ -360,7 +472,7 @@ function VerificationQueuePanel({ onSelect }) {
   );
 }
 
-function AlertSetupPanel({ alertPrefs, setAlertPrefs, matchCount, alertableCount }) {
+function AlertSetupPanel({ alertPrefs, setAlertPrefs, matchCount, alertableCount, alertStrategy }) {
   const updatePref = (key, value) => {
     setAlertPrefs((currentPrefs) => ({
       ...currentPrefs,
@@ -375,8 +487,8 @@ function AlertSetupPanel({ alertPrefs, setAlertPrefs, matchCount, alertableCount
         <h2>Alert preview</h2>
       </div>
       <p>
-        Choose the programs a student would want monitored. This saves locally for now; real email alerts come
-        after the official-source workflow is reliable.
+        Choose what a student would want monitored. This saves intent locally for now; real outbound alerts come
+        after the official-source workflow and consent flow are reliable.
       </p>
       <div className="alert-controls">
         <FilterSelect
@@ -398,6 +510,20 @@ function AlertSetupPanel({ alertPrefs, setAlertPrefs, matchCount, alertableCount
           options={filterOptions.priorities}
           labels={priorityLabels}
         />
+        <FilterSelect
+          label="Alert mode"
+          value={alertPrefs.notificationMode}
+          onChange={(value) => updatePref('notificationMode', value)}
+          options={Object.keys(notificationModeLabels)}
+          labels={notificationModeLabels}
+        />
+        <FilterSelect
+          label="Send timing"
+          value={alertPrefs.sendTiming}
+          onChange={(value) => updatePref('sendTiming', value)}
+          options={Object.keys(sendTimingLabels)}
+          labels={sendTimingLabels}
+        />
       </div>
       <div className="alert-preview-summary" aria-label="Alert preview summary">
         <span>
@@ -408,12 +534,27 @@ function AlertSetupPanel({ alertPrefs, setAlertPrefs, matchCount, alertableCount
           <strong>{alertableCount}</strong>
           Monitoring ready
         </span>
+        <span>
+          <strong>{alertStrategy.modeLabel}</strong>
+          Prototype mode
+        </span>
+      </div>
+      <div className="notification-strategy">
+        <div>
+          <span>Would send</span>
+          <strong>{alertStrategy.sendSummary}</strong>
+        </div>
+        <div>
+          <span>Would not send</span>
+          <strong>{alertStrategy.holdSummary}</strong>
+        </div>
+        <p>{alertStrategy.trustCopy}</p>
       </div>
     </section>
   );
 }
 
-function MonitoringReadinessPanel() {
+function MonitoringReadinessPanel({ monitoringStats }) {
   return (
     <section className="monitoring-readiness-panel">
       <div className="panel-heading">
@@ -621,7 +762,7 @@ function NextActionPanel({ selectedOpportunity }) {
   );
 }
 
-function OpportunityDetail({ opportunity, saved, onSave }) {
+function OpportunityDetail({ opportunity, saved, onSave, onVerificationSave, onVerificationReset }) {
   if (!opportunity) {
     return (
       <section className="detail-panel empty">
@@ -635,6 +776,7 @@ function OpportunityDetail({ opportunity, saved, onSave }) {
   const monitorSignal = getMonitorSignal(opportunity);
   const verificationState = getVerificationState(opportunity);
   const readiness = getMonitoringReadiness(opportunity);
+  const sourceUpdatePlan = getSourceUpdatePlan(opportunity);
 
   return (
     <section className="detail-panel">
@@ -717,6 +859,12 @@ function OpportunityDetail({ opportunity, saved, onSave }) {
         <h3>Source note</h3>
         <p>{opportunity.sourceNote}</p>
       </div>
+      <SourceUpdatePlan plan={sourceUpdatePlan} />
+      <VerificationEditor
+        opportunity={opportunity}
+        onSave={onVerificationSave}
+        onReset={onVerificationReset}
+      />
       <div className="tag-list">
         {opportunity.tags.map((tag) => (
           <span key={tag}>{formatDisplayLabel(tag)}</span>
@@ -733,6 +881,162 @@ function Metric({ label, value }) {
       {label}
     </span>
   );
+}
+
+function SourceUpdatePlan({ plan }) {
+  return (
+    <section className="source-update-plan">
+      <div className="source-update-heading">
+        <h3>Source update plan</h3>
+        <span>{plan.checkCadence}</span>
+      </div>
+      <dl>
+        <div>
+          <dt>Watched page</dt>
+          <dd>{plan.watchedPage}</dd>
+        </div>
+        <div>
+          <dt>Next check</dt>
+          <dd>{plan.nextCheck}</dd>
+        </div>
+        <div>
+          <dt>Alert trigger</dt>
+          <dd>{plan.alertTrigger}</dd>
+        </div>
+      </dl>
+      <ul>
+        {plan.changeSignals.map((signal) => (
+          <li key={signal}>{signal}</li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function getAlertStrategy(alertPrefs, matches, alertableCount) {
+  const modeLabel = notificationModeLabels[alertPrefs.notificationMode] ?? notificationModeLabels.waitlist;
+  const timingLabel = sendTimingLabels[alertPrefs.sendTiming] ?? sendTimingLabels.openAndDeadline;
+  const heldCount = Math.max(matches.length - alertableCount, 0);
+  const channelCopy =
+    alertPrefs.notificationMode === 'local'
+      ? 'No outbound messages. Show saved alert intent inside this browser only.'
+      : alertPrefs.notificationMode === 'saved'
+        ? 'Send reminders only for shortlisted programs after accounts or email consent exist.'
+        : 'Collect interest first, then send emails only after verified alert rules exist.';
+  const timingCopy =
+    alertPrefs.sendTiming === 'openOnly'
+      ? 'program openings'
+      : alertPrefs.sendTiming === 'prepOpenDeadline'
+        ? 'prep windows, openings, and confirmed deadlines'
+        : 'program openings and confirmed deadlines';
+
+  return {
+    modeLabel,
+    sendSummary: `${alertableCount} ${alertableCount === 1 ? 'record' : 'records'} for ${timingCopy}`,
+    holdSummary: `${heldCount} ${heldCount === 1 ? 'record needs' : 'records need'} verification first`,
+    trustCopy: `${modeLabel} / ${timingLabel}: ${channelCopy} Alerts should never go out from unverified records or estimated dates.`,
+  };
+}
+
+function VerificationEditor({ opportunity, onSave, onReset }) {
+  const [draft, setDraft] = useState(() => createVerificationDraft(opportunity));
+
+  useEffect(() => {
+    setDraft(createVerificationDraft(opportunity));
+  }, [opportunity]);
+
+  const updateDraft = (field, value) => {
+    setDraft((currentDraft) => ({
+      ...currentDraft,
+      [field]: value,
+    }));
+  };
+
+  const saveDraft = (event) => {
+    event.preventDefault();
+    onSave(opportunity.id, draft);
+  };
+
+  return (
+    <form className="verification-editor" onSubmit={saveDraft}>
+      <div className="verification-editor-heading">
+        <div>
+          <h3>Verification edit</h3>
+          <p>
+            Save local source updates after checking the official page. This changes your prototype view only.
+          </p>
+        </div>
+        {opportunity.hasLocalVerificationEdit ? <span>Local edit saved</span> : <span>Base record</span>}
+      </div>
+      <div className="verification-form-grid">
+        <label>
+          <span>Official URL</span>
+          <input value={draft.url} onChange={(event) => updateDraft('url', event.target.value)} />
+        </label>
+        <label>
+          <span>Previous URL</span>
+          <input value={draft.previousUrl} onChange={(event) => updateDraft('previousUrl', event.target.value)} />
+        </label>
+        <label>
+          <span>Open window</span>
+          <input value={draft.openDate} onChange={(event) => updateDraft('openDate', event.target.value)} />
+        </label>
+        <label>
+          <span>Deadline</span>
+          <input value={draft.deadline} onChange={(event) => updateDraft('deadline', event.target.value)} />
+        </label>
+        <label>
+          <span>Last checked</span>
+          <input type="date" value={draft.lastChecked} onChange={(event) => updateDraft('lastChecked', event.target.value)} />
+        </label>
+        <label>
+          <span>Confidence</span>
+          <select value={draft.confidence} onChange={(event) => updateDraft('confidence', event.target.value)}>
+            {Object.keys(confidenceLabels).map((confidence) => (
+              <option key={confidence} value={confidence}>
+                {confidenceLabels[confidence]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Status</span>
+          <select value={draft.status} onChange={(event) => updateDraft('status', event.target.value)}>
+            {Object.keys(statusLabels).map((statusOption) => (
+              <option key={statusOption} value={statusOption}>
+                {statusLabels[statusOption]}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <label className="verification-note-field">
+        <span>Source note</span>
+        <textarea value={draft.sourceNote} onChange={(event) => updateDraft('sourceNote', event.target.value)} />
+      </label>
+      <div className="verification-editor-actions">
+        <button type="submit">Save local verification</button>
+        {opportunity.hasLocalVerificationEdit ? (
+          <button type="button" onClick={() => onReset(opportunity.id)}>
+            Reset local edit
+          </button>
+        ) : null}
+      </div>
+    </form>
+  );
+}
+
+function createVerificationDraft(opportunity) {
+  return {
+    url: opportunity.url ?? '',
+    previousUrl: opportunity.previousUrl ?? '',
+    openDate: opportunity.openDate ?? '',
+    deadline: opportunity.deadline ?? '',
+    lastChecked: opportunity.lastChecked ?? '',
+    confidence: opportunity.confidence ?? 'needsReview',
+    status: opportunity.status ?? 'verifyManually',
+    sourceNote: opportunity.sourceNote ?? '',
+  };
 }
 
 function BookmarkIcon({ filled }) {

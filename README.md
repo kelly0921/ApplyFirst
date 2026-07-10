@@ -52,6 +52,12 @@ The first Phase 2 slice adds:
 - Monitoring-readiness calculations for records that are safe to alert on later.
 - Prioritized verification queue for records that need official-cycle review before alerts.
 - Direct review flow from queue item to full program detail.
+- Local verification editor for official URL, previous URL, opening window, deadline, last checked date, confidence, status, and source notes.
+- Readiness and queue updates based on those local verification edits.
+- Source update plan per record, including watched page, check cadence, next check, alert trigger, and meaningful change signals.
+- Notification strategy preview with local preview, email waitlist, and saved-program reminder modes.
+- Alert timing preview for openings, deadlines, and preparation windows.
+- Trust copy that separates records ready to alert from records held for verification.
 - A clear split between public prototype behavior and future live notifications.
 
 Real email alerts, accounts, and automated page-change monitoring are intentionally still future work.

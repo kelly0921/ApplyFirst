@@ -247,6 +247,51 @@ export function getVerificationPriority(opportunity) {
   };
 }
 
+export function getSourceUpdatePlan(opportunity) {
+  const readiness = getMonitoringReadiness(opportunity);
+  const monitorSignal = getMonitorSignal(opportunity);
+  const hasSpecificTiming =
+    opportunity.openDate &&
+    !opportunity.openDate.toLowerCase().includes('watch') &&
+    !opportunity.openDate.toLowerCase().includes('verify') &&
+    !opportunity.openDate.toLowerCase().includes('varies');
+  const needsOfficialCycleCheck = readiness.missing.includes('Official verification');
+  const needsTimingCheck = readiness.missing.includes('Current cycle timing');
+  const checkCadence =
+    monitorSignal.alertReadiness === 'openNow' || monitorSignal.alertReadiness === 'deadlineSoon'
+      ? 'Daily until deadline is confirmed'
+      : monitorSignal.alertReadiness === 'opensSoon'
+        ? 'Twice weekly during the expected opening window'
+        : needsOfficialCycleCheck || needsTimingCheck
+          ? 'Weekly until the official cycle page is clear'
+          : 'Monthly until the next expected season';
+  const watchedPage = opportunity.previousUrl || opportunity.url;
+  const changeSignals = [
+    'Application, apply, deadline, eligibility, or program-year language changes',
+    hasSpecificTiming ? 'Opening or deadline date changes from the current record' : 'A new current-cycle date appears',
+    needsOfficialCycleCheck ? 'Official page confirms the program still exists this cycle' : 'Official source confirms no material change',
+  ];
+
+  return {
+    watchedPage,
+    checkCadence,
+    changeSignals,
+    nextCheck: needsOfficialCycleCheck
+      ? 'Verify official cycle before treating this as alert-ready'
+      : needsTimingCheck
+        ? 'Confirm current opening window or deadline'
+        : monitorSignal.alertReadiness === 'openNow'
+          ? 'Confirm application is still open before alerting'
+          : 'Refresh during the next scheduled source pass',
+    alertTrigger:
+      monitorSignal.alertReadiness === 'openNow'
+        ? 'Send only after official page confirms applications are open'
+        : monitorSignal.alertReadiness === 'deadlineSoon'
+          ? 'Send only after official deadline is confirmed'
+          : 'Send only when a verified open date, deadline, or application page changes',
+  };
+}
+
 export function getMonitorSignal(opportunity) {
   const tracks = getOpportunityTracks(opportunity);
   const highLeverageCategory = [

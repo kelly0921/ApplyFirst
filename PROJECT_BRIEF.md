@@ -238,15 +238,21 @@ The first Phase 2 slice is intentionally local and trust-focused:
 - Separate `Monitoring Ready`, `Needs Setup`, and `Needs Verification` records.
 - Prioritize a verification queue by underclassmen fit, recommendation value, source coverage, role relevance, and missing official-cycle details.
 - Let the user jump from a queue item into the full program record for review.
+- Edit official URL, previous URL, opening window, deadline, last checked date, confidence, status, and source note locally after checking an official page.
+- Recompute readiness and queue placement from local verification edits.
+- Show a source update plan for each record, including watched page, check cadence, next check, alert trigger, and meaningful change signals.
+- Let users preview a notification strategy: local preview, email waitlist, or saved-program reminders.
+- Let users choose alert timing scope: openings only, openings and deadlines, or prep windows plus openings and deadlines.
+- Explain what would send, what would be held for verification, and why unverified records should not trigger alerts.
 - Make it clear that public notifications should not launch until official-source verification and monitoring rules are reliable.
 
 Next Phase 2 steps:
 
-1. Create a source-update workflow for official program pages.
-2. Add a verification edit workflow so queue blockers can be resolved without code changes.
-3. Decide the first notification channel: email waitlist, email alerts, or saved-program reminders.
-4. Add a minimal backend only when user preferences or outbound notifications need persistence beyond the browser.
-5. Define trust copy for public alerts so students know what is verified, what is estimated, and what still needs review.
+1. Decide which local verification edits should be promoted back into the source dataset.
+2. Add a minimal backend only when user preferences or outbound notifications need persistence beyond the browser.
+3. Define production trust copy for public alerts so students know what is verified, what is estimated, and what still needs review.
+4. Design the first lightweight source-check log if manual verification needs an audit trail.
+5. Decide whether the first public conversion path is email waitlist, saved-program reminders, or private beta alerts.
 
 ## Scope Guardrails
 

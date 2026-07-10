@@ -39,7 +39,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -195,7 +196,10 @@ a {
 }
 
 .global-search input,
-.select-control select {
+.select-control select,
+.verification-form-grid input,
+.verification-form-grid select,
+.verification-note-field textarea {
   width: 100%;
   min-height: 42px;
   border: 1px solid var(--line);
@@ -206,7 +210,10 @@ a {
 }
 
 .global-search input:focus,
-.select-control select:focus {
+.select-control select:focus,
+.verification-form-grid input:focus,
+.verification-form-grid select:focus,
+.verification-note-field textarea:focus {
   outline: 2px solid rgba(36, 87, 214, 0.22);
   outline-offset: 1px;
 }
@@ -300,14 +307,14 @@ a {
 
 .alert-controls {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
 }
 
 .alert-preview-summary,
 .monitoring-stats {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -334,6 +341,44 @@ a {
 .monitoring-stats strong {
   color: var(--ink);
   font-size: 1.15rem;
+}
+
+.notification-strategy {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  border: 1px solid rgba(31, 94, 234, 0.18);
+  border-radius: 8px;
+  background: rgba(234, 241, 255, 0.62);
+  padding: 10px;
+}
+
+.notification-strategy div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.notification-strategy span {
+  color: var(--blue);
+  font-size: 0.66rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.notification-strategy strong {
+  color: var(--ink);
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.notification-strategy p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
 }
 
 .verification-queue-panel {
@@ -1152,7 +1197,9 @@ a {
 
 .detail-section h3,
 .tracker-fields h3,
-.source-note h3 {
+.source-note h3,
+.source-update-plan h3,
+.verification-editor h3 {
   margin: 0;
   font-size: 0.75rem;
   letter-spacing: 0.05em;
@@ -1199,6 +1246,175 @@ a {
   border-radius: 8px;
   background: var(--field);
   padding: 11px;
+}
+
+.source-update-plan {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 12px 0;
+}
+
+.source-update-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: start;
+}
+
+.source-update-heading span {
+  flex: 0 0 auto;
+  max-width: 46%;
+  border: 1px solid rgba(169, 120, 24, 0.28);
+  border-radius: 999px;
+  background: var(--gold-soft);
+  color: var(--gold);
+  padding: 4px 7px;
+  font-size: 0.66rem;
+  font-weight: 850;
+  line-height: 1.25;
+}
+
+.source-update-plan dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.source-update-plan dl div {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #ffffff;
+  padding: 8px;
+}
+
+.source-update-plan dt {
+  color: var(--quiet);
+  font-size: 0.66rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.source-update-plan dd {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 720;
+  line-height: 1.38;
+  overflow-wrap: anywhere;
+}
+
+.source-update-plan ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.source-update-plan li {
+  display: grid;
+  grid-template-columns: 9px minmax(0, 1fr);
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.source-update-plan li::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  margin-top: 0.45em;
+  border-radius: 50%;
+  background: var(--blue);
+}
+
+.verification-editor {
+  display: grid;
+  gap: 12px;
+  border: 1px solid rgba(36, 87, 214, 0.2);
+  border-radius: 8px;
+  background:
+    linear-gradient(145deg, rgba(31, 94, 234, 0.06), transparent 54%),
+    #ffffff;
+  padding: 12px;
+}
+
+.verification-editor-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: start;
+}
+
+.verification-editor-heading p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.verification-editor-heading > span {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  padding: 4px 7px;
+  font-size: 0.66rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.verification-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.verification-form-grid label,
+.verification-note-field {
+  display: grid;
+  gap: 5px;
+}
+
+.verification-form-grid span,
+.verification-note-field span {
+  color: var(--quiet);
+  font-size: 0.66rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.verification-note-field textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.verification-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.verification-editor-actions button {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #ffffff;
+  color: var(--ink);
+  padding: 8px 10px;
+  font-weight: 790;
+}
+
+.verification-editor-actions button:first-child {
+  border-color: rgba(31, 94, 234, 0.28);
+  background: var(--blue);
+  color: #ffffff;
 }
 
 .shortlist button {
@@ -1273,6 +1489,10 @@ a {
   .summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .alert-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 760px) {
@@ -1299,15 +1519,29 @@ a {
   .alert-controls,
   .alert-preview-summary,
   .monitoring-stats,
+  .notification-strategy,
   .verification-queue-list,
   .recommendation-guide,
   .left-rail,
   .record-main,
   .opportunity-record,
   .metric-grid,
+  .verification-form-grid,
   .next-action-panel dl,
   .tracker-fields dl {
     grid-template-columns: 1fr;
+  }
+
+  .verification-editor-heading {
+    flex-direction: column;
+  }
+
+  .source-update-heading {
+    flex-direction: column;
+  }
+
+  .source-update-heading span {
+    max-width: 100%;
   }
 
   .segmented-control {
