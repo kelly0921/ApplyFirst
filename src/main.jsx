@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 import {
-  archetypes,
   confidenceLabels,
   filterOptions,
   getMonitorSignal,
@@ -85,7 +84,7 @@ function App() {
     ['open', 'expectedSoon', 'deadlineSoon'].includes(item.status),
   ).length;
   const verifyCount = filtered.filter((item) => item.status === 'verifyManually').length;
-  const highPriorityCount = filtered.filter((item) => getMonitorSignal(item).priority === 'high').length;
+  const recommendedCount = filtered.filter((item) => getMonitorSignal(item).priority === 'high').length;
   const verifiedCount = opportunities.filter((item) => item.confidence === 'high').length;
   const readinessPercent = Math.min(Math.round((opportunities.length / phaseOneTarget) * 100), 100);
 
@@ -115,17 +114,13 @@ function App() {
       <Header savedCount={savedIds.length} />
       <main className="workspace">
         <section className="command-strip" aria-label="Opportunity search command center">
-          <div className="product-title">
-            <p>ApplyFirst</p>
-            <h1>Early-career program monitor</h1>
-          </div>
           <label className="global-search">
             <span>Search programs</span>
             <input
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search program, role, timing, or signal..."
+              placeholder="Search program, role, timing, or source..."
             />
           </label>
           <div className="summary-grid" aria-label="Library summary">
@@ -141,12 +136,16 @@ function App() {
         <section className="prototype-note" aria-label="Prototype notice">
           <strong>Public prototype</strong>
           <p>
-            ApplyFirst is not a job board. It helps students monitor high-signal programs, prepare before
-            applications open, and see which records still need official verification.
+            ApplyFirst is not a job board. It helps students find high-value career-launch programs, prepare
+            before applications open, and see which records still need official verification.
           </p>
         </section>
 
-        <ArchetypeGuide activeTrack={roleTrack} onSelectTrack={setRoleTrack} />
+        <section className="recommendation-guide" aria-label="Recommendation guide">
+          <span><strong>Recommended</strong> underclassmen-fit programs with strong career leverage.</span>
+          <span><strong>Watch List</strong> relevant programs to keep tracking.</span>
+          <span><strong>Foundation</strong> scholarships, communities, conferences, and prep.</span>
+        </section>
 
         <section className="insight-band" aria-label="Current program monitor view">
           <div className="view-controls">
@@ -165,9 +164,9 @@ function App() {
             </div>
           </div>
           <MetricTile label="In view" value={filtered.length} tone="blue" />
-          <MetricTile label="Priority" value={highPriorityCount} tone="green" />
-          <MetricTile label="Action" value={actionCount} tone="green" />
-          <MetricTile label="Verify" value={verifyCount} tone="rose" />
+          <MetricTile label="Recommended" value={recommendedCount} tone="green" />
+          <MetricTile label="Ready soon" value={actionCount} tone="green" />
+          <MetricTile label="Needs review" value={verifyCount} tone="rose" />
         </section>
 
         <section className="product-grid" id="library" aria-label="Opportunity library">
@@ -198,7 +197,7 @@ function App() {
           <section className="results-board">
             <div className="board-toolbar">
               <div>
-                <span>Monitor queue</span>
+                <span>Program queue</span>
                 <strong>{filtered.length} programs</strong>
               </div>
               <button type="button" onClick={resetFilters}>
@@ -243,7 +242,10 @@ function Header({ savedCount }) {
     <header className="site-header">
       <a className="brand" href="#library" aria-label="ApplyFirst home">
         <span aria-hidden="true">AF</span>
-        <strong>ApplyFirst</strong>
+        <span className="brand-copy">
+          <strong>ApplyFirst</strong>
+          <em>Track career-launch programs</em>
+        </span>
       </a>
       <nav aria-label="Page links">
         <a href="#library">Monitor</a>
@@ -265,41 +267,11 @@ function MetricTile({ label, value, tone }) {
   );
 }
 
-function ArchetypeGuide({ activeTrack, onSelectTrack }) {
-  return (
-    <section className="archetype-guide" aria-label="Student archetypes">
-      <div className="panel-heading">
-        <span>Archetypes</span>
-        <h2>Find your starting lens</h2>
-      </div>
-      <div className="archetype-grid">
-        {archetypes.map((archetype) => (
-          <button
-            className={activeTrack === archetype.track ? 'active' : ''}
-            key={archetype.id}
-            type="button"
-            onClick={() => onSelectTrack(activeTrack === archetype.track ? 'all' : archetype.track)}
-          >
-            <span className={`character-mark character-${archetype.id}`} aria-hidden="true">
-              {archetype.character.slice(0, 1)}
-            </span>
-            <span className="archetype-copy">
-              <strong>{archetype.title}</strong>
-              <em>{archetype.character} - {archetype.track}</em>
-              <small>{archetype.summary}</small>
-            </span>
-          </button>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 function ReadinessPanel({ readinessPercent, recordCount, verifiedCount, target }) {
   const mvpComplete = recordCount >= target;
   const readinessItems = [
     { label: 'Standalone app shell', complete: true },
-    { label: 'Monitor filters', complete: true },
+    { label: 'Core filters', complete: true },
     { label: 'Persistent shortlist', complete: true },
     { label: `${target}+ curated records`, complete: recordCount >= target },
     { label: 'Source verification', complete: verifiedCount >= target },
@@ -309,7 +281,7 @@ function ReadinessPanel({ readinessPercent, recordCount, verifiedCount, target }
     <section className="readiness-panel">
       <div className="panel-heading">
         <span>Phase 1</span>
-        <h2>{mvpComplete ? 'Monitor MVP complete' : 'Monitor MVP in progress'}</h2>
+        <h2>{mvpComplete ? 'Prototype MVP ready' : 'Prototype MVP in progress'}</h2>
       </div>
       <div className="readiness-meter" aria-label={`Phase 1 record target is ${readinessPercent}% complete`}>
         <span style={{ width: `${readinessPercent}%` }} />
@@ -317,7 +289,7 @@ function ReadinessPanel({ readinessPercent, recordCount, verifiedCount, target }
       <p>
         {recordCount}/{target} records, {verifiedCount} verified.{' '}
         {mvpComplete
-          ? 'The Phase 1 app is usable; public alerts should wait for a deeper source verification pass.'
+          ? 'The Phase 1 app is usable as a public prototype; live alerts should wait for a deeper source verification pass.'
           : 'The shell is usable; the seed set still needs expansion before Phase 1 is complete.'}
       </p>
       <ul>
@@ -360,7 +332,7 @@ function FilterStack({
         options={filterOptions.roleTracks}
       />
       <FilterSelect
-        label="Monitor priority"
+        label="Recommendation"
         value={priority}
         onChange={setPriority}
         options={filterOptions.priorities}
@@ -393,7 +365,7 @@ function FilterSelect({ label, value, onChange, options, labels = {} }) {
         <option value="all">All</option>
         {options.map((option) => (
           <option key={option} value={option}>
-            {labels[option] ?? option}
+            {formatDisplayLabel(labels[option] ?? option)}
           </option>
         ))}
       </select>
@@ -406,6 +378,7 @@ function OpportunityRecord({ opportunity, selected, saved, onSelect, onSave }) {
   const monitorSignal = getMonitorSignal(opportunity);
   const primaryTrack = tracks[0];
   const verificationState = getVerificationState(opportunity);
+  const verificationMark = verificationState === 'verified' ? '✓' : verificationState === 'needsReview' ? '!' : '';
 
   return (
     <article className={`opportunity-record${selected ? ' selected' : ''}`} role="listitem">
@@ -415,21 +388,32 @@ function OpportunityRecord({ opportunity, selected, saved, onSelect, onSave }) {
           <h3>{opportunity.name}</h3>
           <p>{opportunity.organization}</p>
         </div>
-        <div className="record-meta">
-          <span className={`priority-chip priority-${monitorSignal.priority}`}>{monitorSignal.priorityLabel}</span>
-          <span>{monitorSignal.alertReadinessLabel}</span>
-          <span className={`verification-chip verification-${verificationState}`}>
-            {verificationLabels[verificationState]}
-          </span>
+        <div className="record-summary">
           <span>{primaryTrack}</span>
           <span>{opportunity.classYears.join(', ')}</span>
+          <span>{opportunity.timing}</span>
         </div>
       </button>
       <div className="record-side">
-        <span>{opportunity.category}</span>
-        <button className={saved ? 'saved' : ''} type="button" onClick={onSave}>
-          {saved ? 'Saved' : 'Save'}
-        </button>
+        <span className={`priority-chip priority-${monitorSignal.priority}`}>{monitorSignal.priorityLabel}</span>
+        <div className="record-icons">
+          <span
+            className={`icon-status verification-${verificationState}`}
+            aria-label={verificationLabels[verificationState]}
+            title={verificationLabels[verificationState]}
+          >
+            {verificationMark}
+          </span>
+          <button
+            className={`bookmark-button${saved ? ' saved' : ''}`}
+            type="button"
+            onClick={onSave}
+            aria-label={saved ? 'Remove from shortlist' : 'Add to shortlist'}
+            title={saved ? 'Remove from shortlist' : 'Add to shortlist'}
+          >
+            <BookmarkIcon filled={saved} />
+          </button>
+        </div>
       </div>
     </article>
   );
@@ -445,8 +429,8 @@ function NextActionPanel({ selectedOpportunity }) {
   return (
     <section className="next-action-panel">
       <div className="panel-heading">
-        <span>Next action</span>
-        <h2>{monitorSignal.alertReadinessLabel}</h2>
+        <span>Next step</span>
+        <h2>{monitorSignal.actionLabel}</h2>
       </div>
       <p>{monitorSignal.nextAction}</p>
       <dl>
@@ -484,35 +468,51 @@ function OpportunityDetail({ opportunity, saved, onSave }) {
         <a href={opportunity.url} target="_blank" rel="noreferrer">
           View source
         </a>
-        <button type="button" onClick={onSave}>
-          {saved ? 'Remove from shortlist' : 'Add to shortlist'}
+        <button
+          className={`detail-bookmark${saved ? ' saved' : ''}`}
+          type="button"
+          onClick={onSave}
+          aria-label={saved ? 'Remove from shortlist' : 'Add to shortlist'}
+          title={saved ? 'Remove from shortlist' : 'Add to shortlist'}
+        >
+          <BookmarkIcon filled={saved} />
+          Shortlist
         </button>
       </div>
       <div className="metric-grid">
-        <Metric label="Year" value={opportunity.classYears.join(', ')} />
-        <Metric label="Priority" value={monitorSignal.priorityLabel} />
-        <Metric label="Role track" value={tracks.join(' + ')} />
-        <Metric label="Category" value={opportunity.category} />
+        <Metric label="Best for" value={opportunity.classYears.join(', ')} />
+        <Metric label="Track" value={tracks.join(' + ')} />
         <Metric label="Timing" value={opportunity.timing} />
         <Metric label="Funding" value={opportunity.funding} />
-        <Metric label="Confidence" value={confidenceLabels[opportunity.confidence]} />
-        <Metric label="Verification" value={verificationLabels[verificationState]} />
+      </div>
+      <div className="detail-status-row" aria-label="Program status summary">
+        <StatusItem label="Recommendation" value={monitorSignal.priorityLabel} tone={monitorSignal.priority} />
+        <StatusItem label="Application Status" value={monitorSignal.actionLabel} />
+        <StatusItem
+          label="Verification"
+          value={verificationLabels[verificationState]}
+          tone={verificationState}
+        />
       </div>
       <DetailSection title="Why this matters">{opportunity.why}</DetailSection>
       <DetailSection title="Prep notes">{opportunity.prep}</DetailSection>
       <div className="tracker-fields">
-        <h3>Tracker fields</h3>
+        <h3>Monitoring details</h3>
         <dl>
           <div>
             <dt>Open date</dt>
             <dd>{opportunity.openDate}</dd>
           </div>
           <div>
-            <dt>Alert readiness</dt>
-            <dd>{monitorSignal.alertReadinessLabel}</dd>
+            <dt>Category</dt>
+            <dd>{formatDisplayLabel(opportunity.category)}</dd>
           </div>
           <div>
-            <dt>Source signal</dt>
+            <dt>Confidence</dt>
+            <dd>{confidenceLabels[opportunity.confidence]}</dd>
+          </div>
+          <div>
+            <dt>Source coverage</dt>
             <dd>{monitorSignal.sourceSignal.label}</dd>
           </div>
           <div>
@@ -539,7 +539,7 @@ function OpportunityDetail({ opportunity, saved, onSave }) {
       </div>
       <div className="tag-list">
         {opportunity.tags.map((tag) => (
-          <span key={tag}>{tag}</span>
+          <span key={tag}>{formatDisplayLabel(tag)}</span>
         ))}
       </div>
     </section>
@@ -549,10 +549,85 @@ function OpportunityDetail({ opportunity, saved, onSave }) {
 function Metric({ label, value }) {
   return (
     <span>
-      <strong>{value}</strong>
+      <strong>{formatDisplayLabel(value)}</strong>
       {label}
     </span>
   );
+}
+
+function BookmarkIcon({ filled }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 16 16" focusable="false">
+      <path d="M4 2.5C4 1.7 4.7 1 5.5 1h5c.8 0 1.5.7 1.5 1.5V15l-4-2.4L4 15V2.5Z" />
+      {!filled ? <path className="bookmark-cutout" d="M5.5 2.4h5c.1 0 .2.1.2.2v10L8 11 5.3 12.6v-10c0-.1.1-.2.2-.2Z" /> : null}
+    </svg>
+  );
+}
+
+function StatusItem({ label, value, tone = 'neutral' }) {
+  return (
+    <span className={`status-item status-item-${tone}`} aria-label={`${label}: ${value}`} title={`${label}: ${value}`}>
+      <strong>{value}</strong>
+    </span>
+  );
+}
+
+function formatDisplayLabel(value) {
+  const labelMap = {
+    'Software engineering': 'Software Engineering',
+    'Product engineering': 'Product Engineering',
+    'Open source': 'Open Source',
+    'Big tech': 'Big Tech',
+    'Insight program': 'Insight Program',
+    'Women in tech': 'Women in Tech',
+    'Diversity in tech': 'Diversity in Tech',
+    'Production engineering': 'Production Engineering',
+    'Civic tech': 'Civic Tech',
+    'Public interest tech': 'Public Interest Tech',
+    'Virtual experience': 'Virtual Experience',
+    'Career exploration': 'Career Exploration',
+    'AI projects': 'AI Projects',
+    'Nontraditional backgrounds': 'Nontraditional Backgrounds',
+    'Early-career': 'Early-Career',
+    'Project building': 'Project Building',
+    'Professional development': 'Professional Development',
+    'Interview prep': 'Interview Prep',
+    'Technical training': 'Technical Training',
+    'Python basics': 'Python Basics',
+    'Portfolio project': 'Portfolio Project',
+    'Career prep': 'Career Prep',
+    'Internship matching': 'Internship Matching',
+    'Underrepresented students': 'Underrepresented Students',
+    'Computer science': 'Computer Science',
+    'Career exposure': 'Career Exposure',
+    'Research conference': 'Research Conference',
+    'CS research': 'CS Research',
+    'Women in computing': 'Women in Computing',
+    'Career events': 'Career Events',
+    'Black CS students': 'Black CS Students',
+    'Latinx CS students': 'Latinx CS Students',
+    'Career fairs': 'Career Fairs',
+    'Graduate school prep': 'Graduate School Prep',
+    'Women in STEM': 'Women in STEM',
+    'Conference funding': 'Conference Funding',
+    'Externship / insight series': 'Externship / Insight Series',
+    'Internship-matching fellowship': 'Internship-Matching Fellowship',
+    'Conference funding': 'Conference Funding',
+    'Technical community': 'Technical Community',
+    'Training program': 'Training Program',
+    'Special program / resource': 'Special Program / Resource',
+    'All class years': 'All Class Years',
+    'Paid internship': 'Paid Internship',
+    'Paid fellowship': 'Paid Fellowship',
+    'Travel support': 'Travel Support',
+    'Host-site dependent': 'Host-Site Dependent',
+    'Scholarship': 'Scholarship',
+    'Stipend': 'Stipend',
+    'Free': 'Free',
+    'Varies': 'Varies',
+  };
+
+  return labelMap[value] ?? value;
 }
 
 function DetailSection({ title, children }) {
@@ -568,7 +643,7 @@ function Shortlist({ items, onSelect }) {
   return (
     <section className="shortlist">
       <div className="panel-heading">
-        <span>Saved</span>
+        <span>Shortlist</span>
         <h2>Shortlist</h2>
       </div>
       {items.length ? (
@@ -579,7 +654,7 @@ function Shortlist({ items, onSelect }) {
           </button>
         ))
       ) : (
-        <p>Save records to compare your next moves.</p>
+        <p>Bookmarked programs appear here for comparison.</p>
       )}
     </section>
   );

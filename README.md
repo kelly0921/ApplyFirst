@@ -11,12 +11,16 @@ ApplyFirst is part of the broader Opportunity Systems product exploration. This 
 The first version focuses on:
 
 - Class-year fit for freshmen, sophomores, and all class years.
-- Role-track fit for software engineering, product management, quant / finance, and career-support programs.
+- Role-track fit for software engineering, product management, quant / finance, and Access & Prep programs.
 - Special-program categories inspired by underclassmen opportunity lists.
-- Monitor priority, alert readiness, and source-signal labels.
+- Recommendation, application status, and source-coverage labels.
 - Manual verification and confidence labels.
 - Clear notes on why each opportunity matters and how to prepare.
 - A future path toward an Opportunity Signal Tracker.
+
+This version is meant to be a public prototype, not a live alerting service yet. The app can show the product direction and curated seed set, while notifications should wait for stronger official-source verification.
+
+Recommendation is computed from the Phase 1 rules: underclassmen-fit programs in high-leverage categories become Recommended; relevant programs stay on the Watch List; scholarships, conferences, communities, and resources are treated as Foundation opportunities. Duplicate appearances across older curated lists are useful for verification, but they are not treated as proof that a program is better.
 
 ## Source Strategy
 
@@ -25,7 +29,7 @@ Phase 1 treats curated student repos as discovery inputs, not final truth. The a
 - Primary sources: LuisaE/opportunities and zapplyjobs/underclassmen-internships because they focus on underclassmen-friendly programs, exploratory programs, fellowships, scholarships, and prep resources.
 - Secondary source: SimplifyJobs/Summer2026-Internships because it is stronger as a live role-posting feed than as a curated early-program list.
 - Role-specific sources: PM and quant repos are useful, but they should be filterable tracks instead of the default experience for every user.
-- Duplicate signal: if the same program appears across multiple trusted lists, prioritize it for official-source verification and richer tracker notes.
+- Duplicate signal: if the same program appears across multiple trusted lists, prioritize it for official-source verification and richer tracker notes, not automatic recommendation.
 
 ## Local Development
 

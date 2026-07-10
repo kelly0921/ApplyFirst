@@ -1,40 +1,40 @@
 export const statusLabels = {
-  open: 'Open now',
+  open: 'Open Now',
   watching: 'Watching',
-  expectedSoon: 'Opening soon',
-  deadlineSoon: 'Deadline soon',
-  verifyManually: 'Verify first',
+  expectedSoon: 'Opening Soon',
+  deadlineSoon: 'Deadline Soon',
+  verifyManually: 'Needs Review',
 };
 
 export const confidenceLabels = {
-  high: 'High confidence',
-  medium: 'Medium confidence',
-  needsReview: 'Needs review',
+  high: 'High Confidence',
+  medium: 'Medium Confidence',
+  needsReview: 'Needs Review',
 };
 
 export const verificationLabels = {
   verified: 'Verified',
-  watchOnly: 'Watch only',
-  needsReview: 'Needs review',
+  watchOnly: 'Watch Only',
+  needsReview: 'Needs Review',
 };
 
 export const priorityLabels = {
-  high: 'High priority',
-  watch: 'Watch',
-  support: 'Support',
+  high: 'Recommended',
+  watch: 'Watch List',
+  foundation: 'Foundation',
 };
 
 export const alertReadinessLabels = {
-  openNow: 'Open now',
-  opensSoon: 'Opening soon',
-  watching: 'Watching',
-  deadlineSoon: 'Deadline soon',
-  verify: 'Verify first',
-  prepare: 'Prepare now',
+  openNow: 'Apply Now',
+  opensSoon: 'Prepare Now',
+  watching: 'Watch for Opening',
+  deadlineSoon: 'Deadline Soon',
+  verify: 'Needs Verification',
+  prepare: 'Prepare Now',
 };
 
 export const filterOptions = {
-  roleTracks: ['Software engineering', 'Product management', 'Quant / finance', 'Career support'],
+  roleTracks: ['Software Engineering', 'Product Management', 'Quant / Finance', 'Access & Prep'],
   priorities: Object.keys(priorityLabels),
   verification: Object.keys(verificationLabels),
   categories: [
@@ -54,41 +54,6 @@ export const filterOptions = {
   status: Object.keys(statusLabels),
 };
 
-export const archetypes = [
-  {
-    id: 'builder',
-    character: 'Ari',
-    title: 'The Builder',
-    track: 'Software engineering',
-    summary: 'Turns early projects, open-source work, and technical programs into real experience.',
-    cue: 'Best fit for students collecting proof they can build.',
-  },
-  {
-    id: 'scout',
-    character: 'Mira',
-    title: 'The Product Scout',
-    track: 'Product management',
-    summary: 'Looks for customer problems, product exposure, and programs that build decision-making range.',
-    cue: 'Best fit for students exploring product before formal PM recruiting.',
-  },
-  {
-    id: 'analyst',
-    character: 'Theo',
-    title: 'The Market Analyst',
-    track: 'Quant / finance',
-    summary: 'Tracks trading, finance, math, and early insight programs before competitive pipelines open.',
-    cue: 'Best fit for students testing whether finance-tech environments match them.',
-  },
-  {
-    id: 'pathfinder',
-    character: 'Sana',
-    title: 'The Pathfinder',
-    track: 'Career support',
-    summary: 'Uses fellowships, scholarships, communities, and prep programs to create access and momentum.',
-    cue: 'Best fit for students building support systems alongside applications.',
-  },
-];
-
 export function getOpportunityTracks(opportunity) {
   const signal = [
     opportunity.name,
@@ -104,24 +69,24 @@ export function getOpportunityTracks(opportunity) {
   const tracks = new Set();
 
   if (signal.match(/product|pm|lifecycle|prototype|customer/)) {
-    tracks.add('Product management');
+    tracks.add('Product Management');
   }
 
   if (signal.match(/quant|trading|finance|fintech|bank|wall street|citadel|jane street|virtu/)) {
-    tracks.add('Quant / finance');
+    tracks.add('Quant / Finance');
   }
 
   if (signal.match(/software|engineering|developer|technical|code|coding|open source|computer science|web|ai|cybersecurity|data/)) {
-    tracks.add('Software engineering');
+    tracks.add('Software Engineering');
   }
 
   if (
     signal.match(/scholarship|conference|community|mentorship|career prep|interview prep|training|resource|fellowship/)
   ) {
-    tracks.add('Career support');
+    tracks.add('Access & Prep');
   }
 
-  return tracks.size ? Array.from(tracks) : ['Career support'];
+  return tracks.size ? Array.from(tracks) : ['Access & Prep'];
 }
 
 const repeatedProgramIds = new Set([
@@ -166,7 +131,7 @@ export function getSourceSignal(opportunity) {
 
   return {
     count: sourceCount,
-    label: sourceCount > 1 ? `${sourceCount} source signals` : 'Single source signal',
+    label: sourceCount > 1 ? `Seen in ${sourceCount} sources` : 'Single discovery source',
   };
 }
 
@@ -184,7 +149,6 @@ export function getVerificationState(opportunity) {
 
 export function getMonitorSignal(opportunity) {
   const tracks = getOpportunityTracks(opportunity);
-  const sourceSignal = getSourceSignal(opportunity);
   const highLeverageCategory = [
     'Internship',
     'Externship / insight series',
@@ -195,18 +159,18 @@ export function getMonitorSignal(opportunity) {
   ].includes(opportunity.category);
   const underclassmenFit =
     opportunity.classYears.includes('Freshman') || opportunity.classYears.includes('Sophomore');
-  const supportOnly = ['Scholarship', 'Conference funding', 'Technical community', 'Special program / resource'].includes(
+  const foundationOnly = ['Scholarship', 'Conference funding', 'Technical community', 'Special program / resource'].includes(
     opportunity.category,
   );
 
   let priority = 'watch';
 
-  if ((underclassmenFit && highLeverageCategory) || sourceSignal.count > 1) {
+  if (underclassmenFit && highLeverageCategory) {
     priority = 'high';
   }
 
-  if (supportOnly && sourceSignal.count === 1) {
-    priority = 'support';
+  if (foundationOnly) {
+    priority = 'foundation';
   }
 
   let alertReadiness = 'prepare';
@@ -228,7 +192,8 @@ export function getMonitorSignal(opportunity) {
     priorityLabel: priorityLabels[priority],
     alertReadiness,
     alertReadinessLabel: alertReadinessLabels[alertReadiness],
-    sourceSignal,
+    actionLabel: alertReadinessLabels[alertReadiness],
+    sourceSignal: getSourceSignal(opportunity),
     tracks,
     nextAction:
       alertReadiness === 'openNow'
@@ -831,7 +796,7 @@ export const opportunities = [
 
 export const stats = [
   { label: 'Programs', value: String(opportunities.length) },
-  { label: 'High priority', value: String(opportunities.filter((item) => getMonitorSignal(item).priority === 'high').length) },
+  { label: 'Recommended', value: String(opportunities.filter((item) => getMonitorSignal(item).priority === 'high').length) },
   { label: 'Verified', value: String(opportunities.filter((item) => getVerificationState(item) === 'verified').length) },
-  { label: 'Verify first', value: String(opportunities.filter((item) => getMonitorSignal(item).alertReadiness === 'verify').length) },
+  { label: 'Needs review', value: String(opportunities.filter((item) => getMonitorSignal(item).alertReadiness === 'verify').length) },
 ];

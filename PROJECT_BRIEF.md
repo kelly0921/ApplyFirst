@@ -36,7 +36,7 @@ The wedge:
 
 - Special programs over normal postings.
 - Underclassmen-first, but not underclassmen-only.
-- Role-filtered so SWE, PM, Quant / finance, Data / AI, and career-support paths are not mixed into one messy list.
+- Role-filtered so SWE, PM, Quant / Finance, Data / AI, and Access & Prep paths are not mixed into one messy list.
 - Monitoring and notification readiness as the long-term value.
 - Human-readable context: why the program matters, who it fits, when to prepare, and how trustworthy the current signal is.
 
@@ -57,11 +57,11 @@ ApplyFirst should include:
 
 Role tracks for the current product:
 
-- Software engineering.
-- Product management.
-- Quant / trading / finance tech.
+- Software Engineering.
+- Product Management.
+- Quant / Trading / Finance Tech.
 - Data / AI / ML when tied to early-career programs.
-- Career support, including fellowships, scholarships, conferences, prep programs, and communities.
+- Access & Prep, including fellowships, scholarships, conferences, prep programs, and communities.
 
 Out of scope for now:
 
@@ -145,30 +145,22 @@ Core Phase 1 features:
 - Search.
 - Class-year filter.
 - Role-track filter.
-- Monitor-priority filter.
+- Recommendation filter.
 - Program category filter.
 - Status filter.
-- Character archetypes that help students choose a starting lens.
 - Opportunity detail panel.
 - Saved shortlist.
-- Monitor priority labels.
-- Alert-readiness labels.
-- Duplicate/source-signal labels.
+- Recommendation labels.
+- Application-status labels.
+- Source-coverage labels.
 - Confidence labels.
 - Last checked dates.
 - Notes explaining why an opportunity matters and how to prepare.
 - Next-action guidance for whether to verify, prepare, or act.
 
-Character archetypes:
+Phase 1 is successful if the product feels like a useful public prototype for deciding what to watch, why it matters, and what to do next.
 
-- Ari, The Builder: software engineering students turning projects, open source, and technical programs into early proof of experience.
-- Mira, The Product Scout: product-minded students looking for customer problems, product exposure, and decision-making practice before formal PM recruiting.
-- Theo, The Market Analyst: quant / finance students tracking trading, finance, math, and early insight programs before competitive pipelines open.
-- Sana, The Pathfinder: students using fellowships, scholarships, communities, and prep programs to build access and momentum.
-
-Phase 1 is successful if the product feels like a useful internal/demo MVP for deciding what to watch, why it matters, and what to do next.
-
-It is not public-alert ready until the records are verified against official sources and the monitoring workflow is defined.
+It is ready to show as a public prototype, but not public-alert ready until the records are verified against official sources and the monitoring workflow is defined.
 
 ## Future Product Direction
 
@@ -180,7 +172,7 @@ Future capabilities:
 - Detect application-page changes.
 - Track old URLs vs new URLs.
 - Record expected opening windows.
-- Notify users when high-priority programs open.
+- Notify users when recommended or saved programs open.
 - Send deadline reminders.
 - Let users choose alerts by class year, role track, location, and program type.
 - Maintain a source-confidence and human-verification layer.
@@ -199,7 +191,7 @@ Strong portfolio themes:
 - Personal pain point turned into product direction.
 - Clear market boundary: not another job board.
 - Student-centered UX around eligibility, timing, confidence, and readiness.
-- Character-led archetypes that make role paths easier to understand at a glance.
+- Role-track filtering that keeps SWE, PM, quant / finance, and Access & Prep paths easy to scan.
 - Data modeling for trust: status, confidence, source notes, last checked date, previous URL, and program type.
 - Product roadmap from manual curation to semi-automated monitoring.
 - Practical social impact: helping underclassmen access programs that can shape their career trajectory earlier.
@@ -210,21 +202,20 @@ Potential case-study headline:
 
 ## Current Readiness
 
-Current status: Phase 1 internal/demo monitor MVP.
+Current status: Phase 1 public prototype MVP.
 
 Ready to show:
 
 - Standalone website direction.
 - Searchable program monitor.
 - Role-track and class-year filtering.
-- Character archetype cards.
-- Monitor-priority filtering.
+- Recommendation filtering.
 - Program detail view.
 - Shortlist behavior.
-- Priority, alert-readiness, and source-signal framing.
+- Recommendation, application status, and source-coverage framing.
 - Source-confidence framing.
 
-Needs more work before public launch:
+Needs more work before live alerts:
 
 - Official verification for every record.
 - Clear source-update workflow.
@@ -282,7 +273,7 @@ Secondary users:
 
 I defined the product scope, target user, and positioning around an underclassmen-first program monitor instead of a generic internship board.
 
-I designed and built the standalone React/Vite MVP, including the search and filtering experience, opportunity detail panel, shortlist behavior, monitor-priority model, alert-readiness labels, source-signal framing, and reusable project brief for future portfolio updates.
+I designed and built the standalone React/Vite MVP, including the search and filtering experience, opportunity detail panel, shortlist behavior, recommendation model, application-status labels, source-coverage framing, and reusable project brief for future portfolio updates.
 
 I also shaped the source strategy by deciding which public opportunity repos should influence the product, where normal internships should be excluded, and how role-specific PM and quant sources should become filterable tracks instead of the default experience.
 
@@ -290,15 +281,22 @@ I also shaped the source strategy by deciding which public opportunity repos sho
 
 - Searchable program monitor for high-signal early-career opportunities.
 - Class-year filtering for freshman, sophomore, and all-year opportunities.
-- Role-track filtering for software engineering, product management, quant / finance, and career support.
-- Character archetype cards that translate role tracks into memorable student personas.
-- Monitor-priority filtering for high-priority, watch, and support programs.
+- Role-track filtering for software engineering, product management, quant / finance, and Access & Prep programs.
+- Recommendation filtering for Recommended, Watch List, and Foundation programs.
 - Opportunity detail panel with timing, funding, location, confidence, source notes, and preparation guidance.
-- Alert-readiness labels that distinguish programs to verify, prepare for, or act on.
-- Duplicate/source-signal labels that surface programs appearing across trusted lists.
+- Application-status labels that distinguish programs to verify, prepare for, or act on.
+- Source-coverage labels that surface programs appearing across trusted lists.
 - Persistent shortlist saved locally in the browser.
 - Next-action panel that tells users whether to verify, prepare, or apply quickly.
-- Phase 1 readiness panel that separates demo readiness from public alert readiness.
+- Phase 1 readiness panel that separates prototype readiness from public alert readiness.
+
+Recommendation model:
+
+- Recommended: underclassmen-fit opportunities in high-leverage categories such as internships, fellowships, insight programs, winternships, and training programs.
+- Watch List: relevant programs worth tracking, but without enough current-cycle urgency or class-year fit to elevate.
+- Foundation: scholarships, conferences, communities, and resources that support career momentum but are not the core application-opening alert target.
+
+Duplicate appearances across trusted lists are treated as source-coverage and verification cues, not as proof that a program is automatically higher quality.
 
 ### 7. Technical Details
 
@@ -314,8 +312,7 @@ Architecture and implementation notes:
 
 - Built as a standalone mini-app separate from the personal portfolio, so the product can evolve independently while the portfolio can later link to a case study or demo.
 - Uses a structured local JavaScript data model for opportunity records, including status, confidence, class year, timing, funding, previous URL, last checked date, source note, and prep notes.
-- Uses a lightweight archetype data layer for character-driven role-track navigation.
-- Adds computed helper functions for role-track classification, monitor priority, alert readiness, source-signal labeling, and next-action guidance.
+- Adds computed helper functions for role-track classification, recommendation status, application status, source-coverage labeling, and next-action guidance.
 - Uses client-side filtering and search for a fast Phase 1 MVP without backend complexity.
 - Keeps automation and notifications out of Phase 1 until the data model and source-verification workflow are trustworthy.
 
@@ -336,7 +333,6 @@ Key decisions:
 - Underclassmen-first, but not underclassmen-only.
 - Special programs over generic postings.
 - Role tracks instead of separate products for SWE, PM, and quant.
-- Character archetypes to help students self-identify with a path before they understand the recruiting landscape.
 - Manual verification before public notifications.
 - Source confidence and last-checked fields to build trust.
 - Next-action guidance so users know what to do, not just what exists.
@@ -345,11 +341,11 @@ The main tradeoff was choosing a curated, trustworthy MVP over a larger automate
 
 ### 9. Current Status
 
-Current status: **Phase 1 internal/demo MVP**
+Current status: **Phase 1 public prototype MVP**
 
-The standalone local MVP is built and functional. It includes the core monitor UI, structured opportunity records, filters, detail views, source-confidence framing, shortlist behavior, and monitor-specific signals.
+The standalone local MVP is built and functional. It includes the core monitor UI, structured opportunity records, filters, detail views, source-confidence framing, shortlist behavior, and program-specific status labels.
 
-Not yet public-alert ready. Before publishing as a live resource, the project still needs official verification for core records, a repeatable source-update workflow, notification design, and public trust language.
+Not yet public-alert ready. Before positioning it as a live alerting resource, the project still needs official verification for core records, a repeatable source-update workflow, notification design, and public trust language.
 
 ### 10. What I Learned
 
@@ -377,7 +373,7 @@ Generic job boards solve discovery at scale, but they do not solve the specific 
 
 I scoped ApplyFirst as a special-program monitor instead of a broad internship board.
 
-The MVP focuses on manually curated records, role-track filters, class-year fit, monitor priority, alert readiness, source confidence, and next-action guidance. The goal is to help students answer:
+The MVP focuses on manually curated records, role-track filters, class-year fit, recommendation status, application status, source confidence, and next-action guidance. The goal is to help students answer:
 
 - What am I eligible for?
 - What should I watch?
@@ -397,14 +393,14 @@ I decided to prioritize underclassmen, exclude generic internships, treat PM and
 - Structured JavaScript opportunity dataset.
 - Client-side search and filters.
 - Role-track classification helpers.
-- Monitor-priority and alert-readiness logic.
-- Source-signal and confidence labeling.
+- Recommendation and application-status logic.
+- Source-coverage and confidence labeling.
 - Persistent shortlist using `localStorage`.
 - Responsive dashboard-style interface with detail and next-action panels.
 
 #### Current Status
 
-Phase 1 is a functional internal/demo MVP. The product surface is ready to show as a prototype or portfolio case study, but public launch should wait until official-source verification and notification workflows are complete.
+Phase 1 is a functional public prototype MVP. The product surface is ready to show as a prototype or portfolio case study, while live alert functionality should wait until official-source verification and notification workflows are complete.
 
 #### What I Learned
 
@@ -442,9 +438,9 @@ Project logo or icon direction:
 
 Recommended visuals:
 
-1. Web screenshot of the main monitor dashboard showing search, class-year view, monitor-priority filter, and program queue.
-2. Web screenshot of the detail panel showing priority, alert readiness, source signal, source note, and next action.
-3. Product diagram showing the future workflow: curated sources -> verified program records -> monitor signals -> student alerts.
+1. Web screenshot of the main monitor dashboard showing search, class-year view, recommendation filter, and program queue.
+2. Web screenshot of the detail panel showing recommendation status, application status, source coverage, source note, and next action.
+3. Product diagram showing the future workflow: curated sources -> verified program records -> monitoring rules -> student alerts.
 
 Preferred display format:
 
