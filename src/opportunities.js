@@ -147,6 +147,50 @@ export function getVerificationState(opportunity) {
   return 'watchOnly';
 }
 
+export function getMonitoringReadiness(opportunity) {
+  const missing = [];
+  const hasOfficialUrl = opportunity.url?.startsWith('https://');
+  const hasCheckedDate = Boolean(opportunity.lastChecked);
+  const hasActionableWindow =
+    opportunity.openDate &&
+    !opportunity.openDate.toLowerCase().includes('watch') &&
+    !opportunity.openDate.toLowerCase().includes('verify');
+  const hasDeadline =
+    opportunity.deadline &&
+    !opportunity.deadline.toLowerCase().includes('verify') &&
+    !opportunity.deadline.toLowerCase().includes('varies');
+  const verificationState = getVerificationState(opportunity);
+  const monitorSignal = getMonitorSignal(opportunity);
+
+  if (!hasOfficialUrl) {
+    missing.push('Official URL');
+  }
+
+  if (!hasCheckedDate) {
+    missing.push('Last checked date');
+  }
+
+  if (!hasActionableWindow && !hasDeadline) {
+    missing.push('Current cycle timing');
+  }
+
+  if (verificationState !== 'verified') {
+    missing.push('Official verification');
+  }
+
+  const alertable =
+    hasOfficialUrl &&
+    hasCheckedDate &&
+    verificationState === 'verified' &&
+    ['openNow', 'opensSoon', 'deadlineSoon', 'watching'].includes(monitorSignal.alertReadiness);
+
+  return {
+    alertable,
+    status: alertable ? 'Monitoring Ready' : missing.length <= 2 ? 'Needs Setup' : 'Needs Verification',
+    missing,
+  };
+}
+
 export function getMonitorSignal(opportunity) {
   const tracks = getOpportunityTracks(opportunity);
   const highLeverageCategory = [
@@ -799,4 +843,19 @@ export const stats = [
   { label: 'Recommended', value: String(opportunities.filter((item) => getMonitorSignal(item).priority === 'high').length) },
   { label: 'Verified', value: String(opportunities.filter((item) => getVerificationState(item) === 'verified').length) },
   { label: 'Needs review', value: String(opportunities.filter((item) => getMonitorSignal(item).alertReadiness === 'verify').length) },
+];
+
+export const monitoringStats = [
+  {
+    label: 'Monitoring ready',
+    value: String(opportunities.filter((item) => getMonitoringReadiness(item).alertable).length),
+  },
+  {
+    label: 'Needs setup',
+    value: String(opportunities.filter((item) => getMonitoringReadiness(item).status === 'Needs Setup').length),
+  },
+  {
+    label: 'Needs verification',
+    value: String(opportunities.filter((item) => getMonitoringReadiness(item).status === 'Needs Verification').length),
+  },
 ];

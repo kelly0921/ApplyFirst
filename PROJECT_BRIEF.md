@@ -202,7 +202,7 @@ Potential case-study headline:
 
 ## Current Readiness
 
-Current status: Phase 1 public prototype MVP.
+Current status: Phase 2 started after Phase 1 public prototype MVP.
 
 Ready to show:
 
@@ -214,6 +214,8 @@ Ready to show:
 - Shortlist behavior.
 - Recommendation, application status, and source-coverage framing.
 - Source-confidence framing.
+- Local alert-preference preview.
+- Monitoring-readiness framing for which records are safe to alert on later.
 
 Needs more work before live alerts:
 
@@ -223,6 +225,26 @@ Needs more work before live alerts:
 - Notification design.
 - Privacy and account model if personalized alerts are added.
 - Public copy and trust language.
+
+## Phase 2 Direction
+
+Phase 2 should turn the static monitor into the beginning of the Opportunity Signal Tracker.
+
+The first Phase 2 slice is intentionally local and trust-focused:
+
+- Let students preview the class year, role track, and recommendation level they would want alerts for.
+- Save those alert preferences locally in the browser.
+- Compute how many matching programs are actually monitoring-ready.
+- Separate `Monitoring Ready`, `Needs Setup`, and `Needs Verification` records.
+- Make it clear that public notifications should not launch until official-source verification and monitoring rules are reliable.
+
+Next Phase 2 steps:
+
+1. Create a source-update workflow for official program pages.
+2. Add a verification queue for the records that are high-value but not alert-ready.
+3. Decide the first notification channel: email waitlist, email alerts, or saved-program reminders.
+4. Add a minimal backend only when user preferences or outbound notifications need persistence beyond the browser.
+5. Define trust copy for public alerts so students know what is verified, what is estimated, and what still needs review.
 
 ## Scope Guardrails
 

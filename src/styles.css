@@ -152,6 +152,8 @@ a {
 .global-search,
 .summary-grid,
 .prototype-note,
+.alert-setup-panel,
+.monitoring-readiness-panel,
 .recommendation-guide,
 .insight-band,
 .filter-stack,
@@ -258,6 +260,79 @@ a {
   color: var(--muted);
   font-size: 0.88rem;
   line-height: 1.4;
+}
+
+.phase-two-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(300px, 0.75fr);
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.alert-setup-panel,
+.monitoring-readiness-panel {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 14px;
+}
+
+.alert-setup-panel {
+  background:
+    linear-gradient(145deg, rgba(31, 94, 234, 0.07), transparent 58%),
+    rgba(255, 255, 255, 0.94);
+}
+
+.monitoring-readiness-panel {
+  background:
+    linear-gradient(145deg, rgba(183, 123, 18, 0.08), transparent 56%),
+    rgba(255, 255, 255, 0.94);
+}
+
+.alert-setup-panel p,
+.monitoring-readiness-panel p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.alert-controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.alert-preview-summary,
+.monitoring-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.monitoring-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.alert-preview-summary span,
+.monitoring-stats span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.78);
+  padding: 9px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 760;
+  line-height: 1.25;
+}
+
+.alert-preview-summary strong,
+.monitoring-stats strong {
+  color: var(--ink);
+  font-size: 1.15rem;
 }
 
 .recommendation-guide {
@@ -1047,6 +1122,7 @@ a {
 
 @media (max-width: 1280px) {
   .command-strip,
+  .phase-two-strip,
   .insight-band,
   .product-grid {
     grid-template-columns: 1fr;
@@ -1099,6 +1175,9 @@ a {
   }
 
   .summary-grid,
+  .alert-controls,
+  .alert-preview-summary,
+  .monitoring-stats,
   .recommendation-guide,
   .left-rail,
   .record-main,

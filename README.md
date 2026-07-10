@@ -18,7 +18,7 @@ The first version focuses on:
 - Clear notes on why each opportunity matters and how to prepare.
 - A future path toward an Opportunity Signal Tracker.
 
-This version is meant to be a public prototype, not a live alerting service yet. The app can show the product direction and curated seed set, while notifications should wait for stronger official-source verification.
+This version is a public prototype with Phase 2 alert-preview scaffolding, not a live alerting service yet. The app can show the product direction, curated seed set, local alert preferences, and monitoring-readiness model, while outbound notifications should wait for stronger official-source verification.
 
 Recommendation is computed from the Phase 1 rules: underclassmen-fit programs in high-leverage categories become Recommended; relevant programs stay on the Watch List; scholarships, conferences, communities, and resources are treated as Foundation opportunities. Duplicate appearances across older curated lists are useful for verification, but they are not treated as proof that a program is better.
 
@@ -43,3 +43,13 @@ npm run dev
 ```bash
 npm run build
 ```
+
+## Phase 2 Start
+
+The first Phase 2 slice adds:
+
+- Local alert-preference preview by class year, role track, and recommendation level.
+- Monitoring-readiness calculations for records that are safe to alert on later.
+- A clear split between public prototype behavior and future live notifications.
+
+Real email alerts, accounts, and automated page-change monitoring are intentionally still future work.

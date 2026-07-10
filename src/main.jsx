@@ -5,8 +5,10 @@ import {
   confidenceLabels,
   filterOptions,
   getMonitorSignal,
+  getMonitoringReadiness,
   getOpportunityTracks,
   getVerificationState,
+  monitoringStats,
   opportunities,
   priorityLabels,
   stats,
@@ -22,6 +24,7 @@ const quickViews = [
 ];
 
 const savedStorageKey = 'applyfirst-shortlist';
+const alertStorageKey = 'applyfirst-alert-preview';
 const phaseOneTarget = 25;
 
 function App() {
@@ -34,6 +37,21 @@ function App() {
   const [timing, setTiming] = useState('all');
   const [status, setStatus] = useState('all');
   const [selectedId, setSelectedId] = useState(opportunities[0].id);
+  const [alertPrefs, setAlertPrefs] = useState(() => {
+    try {
+      return JSON.parse(window.localStorage.getItem(alertStorageKey)) ?? {
+        classYear: 'Freshman',
+        roleTrack: 'Software Engineering',
+        priority: 'high',
+      };
+    } catch {
+      return {
+        classYear: 'Freshman',
+        roleTrack: 'Software Engineering',
+        priority: 'high',
+      };
+    }
+  });
   const [savedIds, setSavedIds] = useState(() => {
     try {
       return JSON.parse(window.localStorage.getItem(savedStorageKey)) ?? [];
@@ -80,6 +98,21 @@ function App() {
 
   const selectedOpportunity = filtered.find((item) => item.id === selectedId) ?? filtered[0] ?? null;
   const savedOpportunities = opportunities.filter((item) => savedIds.includes(item.id));
+  const alertPreviewMatches = useMemo(
+    () =>
+      opportunities.filter((opportunity) => {
+        const tracks = getOpportunityTracks(opportunity);
+        const signal = getMonitorSignal(opportunity);
+
+        return (
+          (alertPrefs.classYear === 'all' || opportunity.classYears.includes(alertPrefs.classYear)) &&
+          (alertPrefs.roleTrack === 'all' || tracks.includes(alertPrefs.roleTrack)) &&
+          (alertPrefs.priority === 'all' || signal.priority === alertPrefs.priority)
+        );
+      }),
+    [alertPrefs],
+  );
+  const alertablePreviewCount = alertPreviewMatches.filter((item) => getMonitoringReadiness(item).alertable).length;
   const actionCount = filtered.filter((item) =>
     ['open', 'expectedSoon', 'deadlineSoon'].includes(item.status),
   ).length;
@@ -91,6 +124,10 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem(savedStorageKey, JSON.stringify(savedIds));
   }, [savedIds]);
+
+  useEffect(() => {
+    window.localStorage.setItem(alertStorageKey, JSON.stringify(alertPrefs));
+  }, [alertPrefs]);
 
   const resetFilters = () => {
     setQuery('');
@@ -139,6 +176,16 @@ function App() {
             ApplyFirst is not a job board. It helps students find high-value career-launch programs, prepare
             before applications open, and see which records still need official verification.
           </p>
+        </section>
+
+        <section className="phase-two-strip" id="alerts" aria-label="Phase 2 alert setup preview">
+          <AlertSetupPanel
+            alertPrefs={alertPrefs}
+            setAlertPrefs={setAlertPrefs}
+            matchCount={alertPreviewMatches.length}
+            alertableCount={alertablePreviewCount}
+          />
+          <MonitoringReadinessPanel />
         </section>
 
         <section className="recommendation-guide" aria-label="Recommendation guide">
@@ -249,12 +296,89 @@ function Header({ savedCount }) {
       </a>
       <nav aria-label="Page links">
         <a href="#library">Monitor</a>
+        <a href="#alerts">Alerts</a>
         <a href="https://github.com/zapplyjobs/underclassmen-internships" target="_blank" rel="noreferrer">
           Inspiration
         </a>
         <span>{savedCount} saved</span>
       </nav>
     </header>
+  );
+}
+
+function AlertSetupPanel({ alertPrefs, setAlertPrefs, matchCount, alertableCount }) {
+  const updatePref = (key, value) => {
+    setAlertPrefs((currentPrefs) => ({
+      ...currentPrefs,
+      [key]: value,
+    }));
+  };
+
+  return (
+    <section className="alert-setup-panel">
+      <div className="panel-heading">
+        <span>Phase 2</span>
+        <h2>Alert preview</h2>
+      </div>
+      <p>
+        Choose the programs a student would want monitored. This saves locally for now; real email alerts come
+        after the official-source workflow is reliable.
+      </p>
+      <div className="alert-controls">
+        <FilterSelect
+          label="Class year"
+          value={alertPrefs.classYear}
+          onChange={(value) => updatePref('classYear', value)}
+          options={filterOptions.classYears}
+        />
+        <FilterSelect
+          label="Role track"
+          value={alertPrefs.roleTrack}
+          onChange={(value) => updatePref('roleTrack', value)}
+          options={filterOptions.roleTracks}
+        />
+        <FilterSelect
+          label="Recommendation"
+          value={alertPrefs.priority}
+          onChange={(value) => updatePref('priority', value)}
+          options={filterOptions.priorities}
+          labels={priorityLabels}
+        />
+      </div>
+      <div className="alert-preview-summary" aria-label="Alert preview summary">
+        <span>
+          <strong>{matchCount}</strong>
+          Matching programs
+        </span>
+        <span>
+          <strong>{alertableCount}</strong>
+          Monitoring ready
+        </span>
+      </div>
+    </section>
+  );
+}
+
+function MonitoringReadinessPanel() {
+  return (
+    <section className="monitoring-readiness-panel">
+      <div className="panel-heading">
+        <span>Monitoring layer</span>
+        <h2>Source readiness</h2>
+      </div>
+      <p>
+        Records become alert-ready only when the official URL, current timing, and last-checked source details
+        are reliable enough to avoid noisy public notifications.
+      </p>
+      <div className="monitoring-stats">
+        {monitoringStats.map((item) => (
+          <span key={item.label}>
+            <strong>{item.value}</strong>
+            {item.label}
+          </span>
+        ))}
+      </div>
+    </section>
   );
 }
 
