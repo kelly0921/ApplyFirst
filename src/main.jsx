@@ -65,6 +65,7 @@ const trustPolicyItems = [
 ];
 
 function App() {
+  const [activeView, setActiveView] = useState('monitor');
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('all');
   const [roleTrack, setRoleTrack] = useState('all');
@@ -122,25 +123,6 @@ function App() {
         hasLocalVerificationEdit: Boolean(verificationEdits[opportunity.id]),
       })),
     [verificationEdits],
-  );
-
-  const libraryStats = useMemo(
-    () => [
-      { label: 'Programs', value: String(opportunityRecords.length) },
-      {
-        label: 'Recommended',
-        value: String(opportunityRecords.filter((item) => getMonitorSignal(item).priority === 'high').length),
-      },
-      {
-        label: 'Confirmed',
-        value: String(opportunityRecords.filter((item) => getVerificationState(item) === 'verified').length),
-      },
-      {
-        label: 'Needs confirmation',
-        value: String(opportunityRecords.filter((item) => getMonitorSignal(item).alertReadiness === 'verify').length),
-      },
-    ],
-    [opportunityRecords],
   );
 
   const verificationQueueItems = useMemo(
@@ -213,11 +195,6 @@ function App() {
     () => getAlertStrategy(alertPrefs, alertPreviewMatches, alertablePreviewCount),
     [alertPrefs, alertPreviewMatches, alertablePreviewCount],
   );
-  const actionCount = filtered.filter((item) =>
-    ['open', 'expectedSoon', 'deadlineSoon'].includes(item.status),
-  ).length;
-  const verifyCount = filtered.filter((item) => item.status === 'verifyManually').length;
-  const recommendedCount = filtered.filter((item) => getMonitorSignal(item).priority === 'high').length;
   const verifiedCount = opportunityRecords.filter((item) => item.confidence === 'high').length;
   const readinessPercent = Math.min(Math.round((opportunityRecords.length / phaseOneTarget) * 100), 100);
 
@@ -311,176 +288,216 @@ function App() {
 
   return (
     <div className="app-shell">
-      <Header savedCount={savedIds.length} showInternalTools={showInternalTools} />
+      <Header
+        activeView={activeView}
+        onViewChange={setActiveView}
+        savedCount={savedIds.length}
+        showInternalTools={showInternalTools}
+      />
       <main className="workspace">
-        <section className="command-strip" aria-label="Opportunity search command center">
-          <label className="global-search">
-            <span>Search programs</span>
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search program, role, timing, or source..."
-            />
-          </label>
-          <div className="summary-grid" aria-label="Library summary">
-            {libraryStats.map((stat) => (
-              <span key={stat.label}>
-                <strong>{stat.value}</strong>
-                {stat.label}
-              </span>
-            ))}
-          </div>
-        </section>
-
-        <section className="prototype-note" aria-label="Prototype notice">
-          <strong>Public prototype</strong>
-          <p>
-            ApplyFirst is not a job board. It helps students find high-value career-launch programs, prepare
-            before applications open, and avoid relying on programs that have not been confirmed yet.
-          </p>
-        </section>
-
-        <TrustPolicyPanel />
-
-        <section className="phase-two-strip" id="alerts" aria-label="Phase 2 alert setup preview">
-          <AlertSetupPanel
-            alertPrefs={alertPrefs}
-            setAlertPrefs={setAlertPrefs}
-            matchCount={alertPreviewMatches.length}
-            alertableCount={alertablePreviewCount}
-            alertStrategy={alertStrategy}
-            waitlistIntent={waitlistIntent}
-            onWaitlistSave={saveWaitlistIntent}
-            onWaitlistReset={resetWaitlistIntent}
-          />
-        </section>
-
-        {showInternalTools ? <VerificationQueuePanel queueItems={verificationQueueItems} onSelect={focusOpportunity} /> : null}
-
-        <section className="recommendation-guide" aria-label="Recommendation guide">
-          <strong>Recommendation guide</strong>
-          <span>Recommended: strongest fit</span>
-          <span>Watch List: worth tracking</span>
-          <span>Foundation: prep and access</span>
-        </section>
-
-        <section className="insight-band" aria-label="Current program monitor view">
-          <div className="view-controls">
-            <span>Class-year view</span>
-            <div className="segmented-control">
-              {quickViews.map((view) => (
-                <button
-                  key={view.id}
-                  className={classYear === view.id ? 'active' : ''}
-                  type="button"
-                  onClick={() => setClassYear(view.id)}
-                >
-                  {view.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <MetricTile label="In view" value={filtered.length} tone="blue" />
-          <MetricTile label="Recommended" value={recommendedCount} tone="green" />
-          <MetricTile label="Ready soon" value={actionCount} tone="green" />
-          <MetricTile label="Needs confirmation" value={verifyCount} tone="rose" />
-        </section>
-
-        <section className="product-grid" id="library" aria-label="Opportunity library">
-          <aside className="left-rail">
-            <ReadinessPanel
-              readinessPercent={readinessPercent}
-              recordCount={opportunityRecords.length}
-              verifiedCount={verifiedCount}
-              target={phaseOneTarget}
-            />
-            <ReviewModeControl
-              enabled={showInternalTools}
-              onToggle={() => setShowInternalTools((current) => !current)}
-            />
-            <FilterStack
-              showInternalTools={showInternalTools}
-              category={category}
-              setCategory={setCategory}
-              roleTrack={roleTrack}
-              setRoleTrack={setRoleTrack}
-              priority={priority}
-              setPriority={setPriority}
-              verification={verification}
-              setVerification={setVerification}
-              timing={timing}
-              setTiming={setTiming}
-              status={status}
-              setStatus={setStatus}
-              resetFilters={resetFilters}
-            />
-          </aside>
-
-          <section className="results-board">
-            <div className="board-toolbar">
+        {activeView === 'alerts' ? (
+          <section className="settings-view" aria-label="Alert settings">
+            <section className="alert-hero" aria-label="ApplyFirst alert overview">
               <div>
-                <span>Program queue</span>
-                <strong>{filtered.length} programs</strong>
+                <span>Stay ready</span>
+                <h1>Save the programs you want updates for.</h1>
+                <p>
+                  Tell ApplyFirst your class year, role interests, and timing preferences. This public prototype saves
+                  your setup locally so you can prepare with more confidence while the live notification flow takes
+                  shape.
+                </p>
               </div>
-              <button type="button" onClick={resetFilters}>
-                Clear
-              </button>
+            </section>
+            <div className="settings-note">
+              <strong>Preview mode</strong>
+              <p>
+                Your alert settings stay in this browser for now, so you can shape what you want ApplyFirst to watch.
+              </p>
             </div>
-            <div className="record-table" role="list">
-              {filtered.length ? (
-                filtered.map((opportunity) => (
-                  <OpportunityRecord
-                    key={opportunity.id}
-                    opportunity={opportunity}
-                    selected={selectedOpportunity?.id === opportunity.id}
-                    saved={savedIds.includes(opportunity.id)}
-                    onSelect={() => setSelectedId(opportunity.id)}
-                    onSave={() => toggleSaved(opportunity.id)}
-                  />
-                ))
-              ) : (
-                <EmptyState onReset={resetFilters} />
-              )}
-            </div>
-          </section>
-
-          <aside className="right-rail">
-            <OpportunityDetail
-              opportunity={selectedOpportunity}
-              saved={selectedOpportunity ? savedIds.includes(selectedOpportunity.id) : false}
-              onSave={() => selectedOpportunity && toggleSaved(selectedOpportunity.id)}
-              onVerificationSave={saveVerificationEdit}
-              onVerificationReset={resetVerificationEdit}
-              sourceCheckEntries={selectedOpportunity ? sourceCheckLog[selectedOpportunity.id] ?? [] : []}
-              onSourceCheckSave={addSourceCheckLogEntry}
-              showInternalTools={showInternalTools}
+            <AlertSetupPanel
+              alertPrefs={alertPrefs}
+              setAlertPrefs={setAlertPrefs}
+              matchCount={alertPreviewMatches.length}
+              alertStrategy={alertStrategy}
+              waitlistIntent={waitlistIntent}
+              onWaitlistSave={saveWaitlistIntent}
+              onWaitlistReset={resetWaitlistIntent}
             />
-            <Shortlist items={savedOpportunities} onSelect={setSelectedId} />
-          </aside>
-        </section>
+            <TrustPolicyPanel />
+          </section>
+        ) : (
+          <>
+            <section className="monitor-hero" aria-label="ApplyFirst overview">
+              <div>
+                <span>Student-first</span>
+                <h1>Discover career-launch programs in one place.</h1>
+                <p>
+                  Browse curated underclassmen-friendly programs, save what matters, and see what is confirmed so your
+                  next step feels easier to choose.
+                </p>
+              </div>
+              <div className="hero-facts" aria-label="Current library status">
+                <span>
+                  <strong>{opportunityRecords.length}</strong>
+                  Programs
+                </span>
+                <span>
+                  <strong>{verifiedCount}</strong>
+                  Confirmed
+                </span>
+                <span>
+                  <strong>{savedIds.length}</strong>
+                  Saved
+                </span>
+              </div>
+            </section>
+
+            <section className="command-strip" aria-label="Opportunity search command center">
+              <label className="global-search">
+                <span>Search programs</span>
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Search program, role, timing, or source..."
+                />
+              </label>
+              <div className="view-controls" aria-label="Class-year view">
+                <span>Class-Year View</span>
+                <div className="segmented-control">
+                  {quickViews.map((view) => (
+                    <button
+                      key={view.id}
+                      className={classYear === view.id ? 'active' : ''}
+                      type="button"
+                      onClick={() => setClassYear(view.id)}
+                    >
+                      {view.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            {showInternalTools ? <VerificationQueuePanel queueItems={verificationQueueItems} onSelect={focusOpportunity} /> : null}
+
+            <section className="recommendation-guide" aria-label="Recommendation guide">
+              <strong>Recommendation guide</strong>
+              <span>Recommended: strongest fit</span>
+              <span>Watch List: worth tracking</span>
+              <span>Foundation: prep and access</span>
+            </section>
+
+            <section className="product-grid" id="library" aria-label="Opportunity library">
+              <aside className="left-rail">
+                <FilterStack
+                  showInternalTools={showInternalTools}
+                  category={category}
+                  setCategory={setCategory}
+                  roleTrack={roleTrack}
+                  setRoleTrack={setRoleTrack}
+                  priority={priority}
+                  setPriority={setPriority}
+                  verification={verification}
+                  setVerification={setVerification}
+                  timing={timing}
+                  setTiming={setTiming}
+                  status={status}
+                  setStatus={setStatus}
+                  resetFilters={resetFilters}
+                />
+                <ReadinessPanel
+                  readinessPercent={readinessPercent}
+                  recordCount={opportunityRecords.length}
+                  verifiedCount={verifiedCount}
+                  target={phaseOneTarget}
+                />
+                <ReviewModeControl
+                  enabled={showInternalTools}
+                  onToggle={() => setShowInternalTools((current) => !current)}
+                />
+              </aside>
+
+              <section className="results-board">
+                <div className="board-toolbar">
+                  <div>
+                    <span>Program queue</span>
+                    <strong>{filtered.length} programs</strong>
+                  </div>
+                  <button type="button" onClick={resetFilters}>
+                    Clear
+                  </button>
+                </div>
+                <div className="record-table" role="list">
+                  {filtered.length ? (
+                    filtered.map((opportunity) => (
+                      <OpportunityRecord
+                        key={opportunity.id}
+                        opportunity={opportunity}
+                        selected={selectedOpportunity?.id === opportunity.id}
+                        saved={savedIds.includes(opportunity.id)}
+                        onSelect={() => setSelectedId(opportunity.id)}
+                        onSave={() => toggleSaved(opportunity.id)}
+                      />
+                    ))
+                  ) : (
+                    <EmptyState onReset={resetFilters} />
+                  )}
+                </div>
+              </section>
+
+              <aside className="right-rail">
+                <OpportunityDetail
+                  opportunity={selectedOpportunity}
+                  saved={selectedOpportunity ? savedIds.includes(selectedOpportunity.id) : false}
+                  onSave={() => selectedOpportunity && toggleSaved(selectedOpportunity.id)}
+                  onVerificationSave={saveVerificationEdit}
+                  onVerificationReset={resetVerificationEdit}
+                  sourceCheckEntries={selectedOpportunity ? sourceCheckLog[selectedOpportunity.id] ?? [] : []}
+                  onSourceCheckSave={addSourceCheckLogEntry}
+                  showInternalTools={showInternalTools}
+                />
+                <Shortlist items={savedOpportunities} onSelect={setSelectedId} />
+              </aside>
+            </section>
+          </>
+        )}
       </main>
     </div>
   );
 }
 
-function Header({ savedCount, showInternalTools }) {
+function Header({ activeView, onViewChange, savedCount, showInternalTools }) {
   return (
     <header className="site-header">
-      <a className="brand" href="#library" aria-label="ApplyFirst home">
+      <button className="brand" type="button" onClick={() => onViewChange('monitor')} aria-label="ApplyFirst home">
         <span aria-hidden="true">AF</span>
         <span className="brand-copy">
           <strong>ApplyFirst</strong>
           <em>Track career-launch programs</em>
         </span>
-      </a>
+      </button>
       <nav aria-label="Page links">
-        <a href="#library">Monitor</a>
-        <a href="#alerts">Alerts</a>
-        <a href="#waitlist">Waitlist</a>
-        {showInternalTools ? <a href="#verification">Source Review</a> : null}
-        <span>{savedCount} saved</span>
-        {showInternalTools ? <span>Maintainer Mode On</span> : null}
+        <div className="nav-tabs" role="group" aria-label="Primary views">
+          <button
+            className={activeView === 'monitor' ? 'active' : ''}
+            type="button"
+            onClick={() => onViewChange('monitor')}
+          >
+            Programs
+          </button>
+          <button
+            className={activeView === 'alerts' ? 'active' : ''}
+            type="button"
+            onClick={() => onViewChange('alerts')}
+          >
+            Alerts
+          </button>
+        </div>
+        <div className="nav-status" aria-label="Workspace status">
+          <span>{savedCount} Saved</span>
+          {showInternalTools ? <span className="internal-status">Maintainer</span> : null}
+        </div>
       </nav>
     </header>
   );
@@ -505,11 +522,11 @@ function TrustPolicyPanel() {
   return (
     <section className="trust-policy-panel" aria-label="Alert trust policy">
       <div className="trust-policy-copy">
-        <span>Trust policy</span>
-        <h2>No alerts from unconfirmed programs</h2>
+        <span>Confirmation</span>
+        <h2>Why some programs wait</h2>
         <p>
-          ApplyFirst can help students prepare early, but official sources remain the source of truth. Alerts should
-          only ship when a program has current timing, a checked official page, and clear eligibility context.
+          ApplyFirst can help you prepare early, but official pages are still the source of truth. A program should only
+          become a real alert when timing and eligibility are clear.
         </p>
       </div>
       <div className="trust-policy-grid">
@@ -573,7 +590,6 @@ function AlertSetupPanel({
   alertPrefs,
   setAlertPrefs,
   matchCount,
-  alertableCount,
   alertStrategy,
   waitlistIntent,
   onWaitlistSave,
@@ -588,70 +604,71 @@ function AlertSetupPanel({
 
   return (
     <section className="alert-setup-panel">
-      <div className="panel-heading">
-        <span>Alerts</span>
-        <h2>Choose what to watch</h2>
+      <div className="alert-setup-intro">
+        <div className="panel-heading">
+          <span>Setup</span>
+          <h2>Build your program watchlist</h2>
+        </div>
+        <p>
+          These choices decide which programs show up in your alert preview. Unconfirmed records can still help you
+          prepare, but future alerts should only come from confirmed program pages.
+        </p>
       </div>
-      <p>
-        Pick the kinds of programs you care about. ApplyFirst will only use confirmed programs for future alerts,
-        so anything uncertain waits before it can trigger a notification.
-      </p>
-      <div className="alert-controls">
-        <FilterSelect
-          label="Class year"
-          value={alertPrefs.classYear}
-          onChange={(value) => updatePref('classYear', value)}
-          options={filterOptions.classYears}
-        />
-        <FilterSelect
-          label="Role track"
-          value={alertPrefs.roleTrack}
-          onChange={(value) => updatePref('roleTrack', value)}
-          options={filterOptions.roleTracks}
-        />
-        <FilterSelect
-          label="Recommendation"
-          value={alertPrefs.priority}
-          onChange={(value) => updatePref('priority', value)}
-          options={filterOptions.priorities}
-          labels={priorityLabels}
-        />
-        <FilterSelect
-          label="Alert mode"
-          value={alertPrefs.notificationMode}
-          onChange={(value) => updatePref('notificationMode', value)}
-          options={Object.keys(notificationModeLabels)}
-          labels={notificationModeLabels}
-        />
-        <FilterSelect
-          label="Send timing"
-          value={alertPrefs.sendTiming}
-          onChange={(value) => updatePref('sendTiming', value)}
-          options={Object.keys(sendTimingLabels)}
-          labels={sendTimingLabels}
-        />
-      </div>
-      <div className="alert-summary" aria-label="Alert preference summary">
-        <span>
-          <strong>{matchCount}</strong>
-          Programs matching you
-        </span>
-        <span>
-          <strong>{alertableCount}</strong>
-          Ready for alerts
-        </span>
-        <span>
-          <strong>{Math.max(matchCount - alertableCount, 0)}</strong>
-          Needs confirmation
-        </span>
+      <div className="alert-step-grid">
+        <article className="alert-step-card">
+          <span>1</span>
+          <h3>About you</h3>
+          <FilterSelect
+            label="Class year"
+            value={alertPrefs.classYear}
+            onChange={(value) => updatePref('classYear', value)}
+            options={filterOptions.classYears}
+          />
+          <FilterSelect
+            label="Role interest"
+            value={alertPrefs.roleTrack}
+            onChange={(value) => updatePref('roleTrack', value)}
+            options={filterOptions.roleTracks}
+          />
+        </article>
+        <article className="alert-step-card">
+          <span>2</span>
+          <h3>Programs</h3>
+          <FilterSelect
+            label="Program group"
+            value={alertPrefs.priority}
+            onChange={(value) => updatePref('priority', value)}
+            options={filterOptions.priorities}
+            labels={priorityLabels}
+          />
+          <p>{matchCount} programs match this setup.</p>
+        </article>
+        <article className="alert-step-card">
+          <span>3</span>
+          <h3>Updates</h3>
+          <FilterSelect
+            label="Update option"
+            value={alertPrefs.notificationMode}
+            onChange={(value) => updatePref('notificationMode', value)}
+            options={Object.keys(notificationModeLabels)}
+            labels={notificationModeLabels}
+          />
+          <FilterSelect
+            label="When to update"
+            value={alertPrefs.sendTiming}
+            onChange={(value) => updatePref('sendTiming', value)}
+            options={Object.keys(sendTimingLabels)}
+            labels={sendTimingLabels}
+          />
+        </article>
       </div>
       <div className="notification-strategy">
         <div>
-          <span>Future alerts</span>
+          <span>Confirmed enough</span>
           <strong>{alertStrategy.sendSummary}</strong>
         </div>
         <div>
-          <span>Still reviewing</span>
+          <span>Still checking</span>
           <strong>{alertStrategy.holdSummary}</strong>
         </div>
         <p>{alertStrategy.trustCopy}</p>
@@ -700,11 +717,11 @@ function WaitlistPanel({ alertPrefs, alertStrategy, waitlistIntent, onSave, onRe
   return (
     <section className="waitlist-panel" id="waitlist" aria-label="ApplyFirst waitlist">
       <div className="waitlist-copy">
-        <span>Alert waitlist</span>
-        <h3>{waitlistIntent ? 'Alert preferences saved locally' : 'Join the alert waitlist'}</h3>
+        <span>Save setup</span>
+        <h3>{waitlistIntent ? 'Your setup is saved locally' : 'Save this alert setup'}</h3>
         <p>
-          Choose what you want ApplyFirst to watch. This prototype keeps your preferences in this browser until a
-          real waitlist or account system is connected.
+          Add optional contact context so this can become a real waitlist later. For now, ApplyFirst only saves this in
+          your browser.
         </p>
       </div>
       <dl>
@@ -713,8 +730,8 @@ function WaitlistPanel({ alertPrefs, alertStrategy, waitlistIntent, onSave, onRe
           <dd>{preferenceSummary}</dd>
         </div>
         <div>
-          <dt>Status</dt>
-          <dd>{alertStrategy.modeLabel} before live alerts</dd>
+          <dt>Saved as</dt>
+          <dd>{alertStrategy.modeLabel}</dd>
         </div>
       </dl>
       {waitlistIntent ? (
@@ -727,7 +744,7 @@ function WaitlistPanel({ alertPrefs, alertStrategy, waitlistIntent, onSave, onRe
       ) : (
         <form className="waitlist-form" onSubmit={saveDraft}>
           <label>
-            <span>Email</span>
+            <span>Email for future updates</span>
             <input
               type="email"
               value={draft.email}
@@ -736,7 +753,7 @@ function WaitlistPanel({ alertPrefs, alertStrategy, waitlistIntent, onSave, onRe
             />
           </label>
           <label>
-            <span>School / major</span>
+            <span>School or major</span>
             <input
               value={draft.context}
               onChange={(event) => updateDraft('context', event.target.value)}
@@ -744,10 +761,10 @@ function WaitlistPanel({ alertPrefs, alertStrategy, waitlistIntent, onSave, onRe
             />
           </label>
           <label className="waitlist-note">
-            <span>What should ApplyFirst watch?</span>
+            <span>Anything specific to watch?</span>
             <textarea value={draft.note} onChange={(event) => updateDraft('note', event.target.value)} />
           </label>
-          <button type="submit">Join Waitlist</button>
+          <button type="submit">Save Setup</button>
         </form>
       )}
     </section>
@@ -765,30 +782,21 @@ function createWaitlistDraft(alertPrefs) {
   };
 }
 
-function MetricTile({ label, value, tone }) {
-  return (
-    <div className={`metric-tile tile-${tone}`}>
-      <strong>{value}</strong>
-      <span>{label}</span>
-    </div>
-  );
-}
-
 function ReadinessPanel({ readinessPercent, recordCount, verifiedCount, target }) {
   const mvpComplete = recordCount >= target;
   const readinessItems = [
-    { label: 'Standalone app shell', complete: true },
-    { label: 'Core filters', complete: true },
-    { label: 'Persistent shortlist', complete: true },
-    { label: `${target}+ curated records`, complete: recordCount >= target },
-    { label: 'Confirmed program checks', complete: verifiedCount >= target },
+    { label: 'Curated program library', complete: true },
+    { label: 'Filters for class year and role', complete: true },
+    { label: 'Saved program list', complete: true },
+    { label: `${target}+ programs included`, complete: recordCount >= target },
+    { label: 'Official-page checks underway', complete: verifiedCount >= target },
   ];
 
   return (
     <section className="readiness-panel">
       <div className="panel-heading">
-        <span>Prototype status</span>
-        <h2>{mvpComplete ? 'Student preview ready' : 'Student preview in progress'}</h2>
+        <span>Preview coverage</span>
+        <h2>{mvpComplete ? 'Useful starting library' : 'Library still growing'}</h2>
       </div>
       <div className="readiness-meter" aria-label={`Phase 1 record target is ${readinessPercent}% complete`}>
         <span style={{ width: `${readinessPercent}%` }} />
@@ -796,8 +804,8 @@ function ReadinessPanel({ readinessPercent, recordCount, verifiedCount, target }
       <p>
         {recordCount}/{target} records, {verifiedCount} confirmed.{' '}
         {mvpComplete
-          ? 'The app is usable as a public prototype; live alerts should wait until more programs are confirmed.'
-          : 'The shell is usable; the seed set still needs expansion before Phase 1 is complete.'}
+          ? 'Enough programs are included to explore, compare, and start saving next steps.'
+          : 'The app is usable now, and more programs can be added as the library grows.'}
       </p>
       <ul>
         {readinessItems.map((item) => (
@@ -831,7 +839,7 @@ function FilterStack({
     <section className="filter-stack">
       <div className="panel-heading">
         <span>Filters</span>
-        <h2>Refine the monitor</h2>
+        <h2>Find programs that fit you</h2>
       </div>
       <FilterSelect
         label="Role track"
@@ -960,7 +968,7 @@ function OpportunityDetail({
       </div>
       <div className="detail-actions">
         <a href={opportunity.url} target="_blank" rel="noreferrer">
-          View source
+          Official page
         </a>
         <button
           className={`detail-bookmark${saved ? ' saved' : ''}`}
@@ -970,11 +978,11 @@ function OpportunityDetail({
           title={saved ? 'Remove from shortlist' : 'Add to shortlist'}
         >
           <BookmarkIcon filled={saved} />
-          Shortlist
+          {saved ? 'Saved' : 'Save'}
         </button>
       </div>
       <section className="detail-next-step" aria-label="Recommended next step">
-        <span>Next step</span>
+        <span>Recommended next step</span>
         <h3>{monitorSignal.actionLabel}</h3>
         <p>{monitorSignal.nextAction}</p>
         <strong>{opportunity.openDate}</strong>
@@ -988,7 +996,7 @@ function OpportunityDetail({
         />
       </div>
       <DetailSection title="Why this matters">{opportunity.why}</DetailSection>
-      <DetailSection title="Prep notes">{opportunity.prep}</DetailSection>
+      <DetailSection title="How to prepare">{opportunity.prep}</DetailSection>
       <div className="metric-grid">
         <Metric label="Best for" value={opportunity.classYears.join(', ')} />
         <Metric label="Track" value={tracks.join(' + ')} />
@@ -996,7 +1004,7 @@ function OpportunityDetail({
         <Metric label="Funding" value={opportunity.funding} />
       </div>
       <div className="tracker-fields">
-        <h3>Program details</h3>
+        <h3>Useful details</h3>
         <dl>
           <div>
             <dt>Open date</dt>
@@ -1116,9 +1124,9 @@ function getAlertStrategy(alertPrefs, matches, alertableCount) {
   const channelCopy =
     alertPrefs.notificationMode === 'local'
       ? 'This stays in your browser for now.'
-      : alertPrefs.notificationMode === 'saved'
-        ? 'Saved-program reminders would come after accounts or email consent exist.'
-        : 'Join the waitlist first; email alerts come after confirmed alert rules exist.';
+    : alertPrefs.notificationMode === 'saved'
+        ? 'Saved-program reminders can come later after accounts or email consent exist.'
+        : 'Email alerts can come later after a real waitlist and confirmed rules exist.';
   const timingCopy =
     alertPrefs.sendTiming === 'openOnly'
       ? 'program openings'
@@ -1128,9 +1136,9 @@ function getAlertStrategy(alertPrefs, matches, alertableCount) {
 
   return {
     modeLabel,
-    sendSummary: `${alertableCount} ${alertableCount === 1 ? 'program' : 'programs'} could qualify for ${timingCopy}`,
-    holdSummary: `${heldCount} ${heldCount === 1 ? 'program needs' : 'programs need'} confirmation first`,
-    trustCopy: `${modeLabel} / ${timingLabel}: ${channelCopy} Programs that are not confirmed stay out of alerts.`,
+    sendSummary: `${alertableCount} ${alertableCount === 1 ? 'program is' : 'programs are'} confirmed enough for ${timingCopy}`,
+    holdSummary: `${heldCount} ${heldCount === 1 ? 'program still needs' : 'programs still need'} an official check`,
+    trustCopy: `${channelCopy} Your timing choice is ${timingLabel.toLowerCase()}, and unconfirmed programs stay out of alerts.`,
   };
 }
 

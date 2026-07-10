@@ -244,6 +244,7 @@ The first Phase 2 slice is intentionally local and trust-focused:
 - Log manual source checks locally with checked date, result, and note so verification work has an audit trail before backend storage exists.
 - Let users preview a notification strategy: local preview, email waitlist, or saved-program reminders.
 - Let users choose alert timing scope: openings only, openings and deadlines, or prep windows plus openings and deadlines.
+- Split the public prototype into a focused Programs view and a separate Alerts setup view.
 - Explain matching programs, alert readiness, and programs needing confirmation in student-facing language.
 - Keep technical monitoring-readiness details in Maintainer Mode instead of the default public alert surface.
 - Display a public trust policy explaining Confirmed, Prep Only, and Needs Confirmation records, with a hard rule that outbound alerts should not come from unconfirmed records.
@@ -293,7 +294,7 @@ Portfolio display option: **ApplyFirst: Early-Career Program Monitor**
 
 ### 2. One-Line Summary
 
-ApplyFirst helps underclassmen and emerging technical students discover, track, and prepare for high-signal career-launch programs before applications open.
+ApplyFirst helps underclassmen and emerging technical students discover, track, and prepare for high-signal career-launch programs in one place.
 
 ### 3. Problem
 
@@ -404,7 +405,7 @@ Not yet public-alert ready. Before positioning it as a live alerting resource, t
 
 #### Overview
 
-ApplyFirst is an early-career program monitor for students who need to find, track, and prepare for high-signal career-launch opportunities before they open.
+ApplyFirst is an early-career program monitor for students who need to find, track, and prepare for high-signal career-launch opportunities in one place.
 
 The product started from a personal pain point: useful programs were scattered across GitHub repos, company pages, fellowships, communities, and school resources. Finding a list was only the first step. Students still had to check every link, verify eligibility, track opening windows, and apply quickly before spots filled.
 
@@ -455,7 +456,7 @@ This project helped me practice turning scattered information into a product sys
 
 Title: **ApplyFirst**
 
-1-sentence description: A program monitor that helps underclassmen track high-signal internships, fellowships, and career-launch opportunities before they open.
+1-sentence description: A program monitor that helps underclassmen track high-signal internships, fellowships, and career-launch opportunities in one place.
 
 Tags:
 

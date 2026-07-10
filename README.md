@@ -1,6 +1,6 @@
 # ApplyFirst
 
-A standalone product MVP for helping underclassmen and emerging technical students monitor high-signal career-launch programs before they open: underclassmen-friendly internships, fellowships, externships, winternships, scholarships, technical communities, and conference funding paths.
+A standalone product MVP for helping underclassmen and emerging technical students discover, track, and prepare for high-signal career-launch programs: underclassmen-friendly internships, fellowships, externships, winternships, scholarships, technical communities, and conference funding paths.
 
 For the reusable product narrative, portfolio angle, scope decisions, and future roadmap, see [PROJECT_BRIEF.md](./PROJECT_BRIEF.md).
 
@@ -58,6 +58,7 @@ The first Phase 2 slice adds:
 - Local source-check log with checked date, result, and notes.
 - Notification strategy preview with local preview, email waitlist, and saved-program reminder modes.
 - Alert timing preview for openings, deadlines, and preparation windows.
+- Navigation split between the focused Programs view and a separate Alerts setup view.
 - Simplified student-facing alert preference section with technical readiness details kept in Maintainer Mode.
 - Trust copy that separates records ready to alert from records that still need confirmation.
 - Public trust policy for Confirmed, Prep Only, and Needs Confirmation records.
