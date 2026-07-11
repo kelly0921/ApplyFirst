@@ -22,6 +22,13 @@ The mark uses a softened Sharp A with a restrained underline, matching the produ
 
 ApplyFirst is part of the broader Opportunity Systems product exploration. This app is separate from Kelly's portfolio, so the portfolio can show a case study and screenshots while this app becomes the actual user-facing resource.
 
+ApplyFirst combines two connected layers:
+
+- **Student Opportunity Library**: the public foundation for curated programs, fellowships, scholarships, grants, technical communities, and conference funding paths.
+- **Opportunity Signal Tracker**: the product layer for tracking official-page changes, old vs new URLs, application season patterns, sponsor announcements, confidence scores, and human/community verification.
+
+The library is the front door. The tracker is the moat. The current app starts with the library and local monitoring scaffolding, then grows toward trustworthy alerts.
+
 The first version focuses on:
 
 - Class-year fit for freshmen, sophomores, and all class years.

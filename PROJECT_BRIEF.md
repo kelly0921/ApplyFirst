@@ -32,6 +32,13 @@ This is not a generic internship board.
 
 Existing tools already cover broad job volume: Simplify, LinkedIn, Handshake, school job boards, and public internship repos. ApplyFirst should focus on high-leverage programs where timing, eligibility, and preparation matter more than raw listing volume.
 
+ApplyFirst has two connected product layers:
+
+1. **Student Opportunity Library**: the public-facing foundation that helps students discover high-signal programs worth knowing about.
+2. **Opportunity Signal Tracker**: the differentiated product engine that tracks official-page changes, seasonality, confidence, and human verification before students are notified.
+
+The library is the front door. The signal tracker is the product moat. They should not be treated as separate projects; ApplyFirst needs both to become useful, trustworthy, and meaningfully different from a normal opportunity list.
+
 The wedge:
 
 - Special programs over normal postings.
@@ -139,6 +146,8 @@ Still needs official-cycle verification:
 
 Phase 1 is a manually curated, searchable, filterable program monitor.
 
+In product terms, Phase 1 is the first version of the Student Opportunity Library. It should earn public credibility by organizing scattered student opportunity sources into a clearer, calmer, more useful place to start.
+
 Core Phase 1 features:
 
 - Curated seed dataset.
@@ -164,7 +173,9 @@ It is ready to show as a public prototype, but not public-alert ready until the 
 
 ## Future Product Direction
 
-The strongest long-term product is the Opportunity Signal Tracker.
+The strongest long-term product layer is the Opportunity Signal Tracker.
+
+This layer should build on the Student Opportunity Library instead of replacing it. The library tells students what is worth watching; the tracker tells them when something changed, how confident ApplyFirst is, and what action they should take next.
 
 Future capabilities:
 
