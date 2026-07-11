@@ -65,6 +65,8 @@ The first Phase 2 slice adds:
 - Local waitlist-intent workflow before accounts, reminders, or real outbound alerts.
 - Maintainer Mode toggle for source-review tools, keeping the default view student-facing.
 - A clear split between public prototype behavior and future live notifications.
+- Student-facing monitoring workflow explanation: save programs, verify official pages, watch opening signals, then notify only when trustworthy.
+- Alerts-page saved-program preview showing which bookmarked programs are ready later versus still being checked.
 
 Real email alerts, accounts, and automated page-change monitoring are intentionally still future work.
 
@@ -75,6 +77,7 @@ The first source-monitoring slice keeps the workflow maintainer-controlled inste
 - Maintainer-only monitoring assistant for pasted official-page text.
 - Local classification of page text into application opened, dates updated, eligibility changed, no material change, or needs follow-up.
 - Conservative handling for common official-page patterns: interest forms, "not yet open" pages, rolling review language, closed cycles, and future opening windows.
+- Maintainer review decision labels for alert candidates, deadline candidates, prep watch, watch-only checks, and manual review.
 - Suggested program status and confidence updates before a maintainer confirms them.
 - One-click local source-check log entry from the assistant's suggestion.
 - One-click local verification update for open window, deadline, last checked date, confidence, status, and source note.

@@ -318,6 +318,11 @@ function App() {
               alertPrefs={alertPrefs}
               setAlertPrefs={setAlertPrefs}
               matchCount={alertPreviewMatches.length}
+              savedOpportunities={savedOpportunities}
+              onSavedSelect={(id) => {
+                setSelectedId(id);
+                setActiveView('monitor');
+              }}
               alertStrategy={alertStrategy}
               waitlistIntent={waitlistIntent}
               onWaitlistSave={saveWaitlistIntent}
@@ -590,6 +595,8 @@ function AlertSetupPanel({
   alertPrefs,
   setAlertPrefs,
   matchCount,
+  savedOpportunities,
+  onSavedSelect,
   alertStrategy,
   waitlistIntent,
   onWaitlistSave,
@@ -673,6 +680,8 @@ function AlertSetupPanel({
         </div>
         <p>{alertStrategy.trustCopy}</p>
       </div>
+      <MonitoringWorkflowPanel matchCount={matchCount} alertStrategy={alertStrategy} />
+      <SavedAlertPreview items={savedOpportunities} onSelect={onSavedSelect} />
       <WaitlistPanel
         alertPrefs={alertPrefs}
         alertStrategy={alertStrategy}
@@ -680,6 +689,95 @@ function AlertSetupPanel({
         onSave={onWaitlistSave}
         onReset={onWaitlistReset}
       />
+    </section>
+  );
+}
+
+function SavedAlertPreview({ items, onSelect }) {
+  const alertReadyCount = items.filter((item) => getMonitoringReadiness(item).alertable).length;
+  const needsCheckCount = Math.max(items.length - alertReadyCount, 0);
+
+  return (
+    <section className="saved-alert-preview" aria-label="Saved program alert preview">
+      <div className="saved-alert-heading">
+        <div>
+          <span>Saved programs</span>
+          <h3>{items.length ? `${items.length} saved for tracking` : 'No saved programs yet'}</h3>
+        </div>
+        {items.length ? (
+          <strong>
+            {alertReadyCount} ready / {needsCheckCount} checking
+          </strong>
+        ) : null}
+      </div>
+      {items.length ? (
+        <div className="saved-alert-list" role="list">
+          {items.slice(0, 4).map((item) => {
+            const signal = getMonitorSignal(item);
+            const readiness = getMonitoringReadiness(item);
+
+            return (
+              <button key={item.id} type="button" onClick={() => onSelect(item.id)} role="listitem">
+                <span>{item.name}</span>
+                <strong>{signal.actionLabel}</strong>
+                <em>{readiness.alertable ? 'Alert-ready later' : readiness.status}</em>
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <p>
+          Start on Programs and bookmark opportunities you would actually apply to. Saved programs become the most useful
+          candidates for future reminders once official pages are verified.
+        </p>
+      )}
+    </section>
+  );
+}
+
+function MonitoringWorkflowPanel({ matchCount, alertStrategy }) {
+  const workflowSteps = [
+    {
+      label: 'Save',
+      title: 'Choose what matters',
+      text: `${matchCount} programs match your current setup. Save the ones you would actually apply to or prepare for.`,
+    },
+    {
+      label: 'Verify',
+      title: 'Check official pages',
+      text: 'ApplyFirst keeps unconfirmed programs out of future alerts until timing and eligibility are backed by official pages.',
+    },
+    {
+      label: 'Watch',
+      title: 'Track opening signals',
+      text: 'Official-page checks look for apply links, opening windows, deadlines, eligibility changes, and closed-cycle language.',
+    },
+    {
+      label: 'Notify',
+      title: 'Send only when trustworthy',
+      text: alertStrategy.sendSummary,
+    },
+  ];
+
+  return (
+    <section className="monitoring-workflow-panel" aria-label="How ApplyFirst monitoring works">
+      <div className="monitoring-workflow-copy">
+        <span>How monitoring works</span>
+        <h3>From saved program to future alert</h3>
+        <p>
+          This prototype shows the workflow before live notifications exist: students choose what to watch, records get
+          verified, and only confirmed timing should become alert-ready.
+        </p>
+      </div>
+      <div className="monitoring-workflow-steps">
+        {workflowSteps.map((step) => (
+          <article key={step.label}>
+            <span>{step.label}</span>
+            <strong>{step.title}</strong>
+            <p>{step.text}</p>
+          </article>
+        ))}
+      </div>
     </section>
   );
 }
@@ -1125,6 +1223,7 @@ function SourceUpdatePlan({ plan }) {
 function SourceCheckAssistant({ opportunity, onLog, onApplySuggestion }) {
   const [sourceText, setSourceText] = useState('');
   const [analysis, setAnalysis] = useState(() => createSourceAnalysis(opportunity, ''));
+  const reviewDecision = getSourceReviewDecision(analysis);
 
   useEffect(() => {
     setSourceText('');
@@ -1142,6 +1241,7 @@ function SourceCheckAssistant({ opportunity, onLog, onApplySuggestion }) {
       note: analysis.note,
       suggestedStatus: analysis.suggestedStatus,
       suggestedConfidence: analysis.suggestedConfidence,
+      reviewDecision: reviewDecision.label,
       sourceExcerpt: sourceText.trim().slice(0, 500),
     });
   };
@@ -1191,6 +1291,14 @@ function SourceCheckAssistant({ opportunity, onLog, onApplySuggestion }) {
         </span>
       </div>
       <p className="assistant-note">{analysis.note}</p>
+      <section className={`assistant-review-decision assistant-review-${reviewDecision.tone}`} aria-label="Maintainer review decision">
+        <div>
+          <span>Review decision</span>
+          <strong>{reviewDecision.label}</strong>
+        </div>
+        <p>{reviewDecision.description}</p>
+        <em>{reviewDecision.nextStep}</em>
+      </section>
       <div className="assistant-actions">
         <button type="button" onClick={analyzeText}>
           Analyze Text
@@ -1204,6 +1312,54 @@ function SourceCheckAssistant({ opportunity, onLog, onApplySuggestion }) {
       </div>
     </section>
   );
+}
+
+function getSourceReviewDecision(analysis) {
+  const highConfidence = analysis.suggestedConfidence === 'high';
+  const mediumConfidence = analysis.suggestedConfidence === 'medium';
+
+  if (analysis.result === 'Application opened' && analysis.suggestedStatus === 'open' && highConfidence) {
+    return {
+      label: 'Alert Candidate',
+      tone: 'ready',
+      description: 'The pasted text has enough signal to become a candidate for an opening alert after human confirmation.',
+      nextStep: 'Log the suggestion, apply local fields, then re-open the official page before sending anything public.',
+    };
+  }
+
+  if (analysis.suggestedStatus === 'deadlineSoon' && (highConfidence || mediumConfidence)) {
+    return {
+      label: 'Deadline Candidate',
+      tone: 'ready',
+      description: 'The pasted text looks useful for a deadline reminder, but it still needs the official record saved first.',
+      nextStep: 'Confirm the deadline on the official page, apply the local fields, and keep the source note specific.',
+    };
+  }
+
+  if (analysis.suggestedStatus === 'expectedSoon' && mediumConfidence) {
+    return {
+      label: 'Prep Watch',
+      tone: 'watch',
+      description: 'This is useful for student preparation, but it is not enough to send an opening alert yet.',
+      nextStep: 'Keep it in the watch queue and check again during the expected opening window.',
+    };
+  }
+
+  if (analysis.suggestedStatus === 'watching') {
+    return {
+      label: 'Watch Only',
+      tone: 'watch',
+      description: 'The page gives a reason to keep monitoring, but does not prove that applications are open.',
+      nextStep: 'Log the check so the next maintainer can see why this stayed out of alerts.',
+    };
+  }
+
+  return {
+    label: 'Manual Review',
+    tone: 'review',
+    description: 'The pasted text does not have enough timing or eligibility signal for an alert decision.',
+    nextStep: 'Open the official page directly and update the record only after the current cycle is clear.',
+  };
 }
 
 function createSourceAnalysis(opportunity, sourceText) {
@@ -1464,6 +1620,7 @@ function SourceCheckLog({ opportunity, entries, onSave }) {
             <article key={entry.id} role="listitem">
               <span>{entry.checkedDate}</span>
               <strong>{entry.result}</strong>
+              {entry.reviewDecision ? <em>{entry.reviewDecision}</em> : null}
               <p>{entry.note || 'No note added.'}</p>
             </article>
           ))}

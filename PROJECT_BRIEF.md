@@ -250,8 +250,10 @@ The first Phase 2 slice is intentionally local and trust-focused:
 - Display a public trust policy explaining Confirmed, Prep Only, and Needs Confirmation records, with a hard rule that outbound alerts should not come from unconfirmed records.
 - Use a local waitlist-intent workflow as the first public conversion path before accounts, reminders, or real outbound alerts.
 - Save waitlist intent locally with email, school / major context, notes, selected alert preferences, and saved timestamp.
+- Connect saved programs to the alert setup experience so bookmarked records feel like the future reminder list, not a disconnected sidebar.
 - Keep maintainer-only source-review tools behind Maintainer Mode so the default public view stays student-focused.
 - Make it clear that public notifications should not launch until official-source verification and monitoring rules are reliable.
+- Explain the future monitoring workflow in student-facing language: save the programs that matter, verify official pages, watch opening signals, and notify only when records are trustworthy.
 
 Recommended waitlist fields:
 
@@ -277,6 +279,8 @@ Phase 2.5 starts the path toward the feature students ultimately want: knowing w
 This slice is intentionally manual-assisted instead of fully autonomous. Maintainers can paste official-page text into a monitoring assistant, review suggested application status changes, log a source check, and apply local verification fields. The assistant can suggest whether a page indicates an application opened, dates changed, eligibility changed, no material change, or needs follow-up.
 
 The assistant is intentionally conservative with official-page ambiguity. Interest forms, "not yet open" language, rolling-review wording without a clear opening, and closed-cycle pages are treated as watch or review signals instead of automatic public-alert triggers.
+
+The next layer is a maintainer review decision. The assistant separates raw classification from operational action by labeling checks as alert candidates, deadline candidates, prep watch, watch only, or manual review. This makes the future pipeline clearer: page interpretation creates a review artifact, then a human decides whether the record can move closer to notification readiness.
 
 The important product decision is that AI-like interpretation does not directly send public alerts. It creates a maintainer review artifact first. Public alerting should still wait for backend storage, scheduled page checks, OpenAI-powered interpretation, durable audit logs, and notification consent.
 
