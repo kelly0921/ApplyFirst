@@ -1698,6 +1698,17 @@ a {
   padding: 12px;
 }
 
+.source-check-assistant {
+  display: grid;
+  gap: 12px;
+  border: 1px solid rgba(31, 99, 214, 0.22);
+  border-radius: 8px;
+  background:
+    linear-gradient(145deg, rgba(47, 99, 214, 0.08), transparent 58%),
+    #ffffff;
+  padding: 12px;
+}
+
 .source-check-heading {
   display: flex;
   justify-content: space-between;
@@ -1723,6 +1734,96 @@ a {
   font-weight: 850;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.source-check-assistant .source-check-heading > span {
+  border-color: rgba(47, 99, 214, 0.24);
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.source-assistant-field {
+  display: grid;
+  gap: 5px;
+}
+
+.source-assistant-field span {
+  color: var(--quiet);
+  font-size: 0.66rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.source-assistant-field textarea {
+  width: 100%;
+  min-height: 110px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #ffffff;
+  color: var(--ink);
+  padding: 9px 11px;
+  resize: vertical;
+}
+
+.source-assistant-field textarea:focus {
+  outline: 2px solid rgba(47, 99, 214, 0.2);
+  outline-offset: 1px;
+}
+
+.assistant-result-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.assistant-result-grid span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: rgba(255, 250, 242, 0.72);
+  color: var(--quiet);
+  padding: 8px;
+  font-size: 0.66rem;
+  font-weight: 820;
+  text-transform: uppercase;
+}
+
+.assistant-result-grid strong {
+  color: var(--ink);
+  font-size: 0.8rem;
+  line-height: 1.25;
+  text-transform: none;
+}
+
+.assistant-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.assistant-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.assistant-actions button {
+  border: 1px solid rgba(47, 99, 214, 0.24);
+  border-radius: 7px;
+  background: #ffffff;
+  color: var(--blue);
+  padding: 8px 10px;
+  font-size: 0.8rem;
+  font-weight: 820;
+}
+
+.assistant-actions button:first-child {
+  background: var(--blue);
+  color: #ffffff;
 }
 
 .source-check-form {

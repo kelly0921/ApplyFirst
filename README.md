@@ -67,3 +67,17 @@ The first Phase 2 slice adds:
 - A clear split between public prototype behavior and future live notifications.
 
 Real email alerts, accounts, and automated page-change monitoring are intentionally still future work.
+
+## Phase 2.5 Source Monitoring Foundation
+
+The first source-monitoring slice keeps the workflow maintainer-controlled instead of sending autonomous alerts.
+
+- Maintainer-only monitoring assistant for pasted official-page text.
+- Local classification of page text into application opened, dates updated, eligibility changed, no material change, or needs follow-up.
+- Conservative handling for common official-page patterns: interest forms, "not yet open" pages, rolling review language, closed cycles, and future opening windows.
+- Suggested program status and confidence updates before a maintainer confirms them.
+- One-click local source-check log entry from the assistant's suggestion.
+- One-click local verification update for open window, deadline, last checked date, confidence, status, and source note.
+- Human confirmation remains required before any record is treated as alert-ready.
+
+Still future work: backend storage, scheduled crawling, OpenAI-powered interpretation, durable review queues, accounts, and outbound notifications.

@@ -1055,6 +1055,11 @@ function OpportunityDetail({
             <p>Maintainer-only workflow for verification, source checks, and future alert operations.</p>
           </div>
           <SourceUpdatePlan plan={sourceUpdatePlan} />
+          <SourceCheckAssistant
+            opportunity={opportunity}
+            onLog={onSourceCheckSave}
+            onApplySuggestion={onVerificationSave}
+          />
           <SourceCheckLog
             opportunity={opportunity}
             entries={sourceCheckEntries}
@@ -1115,6 +1120,267 @@ function SourceUpdatePlan({ plan }) {
       </ul>
     </section>
   );
+}
+
+function SourceCheckAssistant({ opportunity, onLog, onApplySuggestion }) {
+  const [sourceText, setSourceText] = useState('');
+  const [analysis, setAnalysis] = useState(() => createSourceAnalysis(opportunity, ''));
+
+  useEffect(() => {
+    setSourceText('');
+    setAnalysis(createSourceAnalysis(opportunity, ''));
+  }, [opportunity]);
+
+  const analyzeText = () => {
+    setAnalysis(createSourceAnalysis(opportunity, sourceText));
+  };
+
+  const logSuggestion = () => {
+    onLog(opportunity.id, {
+      checkedDate: new Date().toISOString().slice(0, 10),
+      result: analysis.result,
+      note: analysis.note,
+      suggestedStatus: analysis.suggestedStatus,
+      suggestedConfidence: analysis.suggestedConfidence,
+      sourceExcerpt: sourceText.trim().slice(0, 500),
+    });
+  };
+
+  const applySuggestion = () => {
+    onApplySuggestion(opportunity.id, {
+      url: opportunity.url ?? '',
+      previousUrl: opportunity.previousUrl ?? '',
+      openDate: analysis.openWindow || opportunity.openDate,
+      deadline: analysis.deadline || opportunity.deadline,
+      lastChecked: new Date().toISOString().slice(0, 10),
+      confidence: analysis.suggestedConfidence,
+      status: analysis.suggestedStatus,
+      sourceNote: analysis.note,
+    });
+  };
+
+  return (
+    <section className="source-check-assistant" aria-label="Source monitoring assistant">
+      <div className="source-check-heading">
+        <div>
+          <h3>Monitoring assistant</h3>
+          <p>Paste text from the official page. The assistant suggests what changed before you confirm the record.</p>
+        </div>
+        <span>{analysis.confidenceLabel}</span>
+      </div>
+      <label className="source-assistant-field">
+        <span>Official page text</span>
+        <textarea
+          value={sourceText}
+          onChange={(event) => setSourceText(event.target.value)}
+          placeholder="Paste application status, dates, eligibility, or page text here..."
+        />
+      </label>
+      <div className="assistant-result-grid" aria-label="Suggested source interpretation">
+        <span>
+          <strong>{analysis.result}</strong>
+          Suggested result
+        </span>
+        <span>
+          <strong>{statusLabels[analysis.suggestedStatus]}</strong>
+          Suggested status
+        </span>
+        <span>
+          <strong>{confidenceLabels[analysis.suggestedConfidence]}</strong>
+          Suggested confidence
+        </span>
+      </div>
+      <p className="assistant-note">{analysis.note}</p>
+      <div className="assistant-actions">
+        <button type="button" onClick={analyzeText}>
+          Analyze Text
+        </button>
+        <button type="button" onClick={logSuggestion}>
+          Log Suggestion
+        </button>
+        <button type="button" onClick={applySuggestion}>
+          Apply Local Fields
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function createSourceAnalysis(opportunity, sourceText) {
+  const normalized = sourceText.trim().replace(/\s+/g, ' ');
+  const hasText = normalized.length > 0;
+  const openWindow = findDateSignal(normalized, ['open', 'opens', 'applications open', 'apply by', 'will open', 'opens on', 'opens in']);
+  const deadline = findDateSignal(normalized, ['deadline', 'due', 'apply by', 'submit by', 'submit your application by', 'closes', 'close'], true);
+  const saysNotOpenYet =
+    /\b(not yet open|not open yet|applications? (are )?not open|not currently accepting|not accepting applications|no longer taking applications)\b/i.test(
+      normalized,
+    );
+  const saysOpen =
+    /\b(apply now|applications? (are )?open|now accepting|currently accepting|accepting applications|submit your application)\b/i.test(
+      normalized,
+    ) && !saysNotOpenYet;
+  const saysClosed = /\b(closed|applications? (are )?closed|no longer accepting|deadline has passed)\b/i.test(normalized);
+  const saysSoon = /\b(open soon|coming soon|check back|next cycle|next application cycle|will open|opens on|opens in)\b/i.test(normalized);
+  const hasInterestForm = /\b(interest form|join (our )?(mailing list|waitlist)|notify me|get notified|sign up for updates|stay informed)\b/i.test(
+    normalized,
+  );
+  const saysRolling = /\b(rolling basis|rolling applications|reviewed on a rolling basis|accepted on a rolling basis|ongoing applications?)\b/i.test(
+    normalized,
+  );
+  const suggestsNextCycle = /\b(next cycle|future cycle|reopen|reopens|opens again|fall|spring|summer \d{4})\b/i.test(normalized);
+  const mentionsEligibility = /\b(freshman|first-year|sophomore|underclass|student|eligible|eligibility|class year)\b/i.test(normalized);
+  const mentionsTiming = Boolean(openWindow || deadline || saysOpen || saysClosed || saysSoon || saysRolling || saysNotOpenYet);
+
+  if (!hasText) {
+    return {
+      result: 'Needs follow-up',
+      suggestedStatus: opportunity.status === 'open' ? 'watching' : opportunity.status,
+      suggestedConfidence: opportunity.confidence === 'high' ? 'medium' : opportunity.confidence,
+      confidenceLabel: 'Needs text',
+      openWindow: '',
+      deadline: '',
+      note: 'Paste official-page text to classify application status, dates, and eligibility before updating this record.',
+    };
+  }
+
+  if (saysRolling && saysOpen) {
+    return {
+      result: 'Application opened',
+      suggestedStatus: 'open',
+      suggestedConfidence: mentionsEligibility || deadline ? 'high' : 'medium',
+      confidenceLabel: mentionsEligibility || deadline ? 'High signal' : 'Rolling review',
+      openWindow: 'Rolling',
+      deadline: deadline || opportunity.deadline,
+      note: buildAssistantNote('Official page text suggests applications are open and reviewed on a rolling basis.', normalized, mentionsEligibility, deadline),
+    };
+  }
+
+  if (saysOpen) {
+    return {
+      result: 'Application opened',
+      suggestedStatus: 'open',
+      suggestedConfidence: mentionsEligibility || mentionsTiming ? 'high' : 'medium',
+      confidenceLabel: mentionsEligibility || mentionsTiming ? 'High signal' : 'Medium signal',
+      openWindow: openWindow || 'Open now',
+      deadline: deadline || opportunity.deadline,
+      note: buildAssistantNote('Official page text suggests applications are open.', normalized, mentionsEligibility, deadline),
+    };
+  }
+
+  if (saysClosed) {
+    return {
+      result: 'No material change',
+      suggestedStatus: suggestsNextCycle ? 'expectedSoon' : 'watching',
+      suggestedConfidence: mentionsEligibility || mentionsTiming ? 'medium' : 'needsReview',
+      confidenceLabel: suggestsNextCycle ? 'Next cycle signal' : 'Watch only',
+      openWindow: suggestsNextCycle ? openWindow || 'Next cycle mentioned' : opportunity.openDate,
+      deadline: deadline || opportunity.deadline,
+      note: buildAssistantNote('Official page text suggests applications are not currently open.', normalized, mentionsEligibility, deadline),
+    };
+  }
+
+  if (hasInterestForm) {
+    return {
+      result: 'Needs follow-up',
+      suggestedStatus: 'watching',
+      suggestedConfidence: mentionsEligibility || mentionsTiming ? 'medium' : 'needsReview',
+      confidenceLabel: 'Interest form',
+      openWindow: openWindow || 'Watch official page',
+      deadline: deadline || opportunity.deadline,
+      note: buildAssistantNote('Official page has an interest or update form, but not a confirmed application opening.', normalized, mentionsEligibility, deadline),
+    };
+  }
+
+  if (deadline && !saysClosed) {
+    return {
+      result: 'Dates updated',
+      suggestedStatus: 'deadlineSoon',
+      suggestedConfidence: mentionsEligibility ? 'high' : 'medium',
+      confidenceLabel: mentionsEligibility ? 'High signal' : 'Medium signal',
+      openWindow: openWindow || opportunity.openDate,
+      deadline,
+      note: buildAssistantNote(`Official page text includes a deadline signal: ${deadline}.`, normalized, mentionsEligibility, deadline),
+    };
+  }
+
+  if (saysNotOpenYet || saysSoon || openWindow || saysRolling) {
+    return {
+      result: saysRolling ? 'Needs follow-up' : 'Dates updated',
+      suggestedStatus: saysRolling ? 'watching' : 'expectedSoon',
+      suggestedConfidence: mentionsEligibility || openWindow || saysRolling ? 'medium' : 'needsReview',
+      confidenceLabel: saysRolling ? 'Rolling review' : openWindow ? 'Medium signal' : 'Needs review',
+      openWindow: saysRolling ? 'Rolling mentioned' : openWindow || 'Expected soon',
+      deadline: deadline || opportunity.deadline,
+      note: buildAssistantNote(
+        saysRolling
+          ? 'Official page mentions rolling review, but does not clearly confirm that applications are open.'
+          : 'Official page text suggests a future or upcoming application cycle.',
+        normalized,
+        mentionsEligibility,
+        deadline,
+      ),
+    };
+  }
+
+  if (mentionsEligibility) {
+    return {
+      result: 'Eligibility changed',
+      suggestedStatus: 'verifyManually',
+      suggestedConfidence: 'medium',
+      confidenceLabel: 'Review eligibility',
+      openWindow: opportunity.openDate,
+      deadline: opportunity.deadline,
+      note: buildAssistantNote('Official page text includes eligibility language but no clear application timing.', normalized, true, deadline),
+    };
+  }
+
+  return {
+    result: 'Needs follow-up',
+    suggestedStatus: 'verifyManually',
+    suggestedConfidence: 'needsReview',
+    confidenceLabel: 'Needs review',
+    openWindow: opportunity.openDate,
+    deadline: opportunity.deadline,
+    note: 'The pasted text does not clearly show application status, deadline, or eligibility. Keep this record in manual review.',
+  };
+}
+
+function findDateSignal(sourceText, nearbyWords, requireNearby = false) {
+  const datePattern =
+    /\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+\d{1,2}(?:,\s*\d{4})?\b|\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/gi;
+  const matches = [...sourceText.matchAll(datePattern)];
+  if (!matches.length) {
+    return '';
+  }
+
+  const lower = sourceText.toLowerCase();
+  const nearbyMatch = matches.find((match) => {
+    const start = Math.max(match.index - 90, 0);
+    const end = Math.min(match.index + match[0].length + 90, sourceText.length);
+    const context = lower.slice(start, end);
+    return nearbyWords.some((word) => context.includes(word));
+  });
+
+  if (nearbyMatch) {
+    return nearbyMatch[0];
+  }
+
+  return requireNearby ? '' : matches[0][0];
+}
+
+function buildAssistantNote(summary, sourceText, mentionsEligibility, deadline) {
+  const details = [];
+
+  if (mentionsEligibility) {
+    details.push('Eligibility language was detected.');
+  }
+
+  if (deadline) {
+    details.push(`Detected deadline/date: ${deadline}.`);
+  }
+
+  const excerpt = sourceText.slice(0, 220);
+  return `${summary} ${details.join(' ')} Review before sending public alerts. Excerpt: ${excerpt}${sourceText.length > 220 ? '...' : ''}`;
 }
 
 function getAlertStrategy(alertPrefs, matches, alertableCount) {

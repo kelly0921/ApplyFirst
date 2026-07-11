@@ -270,6 +270,16 @@ Next Phase 2 steps:
 4. Connect the local waitlist-intent workflow to Tally, Google Forms, Airtable, or a minimal backend when ready.
 5. Design the backend boundary only if alerts need persistence beyond the browser.
 
+## Phase 2.5 Source Monitoring Foundation
+
+Phase 2.5 starts the path toward the feature students ultimately want: knowing when applications open.
+
+This slice is intentionally manual-assisted instead of fully autonomous. Maintainers can paste official-page text into a monitoring assistant, review suggested application status changes, log a source check, and apply local verification fields. The assistant can suggest whether a page indicates an application opened, dates changed, eligibility changed, no material change, or needs follow-up.
+
+The assistant is intentionally conservative with official-page ambiguity. Interest forms, "not yet open" language, rolling-review wording without a clear opening, and closed-cycle pages are treated as watch or review signals instead of automatic public-alert triggers.
+
+The important product decision is that AI-like interpretation does not directly send public alerts. It creates a maintainer review artifact first. Public alerting should still wait for backend storage, scheduled page checks, OpenAI-powered interpretation, durable audit logs, and notification consent.
+
 ## Scope Guardrails
 
 When deciding whether to add something, ask:
