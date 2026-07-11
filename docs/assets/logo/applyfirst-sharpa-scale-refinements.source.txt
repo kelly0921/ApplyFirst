@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ApplyFirst Sharp A Scale Refinements</title>
+    <style>
+      :root {
+        --ink: #111827;
+        --muted: #5d6675;
+        --line: #e6dfd3;
+        --paper: #fffaf2;
+        --cyan: #42bfd6;
+        --teal: #18a17d;
+        --blue: #2f63d6;
+        font-family: Inter, "Segoe UI", system-ui, sans-serif;
+        color: var(--ink);
+        background: var(--paper);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        min-width: 1180px;
+        margin: 0;
+        background:
+          linear-gradient(135deg, rgba(255, 248, 237, 0.98), rgba(242, 248, 246, 0.85) 52%, rgba(244, 247, 255, 0.82)),
+          var(--paper);
+      }
+
+      main {
+        width: 1120px;
+        margin: 0 auto;
+        padding: 44px 0;
+      }
+
+      header {
+        display: grid;
+        gap: 10px;
+        margin-bottom: 26px;
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 980px;
+        font-size: 4.05rem;
+        line-height: 0.98;
+      }
+
+      header p {
+        max-width: 820px;
+        color: var(--muted);
+        font-size: 1.03rem;
+        line-height: 1.55;
+      }
+
+      .concept-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+      }
+
+      article {
+        display: grid;
+        gap: 18px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: 0 18px 38px rgba(52, 58, 72, 0.075);
+        padding: 24px;
+      }
+
+      .logo-row {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        min-height: 92px;
+      }
+
+      .mark {
+        flex: 0 0 auto;
+        width: 86px;
+        height: 86px;
+      }
+
+      .wordmark {
+        color: var(--ink);
+        font-size: 2.15rem;
+        font-weight: 880;
+        letter-spacing: -0.012em;
+        line-height: 1;
+      }
+
+      .tagline {
+        margin-top: 7px;
+        color: var(--muted);
+        font-size: 0.94rem;
+        font-weight: 710;
+      }
+
+      .preview {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--paper);
+        padding: 8px 12px;
+      }
+
+      .preview-icons {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .mini {
+        width: 38px;
+        height: 38px;
+      }
+
+      .preview span {
+        color: var(--muted);
+        font-size: 0.78rem;
+        font-weight: 760;
+      }
+
+      .notes {
+        display: grid;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.45;
+      }
+
+      h2 {
+        color: var(--ink);
+        font-size: 1rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .tag {
+        justify-self: start;
+        border: 1px solid rgba(47, 99, 214, 0.2);
+        border-radius: 999px;
+        background: #edf4ff;
+        color: #2f63d6;
+        padding: 5px 9px;
+        font-size: 0.72rem;
+        font-weight: 850;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Sharp A scale refinements</h1>
+        <p>
+          This pass fixes the A feeling shrunken: the mark is taller, wider, and visually closer to the wordmark weight.
+          The accent is moved into a supporting role instead of making the A sit low.
+        </p>
+      </header>
+
+      <section class="concept-grid" aria-label="Sharp A scale refinements">
+        <article>
+          <div class="logo-row">
+            <svg class="mark" viewBox="0 0 86 86" aria-hidden="true">
+              <path d="M9 62L30 13H56L77 62H58.5L55 53H31L27.5 62H9Z" fill="#111827" />
+              <path d="M36 40H50L43 24L36 40Z" fill="#FFFFFF" />
+              <path d="M29 70H58" stroke="#42BFD6" stroke-width="8" stroke-linecap="round" />
+            </svg>
+            <div>
+              <div class="wordmark">ApplyFirst</div>
+              <p class="tagline">Career-launch programs, tracked early</p>
+            </div>
+          </div>
+          <div class="preview">
+            <div class="preview-icons">
+              <svg class="mini" viewBox="0 0 86 86" aria-hidden="true">
+                <path d="M9 62L30 13H56L77 62H58.5L55 53H31L27.5 62H9Z" fill="#111827" />
+                <path d="M29 70H58" stroke="#42BFD6" stroke-width="8" stroke-linecap="round" />
+              </svg>
+              <svg class="mini" viewBox="0 0 86 86" aria-hidden="true">
+                <path d="M9 62L30 13H56L77 62H58.5L55 53H31L27.5 62H9Z" fill="#111827" />
+                <path d="M29 70H58" stroke="#111827" stroke-width="8" stroke-linecap="round" />
+              </svg>
+            </div>
+            <span>Bigger baseline</span>
+          </div>
+          <div class="notes">
+            <h2>1. Taller Sharp A</h2>
+            <p>The safest correction. Bigger stance, stronger visual weight, and less empty padding around the mark.</p>
+            <span class="tag">Best simple fix</span>
+          </div>
+        </article>
+
+        <article>
+          <div class="logo-row">
+            <svg class="mark" viewBox="0 0 86 86" aria-hidden="true">
+              <path d="M8 62L30 13H56L78 62H59L55.4 53H30.6L27 62H8Z" fill="#111827" />
+              <path d="M36 40H50L43 24L36 40Z" fill="#FFFFFF" />
+              <path d="M29 70H54" stroke="#18A17D" stroke-width="8" stroke-linecap="round" />
+              <path d="M54 60L68 70L54 80V60Z" fill="#18A17D" />
+            </svg>
+            <div>
+              <div class="wordmark">ApplyFirst</div>
+              <p class="tagline">Track openings before the rush</p>
+            </div>
+          </div>
+          <div class="preview">
+            <div class="preview-icons">
+              <svg class="mini" viewBox="0 0 86 86" aria-hidden="true">
+                <path d="M8 62L30 13H56L78 62H59L55.4 53H30.6L27 62H8Z" fill="#111827" />
+                <path d="M29 70H54" stroke="#18A17D" stroke-width="8" stroke-linecap="round" />
+                <path d="M54 60L68 70L54 80V60Z" fill="#18A17D" />
+              </svg>
+              <svg class="mini" viewBox="0 0 86 86" aria-hidden="true">
+                <path d="M8 62L30 13H56L78 62H59L55.4 53H30.6L27 62H8Z" fill="#111827" />
+                <path d="M29 70H54" stroke="#111827" stroke-width="8" stroke-linecap="round" />
+                <path d="M54 60L68 70L54 80V60Z" fill="#111827" />
+              </svg>
+            </div>
+            <span>First move</span>
+          </div>
+          <div class="notes">
+            <h2>2. Larger First Move</h2>
+            <p>Keeps the product meaning from the previous favorite, but the A now has enough weight to stand beside the wordmark.</p>
+            <span class="tag">Best product fit</span>
+          </div>
+        </article>
+
+        <article>
+          <div class="logo-row">
+            <svg class="mark" viewBox="0 0 86 86" aria-hidden="true">
+              <path d="M7 63L29 13H57L79 63H61L56.8 52H29.2L25 63H7Z" fill="#111827" />
+              <path d="M35 40H51L43 22L35 40Z" fill="#FFFFFF" />
+              <path d="M31 70H50" stroke="#2F63D6" stroke-width="8" stroke-linecap="round" />
+              <circle cx="63" cy="70" r="6.5" fill="#2F63D6" />
+            </svg>
+            <div>
+              <div class="wordmark">ApplyFirst</div>
+              <p class="tagline">Know when to act early</p>
+            </div>
+          </div>
+          <div class="preview">
+            <div class="preview-icons">
+              <svg class="mini" viewBox="0 0 86 86" aria-hidden="true">
+                <path d="M7 63L29 13H57L79 63H61L56.8 52H29.2L25 63H7Z" fill="#111827" />
+                <path d="M31 70H50" stroke="#2F63D6" stroke-width="8" stroke-linecap="round" />
+                <circle cx="63" cy="70" r="6.5" fill="#2F63D6" />
+              </svg>
+              <svg class="mini" viewBox="0 0 86 86" aria-hidden="true">
+                <path d="M7 63L29 13H57L79 63H61L56.8 52H29.2L25 63H7Z" fill="#111827" />
+                <path d="M31 70H50" stroke="#111827" stroke-width="8" stroke-linecap="round" />
+                <circle cx="63" cy="70" r="6.5" fill="#111827" />
+              </svg>
+            </div>
+            <span>Signal dot</span>
+          </div>
+          <div class="notes">
+            <h2>3. Wide Signal A</h2>
+            <p>The boldest A. Very legible at small sizes, but the signal dot is quieter than the forward cue.</p>
+            <span class="tag">Best small-size read</span>
+          </div>
+        </article>
+
+        <article>
+          <div class="logo-row">
+            <svg class="mark" viewBox="0 0 86 86" aria-hidden="true">
+              <path d="M10 62L31 14H55L76 62H58L54.4 53H31.6L28 62H10Z" fill="#111827" />
+              <path d="M36.5 40H49.5L43 25L36.5 40Z" fill="#FFFFFF" />
+              <path d="M29 70H59" stroke="#42BFD6" stroke-width="8" stroke-linecap="round" />
+              <path d="M59 70L68 64" stroke="#42BFD6" stroke-width="8" stroke-linecap="round" />
+            </svg>
+            <div>
+              <div class="wordmark">ApplyFirst</div>
+              <p class="tagline">Find what opens first</p>
+            </div>
+          </div>
+          <div class="preview">
+            <div class="preview-icons">
+              <svg class="mini" viewBox="0 0 86 86" aria-hidden="true">
+                <path d="M10 62L31 14H55L76 62H58L54.4 53H31.6L28 62H10Z" fill="#111827" />
+                <path d="M29 70H59" stroke="#42BFD6" stroke-width="8" stroke-linecap="round" />
+                <path d="M59 70L68 64" stroke="#42BFD6" stroke-width="8" stroke-linecap="round" />
+              </svg>
+              <svg class="mini" viewBox="0 0 86 86" aria-hidden="true">
+                <path d="M10 62L31 14H55L76 62H58L54.4 53H31.6L28 62H10Z" fill="#111827" />
+                <path d="M29 70H59" stroke="#111827" stroke-width="8" stroke-linecap="round" />
+                <path d="M59 70L68 64" stroke="#111827" stroke-width="8" stroke-linecap="round" />
+              </svg>
+            </div>
+            <span>Subtle lift</span>
+          </div>
+          <div class="notes">
+            <h2>4. A With Lift</h2>
+            <p>A softer motion cue than the arrow. It feels more refined, but may be slightly less clear at favicon size.</p>
+            <span class="tag">Most polished</span>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

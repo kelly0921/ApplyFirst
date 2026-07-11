@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ApplyFirst Softened Sharp A Refinements</title>
+    <style>
+      :root {
+        --ink: #111827;
+        --muted: #5d6675;
+        --line: #e6dfd3;
+        --paper: #fffaf2;
+        --blue: #3267e3;
+        --teal: #1f9f82;
+        --cyan: #42bfd6;
+        font-family: Inter, "Segoe UI", system-ui, sans-serif;
+        color: var(--ink);
+        background: var(--paper);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        min-width: 1180px;
+        margin: 0;
+        background:
+          linear-gradient(135deg, rgba(255, 248, 237, 0.98), rgba(244, 250, 247, 0.88) 54%, rgba(245, 248, 255, 0.84)),
+          var(--paper);
+      }
+
+      main {
+        width: 1120px;
+        margin: 0 auto;
+        padding: 44px 0;
+      }
+
+      header {
+        display: grid;
+        gap: 10px;
+        margin-bottom: 26px;
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 980px;
+        font-size: 4.05rem;
+        line-height: 0.98;
+      }
+
+      header p {
+        max-width: 820px;
+        color: var(--muted);
+        font-size: 1.03rem;
+        line-height: 1.55;
+      }
+
+      .concept-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+      }
+
+      article {
+        display: grid;
+        gap: 18px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: 0 18px 38px rgba(52, 58, 72, 0.075);
+        padding: 24px;
+      }
+
+      .logo-row {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        min-height: 92px;
+      }
+
+      .mark {
+        flex: 0 0 auto;
+        width: 86px;
+        height: 86px;
+      }
+
+      .wordmark {
+        color: var(--ink);
+        font-size: 2.15rem;
+        font-weight: 880;
+        letter-spacing: -0.012em;
+        line-height: 1;
+      }
+
+      .tagline {
+        margin-top: 7px;
+        color: var(--muted);
+        font-size: 0.94rem;
+        font-weight: 710;
+      }
+
+      .preview {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--paper);
+        padding: 8px 12px;
+      }
+
+      .preview-icons {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .mini {
+        width: 38px;
+        height: 38px;
+      }
+
+      .preview span {
+        color: var(--muted);
+        font-size: 0.78rem;
+        font-weight: 760;
+      }
+
+      .notes {
+        display: grid;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.45;
+      }
+
+      h2 {
+        color: var(--ink);
+        font-size: 1rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .tag {
+        justify-self: start;
+        border: 1px solid rgba(47, 99, 214, 0.2);
+        border-radius: 999px;
+        background: #edf4ff;
+        color: #2f63d6;
+        padding: 5px 9px;
+        font-size: 0.72rem;
+        font-weight: 850;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Softened Sharp A refinements</h1>
+        <p>
+          Same mature career-platform direction, but less severe: softened apex, calmer accent, and a mark that feels
+          confident without looking aggressive.
+        </p>
+      </header>
+
+      <section class="concept-grid" aria-label="Softened Sharp A logo refinements">
+        <article>
+          <div class="logo-row">
+            <svg class="mark" viewBox="0 0 86 86" aria-hidden="true">
+              <path d="M8 63L38 12C40.2 8.2 45.8 8.2 48 12L78 63H60L54.6 53H31.4L26 63H8Z" fill="#111827" />
+              <path d="M37 41H49L43 29L37 41Z" fill="#FFFFFF" />
+              <path d="M30 70H56" stroke="#42BFD6" stroke-width="7" stroke-linecap="round" />
+            </svg>
+            <div>
+              <div class="wordmark">ApplyFirst</div>
+              <p class="tagline">Career-launch programs, tracked early</p>
+            </div>
+          </div>
+          <div class="preview">
+            <div class="preview-icons">
+              <svg class="mini" viewBox="0 0 86 86" aria-hidden="true">
+                <path d="M8 63L38 12C40.2 8.2 45.8 8.2 48 12L78 63H60L54.6 53H31.4L26 63H8Z" fill="#111827" />
+                <path d="M30 70H56" stroke="#42BFD6" stroke-width="7" stroke-linecap="round" />
+              </svg>
+              <svg class="mini" viewBox="0 0 86 86" aria-hidden="true">
+                <path d="M8 63L38 12C40.2 8.2 45.8 8.2 48 12L78 63H60L54.6 53H31.4L26 63H8Z" fill="#111827" />
+                <path d="M30 70H56" stroke="#111827" stroke-width="7" stroke-linecap="round" />
+              </svg>
+            </div>
+            <span>Soft underline</span>
+          </div>
+          <div class="notes">
+            <h2>1. Soft Apex Underline</h2>
+            <p>Clean and mature. The calmer underline keeps the mark from feeling too pointed or urgent.</p>
+            <span class="tag">Safest refined option</span>
+          </div>
+        </article>
+
+        <article>
+          <div class="logo-row">
+            <svg class="mark" viewBox="0 0 86 86" aria-hidden="true">
+              <path d="M8 63L38 12C40.2 8.2 45.8 8.2 48 12L78 63H60L54.6 53H31.4L26 63H8Z" fill="#111827" />
+              <path d="M37 41H49L43 29L37 41Z" fill="#FFFFFF" />
+              <path d="M30 70H51" stroke="#1F9F82" stroke-width="7" stroke-linecap="round" />
+              <path d="M51 63L60 70L51 77V63Z" fill="#1F9F82" />
+            </svg>
+            <div>
+              <div class="wordmark">ApplyFirst</div>
+              <p class="tagline">Track openings before the rush</p>
+            </div>
+          </div>
+          <div class="preview">
+            <div class="preview-icons">
+              <svg class="mini" viewBox="0 0 86 86" aria-hidden="true">
+                <path d="M8 63L38 12C40.2 8.2 45.8 8.2 48 12L78 63H60L54.6 53H31.4L26 63H8Z" fill="#111827" />
+                <path d="M30 70H51" stroke="#1F9F82" stroke-width="7" stroke-linecap="round" />
+                <path d="M51 63L60 70L51 77V63Z" fill="#1F9F82" />
+              </svg>
+              <svg class="mini" viewBox="0 0 86 86" aria-hidden="true">
+                <path d="M8 63L38 12C40.2 8.2 45.8 8.2 48 12L78 63H60L54.6 53H31.4L26 63H8Z" fill="#111827" />
+                <path d="M30 70H51" stroke="#111827" stroke-width="7" stroke-linecap="round" />
+                <path d="M51 63L60 70L51 77V63Z" fill="#111827" />
+              </svg>
+            </div>
+            <span>Short first move</span>
+          </div>
+          <div class="notes">
+            <h2>2. Soft Apex First Move</h2>
+            <p>Best product meaning without the harsh triangle feel. The arrow is shorter so the A stays dominant.</p>
+            <span class="tag">Best product fit</span>
+          </div>
+        </article>
+
+        <article>
+          <div class="logo-row">
+            <svg class="mark" viewBox="0 0 86 86" aria-hidden="true">
+              <path d="M8 63L38 12C40.2 8.2 45.8 8.2 48 12L78 63H60L54.6 53H31.4L26 63H8Z" fill="#111827" />
+              <path d="M37 41H49L43 29L37 41Z" fill="#FFFFFF" />
+              <path d="M30 70H48" stroke="#3267E3" stroke-width="7" stroke-linecap="round" />
+              <circle cx="58" cy="70" r="5.5" fill="#3267E3" />
+            </svg>
+            <div>
+              <div class="wordmark">ApplyFirst</div>
+              <p class="tagline">Know when to act early</p>
+            </div>
+          </div>
+          <div class="preview">
+            <div class="preview-icons">
+              <svg class="mini" viewBox="0 0 86 86" aria-hidden="true">
+                <path d="M8 63L38 12C40.2 8.2 45.8 8.2 48 12L78 63H60L54.6 53H31.4L26 63H8Z" fill="#111827" />
+                <path d="M30 70H48" stroke="#3267E3" stroke-width="7" stroke-linecap="round" />
+                <circle cx="58" cy="70" r="5.5" fill="#3267E3" />
+              </svg>
+              <svg class="mini" viewBox="0 0 86 86" aria-hidden="true">
+                <path d="M8 63L38 12C40.2 8.2 45.8 8.2 48 12L78 63H60L54.6 53H31.4L26 63H8Z" fill="#111827" />
+                <path d="M30 70H48" stroke="#111827" stroke-width="7" stroke-linecap="round" />
+                <circle cx="58" cy="70" r="5.5" fill="#111827" />
+              </svg>
+            </div>
+            <span>Quiet signal</span>
+          </div>
+          <div class="notes">
+            <h2>3. Soft Apex Signal</h2>
+            <p>Calmest signal treatment. It feels credible, but less directly tied to “first” than the short arrow.</p>
+            <span class="tag">Most restrained</span>
+          </div>
+        </article>
+
+        <article>
+          <div class="logo-row">
+            <svg class="mark" viewBox="0 0 86 86" aria-hidden="true">
+              <path d="M8 63L38 12C40.2 8.2 45.8 8.2 48 12L78 63H60L54.6 53H31.4L26 63H8Z" fill="#111827" />
+              <path d="M37 41H49L43 29L37 41Z" fill="#FFFFFF" />
+              <path d="M30 70H56" stroke="#42BFD6" stroke-width="7" stroke-linecap="round" />
+              <path d="M56 70L63 66" stroke="#42BFD6" stroke-width="7" stroke-linecap="round" />
+            </svg>
+            <div>
+              <div class="wordmark">ApplyFirst</div>
+              <p class="tagline">Find what opens first</p>
+            </div>
+          </div>
+          <div class="preview">
+            <div class="preview-icons">
+              <svg class="mini" viewBox="0 0 86 86" aria-hidden="true">
+                <path d="M8 63L38 12C40.2 8.2 45.8 8.2 48 12L78 63H60L54.6 53H31.4L26 63H8Z" fill="#111827" />
+                <path d="M30 70H56" stroke="#42BFD6" stroke-width="7" stroke-linecap="round" />
+                <path d="M56 70L63 66" stroke="#42BFD6" stroke-width="7" stroke-linecap="round" />
+              </svg>
+              <svg class="mini" viewBox="0 0 86 86" aria-hidden="true">
+                <path d="M8 63L38 12C40.2 8.2 45.8 8.2 48 12L78 63H60L54.6 53H31.4L26 63H8Z" fill="#111827" />
+                <path d="M30 70H56" stroke="#111827" stroke-width="7" stroke-linecap="round" />
+                <path d="M56 70L63 66" stroke="#111827" stroke-width="7" stroke-linecap="round" />
+              </svg>
+            </div>
+            <span>Gentle lift</span>
+          </div>
+          <div class="notes">
+            <h2>4. Soft Apex Lift</h2>
+            <p>Most polished and least aggressive, but slightly less readable as “move first” at small sizes.</p>
+            <span class="tag">Most polished</span>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

@@ -84,18 +84,27 @@ a {
   text-decoration: none;
 }
 
-.brand > span:first-child {
-  display: grid;
+.brand-mark {
   flex: 0 0 auto;
-  width: 40px;
-  height: 40px;
-  place-items: center;
-  border-radius: 12px;
-  background: linear-gradient(145deg, #172033, #2f63d6 68%, #109875);
-  box-shadow: 0 10px 22px rgba(24, 33, 47, 0.16);
-  color: #ffffff;
-  font-size: 0.72rem;
-  letter-spacing: 0.04em;
+  width: 42px;
+  height: 42px;
+  overflow: visible;
+  filter: drop-shadow(0 8px 14px rgba(24, 33, 47, 0.1));
+}
+
+.brand-mark-a {
+  fill: var(--ink);
+}
+
+.brand-mark-counter {
+  fill: #ffffff;
+}
+
+.brand-mark-underline {
+  fill: none;
+  stroke: #42bfd6;
+  stroke-linecap: round;
+  stroke-width: 7;
 }
 
 .brand-copy {

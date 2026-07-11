@@ -1,0 +1,11 @@
+<svg width="520" height="144" viewBox="0 0 520 144" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">ApplyFirst logo lockup</title>
+  <desc id="desc">ApplyFirst wordmark with a softened A and restrained underline mark.</desc>
+  <g transform="translate(18 29)">
+    <path d="M8 63L38 12C40.2 8.2 45.8 8.2 48 12L78 63H60L54.6 53H31.4L26 63H8Z" fill="#111827"/>
+    <path d="M37 41H49L43 29L37 41Z" fill="#FFFFFF"/>
+    <path d="M30 70H56" stroke="#42BFD6" stroke-width="7" stroke-linecap="round"/>
+  </g>
+  <text x="132" y="69" fill="#172033" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="40" font-weight="850">ApplyFirst</text>
+  <text x="134" y="96" fill="#5B6472" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="17" font-weight="700">Career-launch programs, tracked early</text>
+</svg>

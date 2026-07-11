@@ -477,7 +477,7 @@ function Header({ activeView, onViewChange, savedCount, showInternalTools }) {
   return (
     <header className="site-header">
       <button className="brand" type="button" onClick={() => onViewChange('monitor')} aria-label="ApplyFirst home">
-        <span aria-hidden="true">AF</span>
+        <ApplyFirstMark />
         <span className="brand-copy">
           <strong>ApplyFirst</strong>
           <em>Track career-launch programs</em>
@@ -506,6 +506,16 @@ function Header({ activeView, onViewChange, savedCount, showInternalTools }) {
         </div>
       </nav>
     </header>
+  );
+}
+
+function ApplyFirstMark() {
+  return (
+    <svg className="brand-mark" aria-hidden="true" viewBox="0 0 86 86" focusable="false">
+      <path className="brand-mark-a" d="M8 63L38 12C40.2 8.2 45.8 8.2 48 12L78 63H60L54.6 53H31.4L26 63H8Z" />
+      <path className="brand-mark-counter" d="M37 41H49L43 29L37 41Z" />
+      <path className="brand-mark-underline" d="M30 70H56" />
+    </svg>
   );
 }
 

@@ -514,9 +514,10 @@ Alternate CTA labels:
 
 Project logo or icon direction:
 
-- A clean signal/radar-inspired mark.
-- Could combine a small orbit, notification pulse, bookmark, or timeline cue.
-- Should feel practical and trustworthy, not like a generic job-search logo.
+- Current direction: a softened Sharp A with a restrained underline.
+- The A anchors the ApplyFirst name and keeps the identity wordmark-led like modern career platforms.
+- The underline suggests early movement and timing without overexplaining the product.
+- The mark should feel mature, credible, optimistic, and student-focused rather than childish or like a generic job-search logo.
 
 Recommended visuals:
 

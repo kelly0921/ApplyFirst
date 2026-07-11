@@ -4,6 +4,12 @@ A standalone product MVP for helping underclassmen and emerging technical studen
 
 For the reusable product narrative, portfolio angle, scope decisions, and future roadmap, see [PROJECT_BRIEF.md](./PROJECT_BRIEF.md).
 
+## Logo
+
+![ApplyFirst logo lockup](./docs/assets/logo/applyfirst-lockup.svg)
+
+The mark uses a softened Sharp A with a restrained underline, matching the product tone: mature, career-focused, and early-moving without feeling like a generic job board.
+
 ## Screenshots
 
 ![ApplyFirst programs dashboard](./docs/assets/screenshots/applyfirst-programs-desktop.png)
