@@ -284,6 +284,28 @@ The next layer is a maintainer review decision. The assistant separates raw clas
 
 The important product decision is that AI-like interpretation does not directly send public alerts. It creates a maintainer review artifact first. Public alerting should still wait for backend storage, scheduled page checks, OpenAI-powered interpretation, durable audit logs, and notification consent.
 
+## Phase 3 Monitoring Pipeline Foundation
+
+Phase 3 starts proving the core product promise: ApplyFirst should eventually notice when official program pages change.
+
+This slice adds a local monitoring pipeline that reuses the same source classifier as the maintainer UI. A seeded monitoring source file compares previous official-page text with sample current text, detects changes, classifies the page signal, and produces review decisions such as Alert Candidate, Deadline Candidate, Prep Watch, Watch Only, or Manual Review.
+
+The next iteration adds gitignored local snapshot state, letting repeated monitor runs compare against the last saved normalized text. This rehearses the future `page_snapshots` table before adding a real backend and separates newly changed alert candidates from current alert-like signals that were already seen.
+
+The following iteration adds a local maintainer review queue, turning changed alert candidates and manual-review checks into concise action items with priority, reason, URL, and next step. This previews the future admin surface without adding accounts or a database yet.
+
+The next iteration adds a generated maintainer review export, so the local queue can be saved as `data/monitoring-review.generated.json` for review tooling without making it student-facing.
+
+The next iteration adds a backend seed export that converts the current curated records into normalized program rows and official source watch rows. This reduces migration friction when the project moves from local prototype data to Supabase or another persistent backend.
+
+The next iteration adds a draft Supabase schema for the durable monitoring backend: programs, official sources, page snapshots, source checks, alert candidates, saved programs, and alert preferences. It keeps maintainer write policies out of scope until auth and admin roles are designed.
+
+The next iteration adds a Supabase seed SQL generator for program and official source upserts, so the prototype data can move into a real backend with less manual translation.
+
+The recommended backend path is Supabase first, because Postgres fits programs, official sources, page snapshots, source checks, alert candidates, saved programs, and future alert preferences. Cloudflare D1 and Workers remain viable later because the public prototype already deploys on Cloudflare, but Supabase is faster while the data model is still changing.
+
+The product guardrail remains the same: monitoring can create alert candidates, but it should not send student notifications until a maintainer confirms the official source and notification consent exists.
+
 ## Scope Guardrails
 
 When deciding whether to add something, ask:

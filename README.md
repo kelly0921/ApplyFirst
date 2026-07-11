@@ -4,6 +4,14 @@ A standalone product MVP for helping underclassmen and emerging technical studen
 
 For the reusable product narrative, portfolio angle, scope decisions, and future roadmap, see [PROJECT_BRIEF.md](./PROJECT_BRIEF.md).
 
+## Screenshots
+
+![ApplyFirst programs dashboard](./docs/assets/screenshots/applyfirst-programs-desktop.png)
+
+![ApplyFirst alerts setup](./docs/assets/screenshots/applyfirst-alerts-desktop.png)
+
+![ApplyFirst mobile programs view](./docs/assets/screenshots/applyfirst-programs-mobile.png)
+
 ## Product Direction
 
 ApplyFirst is part of the broader Opportunity Systems product exploration. This app is separate from Kelly's portfolio, so the portfolio can show a case study and screenshots while this app becomes the actual user-facing resource.
@@ -43,6 +51,52 @@ npm run dev
 ```bash
 npm run build
 ```
+
+## Local Monitoring Demo
+
+```bash
+npm run monitor:demo
+```
+
+This runs the first local monitoring pipeline against seeded official-page samples in `data/monitoring-sources.json`. It compares previous text to current text, classifies the source signal, and prints maintainer review decisions such as Alert Candidate, Deadline Candidate, Prep Watch, Watch Only, or Manual Review.
+
+To rehearse repeated source checks with local snapshot state:
+
+```bash
+npm run monitor:persist
+```
+
+This writes a gitignored `.applyfirst-monitoring-state.json` file so the next run compares against the last saved normalized text instead of the seed baseline. Persisted reports distinguish new alert candidates from current alert-like signals that have already been seen.
+
+To print only maintainer action items:
+
+```bash
+npm run monitor:review
+```
+
+This turns changed alert candidates and manual-review checks into a small queue with priority, reason, URL, and next step.
+
+Use `npm run monitor:review:write` to create a gitignored `data/monitoring-review.generated.json` file for local review tooling or a future maintainer console.
+
+To export backend-ready seed data:
+
+```bash
+npm run monitor:seed
+```
+
+This combines the current curated program records with official source watch rows. Use `npm run monitor:seed:write` to create a gitignored `data/monitoring-seed.generated.json` file for local inspection or future import tooling.
+
+To generate Supabase insert/upsert SQL:
+
+```bash
+npm run monitor:seed:sql
+```
+
+Use `npm run monitor:seed:sql:write` to create a gitignored `supabase/seed.generated.sql` file.
+
+For the backend/data model plan, see [docs/MONITORING_ARCHITECTURE.md](./docs/MONITORING_ARCHITECTURE.md).
+
+For the draft Supabase schema and future import plan, see [docs/SUPABASE_SETUP.md](./docs/SUPABASE_SETUP.md).
 
 ## Phase 2 Start
 
@@ -84,3 +138,19 @@ The first source-monitoring slice keeps the workflow maintainer-controlled inste
 - Human confirmation remains required before any record is treated as alert-ready.
 
 Still future work: backend storage, scheduled crawling, OpenAI-powered interpretation, durable review queues, accounts, and outbound notifications.
+
+## Phase 3 Monitoring Pipeline Foundation
+
+The first Phase 3 slice adds:
+
+- Shared monitoring classifier used by both the UI assistant and local scripts.
+- Seeded official-source monitoring examples.
+- Local CLI report for changed pages, suggested statuses, confidence, review decisions, new alert candidates, and current alert-like signals.
+- Gitignored local snapshot state for repeated monitoring rehearsals.
+- Maintainer review queue output for changed alert candidates and manual-review items.
+- Generated review queue export for local maintainer tooling.
+- Backend seed export for normalized program records and official source watch rows.
+- Draft Supabase schema for programs, official sources, snapshots, checks, alert candidates, saved programs, and alert preferences.
+- Supabase seed SQL generator for program and official source upserts.
+- JSON report output for future automation.
+- Monitoring architecture documentation covering backend tables, alert-candidate review, and the human confirmation gate.

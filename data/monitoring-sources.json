@@ -1,0 +1,32 @@
+[
+  {
+    "id": "microsoft-explore-watch",
+    "watchUrl": "https://careers.microsoft.com/",
+    "previousText": "Microsoft early career programs. Explore opportunities for students. Applications are not currently accepting applications. Check back for future cycles.",
+    "sampleCurrentText": "Microsoft Explore applications are open for Summer 2027. First-year and sophomore students are eligible. Submit your application by October 15, 2026."
+  },
+  {
+    "id": "nasa-internships",
+    "watchUrl": "https://intern.nasa.gov/",
+    "previousText": "NASA internships include spring, summer, and fall sessions. Students can review eligibility and session dates.",
+    "sampleCurrentText": "NASA internships include spring, summer, and fall sessions. Students can review eligibility and session dates. Summer 2027 applications will open on November 1, 2026."
+  },
+  {
+    "id": "outreachy",
+    "watchUrl": "https://www.outreachy.org/",
+    "previousText": "Outreachy internship applications are closed. Please check back for the next application cycle.",
+    "sampleCurrentText": "Outreachy internship applications are closed. Please check back for the next application cycle. Join our mailing list to get notified."
+  },
+  {
+    "id": "mlh-fellowship",
+    "watchUrl": "https://fellowship.mlh.com/",
+    "previousText": "MLH Fellowship applications are reviewed by cohort. Students can learn about open source tracks and eligibility.",
+    "sampleCurrentText": "MLH Fellowship applications are now accepting applications and reviewed on a rolling basis. Students can submit your application by September 20, 2026."
+  },
+  {
+    "id": "codepath-career-ready-courses",
+    "watchUrl": "https://www.codepath.org/courses",
+    "previousText": "CodePath career-ready courses are open by term. Application deadlines vary by course pathway.",
+    "sampleCurrentText": "CodePath career-ready courses are open by term. Apply by August 23, 2026 for Fall 2026 pathways. Students are eligible based on course prerequisites."
+  }
+]

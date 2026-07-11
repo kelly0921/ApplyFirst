@@ -2,3 +2,7 @@ node_modules
 dist
 .DS_Store
 *.local
+.applyfirst-monitoring-state.json
+data/monitoring-seed.generated.json
+data/monitoring-review.generated.json
+supabase/seed.generated.sql

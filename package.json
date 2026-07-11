@@ -6,6 +6,15 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vite build && node scripts/build-sites.mjs",
+    "monitor:demo": "node scripts/monitor-official-pages.mjs",
+    "monitor:json": "node scripts/monitor-official-pages.mjs --json",
+    "monitor:persist": "node scripts/monitor-official-pages.mjs --persist",
+    "monitor:review": "node scripts/monitor-official-pages.mjs --review",
+    "monitor:review:write": "node scripts/monitor-official-pages.mjs --review --write-review",
+    "monitor:seed": "node scripts/export-monitoring-seed.mjs",
+    "monitor:seed:write": "node scripts/export-monitoring-seed.mjs --write",
+    "monitor:seed:sql": "node scripts/export-monitoring-seed.mjs --sql",
+    "monitor:seed:sql:write": "node scripts/export-monitoring-seed.mjs --sql --write",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
