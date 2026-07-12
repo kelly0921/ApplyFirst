@@ -10,6 +10,20 @@ Students often find useful opportunity lists too late, then still have to open e
 
 For underclassmen especially, timing matters. Many programs review applications early or on a rolling basis. A strong candidate who applies late can lose out simply because spots are already filled.
 
+## Product Belief
+
+ApplyFirst is important for two connected reasons: students need to find opportunities early, and they need more chances to learn what kind of work and company environment actually fits them.
+
+The first reason is timing. Early application often changes outcomes. If a student knows when a high-signal program is likely to open, they can prepare their resume, portfolio, essays, referrals, and application materials before the window gets crowded. This is why monitoring, opening signals, and alerts matter.
+
+The second reason is career discovery. Early-career programs do more than add a line to a resume. They help students learn technical and professional skills, build confidence, meet peers and mentors, and understand how different companies actually operate.
+
+For freshmen and sophomores, these programs can be especially valuable because companies often expect curiosity and potential more than polished expertise. Exploratory internships, fellowships, insight programs, conferences, and prep programs can expose students to company culture, mentorship quality, product thinking, ownership, research depth, startup pace, finance, quant, and other specialized paths before students are expected to have everything figured out.
+
+The long-term benefit is agency. The more early exposure a student gets, the more they can compare environments, build a network, understand their own values, and make informed choices. Over time, the goal is not only helping companies choose students; it is helping students understand which companies, roles, cultures, and industries they want to choose.
+
+This matters most in fields that are hard to break into, such as quant, finance tech, product, AI, research, and selective fellowship pipelines. Early discovery programs can become a bridge into those spaces before traditional internship recruiting becomes highly competitive.
+
 ## Target User
 
 The primary user is a first-year or sophomore student trying to break into tech, product, or finance before they have much traditional experience.
@@ -218,6 +232,8 @@ Current status: Phase 2 started after Phase 1 public prototype MVP.
 Ready to show:
 
 - Standalone website direction.
+- Private-beta landing and waitlist direction.
+- Simple invite-code gate before the full app.
 - Searchable program monitor.
 - Role-track and class-year filtering.
 - Recommendation filtering.
@@ -243,6 +259,8 @@ Phase 2 should turn the static monitor into the beginning of the Opportunity Sig
 
 The first Phase 2 slice is intentionally local and trust-focused:
 
+- Put the public URL behind a landing page that explains what ApplyFirst is, who it is for, what users get, and why access is limited.
+- Use a simple invite-code gate before the full app instead of adding full auth before the product has enough student demand.
 - Let students preview the class year, role track, and recommendation level they would want alerts for.
 - Save those alert preferences locally in the browser.
 - Compute how many matching programs are actually monitoring-ready.
@@ -274,6 +292,14 @@ Recommended waitlist fields:
 - Desired alert timing.
 - Programs or categories the student cares about most.
 - Optional school, major, or notes.
+
+Current prototype invite codes:
+
+- `APPLYFIRST`
+- `APPLYFIRST2026`
+- `EARLYACCESS`
+
+These are local prototype access codes only. Replace them with real account, invite, or waitlist approval logic before treating ApplyFirst as a live private beta.
 
 Next Phase 2 steps:
 

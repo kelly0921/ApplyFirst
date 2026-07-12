@@ -29,6 +29,8 @@ ApplyFirst combines two connected layers:
 
 The library is the front door. The tracker is the moat. The current app starts with the library and local monitoring scaffolding, then grows toward trustworthy alerts.
 
+The product belief: ApplyFirst should help students apply earlier and discover what kinds of companies, cultures, mentors, products, and industries fit them. Early-career programs are not only resume builders; they are exposure, confidence, network, and career-agency builders.
+
 The first version focuses on:
 
 - Class-year fit for freshmen, sophomores, and all class years.
@@ -39,9 +41,21 @@ The first version focuses on:
 - Clear notes on why each opportunity matters and how to prepare.
 - A future path toward an Opportunity Signal Tracker.
 
-This version is a public prototype with Phase 2 alert preference scaffolding, not a live alerting service yet. The app can show the product direction, curated seed set, local alert preferences, and student-facing confirmation model, while outbound notifications should wait for stronger official-source confirmation.
+This version is a private-beta public prototype with a landing page, local waitlist request, and invite-code gate before the full app. The app can show the product direction, curated seed set, local alert preferences, and student-facing confirmation model, while outbound notifications should wait for stronger official-source confirmation.
 
 Recommendation is computed from the Phase 1 rules: underclassmen-fit programs in high-leverage categories become Recommended; relevant programs stay on the Watch List; scholarships, conferences, communities, and resources are treated as Foundation opportunities. Duplicate appearances across older curated lists are useful for verification, but they are not treated as proof that a program is better.
+
+Prototype invite codes for local testing:
+
+- `APPLYFIRST`
+- `APPLYFIRST2026`
+- `EARLYACCESS`
+
+These codes are for the current prototype gate only and should be replaced before real private-beta access.
+
+After unlocking the prototype, use the `Landing` button in the app header to clear the local access flag and return to the public landing page.
+
+The waitlist form currently saves locally in the browser. Connect it to Tally, Google Forms, Airtable, Supabase, or another backend before relying on it for real student signups.
 
 ## Source Strategy
 
@@ -115,6 +129,8 @@ For the draft Supabase schema and future import plan, see [docs/SUPABASE_SETUP.m
 
 The first Phase 2 slice adds:
 
+- Public landing page that explains ApplyFirst, who it is for, what students get, and why access is limited during private beta.
+- Simple invite-code gate before the full program monitor, avoiding premature auth while keeping access intentional.
 - Local alert preference preview by class year, role track, and recommendation level.
 - Confirmation-readiness calculations for records that are safe to alert on later.
 - Prioritized source-review queue for records that need official-cycle review before alerts.

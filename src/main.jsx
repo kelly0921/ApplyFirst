@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
+import programsScreenshot from '../docs/assets/screenshots/applyfirst-programs-desktop.png';
 import { createSourceAnalysis, getSourceReviewDecision } from './monitoring';
 import {
   confidenceLabels,
@@ -29,6 +30,8 @@ const alertStorageKey = 'applyfirst-alert-preview';
 const verificationStorageKey = 'applyfirst-verification-edits';
 const sourceCheckLogStorageKey = 'applyfirst-source-check-log';
 const waitlistStorageKey = 'applyfirst-waitlist-intent';
+const accessStorageKey = 'applyfirst-beta-access';
+const inviteCodes = ['APPLYFIRST', 'APPLYFIRST2026', 'EARLYACCESS'];
 const phaseOneTarget = 25;
 const defaultAlertPrefs = {
   classYear: 'Freshman',
@@ -67,6 +70,13 @@ const trustPolicyItems = [
 
 function App() {
   const [activeView, setActiveView] = useState('monitor');
+  const [hasAccess, setHasAccess] = useState(() => {
+    try {
+      return window.localStorage.getItem(accessStorageKey) === 'granted';
+    } catch {
+      return false;
+    }
+  });
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('all');
   const [roleTrack, setRoleTrack] = useState('all');
@@ -287,6 +297,39 @@ function App() {
     setWaitlistIntent(null);
   };
 
+  const grantAccess = () => {
+    try {
+      window.localStorage.setItem(accessStorageKey, 'granted');
+    } catch {
+      // Access still works for the current session if local storage is unavailable.
+    }
+    setHasAccess(true);
+    setActiveView('monitor');
+  };
+
+  const returnToLanding = () => {
+    try {
+      window.localStorage.removeItem(accessStorageKey);
+    } catch {
+      // Returning to the landing page still works for the current session if local storage is unavailable.
+    }
+    setHasAccess(false);
+    setActiveView('monitor');
+  };
+
+  if (!hasAccess) {
+    return (
+      <LandingPage
+        alertPrefs={alertPrefs}
+        alertStrategy={alertStrategy}
+        waitlistIntent={waitlistIntent}
+        onWaitlistSave={saveWaitlistIntent}
+        onWaitlistReset={resetWaitlistIntent}
+        onGrantAccess={grantAccess}
+      />
+    );
+  }
+
   return (
     <div className="app-shell">
       <Header
@@ -294,6 +337,7 @@ function App() {
         onViewChange={setActiveView}
         savedCount={savedIds.length}
         showInternalTools={showInternalTools}
+        onReturnToLanding={returnToLanding}
       />
       <main className="workspace">
         {activeView === 'alerts' ? (
@@ -473,7 +517,275 @@ function App() {
   );
 }
 
-function Header({ activeView, onViewChange, savedCount, showInternalTools }) {
+function LandingPage({ alertPrefs, alertStrategy, waitlistIntent, onWaitlistSave, onWaitlistReset, onGrantAccess }) {
+  const [showAccess, setShowAccess] = useState(false);
+  const [inviteCode, setInviteCode] = useState('');
+  const [accessError, setAccessError] = useState('');
+
+  const submitInviteCode = (event) => {
+    event.preventDefault();
+    const normalizedCode = inviteCode.trim().toUpperCase();
+
+    if (inviteCodes.includes(normalizedCode)) {
+      setAccessError('');
+      onGrantAccess();
+      return;
+    }
+
+    setAccessError('This invite code does not look active yet.');
+  };
+
+  return (
+    <div className="landing-shell">
+      <header className="landing-nav">
+        <div className="brand" aria-label="ApplyFirst">
+          <ApplyFirstMark />
+          <span className="brand-copy">
+            <strong>ApplyFirst</strong>
+            <em>Private beta</em>
+          </span>
+        </div>
+      </header>
+
+      <main className="landing-main">
+        <section className="landing-hero" aria-label="ApplyFirst private beta">
+          <div className="landing-copy">
+            <span>Stop checking scattered lists manually</span>
+            <h1>Apply Before the Crowd</h1>
+            <p>
+              ApplyFirst helps students find high-signal programs, track timing, and prepare before applications open.
+            </p>
+            <div className="landing-actions">
+              <a className="button primary" href="#waitlist">
+                Join the Waitlist
+              </a>
+            </div>
+          </div>
+
+          <aside className="landing-panel" aria-label="Private beta access">
+            <span>Private beta</span>
+            <h2>Early access for students who want to move first.</h2>
+            <p>
+              ApplyFirst is open to a small group first so the library, timing notes, and future alerts stay accurate
+              before wider launch.
+            </p>
+            <div className="beta-panel-points" aria-label="Private beta priorities">
+              <span>Accuracy first</span>
+              <span>Student feedback</span>
+              <span>No noisy alerts</span>
+            </div>
+            {showAccess ? (
+              <form className="invite-form" onSubmit={submitInviteCode}>
+                <label>
+                  Invite Code
+                  <input
+                    type="text"
+                    value={inviteCode}
+                    onChange={(event) => setInviteCode(event.target.value)}
+                    placeholder="Enter your code"
+                    autoComplete="off"
+                  />
+                </label>
+                {accessError ? <p className="form-error">{accessError}</p> : null}
+                <button type="submit">Open ApplyFirst</button>
+              </form>
+            ) : (
+              <div className="access-code-callout">
+                <button className="text-button" type="button" onClick={() => setShowAccess(true)}>
+                  Enter Invite Code
+                </button>
+              </div>
+            )}
+          </aside>
+        </section>
+
+        <HowItWorksSection />
+
+        <ProductPreviewSection />
+
+        <CareerAgencySection />
+
+        <VisualBenefitSection />
+
+        <WaitlistPanel
+          context="landing"
+          alertPrefs={alertPrefs}
+          alertStrategy={alertStrategy}
+          waitlistIntent={waitlistIntent}
+          onSave={onWaitlistSave}
+          onReset={onWaitlistReset}
+        />
+      </main>
+    </div>
+  );
+}
+
+function ProductPreviewSection() {
+  return (
+    <section className="product-preview" aria-label="ApplyFirst product preview">
+      <div className="product-preview-heading">
+        <span>Product Preview</span>
+        <h2>Built around the messy part students already do manually.</h2>
+        <p>One view for discovery, timing, saved programs, and source confidence.</p>
+      </div>
+      <div className="product-preview-layout">
+        <figure className="product-preview-main">
+          <img
+            src={programsScreenshot}
+            alt="ApplyFirst program library with search, filters, opportunity records, and a selected program detail panel."
+          />
+          <figcaption>
+            <strong>Program library</strong>
+            <span>One place to find, filter, and save high-signal student opportunities.</span>
+          </figcaption>
+        </figure>
+        <div className="signal-stack" aria-label="ApplyFirst signal examples">
+          <article>
+            <span className="signal-icon">01</span>
+            <div>
+              <strong>Source check</strong>
+              <p>Official page, prior URL, timing notes, and verification status stay together.</p>
+            </div>
+          </article>
+          <article>
+            <span className="signal-icon">02</span>
+            <div>
+              <strong>Timing signal</strong>
+              <p>Opening windows, deadlines, and prep reminders become easier to watch.</p>
+            </div>
+          </article>
+          <article>
+            <span className="signal-icon">03</span>
+            <div>
+              <strong>Student action</strong>
+              <p>Save programs now; future alerts only go out when signals are trustworthy.</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function VisualBenefitSection() {
+  const benefits = [
+    {
+      label: 'Before',
+      title: 'Scattered Lists',
+      items: ['GitHub repos', 'school links', 'old spreadsheets', 'official pages'],
+    },
+    {
+      label: 'ApplyFirst',
+      title: 'One Watchlist',
+      items: ['program fit', 'timing notes', 'source status', 'next step'],
+    },
+    {
+      label: 'Outcome',
+      title: 'Apply Earlier',
+      items: ['prepare ahead', 'catch openings', 'avoid stale links', 'move faster'],
+    },
+  ];
+
+  return (
+    <section className="visual-benefits" aria-label="ApplyFirst benefits">
+      {benefits.map((benefit) => (
+        <article key={benefit.label}>
+          <span>{benefit.label}</span>
+          <h2>{benefit.title}</h2>
+          <div className="mini-chip-grid">
+            {benefit.items.map((item) => (
+              <em key={item}>{item}</em>
+            ))}
+          </div>
+        </article>
+      ))}
+    </section>
+  );
+}
+
+function CareerAgencySection() {
+  const agencySignals = [
+    {
+      title: 'Learn the work',
+      text: 'Try SWE, product, quant, research, finance tech, fellowships, and technical communities earlier.',
+    },
+    {
+      title: 'Compare environments',
+      text: 'Notice mentorship, ownership, product depth, company culture, and pace before choosing a path.',
+    },
+    {
+      title: 'Build signal',
+      text: 'Turn programs into experience, resume proof, references, peers, and a stronger recruiting story.',
+    },
+    {
+      title: 'Choose with agency',
+      text: 'The goal is not only getting picked; it is learning which companies and roles you want to pick.',
+    },
+  ];
+
+  return (
+    <section className="career-agency" aria-label="Why early career programs matter">
+      <div className="career-agency-copy">
+        <span>Why It Matters</span>
+        <h2>Explore Early. Build Leverage.</h2>
+      </div>
+      <div className="agency-map" aria-label="Early career program benefits">
+        {agencySignals.map((signal) => (
+          <article key={signal.title}>
+            <span aria-hidden="true" />
+            <strong>{signal.title}</strong>
+            <p>{signal.text}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function HowItWorksSection() {
+  const steps = [
+    {
+      label: '1',
+      title: 'Discover',
+      text: 'Find high-signal programs.',
+    },
+    {
+      label: '2',
+      title: 'Save',
+      text: 'Keep a focused watchlist.',
+    },
+    {
+      label: '3',
+      title: 'Prepare',
+      text: 'Use timing notes early.',
+    },
+    {
+      label: '4',
+      title: 'Watch',
+      text: 'Track verified openings.',
+    },
+  ];
+
+  return (
+    <section className="how-it-works" aria-label="How ApplyFirst works">
+      <div className="how-it-works-copy">
+        <span>How It Works</span>
+        <h2>From scattered lists to a focused watchlist.</h2>
+      </div>
+      <div className="how-it-works-steps">
+        {steps.map((step) => (
+          <article key={step.label}>
+            <span>{step.label}</span>
+            <strong>{step.title}</strong>
+            <p>{step.text}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function Header({ activeView, onViewChange, savedCount, showInternalTools, onReturnToLanding }) {
   return (
     <header className="site-header">
       <button className="brand" type="button" onClick={() => onViewChange('monitor')} aria-label="ApplyFirst home">
@@ -503,6 +815,9 @@ function Header({ activeView, onViewChange, savedCount, showInternalTools }) {
         <div className="nav-status" aria-label="Workspace status">
           <span>{savedCount} Saved</span>
           {showInternalTools ? <span className="internal-status">Maintainer</span> : null}
+          <button type="button" onClick={onReturnToLanding}>
+            Landing
+          </button>
         </div>
       </nav>
     </header>
@@ -793,8 +1108,9 @@ function MonitoringWorkflowPanel({ matchCount, alertStrategy }) {
   );
 }
 
-function WaitlistPanel({ alertPrefs, alertStrategy, waitlistIntent, onSave, onReset }) {
+function WaitlistPanel({ context = 'setup', alertPrefs, alertStrategy, waitlistIntent, onSave, onReset }) {
   const [draft, setDraft] = useState(() => createWaitlistDraft(alertPrefs));
+  const isLandingContext = context === 'landing';
 
   useEffect(() => {
     if (!waitlistIntent) {
@@ -826,23 +1142,35 @@ function WaitlistPanel({ alertPrefs, alertStrategy, waitlistIntent, onSave, onRe
   return (
     <section className="waitlist-panel" id="waitlist" aria-label="ApplyFirst waitlist">
       <div className="waitlist-copy">
-        <span>Save setup</span>
-        <h3>{waitlistIntent ? 'Your setup is saved locally' : 'Save this alert setup'}</h3>
-        <p>
-          Add optional contact context so this can become a real waitlist later. For now, ApplyFirst only saves this in
-          your browser.
-        </p>
+        <span>{isLandingContext ? 'Early access' : 'Save setup'}</span>
+        <h3>
+          {waitlistIntent
+            ? isLandingContext
+              ? 'You are on the list'
+              : 'Your setup is saved locally'
+            : isLandingContext
+              ? 'Join the ApplyFirst Waitlist'
+              : 'Save this alert setup'}
+        </h3>
+        {!isLandingContext ? (
+          <p>
+            Add optional contact context so this can become a real waitlist later. For now, ApplyFirst only saves this
+            in your browser.
+          </p>
+        ) : null}
       </div>
-      <dl>
-        <div>
-          <dt>Watching</dt>
-          <dd>{preferenceSummary}</dd>
-        </div>
-        <div>
-          <dt>Saved as</dt>
-          <dd>{alertStrategy.modeLabel}</dd>
-        </div>
-      </dl>
+      {!isLandingContext ? (
+        <dl>
+          <div>
+            <dt>Watching</dt>
+            <dd>{preferenceSummary}</dd>
+          </div>
+          <div>
+            <dt>Saved as</dt>
+            <dd>{alertStrategy.modeLabel}</dd>
+          </div>
+        </dl>
+      ) : null}
       {waitlistIntent ? (
         <div className="waitlist-saved">
           <strong>{waitlistIntent.email || 'No email added'}</strong>
@@ -859,13 +1187,30 @@ function WaitlistPanel({ alertPrefs, alertStrategy, waitlistIntent, onSave, onRe
               value={draft.email}
               onChange={(event) => updateDraft('email', event.target.value)}
               placeholder="you@example.com"
+              required={isLandingContext}
             />
           </label>
           <label>
-            <span>School or major</span>
+            <span>Class year</span>
             <input
-              value={draft.context}
-              onChange={(event) => updateDraft('context', event.target.value)}
+              value={draft.classYear}
+              onChange={(event) => updateDraft('classYear', event.target.value)}
+              placeholder="Freshman, sophomore, junior..."
+            />
+          </label>
+          <label>
+            <span>Primary interest</span>
+            <input
+              value={draft.interest}
+              onChange={(event) => updateDraft('interest', event.target.value)}
+              placeholder="SWE, PM, quant, fellowships..."
+            />
+          </label>
+          <label>
+            <span>School</span>
+            <input
+              value={draft.school}
+              onChange={(event) => updateDraft('school', event.target.value)}
               placeholder="Optional"
             />
           </label>
@@ -873,7 +1218,7 @@ function WaitlistPanel({ alertPrefs, alertStrategy, waitlistIntent, onSave, onRe
             <span>Anything specific to watch?</span>
             <textarea value={draft.note} onChange={(event) => updateDraft('note', event.target.value)} />
           </label>
-          <button type="submit">Save Setup</button>
+          <button type="submit">{isLandingContext ? 'Join Waitlist' : 'Save Setup'}</button>
         </form>
       )}
     </section>
@@ -883,11 +1228,10 @@ function WaitlistPanel({ alertPrefs, alertStrategy, waitlistIntent, onSave, onRe
 function createWaitlistDraft(alertPrefs) {
   return {
     email: '',
-    context: '',
-    note:
-      alertPrefs.roleTrack === 'all'
-        ? 'I want alerts for high-signal early-career programs.'
-        : `I want alerts for ${alertPrefs.roleTrack} programs.`,
+    classYear: '',
+    interest: '',
+    school: '',
+    note: '',
   };
 }
 
