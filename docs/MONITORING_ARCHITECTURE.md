@@ -127,7 +127,7 @@ Future account-backed version of the current local Contribute view.
 
 ### alert_preferences
 
-Future account-backed version of the current local alert setup.
+Future account-backed version of the current local Preferences setup.
 
 - `id`
 - `user_id`

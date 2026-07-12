@@ -400,24 +400,22 @@ function App() {
       />
       <main className="workspace">
         {activeView === 'alerts' ? (
-          <section className="settings-view" aria-label="Alert settings">
+          <section className="settings-view student-alerts-view" aria-label="Alert settings">
             <section className="alert-hero" aria-label="ApplyFirst alert overview">
               <div>
-                <span>Stay ready</span>
-                <h1>Save the programs you want updates for.</h1>
+                <span>Preferences</span>
+                <h1>Tell ApplyFirst what to watch.</h1>
                 <p>
-                  Tell ApplyFirst your class year, role interests, and timing preferences. This public prototype saves
-                  your setup locally so you can prepare with more confidence while the live notification flow takes
-                  shape.
+                  Set the student context that shapes your matches, saved programs, and future opening reminders.
+                  Nothing here should feel like admin work.
                 </p>
               </div>
+              <div className="alert-hero-card" aria-label="Beta alert status">
+                <span>Private Beta</span>
+                <strong>Your choices guide the library.</strong>
+                <p>Start with what you care about most, then save an email only if you want beta follow-up.</p>
+              </div>
             </section>
-            <div className="settings-note">
-              <strong>Preview mode</strong>
-              <p>
-                Your alert settings stay in this browser for now, so you can shape what you want ApplyFirst to watch.
-              </p>
-            </div>
             <AlertSetupPanel
               alertPrefs={alertPrefs}
               setAlertPrefs={setAlertPrefs}
@@ -887,7 +885,7 @@ function Header({ activeView, onViewChange, savedCount, showInternalTools, onRet
             type="button"
             onClick={() => onViewChange('alerts')}
           >
-            Alerts
+            Preferences
           </button>
           <button
             className={activeView === 'contribute' ? 'active' : ''}
@@ -938,11 +936,11 @@ function TrustPolicyPanel() {
   return (
     <section className="trust-policy-panel" aria-label="Alert trust policy">
       <div className="trust-policy-copy">
-        <span>Confirmation</span>
-        <h2>Why some programs wait</h2>
+        <span>Trust Notes</span>
+        <h2>Why ApplyFirst is careful with alerts</h2>
         <p>
-          ApplyFirst can help you prepare early, but official pages are still the source of truth. A program should only
-          become a real alert when timing and eligibility are clear.
+          Students need speed, but they also need accuracy. ApplyFirst can help you prepare early, while still treating
+          official program pages as the source of truth.
         </p>
       </div>
       <div className="trust-policy-grid">
@@ -1025,24 +1023,30 @@ function AlertSetupPanel({
     <section className="alert-setup-panel">
       <div className="alert-setup-intro">
         <div className="panel-heading">
-          <span>Setup</span>
-          <h2>Choose programs to monitor</h2>
+          <span>Your Focus</span>
+          <h2>What should ApplyFirst prioritize for you?</h2>
         </div>
         <p>
-          These choices decide which programs show up in your alert preview. Unconfirmed records can still help you
-          prepare, but future alerts should only come from confirmed program pages.
+          These choices narrow the library to programs that fit your stage and goals. You can still browse everything
+          from Programs whenever you want.
         </p>
       </div>
-      <div className="alert-step-grid">
-        <article className="alert-step-card">
-          <span>1</span>
-          <h3>About you</h3>
+      <div className="alert-preference-layout">
+        <article className="alert-preference-card">
+          <span>Profile</span>
+          <h3>Who are you applying as?</h3>
+          <p>Class year matters because many early programs are built for specific student stages.</p>
           <FilterSelect
             label="Class year"
             value={alertPrefs.classYear}
             onChange={(value) => updatePref('classYear', value)}
             options={filterOptions.classYears}
           />
+        </article>
+        <article className="alert-preference-card">
+          <span>Interest</span>
+          <h3>What career path are you exploring?</h3>
+          <p>Role interest keeps SWE, PM, quant, and access programs from blending into one noisy list.</p>
           <FilterSelect
             label="Role interest"
             value={alertPrefs.roleTrack}
@@ -1050,9 +1054,10 @@ function AlertSetupPanel({
             options={filterOptions.roleTracks}
           />
         </article>
-        <article className="alert-step-card">
-          <span>2</span>
-          <h3>Programs</h3>
+        <article className="alert-preference-card">
+          <span>Programs</span>
+          <h3>What should rise to the top?</h3>
+          <p>Recommended programs are the ones worth reviewing first; Foundation keeps prep and access resources visible.</p>
           <FilterSelect
             label="Program group"
             value={alertPrefs.priority}
@@ -1060,20 +1065,14 @@ function AlertSetupPanel({
             options={filterOptions.priorities}
             labels={priorityLabels}
           />
-          <p>{matchCount} programs match this setup.</p>
+          <p>{matchCount} programs match this focus right now.</p>
         </article>
-        <article className="alert-step-card">
-          <span>3</span>
-          <h3>Updates</h3>
+        <article className="alert-preference-card">
+          <span>Timing</span>
+          <h3>When do you want to pay attention?</h3>
+          <p>Some students only want openings; others want prep windows early enough to update resumes or portfolios.</p>
           <FilterSelect
-            label="Update option"
-            value={alertPrefs.notificationMode}
-            onChange={(value) => updatePref('notificationMode', value)}
-            options={Object.keys(notificationModeLabels)}
-            labels={notificationModeLabels}
-          />
-          <FilterSelect
-            label="When to update"
+            label="Timing preference"
             value={alertPrefs.sendTiming}
             onChange={(value) => updatePref('sendTiming', value)}
             options={Object.keys(sendTimingLabels)}
@@ -1081,18 +1080,21 @@ function AlertSetupPanel({
           />
         </article>
       </div>
-      <div className="notification-strategy">
+      <div className="student-alert-summary">
         <div>
-          <span>Confirmed enough</span>
-          <strong>{alertStrategy.sendSummary}</strong>
+          <span>Your Match</span>
+          <strong>{matchCount} programs fit this setup.</strong>
         </div>
         <div>
-          <span>Still checking</span>
-          <strong>{alertStrategy.holdSummary}</strong>
+          <span>Update Plan</span>
+          <strong>{alertStrategy.timingLabel}</strong>
         </div>
-        <p>{alertStrategy.trustCopy}</p>
+        <p>
+          Opening reminders are not live yet. For the beta, ApplyFirst uses these preferences to shape your saved
+          library and future email follow-up.
+        </p>
       </div>
-      <MonitoringWorkflowPanel matchCount={matchCount} alertStrategy={alertStrategy} />
+      <StudentAlertJourney matchCount={matchCount} alertStrategy={alertStrategy} />
       <SavedAlertPreview items={savedOpportunities} onSelect={onSavedSelect} />
       <WaitlistPanel
         alertPrefs={alertPrefs}
@@ -1108,20 +1110,15 @@ function AlertSetupPanel({
 
 function SavedAlertPreview({ items, onSelect }) {
   const alertReadyCount = items.filter((item) => getMonitoringReadiness(item).alertable).length;
-  const needsCheckCount = Math.max(items.length - alertReadyCount, 0);
 
   return (
     <section className="saved-alert-preview" aria-label="Saved program alert preview">
       <div className="saved-alert-heading">
         <div>
-          <span>Saved programs</span>
-          <h3>{items.length ? `${items.length} saved for tracking` : 'No saved programs yet'}</h3>
+          <span>Saved Programs</span>
+          <h3>{items.length ? `${items.length} programs in your watchlist` : 'No saved programs yet'}</h3>
         </div>
-        {items.length ? (
-          <strong>
-            {alertReadyCount} ready / {needsCheckCount} checking
-          </strong>
-        ) : null}
+        {items.length ? <strong>{alertReadyCount} with confirmed timing</strong> : null}
       </div>
       {items.length ? (
         <div className="saved-alert-list" role="list">
@@ -1133,53 +1130,48 @@ function SavedAlertPreview({ items, onSelect }) {
               <button key={item.id} type="button" onClick={() => onSelect(item.id)} role="listitem">
                 <span>{item.name}</span>
                 <strong>{signal.actionLabel}</strong>
-                <em>{readiness.alertable ? 'Alert-ready later' : readiness.status}</em>
+                <em>{readiness.alertable ? 'Official timing found' : 'Timing needs a source check'}</em>
               </button>
             );
           })}
         </div>
       ) : (
         <p>
-          Start on Programs and bookmark opportunities you would actually apply to. Saved programs become the most useful
-          candidates for future reminders once official pages are verified.
+          Start on Programs and bookmark opportunities you would actually apply to. Saved programs become your personal
+          watchlist for future reminders.
         </p>
       )}
     </section>
   );
 }
 
-function MonitoringWorkflowPanel({ matchCount, alertStrategy }) {
+function StudentAlertJourney({ matchCount, alertStrategy }) {
   const workflowSteps = [
     {
-      label: 'Save',
-      title: 'Choose what matters',
-      text: `${matchCount} programs match your current setup. Save the ones you would actually apply to or prepare for.`,
+      label: 'Discover',
+      title: 'Find the right programs',
+      text: `${matchCount} programs currently match your focus, so you can start from a smaller list.`,
     },
     {
-      label: 'Verify',
-      title: 'Check official pages',
-      text: 'ApplyFirst keeps unconfirmed programs out of future alerts until timing and eligibility are backed by official pages.',
+      label: 'Prepare',
+      title: 'Know what to get ready',
+      text: 'Use timing notes, eligibility, and saved programs to prepare before applications open.',
     },
     {
-      label: 'Watch',
-      title: 'Track opening signals',
-      text: 'Official-page checks look for apply links, opening windows, deadlines, eligibility changes, and closed-cycle language.',
-    },
-    {
-      label: 'Notify',
-      title: 'Send only when trustworthy',
+      label: 'Move Early',
+      title: 'Apply when timing matters',
       text: alertStrategy.sendSummary,
     },
   ];
 
   return (
-    <section className="monitoring-workflow-panel" aria-label="How ApplyFirst monitoring works">
+    <section className="monitoring-workflow-panel student-alert-journey" aria-label="How ApplyFirst updates help students">
       <div className="monitoring-workflow-copy">
-        <span>How monitoring works</span>
-        <h3>From saved program to future alert</h3>
+        <span>How It Helps</span>
+        <h3>From interest to action</h3>
         <p>
-          This prototype shows the workflow before live notifications exist: students choose what to watch, records get
-          verified, and only confirmed timing should become alert-ready.
+          The goal is simple: spend less time checking scattered pages and more time getting ready for programs that
+          can actually change your options.
         </p>
       </div>
       <div className="monitoring-workflow-steps">
@@ -1235,17 +1227,17 @@ function ContributeView({ contributions, opportunities, captureEndpoint = '', on
     <section className="contribute-view" aria-label="ApplyFirst contribution center">
       <section className="contribute-hero">
         <div>
-          <span>Student signal</span>
-          <h1>Help ApplyFirst catch what students actually find.</h1>
+          <span>Student Feedback</span>
+          <h1>Share what ApplyFirst should know.</h1>
           <p>
-            Submit a program to track or report outdated information. If a contribution endpoint is connected,
-            submissions go there; otherwise this prototype saves them locally for beta testing.
+            Add a program you found elsewhere, report stale information, or tell us what felt confusing while testing.
+            Every submission is reviewed before it changes the library.
           </p>
         </div>
         <div className="contribute-facts" aria-label="Contribution status">
           <span>
             <strong>{contributions.length}</strong>
-            {captureEndpoint ? 'Captured' : 'Saved Locally'}
+            Shared In This Session
           </span>
           <span>
             <strong>Beta</strong>
@@ -1324,6 +1316,7 @@ function ContributeView({ contributions, opportunities, captureEndpoint = '', on
           <label>
             <span>Issue type</span>
             <select value={feedbackDraft.issueType} onChange={(event) => updateFeedbackDraft('issueType', event.target.value)}>
+              <option>Beta feedback</option>
               <option>Outdated status</option>
               <option>Broken link</option>
               <option>Wrong eligibility</option>
@@ -1336,7 +1329,7 @@ function ContributeView({ contributions, opportunities, captureEndpoint = '', on
             <textarea
               value={feedbackDraft.note}
               onChange={(event) => updateFeedbackDraft('note', event.target.value)}
-              placeholder="Share the source, correction, or what felt unclear."
+              placeholder="Share the source, correction, what felt unclear, or what you expected to happen."
               required
             />
           </label>
@@ -1348,8 +1341,8 @@ function ContributeView({ contributions, opportunities, captureEndpoint = '', on
 
         <section className="contribution-card contribution-log" aria-label="Saved local contributions">
           <div className="panel-heading">
-            <span>Local Queue</span>
-            <h2>{contributions.length ? `${contributions.length} saved` : 'No contributions yet'}</h2>
+            <span>Review Queue</span>
+            <h2>{contributions.length ? `${contributions.length} shared` : 'No feedback shared yet'}</h2>
           </div>
           {contributions.length ? (
             <div className="contribution-items" role="list">
@@ -1363,7 +1356,7 @@ function ContributeView({ contributions, opportunities, captureEndpoint = '', on
               ))}
             </div>
           ) : (
-            <p>Student submissions will appear here during prototype testing.</p>
+            <p>Submissions you add during this session will appear here before review.</p>
           )}
         </section>
       </section>
@@ -1377,8 +1370,9 @@ function BetaTestingPanel() {
     'Join the waitlist or enter an invite code.',
     'Search for a program that matches your year or role.',
     'Save one program you would actually track.',
+    'Set your Preferences and explain whether the fields make sense.',
     'Submit one program ApplyFirst should watch.',
-    'Report one piece of stale or confusing information.',
+    'Report one piece of stale, confusing, or missing information.',
   ];
 
   return (
@@ -1387,8 +1381,8 @@ function BetaTestingPanel() {
         <span>Private beta</span>
         <h2>What students should test</h2>
         <p>
-          ApplyFirst stores prototype waitlist, saved program, alert setup, and contribution data in this browser unless
-          a capture endpoint is connected. Official program pages remain the source of truth.
+          Use this checklist during early testing. The goal is to learn whether students understand the product, trust
+          the library, and know what they would want ApplyFirst to watch.
         </p>
       </div>
       <ol>
@@ -1415,11 +1409,11 @@ function SubmissionHelper({ state, captureEndpoint }) {
   }
 
   if (state === 'localFallback') {
-    return <p className="form-helper">Endpoint was not available, so this was saved locally.</p>;
+    return <p className="form-helper">Saved on this device because beta capture was unavailable.</p>;
   }
 
   if (!captureEndpoint) {
-    return <p className="form-helper">Prototype mode: saved in this browser.</p>;
+    return <p className="form-helper">Prototype mode: saved on this device.</p>;
   }
 
   return null;
@@ -1445,6 +1439,7 @@ function WaitlistPanel({
   const [draft, setDraft] = useState(() => createWaitlistDraft(alertPrefs));
   const [submitState, setSubmitState] = useState('idle');
   const isLandingContext = context === 'landing';
+  const isSetupContext = !isLandingContext;
 
   useEffect(() => {
     if (!waitlistIntent) {
@@ -1512,37 +1507,29 @@ function WaitlistPanel({
   };
 
   return (
-    <section className="waitlist-panel" id="waitlist" aria-label="ApplyFirst waitlist">
+    <section
+      className={`waitlist-panel ${isSetupContext ? 'updates-waitlist-panel' : ''}`}
+      id="waitlist"
+      aria-label="ApplyFirst waitlist"
+    >
       <div className="waitlist-copy">
-        <span>{isLandingContext ? 'Early access' : 'Save setup'}</span>
+        <span>{isLandingContext ? 'Early access' : 'Optional Contact'}</span>
         <h3>
           {waitlistIntent
             ? isLandingContext
               ? 'You are on the list'
-              : 'Your setup is saved locally'
+              : 'Your contact preference is saved'
             : isLandingContext
               ? 'Join the ApplyFirst Waitlist'
-              : 'Save this alert setup'}
+              : 'Get beta follow-up'}
         </h3>
         {!isLandingContext ? (
           <p>
-            Add optional contact context. If a waitlist endpoint is connected, this submits there; otherwise ApplyFirst
-            saves it in this browser for prototype testing.
+            This is optional. Add an email only if you want ApplyFirst to reach out when live reminders or beta testing
+            are ready.
           </p>
         ) : null}
       </div>
-      {!isLandingContext ? (
-        <dl>
-          <div>
-            <dt>Watching</dt>
-            <dd>{preferenceSummary}</dd>
-          </div>
-          <div>
-            <dt>Saved as</dt>
-            <dd>{alertStrategy.modeLabel}</dd>
-          </div>
-        </dl>
-      ) : null}
       {waitlistIntent ? (
         <div className="waitlist-saved">
           <strong>{waitlistIntent.email || 'No email added'}</strong>
@@ -1554,7 +1541,7 @@ function WaitlistPanel({
       ) : (
         <form className="waitlist-form" onSubmit={saveDraft}>
           <label>
-            <span>Email for future updates</span>
+            <span>{isLandingContext ? 'Email for future updates' : 'Email'}</span>
             <input
               type="email"
               value={draft.email}
@@ -1563,41 +1550,53 @@ function WaitlistPanel({
               required={isLandingContext}
             />
           </label>
-          <label>
-            <span>Class year</span>
-            <input
-              value={draft.classYear}
-              onChange={(event) => updateDraft('classYear', event.target.value)}
-              placeholder="Freshman, sophomore, junior..."
-            />
-          </label>
-          <label>
-            <span>Primary interest</span>
-            <input
-              value={draft.interest}
-              onChange={(event) => updateDraft('interest', event.target.value)}
-              placeholder="SWE, PM, quant, fellowships..."
-            />
-          </label>
-          <label>
-            <span>School</span>
-            <input
-              value={draft.school}
-              onChange={(event) => updateDraft('school', event.target.value)}
-              placeholder="Optional"
-            />
-          </label>
+          {isLandingContext ? (
+            <>
+              <label>
+                <span>Class year</span>
+                <input
+                  value={draft.classYear}
+                  onChange={(event) => updateDraft('classYear', event.target.value)}
+                  placeholder="Freshman, sophomore, junior..."
+                />
+              </label>
+              <label>
+                <span>Primary interest</span>
+                <input
+                  value={draft.interest}
+                  onChange={(event) => updateDraft('interest', event.target.value)}
+                  placeholder="SWE, PM, quant, fellowships..."
+                />
+              </label>
+              <label>
+                <span>School</span>
+                <input
+                  value={draft.school}
+                  onChange={(event) => updateDraft('school', event.target.value)}
+                  placeholder="Optional"
+                />
+              </label>
+            </>
+          ) : null}
           <label className="waitlist-note">
-            <span>Anything specific to watch?</span>
-            <textarea value={draft.note} onChange={(event) => updateDraft('note', event.target.value)} />
+            <span>{isLandingContext ? 'Anything specific to watch?' : 'What should ApplyFirst watch for you?'}</span>
+            <textarea
+              value={draft.note}
+              onChange={(event) => updateDraft('note', event.target.value)}
+              placeholder={isLandingContext ? '' : 'Example: freshman SWE discovery programs, conference funding, PM fellowships...'}
+            />
           </label>
           <button type="submit" disabled={submitState === 'submitting'}>
-            {submitState === 'submitting' ? 'Saving...' : isLandingContext ? 'Join Waitlist' : 'Save Setup'}
+            {submitState === 'submitting' ? 'Saving...' : isLandingContext ? 'Join Waitlist' : 'Save Contact Preference'}
           </button>
           {submitState === 'localFallback' ? (
-            <p className="form-helper">Endpoint was not available, so this was saved locally.</p>
+            <p className="form-helper">Saved on this device because beta capture was unavailable.</p>
           ) : null}
-          {!captureEndpoint ? <p className="form-helper">Prototype mode: saved in this browser.</p> : null}
+          {!captureEndpoint ? (
+            <p className="form-helper">
+              {isLandingContext ? 'Prototype mode: saved on this device.' : 'Saved on this device for this prototype.'}
+            </p>
+          ) : null}
         </form>
       )}
     </section>
@@ -2067,6 +2066,7 @@ function getAlertStrategy(alertPrefs, matches, alertableCount) {
 
   return {
     modeLabel,
+    timingLabel,
     sendSummary: `${alertableCount} ${alertableCount === 1 ? 'program is' : 'programs are'} confirmed enough for ${timingCopy}`,
     holdSummary: `${heldCount} ${heldCount === 1 ? 'program still needs' : 'programs still need'} an official check`,
     trustCopy: `${channelCopy} Your timing choice is ${timingLabel.toLowerCase()}, and unconfirmed programs stay out of alerts.`,

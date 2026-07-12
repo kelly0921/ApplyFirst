@@ -12,9 +12,13 @@ The mark uses a softened Sharp A with a restrained underline, matching the produ
 
 ## Screenshots
 
+![ApplyFirst landing page](./docs/assets/screenshots/applyfirst-landing-desktop.png)
+
 ![ApplyFirst programs dashboard](./docs/assets/screenshots/applyfirst-programs-desktop.png)
 
-![ApplyFirst alerts setup](./docs/assets/screenshots/applyfirst-alerts-desktop.png)
+![ApplyFirst preferences setup](./docs/assets/screenshots/applyfirst-preferences-desktop.png)
+
+![ApplyFirst contribution flow](./docs/assets/screenshots/applyfirst-contribute-desktop.png)
 
 ![ApplyFirst mobile programs view](./docs/assets/screenshots/applyfirst-programs-mobile.png)
 
@@ -41,7 +45,7 @@ The first version focuses on:
 - Clear notes on why each opportunity matters and how to prepare.
 - A future path toward an Opportunity Signal Tracker.
 
-This version is a private-beta public prototype with a landing page, endpoint-ready waitlist request, invite-code gate, local contribution capture, and the full app behind the gate. The app can show the product direction, curated seed set, local alert preferences, student-facing confirmation model, and student submission flow, while outbound notifications should wait for stronger official-source confirmation.
+This version is a private-beta public prototype with a landing page, endpoint-ready waitlist request, invite-code gate, endpoint-ready contribution capture, and the full app behind the gate. The app can show the product direction, curated seed set, student Preferences, student-facing confirmation model, and student submission flow, while outbound opening reminders should wait for stronger official-source confirmation.
 
 Recommendation is computed from the Phase 1 rules: underclassmen-fit programs in high-leverage categories become Recommended; relevant programs can also be Recommended when they are useful enough to review, save, or prepare for early; scholarships, conferences, communities, and resources are treated as Foundation opportunities. Student actions stay separate from these labels: users save programs they care about, while ApplyFirst monitors confirmed sources for future opening signals. Duplicate appearances across older curated lists are useful for verification, but they are not treated as proof that a program is better.
 
@@ -55,9 +59,17 @@ These codes are for the current prototype gate only and should be replaced befor
 
 After unlocking the prototype, use the `Landing` button in the app header to clear the local access flag and return to the public landing page.
 
-The waitlist form saves locally by default. Set `VITE_WAITLIST_ENDPOINT` to a JSON-compatible form/backend endpoint to submit waitlist requests externally; if the endpoint fails, the prototype falls back to local browser storage. Student program submissions and feedback save locally by default. Set `VITE_CONTRIBUTION_ENDPOINT` to capture Contribute submissions externally; if the endpoint fails, the prototype falls back to local browser storage.
+The waitlist/contact form saves locally by default. Set `VITE_WAITLIST_ENDPOINT` to a JSON-compatible form/backend endpoint to submit waitlist and Preferences contact requests externally; if the endpoint fails, the prototype falls back to local browser storage. Student program submissions and feedback save locally by default. Set `VITE_CONTRIBUTION_ENDPOINT` to capture Contribute submissions externally; if the endpoint fails, the prototype falls back to local browser storage. Copy `.env.example` to `.env.local` for local endpoint testing.
 
 Private beta testing should ask students to join the waitlist, unlock the app with an invite code, save one program, submit one program ApplyFirst should watch, and report one stale or confusing record. Until real accounts and moderation exist, submitted programs and feedback should be treated as review candidates rather than public library records.
+
+Beta-readiness references:
+
+- [Data capture setup](./docs/DATA_CAPTURE_SETUP.md)
+- [Beta testing plan](./docs/BETA_TESTING_PLAN.md)
+- [Seed data review checklist](./docs/SEED_DATA_REVIEW.md)
+- [Beta seed review results](./docs/BETA_SEED_REVIEW_RESULTS.md)
+- [Deployment checklist](./docs/DEPLOYMENT_CHECKLIST.md)
 
 ## Source Strategy
 
@@ -127,13 +139,19 @@ For the backend/data model plan, see [docs/MONITORING_ARCHITECTURE.md](./docs/MO
 
 For the draft Supabase schema and future import plan, see [docs/SUPABASE_SETUP.md](./docs/SUPABASE_SETUP.md).
 
+To smoke-test beta capture endpoints after setting `VITE_WAITLIST_ENDPOINT` and `VITE_CONTRIBUTION_ENDPOINT`:
+
+```bash
+npm run capture:smoke
+```
+
 ## Phase 2 Start
 
 The first Phase 2 slice adds:
 
 - Public landing page that explains ApplyFirst, who it is for, what students get, and why access is limited during private beta.
 - Simple invite-code gate before the full program monitor, avoiding premature auth while keeping access intentional.
-- Local alert preference preview by class year, role track, and recommendation level.
+- Student Preferences preview by class year, role track, recommendation level, and timing preference.
 - Confirmation-readiness calculations for records that are safe to alert on later.
 - Prioritized source-review queue for records that need official-cycle review before alerts.
 - Direct review flow from queue item to full program detail.
@@ -141,18 +159,18 @@ The first Phase 2 slice adds:
 - Readiness and queue updates based on those local verification edits.
 - Source update plan per record, including watched page, check cadence, next check, alert trigger, and meaningful change signals.
 - Local source-check log with checked date, result, and notes.
-- Notification strategy preview with local preview, email waitlist, and saved-program reminder modes.
+- Student-facing preference and contact flow for future reminders.
 - Contribute view for local student program submissions and stale-info feedback.
 - Alert timing preview for openings, deadlines, and preparation windows.
-- Navigation split between the focused Programs view and a separate Alerts setup view.
-- Simplified student-facing alert preference section with technical readiness details kept in Maintainer Mode.
+- Navigation split between the focused Programs view, student Preferences, and Contribute.
+- Simplified student-facing Preferences section with technical readiness details kept in Maintainer Mode.
 - Trust copy that separates records ready to alert from records that still need confirmation.
 - Public trust policy for Confirmed, Prep Only, and Needs Confirmation records.
 - Local waitlist-intent workflow before accounts, reminders, or real outbound alerts.
 - Maintainer Mode toggle for source-review tools, keeping the default view student-facing.
 - A clear split between public prototype behavior and future live notifications.
 - Student-facing monitoring workflow explanation: save programs, verify official pages, watch opening signals, then notify only when trustworthy.
-- Alerts-page saved-program preview showing which bookmarked programs are ready later versus still being checked.
+- Preferences-page saved-program preview showing bookmarked programs without exposing internal dashboard language.
 
 Real email alerts, accounts, and automated page-change monitoring are intentionally still future work.
 

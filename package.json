@@ -15,6 +15,7 @@
     "monitor:seed:write": "node scripts/export-monitoring-seed.mjs --write",
     "monitor:seed:sql": "node scripts/export-monitoring-seed.mjs --sql",
     "monitor:seed:sql:write": "node scripts/export-monitoring-seed.mjs --sql --write",
+    "capture:smoke": "node scripts/smoke-capture-endpoints.mjs",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {

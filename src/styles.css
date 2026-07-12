@@ -973,12 +973,60 @@ a {
   gap: 14px;
 }
 
+.student-alerts-view {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
 .alert-hero {
   grid-template-columns: minmax(0, 0.82fr);
   margin-bottom: 0;
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(238, 245, 255, 0.76) 52%, rgba(255, 242, 231, 0.58)),
     #ffffff;
+}
+
+.student-alerts-view .alert-hero {
+  grid-template-columns: minmax(0, 1fr) minmax(250px, 0.36fr);
+  align-items: stretch;
+}
+
+.alert-hero-card {
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  border: 1px solid rgba(39, 94, 216, 0.16);
+  border-radius: 16px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(238, 245, 255, 0.76)),
+    #ffffff;
+  padding: 16px;
+}
+
+.alert-hero-card span {
+  color: var(--blue);
+  font-size: 0.68rem;
+  font-weight: 880;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.alert-hero-card strong,
+.alert-hero-card p {
+  margin: 0;
+}
+
+.alert-hero-card strong {
+  color: var(--ink);
+  font-size: 1rem;
+  line-height: 1.25;
+}
+
+.alert-hero-card p {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 680;
+  line-height: 1.45;
 }
 
 .settings-note {
@@ -1141,17 +1189,16 @@ a {
   display: grid;
   align-content: start;
   gap: 16px;
-  background:
-    linear-gradient(145deg, rgba(31, 94, 234, 0.07), transparent 58%),
-    rgba(255, 255, 255, 0.94);
-  padding: 16px;
+  border-radius: 18px;
+  background: var(--surface);
+  padding: 18px;
 }
 
 .alert-setup-intro {
   display: grid;
-  grid-template-columns: minmax(220px, 0.36fr) minmax(0, 1fr);
+  grid-template-columns: minmax(240px, 0.45fr) minmax(0, 1fr);
   gap: 12px;
-  align-items: end;
+  align-items: center;
   border-bottom: 1px solid var(--line);
   padding-bottom: 12px;
 }
@@ -1161,6 +1208,55 @@ a {
   color: var(--muted);
   font-size: 0.86rem;
   line-height: 1.45;
+}
+
+.alert-preference-layout {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.alert-preference-card {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid rgba(211, 222, 217, 0.9);
+  border-radius: 14px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(247, 250, 248, 0.86)),
+    #ffffff;
+  padding: 14px;
+}
+
+.alert-preference-card > span {
+  color: var(--blue);
+  font-size: 0.68rem;
+  font-weight: 880;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.alert-preference-card h3,
+.alert-preference-card p {
+  margin: 0;
+}
+
+.alert-preference-card h3 {
+  color: var(--ink);
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.alert-preference-card p {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 720;
+  line-height: 1.45;
+}
+
+.alert-preference-card .select-control {
+  margin-top: auto;
 }
 
 .alert-step-grid {
@@ -1248,6 +1344,46 @@ a {
   line-height: 1.45;
 }
 
+.student-alert-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 0.72fr) minmax(260px, 1.2fr);
+  gap: 10px;
+  align-items: stretch;
+  border: 1px solid rgba(39, 94, 216, 0.14);
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, rgba(238, 245, 255, 0.72), rgba(232, 247, 239, 0.58)),
+    #ffffff;
+  padding: 12px;
+}
+
+.student-alert-summary div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.student-alert-summary span {
+  color: var(--blue);
+  font-size: 0.66rem;
+  font-weight: 880;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.student-alert-summary strong {
+  color: var(--ink);
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.student-alert-summary p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
 .monitoring-workflow-panel {
   display: grid;
   grid-template-columns: minmax(220px, 0.5fr) minmax(0, 1fr);
@@ -1261,6 +1397,14 @@ a {
   padding: 14px;
 }
 
+.student-alert-journey {
+  grid-template-columns: minmax(220px, 0.42fr) minmax(0, 1fr);
+  border-color: rgba(211, 222, 217, 0.9);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(255, 242, 231, 0.46)),
+    #ffffff;
+}
+
 .monitoring-workflow-copy {
   display: grid;
   gap: 6px;
@@ -1268,7 +1412,7 @@ a {
 
 .monitoring-workflow-copy span,
 .monitoring-workflow-steps span {
-  color: var(--warm);
+  color: var(--green);
   font-size: 0.66rem;
   font-weight: 860;
   letter-spacing: 0.04em;
@@ -1296,7 +1440,7 @@ a {
 
 .monitoring-workflow-steps {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -1758,6 +1902,18 @@ a {
   border-color: rgba(47, 99, 214, 0.12);
   border-radius: 18px;
   padding: 14px;
+}
+
+.updates-waitlist-panel .waitlist-form {
+  grid-template-columns: 1fr;
+}
+
+.updates-waitlist-panel .waitlist-copy {
+  align-content: center;
+}
+
+.updates-waitlist-panel .waitlist-note textarea {
+  min-height: 88px;
 }
 
 .waitlist-saved {
@@ -3338,6 +3494,7 @@ a {
   .library-controls,
   .command-strip,
   .alert-setup-intro,
+  .student-alert-summary,
   .notification-strategy,
   .monitoring-workflow-panel,
   .library-workspace,
@@ -3425,6 +3582,10 @@ a {
   }
 
   .library-controls .filter-stack {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .alert-preference-layout {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -3540,6 +3701,8 @@ a {
   .library-stats,
   .contribute-facts,
   .trust-policy-grid,
+  .alert-preference-layout,
+  .student-alert-summary,
   .alert-step-grid,
   .notification-strategy,
   .monitoring-workflow-panel,

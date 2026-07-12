@@ -185,6 +185,28 @@ Phase 1 is successful if the product feels like a useful public prototype for de
 
 It is ready to show as a public prototype, but not public-alert ready until the records are verified against official sources and the monitoring workflow is defined.
 
+## Beta User Testing Readiness
+
+ApplyFirst can be tested with a small private beta when the goal is product clarity, preference-flow feedback, library trust, and contribution behavior. It should not be described as a live alert product yet.
+
+Before inviting students, the beta should have:
+
+- Durable waitlist/contact capture through `VITE_WAITLIST_ENDPOINT`.
+- Durable contribution and beta-feedback capture through `VITE_CONTRIBUTION_ENDPOINT`.
+- A short user-testing script focused on first impression, program discovery, Preferences, saved programs, and feedback submission.
+- A manually reviewed set of high-visibility seed records so testers do not immediately hit stale examples.
+- Honest product copy that says opening reminders are coming later.
+- A deployment checklist confirming the public Cloudflare build is current before sharing the link.
+
+The current beta questions are:
+
+- Do students understand ApplyFirst within 10 seconds?
+- Do they understand this is not a generic internship board?
+- Do Preferences ask the right questions?
+- Do students save programs they would actually track?
+- Do they trust the source and timing model?
+- What programs or categories are missing?
+
 ## Future Product Direction
 
 The strongest long-term product layer is the Opportunity Signal Tracker.
@@ -261,8 +283,8 @@ The first Phase 2 slice is intentionally local and trust-focused:
 
 - Put the public URL behind a landing page that explains what ApplyFirst is, who it is for, what users get, and why access is limited.
 - Use a simple invite-code gate before the full app instead of adding full auth before the product has enough student demand.
-- Let students preview the class year, role track, and recommendation level they would want alerts for.
-- Save those alert preferences locally in the browser.
+- Let students set Preferences by class year, role track, recommendation level, and timing interest.
+- Save those Preferences locally in the browser before real accounts exist.
 - Compute how many matching programs are actually monitoring-ready.
 - Separate `Monitoring Ready`, `Needs Setup`, and `Needs Confirmation` records.
 - Prioritize a source-review queue by underclassmen fit, recommendation value, source coverage, role relevance, and missing official-cycle details.
@@ -271,15 +293,14 @@ The first Phase 2 slice is intentionally local and trust-focused:
 - Recompute readiness and queue placement from local verification edits.
 - Show a source update plan for each record, including watched page, check cadence, next check, alert trigger, and meaningful change signals.
 - Log manual source checks locally with checked date, result, and note so verification work has an audit trail before backend storage exists.
-- Let users preview a notification strategy: local preview, email waitlist, or saved-program reminders.
-- Let users choose alert timing scope: openings only, openings and deadlines, or prep windows plus openings and deadlines.
-- Split the public prototype into a focused Programs view and a separate Alerts setup view.
+- Let users choose reminder timing scope: openings only, openings and deadlines, or prep windows plus openings and deadlines.
+- Split the public prototype into focused Programs, student Preferences, and Contribute views.
 - Explain matching programs, alert readiness, and programs needing confirmation in student-facing language.
 - Keep technical monitoring-readiness details in Maintainer Mode instead of the default public alert surface.
 - Display a public trust policy explaining Confirmed, Prep Only, and Needs Confirmation records, with a hard rule that outbound alerts should not come from unconfirmed records.
-- Use a local waitlist-intent workflow as the first public conversion path before accounts, reminders, or real outbound alerts.
-- Save waitlist intent locally with email, school / major context, notes, selected alert preferences, and saved timestamp.
-- Connect saved programs to the alert setup experience so bookmarked records feel like the future reminder list, not a disconnected sidebar.
+- Use a local or endpoint-backed waitlist/contact workflow as the first public conversion path before accounts, reminders, or real outbound alerts.
+- Save waitlist intent with email, student context, notes, selected Preferences, and saved timestamp.
+- Connect saved programs to the Preferences experience so bookmarked records feel like the future reminder list, not a disconnected sidebar.
 - Keep maintainer-only source-review tools behind Maintainer Mode so the default public view stays student-focused.
 - Make it clear that public notifications should not launch until official-source verification and monitoring rules are reliable.
 - Explain the future monitoring workflow in student-facing language: save the programs that matter, verify official pages, watch opening signals, and notify only when records are trustworthy.
