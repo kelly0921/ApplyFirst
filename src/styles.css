@@ -927,27 +927,94 @@ a {
 
 .library-stats {
   display: grid;
+  align-content: start;
+  gap: 10px;
+  border: 1px solid rgba(211, 222, 217, 0.9);
+  border-radius: 18px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(243, 248, 244, 0.82)),
+    var(--surface);
+  padding: 14px;
+}
+
+.library-stat-heading {
+  display: grid;
+  gap: 2px;
+  padding: 0 2px 2px;
+}
+
+.library-stat-heading span {
+  color: var(--blue);
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.library-stat-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 760;
+}
+
+.library-stat-grid {
+  display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+  margin: 0;
 }
 
-.library-stats span {
+.library-stat-grid div {
+  position: relative;
   display: grid;
-  gap: 3px;
-  border: 1px solid rgba(211, 222, 217, 0.86);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.86);
-  padding: 11px;
-  color: var(--muted);
-  font-size: 0.76rem;
-  font-weight: 750;
-  letter-spacing: 0;
-  text-transform: none;
+  gap: 5px;
+  min-width: 0;
+  min-height: 82px;
+  border: 1px solid rgba(211, 222, 217, 0.78);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.76);
+  overflow: hidden;
+  padding: 13px 11px 11px;
 }
 
-.library-stats strong {
+.library-stat-grid div::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: rgba(18, 133, 103, 0.72);
+}
+
+.library-stat-grid div:nth-child(2)::before {
+  background: rgba(182, 123, 15, 0.68);
+}
+
+.library-stat-grid div:nth-child(3)::before {
+  background: rgba(39, 94, 216, 0.62);
+}
+
+.library-stat-grid div:nth-child(4)::before {
+  background: rgba(23, 32, 51, 0.5);
+}
+
+.library-stats dt,
+.library-stats dd {
+  margin: 0;
+}
+
+.library-stats dt {
   color: var(--ink);
-  font-size: 1.32rem;
+  font-size: 1.55rem;
+  font-weight: 940;
+  line-height: 1;
+}
+
+.library-stats dd {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 820;
+  line-height: 1.25;
 }
 
 .library-controls,
@@ -1109,6 +1176,12 @@ a {
   padding: 9px 11px;
 }
 
+.select-control select.needs-choice {
+  border-color: rgba(225, 168, 52, 0.74);
+  background: rgba(255, 250, 238, 0.94);
+  color: #7a5a18;
+}
+
 .global-search input:focus,
 .select-control select:focus,
 .verification-form-grid input:focus,
@@ -1208,6 +1281,12 @@ a {
   color: var(--muted);
   font-size: 0.86rem;
   line-height: 1.45;
+}
+
+.alert-setup-intro .preference-source-note {
+  color: var(--green);
+  font-size: 0.78rem;
+  font-weight: 780;
 }
 
 .alert-preference-layout {
@@ -2121,29 +2200,62 @@ a {
 }
 
 .recommendation-guide {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  align-items: center;
-  margin: 14px 0 0;
-  padding: 0 2px;
+  display: grid;
+  gap: 8px;
+  max-width: 860px;
+  margin: 18px 0 0;
 }
 
-.recommendation-guide span {
-  display: inline;
-  background: transparent;
-  color: var(--muted);
-  padding: 0;
-  font-size: 0.78rem;
-  font-weight: 720;
-  line-height: 1.3;
+.recommendation-guide > strong,
+.recommendation-guide > p {
+  margin: 0;
 }
 
-.recommendation-guide strong {
-  flex: 0 0 auto;
+.recommendation-guide > strong {
   color: var(--ink);
-  font-size: 0.78rem;
-  font-weight: 860;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.recommendation-guide > p {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 720;
+  line-height: 1.35;
+}
+
+.recommendation-guide dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.recommendation-guide dl div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  border: 1px solid rgba(211, 222, 217, 0.88);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 10px 12px;
+}
+
+.recommendation-guide dt,
+.recommendation-guide dd {
+  margin: 0;
+}
+
+.recommendation-guide dt {
+  justify-content: center;
+  justify-self: start;
+}
+
+.recommendation-guide dd {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 720;
+  line-height: 1.35;
 }
 
 .view-controls {
@@ -3576,7 +3688,6 @@ a {
     white-space: normal;
   }
 
-  .library-stats,
   .contribute-facts {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
@@ -3724,6 +3835,10 @@ a {
 
   .library-summary h1 {
     font-size: clamp(2.2rem, 11vw, 3.25rem);
+  }
+
+  .recommendation-guide dl {
+    grid-template-columns: 1fr;
   }
 
   .library-controls .filter-stack {

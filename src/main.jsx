@@ -25,6 +25,8 @@ const quickViews = [
   { id: 'All class years', label: 'All years' },
 ];
 
+const appViews = ['monitor', 'alerts', 'contribute'];
+
 const savedStorageKey = 'applyfirst-shortlist';
 const alertStorageKey = 'applyfirst-alert-preview';
 const verificationStorageKey = 'applyfirst-verification-edits';
@@ -37,12 +39,77 @@ const phaseOneTarget = 25;
 const waitlistEndpoint = import.meta.env.VITE_WAITLIST_ENDPOINT ?? '';
 const contributionEndpoint = import.meta.env.VITE_CONTRIBUTION_ENDPOINT ?? '';
 const defaultAlertPrefs = {
-  classYear: 'Freshman',
-  roleTrack: 'Software Engineering',
-  priority: 'high',
+  classYear: '',
+  roleTrack: '',
+  priority: '',
   notificationMode: 'waitlist',
-  sendTiming: 'openAndDeadline',
+  sendTiming: '',
 };
+
+function inferClassYearPreference(value = '') {
+  const normalizedValue = value.toLowerCase();
+
+  if (normalizedValue.includes('fresh') || normalizedValue.includes('first')) {
+    return 'Freshman';
+  }
+
+  if (normalizedValue.includes('soph')) {
+    return 'Sophomore';
+  }
+
+  return 'All class years';
+}
+
+function inferRoleTrackPreference(value = '') {
+  const normalizedValue = value.toLowerCase();
+
+  if (normalizedValue.match(/\bpm\b|product/)) {
+    return 'Product Management';
+  }
+
+  if (normalizedValue.match(/quant|trading|finance|fintech/)) {
+    return 'Quant / Finance';
+  }
+
+  if (normalizedValue.match(/fellowship|scholarship|conference|funding|community|access|prep/)) {
+    return 'Access & Prep';
+  }
+
+  return 'Software Engineering';
+}
+
+function createAlertPrefsFromIntent(intent, basePrefs = defaultAlertPrefs) {
+  if (!intent) {
+    return basePrefs;
+  }
+
+  return {
+    ...basePrefs,
+    classYear: intent.classYear ? inferClassYearPreference(intent.classYear) : basePrefs.classYear,
+    roleTrack: intent.interest ? inferRoleTrackPreference(intent.interest) : basePrefs.roleTrack,
+  };
+}
+
+function isPreferenceUnset(value) {
+  return !value;
+}
+
+function getInitialView() {
+  try {
+    const requestedView = new URLSearchParams(window.location.search).get('view');
+    return appViews.includes(requestedView) ? requestedView : 'monitor';
+  } catch {
+    return 'monitor';
+  }
+}
+
+function isCleanCaptureMode() {
+  try {
+    return new URLSearchParams(window.location.search).get('capture') === 'clean';
+  } catch {
+    return false;
+  }
+}
 
 const notificationModeLabels = {
   local: 'Local Preview',
@@ -72,9 +139,14 @@ const trustPolicyItems = [
 ];
 
 function App() {
-  const [activeView, setActiveView] = useState('monitor');
+  const cleanCaptureMode = isCleanCaptureMode();
+  const [activeView, setActiveView] = useState(() => getInitialView());
   const [hasAccess, setHasAccess] = useState(() => {
     try {
+      if (cleanCaptureMode) {
+        return true;
+      }
+
       return window.localStorage.getItem(accessStorageKey) === 'granted';
     } catch {
       return false;
@@ -92,6 +164,10 @@ function App() {
   const [showInternalTools, setShowInternalTools] = useState(false);
   const [verificationEdits, setVerificationEdits] = useState(() => {
     try {
+      if (cleanCaptureMode) {
+        return {};
+      }
+
       return JSON.parse(window.localStorage.getItem(verificationStorageKey)) ?? {};
     } catch {
       return {};
@@ -99,6 +175,10 @@ function App() {
   });
   const [sourceCheckLog, setSourceCheckLog] = useState(() => {
     try {
+      if (cleanCaptureMode) {
+        return {};
+      }
+
       return JSON.parse(window.localStorage.getItem(sourceCheckLogStorageKey)) ?? {};
     } catch {
       return {};
@@ -106,9 +186,27 @@ function App() {
   });
   const [alertPrefs, setAlertPrefs] = useState(() => {
     try {
+      if (cleanCaptureMode) {
+        return defaultAlertPrefs;
+      }
+
+      const storedPrefs = JSON.parse(window.localStorage.getItem(alertStorageKey));
+
+      if (storedPrefs) {
+        return {
+          ...defaultAlertPrefs,
+          ...storedPrefs,
+        };
+      }
+
+      const storedIntent = JSON.parse(window.localStorage.getItem(waitlistStorageKey));
+
+      if (storedIntent) {
+        return createAlertPrefsFromIntent(storedIntent);
+      }
+
       return {
         ...defaultAlertPrefs,
-        ...(JSON.parse(window.localStorage.getItem(alertStorageKey)) ?? {}),
       };
     } catch {
       return defaultAlertPrefs;
@@ -116,6 +214,10 @@ function App() {
   });
   const [waitlistIntent, setWaitlistIntent] = useState(() => {
     try {
+      if (cleanCaptureMode) {
+        return null;
+      }
+
       return JSON.parse(window.localStorage.getItem(waitlistStorageKey)) ?? null;
     } catch {
       return null;
@@ -123,6 +225,10 @@ function App() {
   });
   const [studentContributions, setStudentContributions] = useState(() => {
     try {
+      if (cleanCaptureMode) {
+        return [];
+      }
+
       return JSON.parse(window.localStorage.getItem(contributionStorageKey)) ?? [];
     } catch {
       return [];
@@ -130,6 +236,10 @@ function App() {
   });
   const [savedIds, setSavedIds] = useState(() => {
     try {
+      if (cleanCaptureMode) {
+        return [];
+      }
+
       return JSON.parse(window.localStorage.getItem(savedStorageKey)) ?? [];
     } catch {
       return [];
@@ -204,9 +314,11 @@ function App() {
         const signal = getMonitorSignal(opportunity);
 
         return (
-          (alertPrefs.classYear === 'all' || opportunity.classYears.includes(alertPrefs.classYear)) &&
-          (alertPrefs.roleTrack === 'all' || tracks.includes(alertPrefs.roleTrack)) &&
-          (alertPrefs.priority === 'all' || signal.priority === alertPrefs.priority)
+          (isPreferenceUnset(alertPrefs.classYear) ||
+            alertPrefs.classYear === 'all' ||
+            opportunity.classYears.includes(alertPrefs.classYear)) &&
+          (isPreferenceUnset(alertPrefs.roleTrack) || alertPrefs.roleTrack === 'all' || tracks.includes(alertPrefs.roleTrack)) &&
+          (isPreferenceUnset(alertPrefs.priority) || alertPrefs.priority === 'all' || signal.priority === alertPrefs.priority)
         );
       }),
     [alertPrefs, opportunityRecords],
@@ -224,32 +336,56 @@ function App() {
   ).length;
 
   useEffect(() => {
+    if (cleanCaptureMode) {
+      return;
+    }
+
     window.localStorage.setItem(savedStorageKey, JSON.stringify(savedIds));
-  }, [savedIds]);
+  }, [cleanCaptureMode, savedIds]);
 
   useEffect(() => {
+    if (cleanCaptureMode) {
+      return;
+    }
+
     window.localStorage.setItem(alertStorageKey, JSON.stringify(alertPrefs));
-  }, [alertPrefs]);
+  }, [alertPrefs, cleanCaptureMode]);
 
   useEffect(() => {
+    if (cleanCaptureMode) {
+      return;
+    }
+
     window.localStorage.setItem(verificationStorageKey, JSON.stringify(verificationEdits));
-  }, [verificationEdits]);
+  }, [cleanCaptureMode, verificationEdits]);
 
   useEffect(() => {
+    if (cleanCaptureMode) {
+      return;
+    }
+
     window.localStorage.setItem(sourceCheckLogStorageKey, JSON.stringify(sourceCheckLog));
-  }, [sourceCheckLog]);
+  }, [cleanCaptureMode, sourceCheckLog]);
 
   useEffect(() => {
+    if (cleanCaptureMode) {
+      return;
+    }
+
     if (waitlistIntent) {
       window.localStorage.setItem(waitlistStorageKey, JSON.stringify(waitlistIntent));
     } else {
       window.localStorage.removeItem(waitlistStorageKey);
     }
-  }, [waitlistIntent]);
+  }, [cleanCaptureMode, waitlistIntent]);
 
   useEffect(() => {
+    if (cleanCaptureMode) {
+      return;
+    }
+
     window.localStorage.setItem(contributionStorageKey, JSON.stringify(studentContributions));
-  }, [studentContributions]);
+  }, [cleanCaptureMode, studentContributions]);
 
   const resetFilters = () => {
     setQuery('');
@@ -305,14 +441,18 @@ function App() {
   };
 
   const saveWaitlistIntent = (intent) => {
-    setWaitlistIntent({
+    const savedIntent = {
       ...intent,
       savedAt: new Date().toISOString(),
-    });
+    };
+
+    setWaitlistIntent(savedIntent);
+    setAlertPrefs((currentPrefs) => createAlertPrefsFromIntent(savedIntent, currentPrefs));
   };
 
   const resetWaitlistIntent = () => {
     setWaitlistIntent(null);
+    setAlertPrefs(defaultAlertPrefs);
   };
 
   const addStudentContribution = async (type, draft) => {
@@ -391,13 +531,15 @@ function App() {
 
   return (
     <div className="app-shell">
-      <Header
-        activeView={activeView}
-        onViewChange={setActiveView}
-        savedCount={savedIds.length}
-        showInternalTools={showInternalTools}
-        onReturnToLanding={returnToLanding}
-      />
+      {cleanCaptureMode ? null : (
+        <Header
+          activeView={activeView}
+          onViewChange={setActiveView}
+          savedCount={savedIds.length}
+          showInternalTools={showInternalTools}
+          onReturnToLanding={returnToLanding}
+        />
+      )}
       <main className="workspace">
         {activeView === 'alerts' ? (
           <section className="settings-view student-alerts-view" aria-label="Alert settings">
@@ -450,30 +592,45 @@ function App() {
                   ApplyFirst organizes underclassmen-friendly programs, fellowships, scholarships, technical
                   communities, and conference funding paths into one place to compare and prepare earlier.
                 </p>
-                <div className="recommendation-guide" aria-label="Recommendation guide">
-                  <strong>How to read the library</strong>
-                  <span>Recommended means useful enough to review, save, or prepare for early.</span>
-                  <span>Foundation means useful prep, access, or community support.</span>
+                <div className="recommendation-guide" aria-label="Library label guide">
+                  <strong>Library Labels</strong>
+                  <p>You will see these badges on program cards and in the Library Label filter.</p>
+                  <dl>
+                    <div>
+                      <dt className="priority-chip priority-high">Recommended</dt>
+                      <dd>Programs worth reviewing, saving, or preparing for early.</dd>
+                    </div>
+                    <div>
+                      <dt className="priority-chip priority-foundation">Foundation</dt>
+                      <dd>Prep, funding, access, and community resources.</dd>
+                    </div>
+                  </dl>
                 </div>
               </div>
-              <div className="library-stats" aria-label="Current library status">
-                <span>
-                  <strong>{opportunityRecords.length}</strong>
-                  Curated Programs
-                </span>
-                <span>
-                  <strong>{readySoonCount}</strong>
-                  Ready Soon
-                </span>
-                <span>
-                  <strong>{alertableCount}</strong>
-                  Source Confirmed
-                </span>
-                <span>
-                  <strong>{savedIds.length}</strong>
-                  Saved
-                </span>
-              </div>
+              <aside className="library-stats" aria-label="Current library status">
+                <div className="library-stat-heading">
+                  <span>At A Glance</span>
+                  <p>Current beta library</p>
+                </div>
+                <dl className="library-stat-grid">
+                  <div>
+                    <dt>{opportunityRecords.length}</dt>
+                    <dd>Curated Programs</dd>
+                  </div>
+                  <div>
+                    <dt>{readySoonCount}</dt>
+                    <dd>Ready Soon</dd>
+                  </div>
+                  <div>
+                    <dt>{savedIds.length}</dt>
+                    <dd>Saved By You</dd>
+                  </div>
+                  <div>
+                    <dt>{alertableCount}</dt>
+                    <dd>Source Confirmed</dd>
+                  </div>
+                </dl>
+              </aside>
             </section>
 
             <section className="library-controls" aria-label="Search and filter opportunities">
@@ -1012,6 +1169,13 @@ function AlertSetupPanel({
   onWaitlistSave,
   onWaitlistReset,
 }) {
+  const hasIncompletePreferences = [
+    alertPrefs.classYear,
+    alertPrefs.roleTrack,
+    alertPrefs.priority,
+    alertPrefs.sendTiming,
+  ].some(isPreferenceUnset);
+
   const updatePref = (key, value) => {
     setAlertPrefs((currentPrefs) => ({
       ...currentPrefs,
@@ -1030,6 +1194,11 @@ function AlertSetupPanel({
           These choices narrow the library to programs that fit your stage and goals. You can still browse everything
           from Programs whenever you want.
         </p>
+        <p className="preference-source-note">
+          {waitlistIntent
+            ? 'Pre-filled from your waitlist response. You can change anything here.'
+            : 'No signup context yet. Choose each field so ApplyFirst knows what to prioritize.'}
+        </p>
       </div>
       <div className="alert-preference-layout">
         <article className="alert-preference-card">
@@ -1041,6 +1210,7 @@ function AlertSetupPanel({
             value={alertPrefs.classYear}
             onChange={(value) => updatePref('classYear', value)}
             options={filterOptions.classYears}
+            placeholder="Choose Class Year"
           />
         </article>
         <article className="alert-preference-card">
@@ -1052,6 +1222,7 @@ function AlertSetupPanel({
             value={alertPrefs.roleTrack}
             onChange={(value) => updatePref('roleTrack', value)}
             options={filterOptions.roleTracks}
+            placeholder="Choose Role Interest"
           />
         </article>
         <article className="alert-preference-card">
@@ -1064,6 +1235,7 @@ function AlertSetupPanel({
             onChange={(value) => updatePref('priority', value)}
             options={filterOptions.priorities}
             labels={priorityLabels}
+            placeholder="Choose Program Group"
           />
           <p>{matchCount} programs match this focus right now.</p>
         </article>
@@ -1077,21 +1249,25 @@ function AlertSetupPanel({
             onChange={(value) => updatePref('sendTiming', value)}
             options={Object.keys(sendTimingLabels)}
             labels={sendTimingLabels}
+            placeholder="Choose Timing"
           />
         </article>
       </div>
       <div className="student-alert-summary">
         <div>
-          <span>Your Match</span>
-          <strong>{matchCount} programs fit this setup.</strong>
+          <span>{hasIncompletePreferences ? 'Finish Setup' : 'Your Match'}</span>
+          <strong>
+            {hasIncompletePreferences ? 'Choose your preferences above.' : `${matchCount} programs fit this setup.`}
+          </strong>
         </div>
         <div>
-          <span>Update Plan</span>
-          <strong>{alertStrategy.timingLabel}</strong>
+          <span>Save Status</span>
+          <strong>Preferences save automatically in this browser.</strong>
         </div>
         <p>
-          Opening reminders are not live yet. For the beta, ApplyFirst uses these preferences to shape your saved
-          library and future email follow-up.
+          {hasIncompletePreferences
+            ? 'Once these fields are set, ApplyFirst can make the library and beta follow-up feel less generic.'
+            : 'Opening reminders are not live yet. For the beta, ApplyFirst uses these preferences to shape your saved library and future email follow-up.'}
         </p>
       </div>
       <StudentAlertJourney matchCount={matchCount} alertStrategy={alertStrategy} />
@@ -1448,10 +1624,16 @@ function WaitlistPanel({
   }, [alertPrefs, waitlistIntent]);
 
   const preferenceSummary = [
-    formatDisplayLabel(alertPrefs.classYear === 'all' ? 'All class years' : alertPrefs.classYear),
-    alertPrefs.roleTrack === 'all' ? 'All Role Tracks' : alertPrefs.roleTrack,
-    priorityLabels[alertPrefs.priority] ?? 'All Recommendations',
-    sendTimingLabels[alertPrefs.sendTiming],
+    isPreferenceUnset(alertPrefs.classYear)
+      ? 'Class Year Not Selected'
+      : formatDisplayLabel(alertPrefs.classYear === 'all' ? 'All class years' : alertPrefs.classYear),
+    isPreferenceUnset(alertPrefs.roleTrack)
+      ? 'Role Interest Not Selected'
+      : alertPrefs.roleTrack === 'all'
+        ? 'All Role Tracks'
+        : alertPrefs.roleTrack,
+    isPreferenceUnset(alertPrefs.priority) ? 'Program Group Not Selected' : priorityLabels[alertPrefs.priority] ?? 'All Recommendations',
+    isPreferenceUnset(alertPrefs.sendTiming) ? 'Timing Not Selected' : sendTimingLabels[alertPrefs.sendTiming],
   ].join(' / ');
   const updateDraft = (field, value) => {
     setDraft((currentDraft) => ({
@@ -1679,7 +1861,7 @@ function FilterStack({
         options={filterOptions.roleTracks}
       />
       <FilterSelect
-        label="Recommendation"
+        label="Library Label"
         value={priority}
         onChange={setPriority}
         options={filterOptions.priorities}
@@ -1704,13 +1886,20 @@ function FilterStack({
   );
 }
 
-function FilterSelect({ label, value, onChange, options, labels = {} }) {
+function FilterSelect({ label, value, onChange, options, labels = {}, placeholder = '' }) {
   const selectId = `filter-${label.toLowerCase().replaceAll(' ', '-').replaceAll('/', '').replaceAll('&', 'and')}`;
 
   return (
     <label className="select-control">
       <span id={`${selectId}-label`}>{label}</span>
-      <select aria-labelledby={`${selectId}-label`} id={selectId} value={value} onChange={(event) => onChange(event.target.value)}>
+      <select
+        aria-labelledby={`${selectId}-label`}
+        className={placeholder && !value ? 'needs-choice' : ''}
+        id={selectId}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        {placeholder ? <option value="">{placeholder}</option> : null}
         <option value="all">All</option>
         {options.map((option) => (
           <option key={option} value={option}>
@@ -2049,7 +2238,7 @@ function SourceCheckAssistant({ opportunity, onLog, onApplySuggestion }) {
 
 function getAlertStrategy(alertPrefs, matches, alertableCount) {
   const modeLabel = notificationModeLabels[alertPrefs.notificationMode] ?? notificationModeLabels.waitlist;
-  const timingLabel = sendTimingLabels[alertPrefs.sendTiming] ?? sendTimingLabels.openAndDeadline;
+  const timingLabel = sendTimingLabels[alertPrefs.sendTiming] ?? 'Timing Not Selected';
   const heldCount = Math.max(matches.length - alertableCount, 0);
   const channelCopy =
     alertPrefs.notificationMode === 'local'
@@ -2062,14 +2251,20 @@ function getAlertStrategy(alertPrefs, matches, alertableCount) {
       ? 'program openings'
       : alertPrefs.sendTiming === 'prepOpenDeadline'
         ? 'prep windows, openings, and confirmed deadlines'
-        : 'program openings and confirmed deadlines';
+        : alertPrefs.sendTiming === 'openAndDeadline'
+          ? 'program openings and confirmed deadlines'
+          : 'the timing you choose';
 
   return {
     modeLabel,
     timingLabel,
     sendSummary: `${alertableCount} ${alertableCount === 1 ? 'program is' : 'programs are'} confirmed enough for ${timingCopy}`,
     holdSummary: `${heldCount} ${heldCount === 1 ? 'program still needs' : 'programs still need'} an official check`,
-    trustCopy: `${channelCopy} Your timing choice is ${timingLabel.toLowerCase()}, and unconfirmed programs stay out of alerts.`,
+    trustCopy: `${channelCopy} ${
+      alertPrefs.sendTiming
+        ? `Your timing choice is ${timingLabel.toLowerCase()}, and unconfirmed programs stay out of alerts.`
+        : 'Choose a timing preference before treating this as your alert setup.'
+    }`,
   };
 }
 
