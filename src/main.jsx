@@ -461,7 +461,7 @@ function App() {
       id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
       type,
       savedAt: new Date().toISOString(),
-      status: contributionEndpoint ? 'Submitting' : 'Saved locally',
+      status: contributionEndpoint ? 'Submitting' : 'Saved Locally',
     };
 
     if (contributionEndpoint) {
@@ -480,12 +480,12 @@ function App() {
         }
 
         setStudentContributions((currentContributions) =>
-          [{ ...contribution, status: 'Submitted for review' }, ...currentContributions].slice(0, 12),
+          [{ ...contribution, status: 'Submitted for Review' }, ...currentContributions].slice(0, 12),
         );
         return 'submitted';
       } catch {
         setStudentContributions((currentContributions) =>
-          [{ ...contribution, status: 'Saved locally after endpoint issue' }, ...currentContributions].slice(0, 12),
+          [{ ...contribution, status: 'Saved Locally After Endpoint Issue' }, ...currentContributions].slice(0, 12),
         );
         return 'localFallback';
       }
@@ -546,7 +546,7 @@ function App() {
             <section className="alert-hero" aria-label="ApplyFirst alert overview">
               <div>
                 <span>Preferences</span>
-                <h1>Tell ApplyFirst what to watch.</h1>
+                <h1>Tell ApplyFirst What to Watch.</h1>
                 <p>
                   Set the student context that shapes your matches, saved programs, and future opening reminders.
                   Nothing here should feel like admin work.
@@ -554,7 +554,7 @@ function App() {
               </div>
               <div className="alert-hero-card" aria-label="Beta alert status">
                 <span>Private Beta</span>
-                <strong>Your choices guide the library.</strong>
+                <strong>Your Choices Guide the Library.</strong>
                 <p>Start with what you care about most, then save an email only if you want beta follow-up.</p>
               </div>
             </section>
@@ -587,7 +587,7 @@ function App() {
             <section className="library-summary" aria-label="ApplyFirst overview">
               <div className="library-summary-copy">
                 <span>Opportunity Library</span>
-                <h1>Find early programs before they get crowded.</h1>
+                <h1>Find Early Programs Before They Get Crowded.</h1>
                 <p>
                   ApplyFirst organizes underclassmen-friendly programs, fellowships, scholarships, technical
                   communities, and conference funding paths into one place to compare and prepare earlier.
@@ -610,7 +610,7 @@ function App() {
               <aside className="library-stats" aria-label="Current library status">
                 <div className="library-stat-heading">
                   <span>At A Glance</span>
-                  <p>Current beta library</p>
+                  <p>Current Beta Library</p>
                 </div>
                 <dl className="library-stat-grid">
                   <div>
@@ -721,7 +721,7 @@ function App() {
               </aside>
             </section>
 
-            <section className="library-support-row" aria-label="Saved programs and beta coverage">
+            <section className="library-support-row" aria-label="Saved Programs and Beta Coverage">
               <Shortlist items={savedOpportunities} onSelect={setSelectedId} />
               <ReadinessPanel
                 readinessPercent={readinessPercent}
@@ -774,7 +774,7 @@ function LandingPage({
           <ApplyFirstMark />
           <span className="brand-copy">
             <strong>ApplyFirst</strong>
-            <em>Private beta</em>
+            <em>Private Beta</em>
           </span>
         </div>
       </header>
@@ -782,7 +782,7 @@ function LandingPage({
       <main className="landing-main">
         <section className="landing-hero" aria-label="ApplyFirst private beta">
           <div className="landing-copy">
-            <span>Stop checking scattered lists manually</span>
+            <span>Stop Checking Scattered Lists Manually</span>
             <h1>Apply Before the Crowd</h1>
             <p>
               ApplyFirst helps students find high-signal programs, track timing, and prepare before applications open.
@@ -794,17 +794,17 @@ function LandingPage({
             </div>
           </div>
 
-          <aside className="landing-panel" aria-label="Private beta access">
-            <span>Private beta</span>
-            <h2>Early access for students who want to move first.</h2>
+          <aside className="landing-panel" aria-label="Private Beta Access">
+            <span>Private Beta</span>
+            <h2>Early Access for Students Who Want to Move First.</h2>
             <p>
               ApplyFirst is open to a small group first so the library, timing notes, and future alerts stay accurate
               before wider launch.
             </p>
-            <div className="beta-panel-points" aria-label="Private beta priorities">
-              <span>Accuracy first</span>
-              <span>Student feedback</span>
-              <span>No noisy alerts</span>
+            <div className="beta-panel-points" aria-label="Private Beta Priorities">
+              <span>Accuracy First</span>
+              <span>Student Feedback</span>
+              <span>No Noisy Alerts</span>
             </div>
             {showAccess ? (
               <form className="invite-form" onSubmit={submitInviteCode}>
@@ -858,7 +858,7 @@ function ProductPreviewSection() {
     <section className="product-preview" aria-label="ApplyFirst product preview">
       <div className="product-preview-heading">
         <span>Product Preview</span>
-        <h2>Built around the messy part students already do manually.</h2>
+        <h2>Built Around the Messy Part Students Already Do Manually.</h2>
         <p>One view for discovery, timing, saved programs, and source confidence.</p>
       </div>
       <div className="product-preview-layout">
@@ -868,7 +868,7 @@ function ProductPreviewSection() {
             alt="ApplyFirst program library with search, filters, opportunity records, and a selected program detail panel."
           />
           <figcaption>
-            <strong>Program library</strong>
+            <strong>Program Library</strong>
             <span>One place to find, filter, and save high-signal student opportunities.</span>
           </figcaption>
         </figure>
@@ -876,21 +876,21 @@ function ProductPreviewSection() {
           <article>
             <span className="signal-icon">01</span>
             <div>
-              <strong>Source check</strong>
+              <strong>Source Check</strong>
               <p>Official page, prior URL, timing notes, and verification status stay together.</p>
             </div>
           </article>
           <article>
             <span className="signal-icon">02</span>
             <div>
-              <strong>Timing signal</strong>
+              <strong>Timing Signal</strong>
               <p>Opening windows, deadlines, and prep reminders become easier to watch.</p>
             </div>
           </article>
           <article>
             <span className="signal-icon">03</span>
             <div>
-              <strong>Student action</strong>
+              <strong>Student Action</strong>
               <p>Save programs now; future alerts only go out when signals are trustworthy.</p>
             </div>
           </article>
@@ -905,17 +905,17 @@ function VisualBenefitSection() {
     {
       label: 'Before',
       title: 'Scattered Lists',
-      items: ['GitHub repos', 'school links', 'old spreadsheets', 'official pages'],
+      items: ['GitHub Repos', 'School Links', 'Old Spreadsheets', 'Official Pages'],
     },
     {
       label: 'ApplyFirst',
       title: 'One Watchlist',
-      items: ['program fit', 'timing notes', 'source status', 'next step'],
+      items: ['Program Fit', 'Timing Notes', 'Source Status', 'Next Step'],
     },
     {
       label: 'Outcome',
       title: 'Apply Earlier',
-      items: ['prepare ahead', 'catch openings', 'avoid stale links', 'move faster'],
+      items: ['Prepare Ahead', 'Catch Openings', 'Avoid Stale Links', 'Move Faster'],
     },
   ];
 
@@ -939,19 +939,19 @@ function VisualBenefitSection() {
 function CareerAgencySection() {
   const agencySignals = [
     {
-      title: 'Learn the work',
+      title: 'Learn the Work',
       text: 'Try SWE, product, quant, research, finance tech, fellowships, and technical communities earlier.',
     },
     {
-      title: 'Compare environments',
+      title: 'Compare Environments',
       text: 'Notice mentorship, ownership, product depth, company culture, and pace before choosing a path.',
     },
     {
-      title: 'Build signal',
+      title: 'Build Signal',
       text: 'Turn programs into experience, resume proof, references, peers, and a stronger recruiting story.',
     },
     {
-      title: 'Choose with agency',
+      title: 'Choose With Agency',
       text: 'The goal is not only getting picked; it is learning which companies and roles you want to pick.',
     },
   ];
@@ -1003,7 +1003,7 @@ function HowItWorksSection() {
     <section className="how-it-works" aria-label="How ApplyFirst works">
       <div className="how-it-works-copy">
         <span>How It Works</span>
-        <h2>From scattered lists to a focused saved list.</h2>
+        <h2>From Scattered Lists to a Focused Saved List.</h2>
       </div>
       <div className="how-it-works-steps">
         {steps.map((step) => (
@@ -1094,7 +1094,7 @@ function TrustPolicyPanel() {
     <section className="trust-policy-panel" aria-label="Alert trust policy">
       <div className="trust-policy-copy">
         <span>Trust Notes</span>
-        <h2>Why ApplyFirst is careful with alerts</h2>
+        <h2>Why ApplyFirst Is Careful With Alerts</h2>
         <p>
           Students need speed, but they also need accuracy. ApplyFirst can help you prepare early, while still treating
           official program pages as the source of truth.
@@ -1119,8 +1119,8 @@ function VerificationQueuePanel({ queueItems, onSelect }) {
     <section className="verification-queue-panel" id="verification" aria-label="Source review queue">
       <div className="queue-heading">
         <div className="panel-heading">
-          <span>Source review</span>
-          <h2>What to confirm before real alerts</h2>
+          <span>Source Review</span>
+          <h2>What to Confirm Before Real Alerts</h2>
         </div>
         <p>
           Prioritized by underclassmen fit, recommendation value, source coverage, and missing official-cycle
@@ -1140,7 +1140,7 @@ function VerificationQueuePanel({ queueItems, onSelect }) {
             <dl>
               <div>
                 <dt>Blockers</dt>
-                <dd>{readiness.missing.length ? readiness.missing.join(', ') : 'Ready for monitoring'}</dd>
+                <dd>{readiness.missing.length ? readiness.missing.join(', ') : 'Ready for Monitoring'}</dd>
               </div>
               <div>
                 <dt>Reason</dt>
@@ -1188,7 +1188,7 @@ function AlertSetupPanel({
       <div className="alert-setup-intro">
         <div className="panel-heading">
           <span>Your Focus</span>
-          <h2>What should ApplyFirst prioritize for you?</h2>
+          <h2>What Should ApplyFirst Prioritize for You?</h2>
         </div>
         <p>
           These choices narrow the library to programs that fit your stage and goals. You can still browse everything
@@ -1203,7 +1203,7 @@ function AlertSetupPanel({
       <div className="alert-preference-layout">
         <article className="alert-preference-card">
           <span>Profile</span>
-          <h3>Who are you applying as?</h3>
+          <h3>Who Are You Applying As?</h3>
           <p>Class year matters because many early programs are built for specific student stages.</p>
           <FilterSelect
             label="Class year"
@@ -1215,7 +1215,7 @@ function AlertSetupPanel({
         </article>
         <article className="alert-preference-card">
           <span>Interest</span>
-          <h3>What career path are you exploring?</h3>
+          <h3>What Career Path Are You Exploring?</h3>
           <p>Role interest keeps SWE, PM, quant, and access programs from blending into one noisy list.</p>
           <FilterSelect
             label="Role interest"
@@ -1227,7 +1227,7 @@ function AlertSetupPanel({
         </article>
         <article className="alert-preference-card">
           <span>Programs</span>
-          <h3>What should rise to the top?</h3>
+          <h3>What Should Rise to the Top?</h3>
           <p>Recommended programs are the ones worth reviewing first; Foundation keeps prep and access resources visible.</p>
           <FilterSelect
             label="Program group"
@@ -1241,7 +1241,7 @@ function AlertSetupPanel({
         </article>
         <article className="alert-preference-card">
           <span>Timing</span>
-          <h3>When do you want to pay attention?</h3>
+          <h3>When Do You Want to Pay Attention?</h3>
           <p>Some students only want openings; others want prep windows early enough to update resumes or portfolios.</p>
           <FilterSelect
             label="Timing preference"
@@ -1257,12 +1257,12 @@ function AlertSetupPanel({
         <div>
           <span>{hasIncompletePreferences ? 'Finish Setup' : 'Your Match'}</span>
           <strong>
-            {hasIncompletePreferences ? 'Choose your preferences above.' : `${matchCount} programs fit this setup.`}
+            {hasIncompletePreferences ? 'Choose Your Preferences Above.' : `${matchCount} Programs Fit This Setup.`}
           </strong>
         </div>
         <div>
           <span>Save Status</span>
-          <strong>Preferences save automatically in this browser.</strong>
+          <strong>Preferences Save Automatically in This Browser.</strong>
         </div>
         <p>
           {hasIncompletePreferences
@@ -1292,9 +1292,9 @@ function SavedAlertPreview({ items, onSelect }) {
       <div className="saved-alert-heading">
         <div>
           <span>Saved Programs</span>
-          <h3>{items.length ? `${items.length} programs in your watchlist` : 'No saved programs yet'}</h3>
+          <h3>{items.length ? `${items.length} Programs in Your Watchlist` : 'No Saved Programs Yet'}</h3>
         </div>
-        {items.length ? <strong>{alertReadyCount} with confirmed timing</strong> : null}
+        {items.length ? <strong>{alertReadyCount} With Confirmed Timing</strong> : null}
       </div>
       {items.length ? (
         <div className="saved-alert-list" role="list">
@@ -1306,7 +1306,7 @@ function SavedAlertPreview({ items, onSelect }) {
               <button key={item.id} type="button" onClick={() => onSelect(item.id)} role="listitem">
                 <span>{item.name}</span>
                 <strong>{signal.actionLabel}</strong>
-                <em>{readiness.alertable ? 'Official timing found' : 'Timing needs a source check'}</em>
+                <em>{readiness.alertable ? 'Official Timing Found' : 'Timing Needs a Source Check'}</em>
               </button>
             );
           })}
@@ -1325,17 +1325,17 @@ function StudentAlertJourney({ matchCount, alertStrategy }) {
   const workflowSteps = [
     {
       label: 'Discover',
-      title: 'Find the right programs',
+      title: 'Find the Right Programs',
       text: `${matchCount} programs currently match your focus, so you can start from a smaller list.`,
     },
     {
       label: 'Prepare',
-      title: 'Know what to get ready',
+      title: 'Know What to Get Ready',
       text: 'Use timing notes, eligibility, and saved programs to prepare before applications open.',
     },
     {
       label: 'Move Early',
-      title: 'Apply when timing matters',
+      title: 'Apply When Timing Matters',
       text: alertStrategy.sendSummary,
     },
   ];
@@ -1344,7 +1344,7 @@ function StudentAlertJourney({ matchCount, alertStrategy }) {
     <section className="monitoring-workflow-panel student-alert-journey" aria-label="How ApplyFirst updates help students">
       <div className="monitoring-workflow-copy">
         <span>How It Helps</span>
-        <h3>From interest to action</h3>
+        <h3>From Interest to Action</h3>
         <p>
           The goal is simple: spend less time checking scattered pages and more time getting ready for programs that
           can actually change your options.
@@ -1404,7 +1404,7 @@ function ContributeView({ contributions, opportunities, captureEndpoint = '', on
       <section className="contribute-hero">
         <div>
           <span>Student Feedback</span>
-          <h1>Share what ApplyFirst should know.</h1>
+          <h1>Share What ApplyFirst Should Know.</h1>
           <p>
             Add a program you found elsewhere, report stale information, or tell us what felt confusing while testing.
             Every submission is reviewed before it changes the library.
@@ -1426,10 +1426,10 @@ function ContributeView({ contributions, opportunities, captureEndpoint = '', on
         <form className="contribution-card contribution-form" onSubmit={submitProgram}>
           <div className="panel-heading">
             <span>Submit Program</span>
-            <h2>Add an opportunity to track</h2>
+            <h2>Add an Opportunity to Track</h2>
           </div>
           <label>
-            <span>Program name</span>
+            <span>Program Name</span>
             <input
               value={programDraft.name}
               onChange={(event) => updateProgramDraft('name', event.target.value)}
@@ -1438,7 +1438,7 @@ function ContributeView({ contributions, opportunities, captureEndpoint = '', on
             />
           </label>
           <label>
-            <span>Official link</span>
+            <span>Official Link</span>
             <input
               type="url"
               value={programDraft.url}
@@ -1448,18 +1448,18 @@ function ContributeView({ contributions, opportunities, captureEndpoint = '', on
             />
           </label>
           <label>
-            <span>Best fit</span>
+            <span>Best Fit</span>
             <select value={programDraft.track} onChange={(event) => updateProgramDraft('track', event.target.value)}>
               <option>Software Engineering</option>
               <option>Product Management</option>
               <option>Quant / Finance</option>
               <option>Access & Prep</option>
               <option>Scholarship / Funding</option>
-              <option>Not sure yet</option>
+              <option>Not Sure Yet</option>
             </select>
           </label>
           <label>
-            <span>Why should ApplyFirst watch it?</span>
+            <span>Why Should ApplyFirst Watch It?</span>
             <textarea
               value={programDraft.reason}
               onChange={(event) => updateProgramDraft('reason', event.target.value)}
@@ -1476,12 +1476,12 @@ function ContributeView({ contributions, opportunities, captureEndpoint = '', on
         <form className="contribution-card contribution-form" onSubmit={submitFeedback}>
           <div className="panel-heading">
             <span>Report Update</span>
-            <h2>Flag stale or confusing info</h2>
+            <h2>Flag Stale or Confusing Info</h2>
           </div>
           <label>
-            <span>Related program</span>
+            <span>Related Program</span>
             <select value={feedbackDraft.programId} onChange={(event) => updateFeedbackDraft('programId', event.target.value)}>
-              <option value="">General feedback</option>
+              <option value="">General Feedback</option>
               {opportunities.map((opportunity) => (
                 <option key={opportunity.id} value={opportunity.id}>
                   {opportunity.name}
@@ -1490,18 +1490,18 @@ function ContributeView({ contributions, opportunities, captureEndpoint = '', on
             </select>
           </label>
           <label>
-            <span>Issue type</span>
+            <span>Issue Type</span>
             <select value={feedbackDraft.issueType} onChange={(event) => updateFeedbackDraft('issueType', event.target.value)}>
-              <option>Beta feedback</option>
-              <option>Outdated status</option>
-              <option>Broken link</option>
-              <option>Wrong eligibility</option>
-              <option>Missing program</option>
-              <option>Confusing copy</option>
+              <option>Beta Feedback</option>
+              <option>Outdated Status</option>
+              <option>Broken Link</option>
+              <option>Wrong Eligibility</option>
+              <option>Missing Program</option>
+              <option>Confusing Copy</option>
             </select>
           </label>
           <label>
-            <span>What should be fixed?</span>
+            <span>What Should Be Fixed?</span>
             <textarea
               value={feedbackDraft.note}
               onChange={(event) => updateFeedbackDraft('note', event.target.value)}
@@ -1518,7 +1518,7 @@ function ContributeView({ contributions, opportunities, captureEndpoint = '', on
         <section className="contribution-card contribution-log" aria-label="Saved local contributions">
           <div className="panel-heading">
             <span>Review Queue</span>
-            <h2>{contributions.length ? `${contributions.length} shared` : 'No feedback shared yet'}</h2>
+            <h2>{contributions.length ? `${contributions.length} Shared` : 'No Feedback Shared Yet'}</h2>
           </div>
           {contributions.length ? (
             <div className="contribution-items" role="list">
@@ -1552,10 +1552,10 @@ function BetaTestingPanel() {
   ];
 
   return (
-    <section className="beta-testing-panel" aria-label="Private beta testing notes">
+    <section className="beta-testing-panel" aria-label="Private Beta Testing Notes">
       <div>
-        <span>Private beta</span>
-        <h2>What students should test</h2>
+        <span>Private Beta</span>
+        <h2>What Students Should Test</h2>
         <p>
           Use this checklist during early testing. The goal is to learn whether students understand the product, trust
           the library, and know what they would want ApplyFirst to watch.
@@ -1581,15 +1581,15 @@ function createProgramSubmissionDraft() {
 
 function SubmissionHelper({ state, captureEndpoint }) {
   if (state === 'submitted') {
-    return <p className="form-helper">Submitted for review.</p>;
+    return <p className="form-helper">Submitted for Review.</p>;
   }
 
   if (state === 'localFallback') {
-    return <p className="form-helper">Saved on this device because beta capture was unavailable.</p>;
+    return <p className="form-helper">Saved on This Device Because Beta Capture Was Unavailable.</p>;
   }
 
   if (!captureEndpoint) {
-    return <p className="form-helper">Prototype mode: saved on this device.</p>;
+    return <p className="form-helper">Prototype Mode: Saved on This Device.</p>;
   }
 
   return null;
@@ -1667,14 +1667,14 @@ function WaitlistPanel({
 
         onSave({
           ...payload,
-          captureStatus: 'Submitted to waitlist endpoint',
+          captureStatus: 'Submitted to Waitlist Endpoint',
         });
         setSubmitState('submitted');
         return;
       } catch {
         onSave({
           ...payload,
-          captureStatus: 'Saved locally after endpoint issue',
+          captureStatus: 'Saved Locally After Endpoint Issue',
         });
         setSubmitState('localFallback');
         return;
@@ -1683,7 +1683,7 @@ function WaitlistPanel({
 
     onSave({
       ...payload,
-      captureStatus: 'Saved locally',
+      captureStatus: 'Saved Locally',
     });
     setSubmitState('savedLocal');
   };
@@ -1695,15 +1695,15 @@ function WaitlistPanel({
       aria-label="ApplyFirst waitlist"
     >
       <div className="waitlist-copy">
-        <span>{isLandingContext ? 'Early access' : 'Optional Contact'}</span>
+        <span>{isLandingContext ? 'Early Access' : 'Optional Contact'}</span>
         <h3>
           {waitlistIntent
             ? isLandingContext
-              ? 'You are on the list'
-              : 'Your contact preference is saved'
+              ? 'You Are on the List'
+              : 'Your Contact Preference Is Saved'
             : isLandingContext
               ? 'Join the ApplyFirst Waitlist'
-              : 'Get beta follow-up'}
+              : 'Get Beta Follow-Up'}
         </h3>
         {!isLandingContext ? (
           <p>
@@ -1714,11 +1714,11 @@ function WaitlistPanel({
       </div>
       {waitlistIntent ? (
         <div className="waitlist-saved">
-          <strong>{waitlistIntent.email || 'No email added'}</strong>
-          <span>{waitlistIntent.savedAt ? `Saved ${waitlistIntent.savedAt.slice(0, 10)}` : 'Saved locally'}</span>
-          <em>{waitlistIntent.captureStatus ?? 'Saved locally'}</em>
-          <p>{waitlistIntent.note || 'No notes added.'}</p>
-          <button type="button" onClick={onReset}>Reset preferences</button>
+          <strong>{waitlistIntent.email || 'No Email Added'}</strong>
+          <span>{waitlistIntent.savedAt ? `Saved ${waitlistIntent.savedAt.slice(0, 10)}` : 'Saved Locally'}</span>
+          <em>{waitlistIntent.captureStatus ?? 'Saved Locally'}</em>
+          <p>{waitlistIntent.note || 'No Notes Added.'}</p>
+          <button type="button" onClick={onReset}>Reset Preferences</button>
         </div>
       ) : (
         <form className="waitlist-form" onSubmit={saveDraft}>
@@ -1772,11 +1772,11 @@ function WaitlistPanel({
             {submitState === 'submitting' ? 'Saving...' : isLandingContext ? 'Join Waitlist' : 'Save Contact Preference'}
           </button>
           {submitState === 'localFallback' ? (
-            <p className="form-helper">Saved on this device because beta capture was unavailable.</p>
+            <p className="form-helper">Saved on This Device Because Beta Capture Was Unavailable.</p>
           ) : null}
           {!captureEndpoint ? (
             <p className="form-helper">
-              {isLandingContext ? 'Prototype mode: saved on this device.' : 'Saved on this device for this prototype.'}
+              {isLandingContext ? 'Prototype Mode: Saved on This Device.' : 'Saved on This Device for This Prototype.'}
             </p>
           ) : null}
         </form>
@@ -1798,9 +1798,9 @@ function createWaitlistDraft(alertPrefs) {
 function ReadinessPanel({ readinessPercent, recordCount, verifiedCount, target }) {
   const mvpComplete = recordCount >= target;
   const readinessItems = [
-    { label: 'Curated program library', complete: true },
-    { label: 'Filters for class year and role', complete: true },
-    { label: 'Saved program list', complete: true },
+    { label: 'Curated Program Library', complete: true },
+    { label: 'Filters for Class Year and Role', complete: true },
+    { label: 'Saved Program List', complete: true },
     { label: `${target}+ programs included`, complete: recordCount >= target },
     { label: 'Official-page checks underway', complete: verifiedCount >= target },
   ];
@@ -1808,8 +1808,8 @@ function ReadinessPanel({ readinessPercent, recordCount, verifiedCount, target }
   return (
     <section className="readiness-panel">
       <div className="panel-heading">
-        <span>Preview coverage</span>
-        <h2>{mvpComplete ? 'Useful starting library' : 'Library still growing'}</h2>
+        <span>Preview Coverage</span>
+        <h2>{mvpComplete ? 'Useful Starting Library' : 'Library Still Growing'}</h2>
       </div>
       <div className="readiness-meter" aria-label={`Phase 1 record target is ${readinessPercent}% complete`}>
         <span style={{ width: `${readinessPercent}%` }} />
@@ -1852,7 +1852,7 @@ function FilterStack({
     <section className="filter-stack">
       <div className="panel-heading">
         <span>Filters</span>
-        <h2>Find programs that fit you</h2>
+        <h2>Find Programs That Fit You</h2>
       </div>
       <FilterSelect
         label="Role track"
@@ -2001,8 +2001,8 @@ function OpportunityDetail({
           {saved ? 'Saved' : 'Save'}
         </button>
       </div>
-      <section className="detail-next-step" aria-label="Recommended next step">
-        <span>Recommended next step</span>
+      <section className="detail-next-step" aria-label="Recommended Next Step">
+        <span>Recommended Next Step</span>
         <h3>{monitorSignal.actionLabel}</h3>
         <p>{monitorSignal.nextAction}</p>
         <strong>{opportunity.openDate}</strong>
@@ -2024,10 +2024,10 @@ function OpportunityDetail({
         <Metric label="Funding" value={opportunity.funding} />
       </div>
       <div className="tracker-fields">
-        <h3>Useful details</h3>
+        <h3>Useful Details</h3>
         <dl>
           <div>
-            <dt>Open date</dt>
+            <dt>Open Date</dt>
             <dd>{opportunity.openDate}</dd>
           </div>
           <div>
@@ -2049,29 +2049,29 @@ function OpportunityDetail({
                 <dd>{confidenceLabels[opportunity.confidence]}</dd>
               </div>
               <div>
-                <dt>Source coverage</dt>
+                <dt>Source Coverage</dt>
                 <dd>{monitorSignal.sourceSignal.label}</dd>
               </div>
               <div>
-                <dt>Last checked</dt>
-                <dd>{opportunity.lastChecked || 'Needs confirmation pass'}</dd>
+                <dt>Last Checked</dt>
+                <dd>{opportunity.lastChecked || 'Needs Confirmation Pass'}</dd>
               </div>
               <div>
                 <dt>Previous URL</dt>
-                <dd>{opportunity.previousUrl || 'Not tracked yet'}</dd>
+                <dd>{opportunity.previousUrl || 'Not Tracked Yet'}</dd>
               </div>
             </>
           ) : null}
         </dl>
       </div>
       {showInternalTools ? <div className="source-note">
-        <h3>Source note</h3>
+        <h3>Source Note</h3>
         <p>{opportunity.sourceNote}</p>
       </div> : null}
       {showInternalTools ? (
         <section className="internal-tools-stack" aria-label="Internal monitoring tools">
           <div className="internal-tools-heading">
-            <span>Internal tools</span>
+            <span>Internal Tools</span>
             <p>Maintainer-only workflow for verification, source checks, and future alert operations.</p>
           </div>
           <SourceUpdatePlan plan={sourceUpdatePlan} />
@@ -2116,20 +2116,20 @@ function SourceUpdatePlan({ plan }) {
   return (
     <section className="source-update-plan">
       <div className="source-update-heading">
-        <h3>Source update plan</h3>
+        <h3>Source Update Plan</h3>
         <span>{plan.checkCadence}</span>
       </div>
       <dl>
         <div>
-          <dt>Watched page</dt>
+          <dt>Watched Page</dt>
           <dd>{plan.watchedPage}</dd>
         </div>
         <div>
-          <dt>Next check</dt>
+          <dt>Next Check</dt>
           <dd>{plan.nextCheck}</dd>
         </div>
         <div>
-          <dt>Alert trigger</dt>
+          <dt>Alert Trigger</dt>
           <dd>{plan.alertTrigger}</dd>
         </div>
       </dl>
@@ -2185,13 +2185,13 @@ function SourceCheckAssistant({ opportunity, onLog, onApplySuggestion }) {
     <section className="source-check-assistant" aria-label="Source monitoring assistant">
       <div className="source-check-heading">
         <div>
-          <h3>Monitoring assistant</h3>
+          <h3>Monitoring Assistant</h3>
           <p>Paste text from the official page. The assistant suggests what changed before you confirm the record.</p>
         </div>
         <span>{analysis.confidenceLabel}</span>
       </div>
       <label className="source-assistant-field">
-        <span>Official page text</span>
+        <span>Official Page Text</span>
         <textarea
           value={sourceText}
           onChange={(event) => setSourceText(event.target.value)}
@@ -2215,7 +2215,7 @@ function SourceCheckAssistant({ opportunity, onLog, onApplySuggestion }) {
       <p className="assistant-note">{analysis.note}</p>
       <section className={`assistant-review-decision assistant-review-${reviewDecision.tone}`} aria-label="Maintainer review decision">
         <div>
-          <span>Review decision</span>
+          <span>Review Decision</span>
           <strong>{reviewDecision.label}</strong>
         </div>
         <p>{reviewDecision.description}</p>
@@ -2292,31 +2292,31 @@ function SourceCheckLog({ opportunity, entries, onSave }) {
     <section className="source-check-log">
       <div className="source-check-heading">
         <div>
-          <h3>Source check log</h3>
+          <h3>Source Check Log</h3>
           <p>Record manual checks before deciding whether to update the source fields.</p>
         </div>
         <span>{entries.length} saved</span>
       </div>
       <form className="source-check-form" onSubmit={saveEntry}>
         <label>
-          <span>Checked date</span>
+          <span>Checked Date</span>
           <input type="date" value={draft.checkedDate} onChange={(event) => updateDraft('checkedDate', event.target.value)} />
         </label>
         <label>
           <span>Result</span>
           <select value={draft.result} onChange={(event) => updateDraft('result', event.target.value)}>
-            <option value="No material change">No material change</option>
-            <option value="Application opened">Application opened</option>
-            <option value="Dates updated">Dates updated</option>
-            <option value="Eligibility changed">Eligibility changed</option>
-            <option value="Needs follow-up">Needs follow-up</option>
+            <option value="No Material Change">No Material Change</option>
+            <option value="Application Opened">Application Opened</option>
+            <option value="Dates Updated">Dates Updated</option>
+            <option value="Eligibility Changed">Eligibility Changed</option>
+            <option value="Needs Follow-Up">Needs Follow-Up</option>
           </select>
         </label>
         <label className="source-check-note">
-          <span>Check note</span>
+          <span>Check Note</span>
           <textarea value={draft.note} onChange={(event) => updateDraft('note', event.target.value)} />
         </label>
-        <button type="submit">Add source check</button>
+        <button type="submit">Add Source Check</button>
       </form>
       {entries.length ? (
         <div className="source-check-entries" role="list">
@@ -2325,12 +2325,12 @@ function SourceCheckLog({ opportunity, entries, onSave }) {
               <span>{entry.checkedDate}</span>
               <strong>{entry.result}</strong>
               {entry.reviewDecision ? <em>{entry.reviewDecision}</em> : null}
-              <p>{entry.note || 'No note added.'}</p>
+              <p>{entry.note || 'No Note Added.'}</p>
             </article>
           ))}
         </div>
       ) : (
-        <p className="source-check-empty">No source checks logged yet.</p>
+        <p className="source-check-empty">No Source Checks Logged Yet.</p>
       )}
     </section>
   );
@@ -2339,7 +2339,7 @@ function SourceCheckLog({ opportunity, entries, onSave }) {
 function createSourceCheckDraft() {
   return {
     checkedDate: new Date().toISOString().slice(0, 10),
-    result: 'No material change',
+    result: 'No Material Change',
     note: '',
   };
 }
@@ -2367,12 +2367,12 @@ function VerificationEditor({ opportunity, onSave, onReset }) {
     <form className="verification-editor" onSubmit={saveDraft}>
       <div className="verification-editor-heading">
         <div>
-          <h3>Verification edit</h3>
+          <h3>Verification Edit</h3>
           <p>
             Save local source updates after checking the official page. This changes your prototype view only.
           </p>
         </div>
-        {opportunity.hasLocalVerificationEdit ? <span>Local edit saved</span> : <span>Base record</span>}
+        {opportunity.hasLocalVerificationEdit ? <span>Local Edit Saved</span> : <span>Base Record</span>}
       </div>
       <div className="verification-form-grid">
         <label>
@@ -2384,7 +2384,7 @@ function VerificationEditor({ opportunity, onSave, onReset }) {
           <input value={draft.previousUrl} onChange={(event) => updateDraft('previousUrl', event.target.value)} />
         </label>
         <label>
-          <span>Open window</span>
+          <span>Open Window</span>
           <input value={draft.openDate} onChange={(event) => updateDraft('openDate', event.target.value)} />
         </label>
         <label>
@@ -2392,7 +2392,7 @@ function VerificationEditor({ opportunity, onSave, onReset }) {
           <input value={draft.deadline} onChange={(event) => updateDraft('deadline', event.target.value)} />
         </label>
         <label>
-          <span>Last checked</span>
+          <span>Last Checked</span>
           <input type="date" value={draft.lastChecked} onChange={(event) => updateDraft('lastChecked', event.target.value)} />
         </label>
         <label>
@@ -2417,11 +2417,11 @@ function VerificationEditor({ opportunity, onSave, onReset }) {
         </label>
       </div>
       <label className="verification-note-field">
-        <span>Source note</span>
+        <span>Source Note</span>
         <textarea value={draft.sourceNote} onChange={(event) => updateDraft('sourceNote', event.target.value)} />
       </label>
       <div className="verification-editor-actions">
-        <button type="submit">Save local verification</button>
+        <button type="submit">Save Local Verification</button>
         {opportunity.hasLocalVerificationEdit ? (
           <button type="button" onClick={() => onReset(opportunity.id)}>
             Reset local edit
@@ -2535,7 +2535,7 @@ function Shortlist({ items, onSelect }) {
     <section className="shortlist">
       <div className="panel-heading">
         <span>Saved</span>
-        <h2>{items.length ? `${items.length} saved` : 'Saved programs'}</h2>
+        <h2>{items.length ? `${items.length} Saved` : 'Saved Programs'}</h2>
       </div>
       {items.length ? (
         items.map((item) => {
@@ -2559,7 +2559,7 @@ function Shortlist({ items, onSelect }) {
 function EmptyState({ onReset }) {
   return (
     <div className="empty-state">
-      <h3>No opportunities match those filters.</h3>
+      <h3>No Opportunities Match Those Filters.</h3>
       <p>Try a broader class year, category, or status.</p>
       <button type="button" onClick={onReset}>
         Clear filters
