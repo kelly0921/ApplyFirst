@@ -41,9 +41,9 @@ The first version focuses on:
 - Clear notes on why each opportunity matters and how to prepare.
 - A future path toward an Opportunity Signal Tracker.
 
-This version is a private-beta public prototype with a landing page, local waitlist request, and invite-code gate before the full app. The app can show the product direction, curated seed set, local alert preferences, and student-facing confirmation model, while outbound notifications should wait for stronger official-source confirmation.
+This version is a private-beta public prototype with a landing page, endpoint-ready waitlist request, invite-code gate, local contribution capture, and the full app behind the gate. The app can show the product direction, curated seed set, local alert preferences, student-facing confirmation model, and student submission flow, while outbound notifications should wait for stronger official-source confirmation.
 
-Recommendation is computed from the Phase 1 rules: underclassmen-fit programs in high-leverage categories become Recommended; relevant programs stay on the Watch List; scholarships, conferences, communities, and resources are treated as Foundation opportunities. Duplicate appearances across older curated lists are useful for verification, but they are not treated as proof that a program is better.
+Recommendation is computed from the Phase 1 rules: underclassmen-fit programs in high-leverage categories become Recommended; relevant programs can also be Recommended when they are useful enough to review, save, or prepare for early; scholarships, conferences, communities, and resources are treated as Foundation opportunities. Student actions stay separate from these labels: users save programs they care about, while ApplyFirst monitors confirmed sources for future opening signals. Duplicate appearances across older curated lists are useful for verification, but they are not treated as proof that a program is better.
 
 Prototype invite codes for local testing:
 
@@ -55,7 +55,9 @@ These codes are for the current prototype gate only and should be replaced befor
 
 After unlocking the prototype, use the `Landing` button in the app header to clear the local access flag and return to the public landing page.
 
-The waitlist form currently saves locally in the browser. Connect it to Tally, Google Forms, Airtable, Supabase, or another backend before relying on it for real student signups.
+The waitlist form saves locally by default. Set `VITE_WAITLIST_ENDPOINT` to a JSON-compatible form/backend endpoint to submit waitlist requests externally; if the endpoint fails, the prototype falls back to local browser storage. Student program submissions and feedback save locally by default. Set `VITE_CONTRIBUTION_ENDPOINT` to capture Contribute submissions externally; if the endpoint fails, the prototype falls back to local browser storage.
+
+Private beta testing should ask students to join the waitlist, unlock the app with an invite code, save one program, submit one program ApplyFirst should watch, and report one stale or confusing record. Until real accounts and moderation exist, submitted programs and feedback should be treated as review candidates rather than public library records.
 
 ## Source Strategy
 
@@ -85,7 +87,7 @@ npm run build
 npm run monitor:demo
 ```
 
-This runs the first local monitoring pipeline against seeded official-page samples in `data/monitoring-sources.json`. It compares previous text to current text, classifies the source signal, and prints maintainer review decisions such as Alert Candidate, Deadline Candidate, Prep Watch, Watch Only, or Manual Review.
+This runs the first local monitoring pipeline against seeded official-page samples in `data/monitoring-sources.json`. It compares previous text to current text, classifies the source signal, and prints maintainer review decisions such as Alert Candidate, Deadline Candidate, Prep Watch, Monitor Only, or Manual Review.
 
 To rehearse repeated source checks with local snapshot state:
 
@@ -140,6 +142,7 @@ The first Phase 2 slice adds:
 - Source update plan per record, including watched page, check cadence, next check, alert trigger, and meaningful change signals.
 - Local source-check log with checked date, result, and notes.
 - Notification strategy preview with local preview, email waitlist, and saved-program reminder modes.
+- Contribute view for local student program submissions and stale-info feedback.
 - Alert timing preview for openings, deadlines, and preparation windows.
 - Navigation split between the focused Programs view and a separate Alerts setup view.
 - Simplified student-facing alert preference section with technical readiness details kept in Maintainer Mode.

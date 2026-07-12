@@ -103,11 +103,26 @@ Review queue for changes that may become student alerts.
 
 ### saved_programs
 
-Future account-backed version of the current local shortlist.
+Future account-backed version of the current local saved list.
 
 - `id`
 - `user_id`
 - `program_id`
+- `created_at`
+
+### student_contributions
+
+Future account-backed version of the current local Contribute view.
+
+- `id`
+- `user_id`
+- `type`
+- `program_name`
+- `official_url`
+- `related_program_id`
+- `issue_type`
+- `note`
+- `status`
 - `created_at`
 
 ### alert_preferences
@@ -131,7 +146,7 @@ The local monitoring classifier currently produces:
 - `Alert Candidate`: applications appear open and strong enough for maintainer review.
 - `Deadline Candidate`: a deadline appears or changed and should be reviewed.
 - `Prep Watch`: a future opening signal is useful for preparation but not an opening alert.
-- `Watch Only`: the page is worth monitoring but not actionable.
+- `Monitor Only`: the page is worth monitoring but not actionable.
 - `Manual Review`: the page text is ambiguous or failed to fetch.
 
 No decision sends a public alert by itself.

@@ -14,13 +14,13 @@ export const confidenceLabels = {
 
 export const verificationLabels = {
   verified: 'Confirmed',
-  watchOnly: 'Watch Only',
+  watchOnly: 'Prep Only',
   needsReview: 'Needs Confirmation',
 };
 
 export const priorityLabels = {
   high: 'Recommended',
-  watch: 'Watch List',
+  watch: 'Recommended',
   foundation: 'Foundation',
 };
 
@@ -350,7 +350,7 @@ export function getMonitorSignal(opportunity) {
         : alertReadiness === 'verify'
           ? 'Verify the official page before sending public alerts or relying on the date.'
           : alertReadiness === 'watching'
-            ? 'Keep this on the watchlist and refresh the official source on the next verification pass.'
+          ? 'Keep this program on your radar and refresh the official source on the next verification pass.'
             : 'Prepare resume, portfolio, and short application stories before the opening window.',
   };
 }
@@ -912,7 +912,7 @@ export const opportunities = [
     why:
       'Broad scholarship pool for women in engineering and related technical disciplines, often worth watching early in the year.',
     prep:
-      'Check membership requirements, gather academic details, and shortlist scholarships that match year, major, and identity criteria.',
+      'Check membership requirements, gather academic details, and save scholarships that match year, major, and identity criteria.',
     sourceNote: 'Useful for the funding side of the opportunity library.',
   },
   {

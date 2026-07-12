@@ -30,9 +30,12 @@ const alertStorageKey = 'applyfirst-alert-preview';
 const verificationStorageKey = 'applyfirst-verification-edits';
 const sourceCheckLogStorageKey = 'applyfirst-source-check-log';
 const waitlistStorageKey = 'applyfirst-waitlist-intent';
+const contributionStorageKey = 'applyfirst-student-contributions';
 const accessStorageKey = 'applyfirst-beta-access';
 const inviteCodes = ['APPLYFIRST', 'APPLYFIRST2026', 'EARLYACCESS'];
 const phaseOneTarget = 25;
+const waitlistEndpoint = import.meta.env.VITE_WAITLIST_ENDPOINT ?? '';
+const contributionEndpoint = import.meta.env.VITE_CONTRIBUTION_ENDPOINT ?? '';
 const defaultAlertPrefs = {
   classYear: 'Freshman',
   roleTrack: 'Software Engineering',
@@ -44,7 +47,7 @@ const defaultAlertPrefs = {
 const notificationModeLabels = {
   local: 'Local Preview',
   waitlist: 'Email Waitlist',
-  saved: 'Saved Program Reminders',
+  saved: 'Saved Program Updates',
 };
 
 const sendTimingLabels = {
@@ -116,6 +119,13 @@ function App() {
       return JSON.parse(window.localStorage.getItem(waitlistStorageKey)) ?? null;
     } catch {
       return null;
+    }
+  });
+  const [studentContributions, setStudentContributions] = useState(() => {
+    try {
+      return JSON.parse(window.localStorage.getItem(contributionStorageKey)) ?? [];
+    } catch {
+      return [];
     }
   });
   const [savedIds, setSavedIds] = useState(() => {
@@ -208,6 +218,10 @@ function App() {
   );
   const verifiedCount = opportunityRecords.filter((item) => item.confidence === 'high').length;
   const readinessPercent = Math.min(Math.round((opportunityRecords.length / phaseOneTarget) * 100), 100);
+  const alertableCount = opportunityRecords.filter((item) => getMonitoringReadiness(item).alertable).length;
+  const readySoonCount = opportunityRecords.filter((item) =>
+    ['open', 'expectedSoon', 'deadlineSoon'].includes(item.status),
+  ).length;
 
   useEffect(() => {
     window.localStorage.setItem(savedStorageKey, JSON.stringify(savedIds));
@@ -232,6 +246,10 @@ function App() {
       window.localStorage.removeItem(waitlistStorageKey);
     }
   }, [waitlistIntent]);
+
+  useEffect(() => {
+    window.localStorage.setItem(contributionStorageKey, JSON.stringify(studentContributions));
+  }, [studentContributions]);
 
   const resetFilters = () => {
     setQuery('');
@@ -297,6 +315,46 @@ function App() {
     setWaitlistIntent(null);
   };
 
+  const addStudentContribution = async (type, draft) => {
+    const contribution = {
+      ...draft,
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      type,
+      savedAt: new Date().toISOString(),
+      status: contributionEndpoint ? 'Submitting' : 'Saved locally',
+    };
+
+    if (contributionEndpoint) {
+      try {
+        const response = await fetch(contributionEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            source: 'applyfirst-contribution',
+            ...contribution,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Contribution endpoint returned an error.');
+        }
+
+        setStudentContributions((currentContributions) =>
+          [{ ...contribution, status: 'Submitted for review' }, ...currentContributions].slice(0, 12),
+        );
+        return 'submitted';
+      } catch {
+        setStudentContributions((currentContributions) =>
+          [{ ...contribution, status: 'Saved locally after endpoint issue' }, ...currentContributions].slice(0, 12),
+        );
+        return 'localFallback';
+      }
+    }
+
+    setStudentContributions((currentContributions) => [contribution, ...currentContributions].slice(0, 12));
+    return 'savedLocal';
+  };
+
   const grantAccess = () => {
     try {
       window.localStorage.setItem(accessStorageKey, 'granted');
@@ -323,6 +381,7 @@ function App() {
         alertPrefs={alertPrefs}
         alertStrategy={alertStrategy}
         waitlistIntent={waitlistIntent}
+        waitlistEndpoint={waitlistEndpoint}
         onWaitlistSave={saveWaitlistIntent}
         onWaitlistReset={resetWaitlistIntent}
         onGrantAccess={grantAccess}
@@ -370,30 +429,47 @@ function App() {
               }}
               alertStrategy={alertStrategy}
               waitlistIntent={waitlistIntent}
+              waitlistEndpoint={waitlistEndpoint}
               onWaitlistSave={saveWaitlistIntent}
               onWaitlistReset={resetWaitlistIntent}
             />
             <TrustPolicyPanel />
           </section>
+        ) : activeView === 'contribute' ? (
+          <ContributeView
+            contributions={studentContributions}
+            opportunities={opportunityRecords}
+            captureEndpoint={contributionEndpoint}
+            onSubmit={addStudentContribution}
+          />
         ) : (
-          <>
-            <section className="monitor-hero" aria-label="ApplyFirst overview">
-              <div>
-                <span>Student-first</span>
-                <h1>Discover career-launch programs in one place.</h1>
+          <section className="opportunity-library-view" aria-label="ApplyFirst opportunity library">
+            <section className="library-summary" aria-label="ApplyFirst overview">
+              <div className="library-summary-copy">
+                <span>Opportunity Library</span>
+                <h1>Find early programs before they get crowded.</h1>
                 <p>
-                  Browse curated underclassmen-friendly programs, save what matters, and see what is confirmed so your
-                  next step feels easier to choose.
+                  ApplyFirst organizes underclassmen-friendly programs, fellowships, scholarships, technical
+                  communities, and conference funding paths into one place to compare and prepare earlier.
                 </p>
+                <div className="recommendation-guide" aria-label="Recommendation guide">
+                  <strong>How to read the library</strong>
+                  <span>Recommended means useful enough to review, save, or prepare for early.</span>
+                  <span>Foundation means useful prep, access, or community support.</span>
+                </div>
               </div>
-              <div className="hero-facts" aria-label="Current library status">
+              <div className="library-stats" aria-label="Current library status">
                 <span>
                   <strong>{opportunityRecords.length}</strong>
-                  Programs
+                  Curated Programs
                 </span>
                 <span>
-                  <strong>{verifiedCount}</strong>
-                  Confirmed
+                  <strong>{readySoonCount}</strong>
+                  Ready Soon
+                </span>
+                <span>
+                  <strong>{alertableCount}</strong>
+                  Source Confirmed
                 </span>
                 <span>
                   <strong>{savedIds.length}</strong>
@@ -402,9 +478,9 @@ function App() {
               </div>
             </section>
 
-            <section className="command-strip" aria-label="Opportunity search command center">
+            <section className="library-controls" aria-label="Search and filter opportunities">
               <label className="global-search">
-                <span>Search programs</span>
+                <span>Search Programs</span>
                 <input
                   type="search"
                   value={query}
@@ -427,51 +503,31 @@ function App() {
                   ))}
                 </div>
               </div>
+              <FilterStack
+                showInternalTools={showInternalTools}
+                category={category}
+                setCategory={setCategory}
+                roleTrack={roleTrack}
+                setRoleTrack={setRoleTrack}
+                priority={priority}
+                setPriority={setPriority}
+                verification={verification}
+                setVerification={setVerification}
+                timing={timing}
+                setTiming={setTiming}
+                status={status}
+                setStatus={setStatus}
+                resetFilters={resetFilters}
+              />
             </section>
 
             {showInternalTools ? <VerificationQueuePanel queueItems={verificationQueueItems} onSelect={focusOpportunity} /> : null}
 
-            <section className="recommendation-guide" aria-label="Recommendation guide">
-              <strong>Recommendation guide</strong>
-              <span>Recommended: strongest fit</span>
-              <span>Watch List: worth tracking</span>
-              <span>Foundation: prep and access</span>
-            </section>
-
-            <section className="product-grid" id="library" aria-label="Opportunity library">
-              <aside className="left-rail">
-                <FilterStack
-                  showInternalTools={showInternalTools}
-                  category={category}
-                  setCategory={setCategory}
-                  roleTrack={roleTrack}
-                  setRoleTrack={setRoleTrack}
-                  priority={priority}
-                  setPriority={setPriority}
-                  verification={verification}
-                  setVerification={setVerification}
-                  timing={timing}
-                  setTiming={setTiming}
-                  status={status}
-                  setStatus={setStatus}
-                  resetFilters={resetFilters}
-                />
-                <ReadinessPanel
-                  readinessPercent={readinessPercent}
-                  recordCount={opportunityRecords.length}
-                  verifiedCount={verifiedCount}
-                  target={phaseOneTarget}
-                />
-                <ReviewModeControl
-                  enabled={showInternalTools}
-                  onToggle={() => setShowInternalTools((current) => !current)}
-                />
-              </aside>
-
+            <section className="library-workspace" id="library" aria-label="Opportunity library workspace">
               <section className="results-board">
                 <div className="board-toolbar">
                   <div>
-                    <span>Program queue</span>
+                    <span>Library Results</span>
                     <strong>{filtered.length} programs</strong>
                   </div>
                   <button type="button" onClick={resetFilters}>
@@ -496,7 +552,7 @@ function App() {
                 </div>
               </section>
 
-              <aside className="right-rail">
+              <aside className="opportunity-detail-column">
                 <OpportunityDetail
                   opportunity={selectedOpportunity}
                   saved={selectedOpportunity ? savedIds.includes(selectedOpportunity.id) : false}
@@ -507,17 +563,38 @@ function App() {
                   onSourceCheckSave={addSourceCheckLogEntry}
                   showInternalTools={showInternalTools}
                 />
-                <Shortlist items={savedOpportunities} onSelect={setSelectedId} />
               </aside>
             </section>
-          </>
+
+            <section className="library-support-row" aria-label="Saved programs and beta coverage">
+              <Shortlist items={savedOpportunities} onSelect={setSelectedId} />
+              <ReadinessPanel
+                readinessPercent={readinessPercent}
+                recordCount={opportunityRecords.length}
+                verifiedCount={verifiedCount}
+                target={phaseOneTarget}
+              />
+              <ReviewModeControl
+                enabled={showInternalTools}
+                onToggle={() => setShowInternalTools((current) => !current)}
+              />
+            </section>
+          </section>
         )}
       </main>
     </div>
   );
 }
 
-function LandingPage({ alertPrefs, alertStrategy, waitlistIntent, onWaitlistSave, onWaitlistReset, onGrantAccess }) {
+function LandingPage({
+  alertPrefs,
+  alertStrategy,
+  waitlistIntent,
+  waitlistEndpoint,
+  onWaitlistSave,
+  onWaitlistReset,
+  onGrantAccess,
+}) {
   const [showAccess, setShowAccess] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
   const [accessError, setAccessError] = useState('');
@@ -582,7 +659,7 @@ function LandingPage({ alertPrefs, alertStrategy, waitlistIntent, onWaitlistSave
                     type="text"
                     value={inviteCode}
                     onChange={(event) => setInviteCode(event.target.value)}
-                    placeholder="Enter your code"
+                    placeholder="Enter invite code"
                     autoComplete="off"
                   />
                 </label>
@@ -612,6 +689,7 @@ function LandingPage({ alertPrefs, alertStrategy, waitlistIntent, onWaitlistSave
           alertPrefs={alertPrefs}
           alertStrategy={alertStrategy}
           waitlistIntent={waitlistIntent}
+          captureEndpoint={waitlistEndpoint}
           onSave={onWaitlistSave}
           onReset={onWaitlistReset}
         />
@@ -752,7 +830,7 @@ function HowItWorksSection() {
     {
       label: '2',
       title: 'Save',
-      text: 'Keep a focused watchlist.',
+      text: 'Keep a personal saved list.',
     },
     {
       label: '3',
@@ -761,7 +839,7 @@ function HowItWorksSection() {
     },
     {
       label: '4',
-      title: 'Watch',
+      title: 'Monitor',
       text: 'Track verified openings.',
     },
   ];
@@ -770,7 +848,7 @@ function HowItWorksSection() {
     <section className="how-it-works" aria-label="How ApplyFirst works">
       <div className="how-it-works-copy">
         <span>How It Works</span>
-        <h2>From scattered lists to a focused watchlist.</h2>
+        <h2>From scattered lists to a focused saved list.</h2>
       </div>
       <div className="how-it-works-steps">
         {steps.map((step) => (
@@ -810,6 +888,13 @@ function Header({ activeView, onViewChange, savedCount, showInternalTools, onRet
             onClick={() => onViewChange('alerts')}
           >
             Alerts
+          </button>
+          <button
+            className={activeView === 'contribute' ? 'active' : ''}
+            type="button"
+            onClick={() => onViewChange('contribute')}
+          >
+            Contribute
           </button>
         </div>
         <div className="nav-status" aria-label="Workspace status">
@@ -925,6 +1010,7 @@ function AlertSetupPanel({
   onSavedSelect,
   alertStrategy,
   waitlistIntent,
+  waitlistEndpoint,
   onWaitlistSave,
   onWaitlistReset,
 }) {
@@ -940,7 +1026,7 @@ function AlertSetupPanel({
       <div className="alert-setup-intro">
         <div className="panel-heading">
           <span>Setup</span>
-          <h2>Build your program watchlist</h2>
+          <h2>Choose programs to monitor</h2>
         </div>
         <p>
           These choices decide which programs show up in your alert preview. Unconfirmed records can still help you
@@ -1012,6 +1098,7 @@ function AlertSetupPanel({
         alertPrefs={alertPrefs}
         alertStrategy={alertStrategy}
         waitlistIntent={waitlistIntent}
+        captureEndpoint={waitlistEndpoint}
         onSave={onWaitlistSave}
         onReset={onWaitlistReset}
       />
@@ -1108,8 +1195,255 @@ function MonitoringWorkflowPanel({ matchCount, alertStrategy }) {
   );
 }
 
-function WaitlistPanel({ context = 'setup', alertPrefs, alertStrategy, waitlistIntent, onSave, onReset }) {
+function ContributeView({ contributions, opportunities, captureEndpoint = '', onSubmit }) {
+  const [programDraft, setProgramDraft] = useState(() => createProgramSubmissionDraft());
+  const [feedbackDraft, setFeedbackDraft] = useState(() => createFeedbackDraft(opportunities));
+  const [programSubmitState, setProgramSubmitState] = useState('idle');
+  const [feedbackSubmitState, setFeedbackSubmitState] = useState('idle');
+
+  const updateProgramDraft = (field, value) => {
+    setProgramDraft((currentDraft) => ({
+      ...currentDraft,
+      [field]: value,
+    }));
+  };
+
+  const updateFeedbackDraft = (field, value) => {
+    setFeedbackDraft((currentDraft) => ({
+      ...currentDraft,
+      [field]: value,
+    }));
+  };
+
+  const submitProgram = async (event) => {
+    event.preventDefault();
+    setProgramSubmitState('submitting');
+    const result = await onSubmit('program', programDraft);
+    setProgramSubmitState(result);
+    setProgramDraft(createProgramSubmissionDraft());
+  };
+
+  const submitFeedback = async (event) => {
+    event.preventDefault();
+    setFeedbackSubmitState('submitting');
+    const result = await onSubmit('feedback', feedbackDraft);
+    setFeedbackSubmitState(result);
+    setFeedbackDraft(createFeedbackDraft(opportunities));
+  };
+
+  return (
+    <section className="contribute-view" aria-label="ApplyFirst contribution center">
+      <section className="contribute-hero">
+        <div>
+          <span>Student signal</span>
+          <h1>Help ApplyFirst catch what students actually find.</h1>
+          <p>
+            Submit a program to track or report outdated information. If a contribution endpoint is connected,
+            submissions go there; otherwise this prototype saves them locally for beta testing.
+          </p>
+        </div>
+        <div className="contribute-facts" aria-label="Contribution status">
+          <span>
+            <strong>{contributions.length}</strong>
+            {captureEndpoint ? 'Captured' : 'Saved Locally'}
+          </span>
+          <span>
+            <strong>Beta</strong>
+            Human Review First
+          </span>
+        </div>
+      </section>
+
+      <section className="contribute-grid">
+        <form className="contribution-card contribution-form" onSubmit={submitProgram}>
+          <div className="panel-heading">
+            <span>Submit Program</span>
+            <h2>Add an opportunity to track</h2>
+          </div>
+          <label>
+            <span>Program name</span>
+            <input
+              value={programDraft.name}
+              onChange={(event) => updateProgramDraft('name', event.target.value)}
+              placeholder="Program, fellowship, scholarship, event..."
+              required
+            />
+          </label>
+          <label>
+            <span>Official link</span>
+            <input
+              type="url"
+              value={programDraft.url}
+              onChange={(event) => updateProgramDraft('url', event.target.value)}
+              placeholder="https://..."
+              required
+            />
+          </label>
+          <label>
+            <span>Best fit</span>
+            <select value={programDraft.track} onChange={(event) => updateProgramDraft('track', event.target.value)}>
+              <option>Software Engineering</option>
+              <option>Product Management</option>
+              <option>Quant / Finance</option>
+              <option>Access & Prep</option>
+              <option>Scholarship / Funding</option>
+              <option>Not sure yet</option>
+            </select>
+          </label>
+          <label>
+            <span>Why should ApplyFirst watch it?</span>
+            <textarea
+              value={programDraft.reason}
+              onChange={(event) => updateProgramDraft('reason', event.target.value)}
+              placeholder="Who is it useful for, when does it usually open, or why does it matter?"
+              required
+            />
+          </label>
+          <button type="submit" disabled={programSubmitState === 'submitting'}>
+            {programSubmitState === 'submitting' ? 'Saving...' : 'Save Submission'}
+          </button>
+          <SubmissionHelper state={programSubmitState} captureEndpoint={captureEndpoint} />
+        </form>
+
+        <form className="contribution-card contribution-form" onSubmit={submitFeedback}>
+          <div className="panel-heading">
+            <span>Report Update</span>
+            <h2>Flag stale or confusing info</h2>
+          </div>
+          <label>
+            <span>Related program</span>
+            <select value={feedbackDraft.programId} onChange={(event) => updateFeedbackDraft('programId', event.target.value)}>
+              <option value="">General feedback</option>
+              {opportunities.map((opportunity) => (
+                <option key={opportunity.id} value={opportunity.id}>
+                  {opportunity.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Issue type</span>
+            <select value={feedbackDraft.issueType} onChange={(event) => updateFeedbackDraft('issueType', event.target.value)}>
+              <option>Outdated status</option>
+              <option>Broken link</option>
+              <option>Wrong eligibility</option>
+              <option>Missing program</option>
+              <option>Confusing copy</option>
+            </select>
+          </label>
+          <label>
+            <span>What should be fixed?</span>
+            <textarea
+              value={feedbackDraft.note}
+              onChange={(event) => updateFeedbackDraft('note', event.target.value)}
+              placeholder="Share the source, correction, or what felt unclear."
+              required
+            />
+          </label>
+          <button type="submit" disabled={feedbackSubmitState === 'submitting'}>
+            {feedbackSubmitState === 'submitting' ? 'Saving...' : 'Save Feedback'}
+          </button>
+          <SubmissionHelper state={feedbackSubmitState} captureEndpoint={captureEndpoint} />
+        </form>
+
+        <section className="contribution-card contribution-log" aria-label="Saved local contributions">
+          <div className="panel-heading">
+            <span>Local Queue</span>
+            <h2>{contributions.length ? `${contributions.length} saved` : 'No contributions yet'}</h2>
+          </div>
+          {contributions.length ? (
+            <div className="contribution-items" role="list">
+              {contributions.map((item) => (
+                <article key={item.id} role="listitem">
+                  <span>{item.type === 'program' ? 'Program' : 'Feedback'}</span>
+                  <strong>{item.name || item.issueType}</strong>
+                  <p>{item.reason || item.note}</p>
+                  <em>{item.status}</em>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p>Student submissions will appear here during prototype testing.</p>
+          )}
+        </section>
+      </section>
+      <BetaTestingPanel />
+    </section>
+  );
+}
+
+function BetaTestingPanel() {
+  const testingSteps = [
+    'Join the waitlist or enter an invite code.',
+    'Search for a program that matches your year or role.',
+    'Save one program you would actually track.',
+    'Submit one program ApplyFirst should watch.',
+    'Report one piece of stale or confusing information.',
+  ];
+
+  return (
+    <section className="beta-testing-panel" aria-label="Private beta testing notes">
+      <div>
+        <span>Private beta</span>
+        <h2>What students should test</h2>
+        <p>
+          ApplyFirst stores prototype waitlist, saved program, alert setup, and contribution data in this browser unless
+          a capture endpoint is connected. Official program pages remain the source of truth.
+        </p>
+      </div>
+      <ol>
+        {testingSteps.map((step) => (
+          <li key={step}>{step}</li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+function createProgramSubmissionDraft() {
+  return {
+    name: '',
+    url: '',
+    track: 'Software Engineering',
+    reason: '',
+  };
+}
+
+function SubmissionHelper({ state, captureEndpoint }) {
+  if (state === 'submitted') {
+    return <p className="form-helper">Submitted for review.</p>;
+  }
+
+  if (state === 'localFallback') {
+    return <p className="form-helper">Endpoint was not available, so this was saved locally.</p>;
+  }
+
+  if (!captureEndpoint) {
+    return <p className="form-helper">Prototype mode: saved in this browser.</p>;
+  }
+
+  return null;
+}
+
+function createFeedbackDraft(opportunities) {
+  return {
+    programId: opportunities[0]?.id ?? '',
+    issueType: 'Outdated status',
+    note: '',
+  };
+}
+
+function WaitlistPanel({
+  context = 'setup',
+  alertPrefs,
+  alertStrategy,
+  waitlistIntent,
+  captureEndpoint = '',
+  onSave,
+  onReset,
+}) {
   const [draft, setDraft] = useState(() => createWaitlistDraft(alertPrefs));
+  const [submitState, setSubmitState] = useState('idle');
   const isLandingContext = context === 'landing';
 
   useEffect(() => {
@@ -1130,13 +1464,51 @@ function WaitlistPanel({ context = 'setup', alertPrefs, alertStrategy, waitlistI
       [field]: value,
     }));
   };
-  const saveDraft = (event) => {
+  const saveDraft = async (event) => {
     event.preventDefault();
-    onSave({
+    const payload = {
       ...draft,
       preferenceSummary,
       notificationMode: alertStrategy.modeLabel,
+    };
+
+    if (captureEndpoint) {
+      setSubmitState('submitting');
+      try {
+        const response = await fetch(captureEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            source: 'applyfirst-waitlist',
+            ...payload,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Waitlist endpoint returned an error.');
+        }
+
+        onSave({
+          ...payload,
+          captureStatus: 'Submitted to waitlist endpoint',
+        });
+        setSubmitState('submitted');
+        return;
+      } catch {
+        onSave({
+          ...payload,
+          captureStatus: 'Saved locally after endpoint issue',
+        });
+        setSubmitState('localFallback');
+        return;
+      }
+    }
+
+    onSave({
+      ...payload,
+      captureStatus: 'Saved locally',
     });
+    setSubmitState('savedLocal');
   };
 
   return (
@@ -1154,8 +1526,8 @@ function WaitlistPanel({ context = 'setup', alertPrefs, alertStrategy, waitlistI
         </h3>
         {!isLandingContext ? (
           <p>
-            Add optional contact context so this can become a real waitlist later. For now, ApplyFirst only saves this
-            in your browser.
+            Add optional contact context. If a waitlist endpoint is connected, this submits there; otherwise ApplyFirst
+            saves it in this browser for prototype testing.
           </p>
         ) : null}
       </div>
@@ -1175,6 +1547,7 @@ function WaitlistPanel({ context = 'setup', alertPrefs, alertStrategy, waitlistI
         <div className="waitlist-saved">
           <strong>{waitlistIntent.email || 'No email added'}</strong>
           <span>{waitlistIntent.savedAt ? `Saved ${waitlistIntent.savedAt.slice(0, 10)}` : 'Saved locally'}</span>
+          <em>{waitlistIntent.captureStatus ?? 'Saved locally'}</em>
           <p>{waitlistIntent.note || 'No notes added.'}</p>
           <button type="button" onClick={onReset}>Reset preferences</button>
         </div>
@@ -1218,7 +1591,13 @@ function WaitlistPanel({ context = 'setup', alertPrefs, alertStrategy, waitlistI
             <span>Anything specific to watch?</span>
             <textarea value={draft.note} onChange={(event) => updateDraft('note', event.target.value)} />
           </label>
-          <button type="submit">{isLandingContext ? 'Join Waitlist' : 'Save Setup'}</button>
+          <button type="submit" disabled={submitState === 'submitting'}>
+            {submitState === 'submitting' ? 'Saving...' : isLandingContext ? 'Join Waitlist' : 'Save Setup'}
+          </button>
+          {submitState === 'localFallback' ? (
+            <p className="form-helper">Endpoint was not available, so this was saved locally.</p>
+          ) : null}
+          {!captureEndpoint ? <p className="form-helper">Prototype mode: saved in this browser.</p> : null}
         </form>
       )}
     </section>
@@ -1376,8 +1755,8 @@ function OpportunityRecord({ opportunity, selected, saved, onSelect, onSave }) {
             className={`bookmark-button${saved ? ' saved' : ''}`}
             type="button"
             onClick={onSave}
-            aria-label={saved ? 'Remove from shortlist' : 'Add to shortlist'}
-            title={saved ? 'Remove from shortlist' : 'Add to shortlist'}
+            aria-label={saved ? 'Remove from saved programs' : 'Save program'}
+            title={saved ? 'Remove from saved programs' : 'Save program'}
           >
             <BookmarkIcon filled={saved} />
           </button>
@@ -1427,8 +1806,8 @@ function OpportunityDetail({
           className={`detail-bookmark${saved ? ' saved' : ''}`}
           type="button"
           onClick={onSave}
-          aria-label={saved ? 'Remove from shortlist' : 'Add to shortlist'}
-          title={saved ? 'Remove from shortlist' : 'Add to shortlist'}
+          aria-label={saved ? 'Remove from saved programs' : 'Save program'}
+          title={saved ? 'Remove from saved programs' : 'Save program'}
         >
           <BookmarkIcon filled={saved} />
           {saved ? 'Saved' : 'Save'}
@@ -1444,7 +1823,7 @@ function OpportunityDetail({
         <StatusItem value={monitorSignal.priorityLabel} tone={monitorSignal.priority} />
         <StatusItem value={monitorSignal.actionLabel} />
         <StatusItem
-          value={verificationState === 'verified' ? 'Confirmed' : verificationState === 'watchOnly' ? 'Watch Only' : 'Needs Confirmation'}
+          value={verificationState === 'verified' ? 'Confirmed' : verificationState === 'watchOnly' ? 'Prep Only' : 'Needs Confirmation'}
           tone={verificationState}
         />
       </div>

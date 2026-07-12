@@ -170,7 +170,7 @@ export function getSourceReviewDecision(analysis) {
 
   if (analysis.suggestedStatus === 'watching') {
     return {
-      label: 'Watch Only',
+      label: 'Monitor Only',
       tone: 'watch',
       description: 'The page gives a reason to keep monitoring, but does not prove that applications are open.',
       nextStep: 'Log the check so the next maintainer can see why this stayed out of alerts.',
