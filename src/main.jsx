@@ -34,16 +34,31 @@ const sourceCheckLogStorageKey = 'applyfirst-source-check-log';
 const waitlistStorageKey = 'applyfirst-waitlist-intent';
 const contributionStorageKey = 'applyfirst-student-contributions';
 const accessStorageKey = 'applyfirst-beta-access';
+const onboardingStorageKey = 'applyfirst-onboarding-progress';
+const betaAlertSetupStorageKey = 'applyfirst-beta-alert-setup';
 const inviteCodes = ['APPLYFIRST', 'APPLYFIRST2026', 'EARLYACCESS'];
 const phaseOneTarget = 25;
 const waitlistEndpoint = import.meta.env.VITE_WAITLIST_ENDPOINT ?? '';
 const contributionEndpoint = import.meta.env.VITE_CONTRIBUTION_ENDPOINT ?? '';
+const alertEndpoint = import.meta.env.VITE_ALERT_ENDPOINT ?? waitlistEndpoint;
 const defaultAlertPrefs = {
   classYear: '',
   roleTrack: '',
-  priority: '',
+  priority: 'all',
   notificationMode: 'waitlist',
   sendTiming: '',
+};
+const defaultOnboardingProgress = {
+  browsed: false,
+  saved: false,
+  focused: false,
+  alerted: false,
+  improved: false,
+  dismissed: false,
+};
+const libraryPriorityLabels = {
+  recommended: 'Recommended Programs',
+  foundation: 'Prep Resources',
 };
 
 function inferClassYearPreference(value = '') {
@@ -123,23 +138,33 @@ const sendTimingLabels = {
   prepOpenDeadline: 'Prep, Openings & Deadlines',
 };
 
-const trustPolicyItems = [
-  {
-    label: 'Confirmed',
-    text: 'Official page supports the important timing and eligibility claims.',
-  },
-  {
-    label: 'Prep Only',
-    text: 'Useful for planning, but not enough for outbound alerts.',
-  },
-  {
-    label: 'Needs Confirmation',
-    text: 'Missing official-cycle proof, so it waits before alerts.',
-  },
+const feedbackIssueTypes = [
+  'Opening Date Looks Wrong',
+  'Deadline Looks Wrong',
+  'Eligibility Looks Wrong',
+  'Broken or Wrong Link',
+  'Program Status Looks Outdated',
+  'Missing Program',
+  'Should Have Alerts',
+  'Confusing Label or Category',
+  'Duplicate Program',
+  'Other Feedback',
+];
+
+const betaReadyExamples = [
+  'NASA Internships',
+  'Outreachy',
+  'MLH Fellowship',
+  'Coding it Forward Fellowship',
+  'CodePath Career-Ready Courses',
+  'SEO Tech Developer',
 ];
 
 function App() {
   const cleanCaptureMode = isCleanCaptureMode();
+  const activeWaitlistEndpoint = cleanCaptureMode ? '' : waitlistEndpoint;
+  const activeContributionEndpoint = cleanCaptureMode ? '' : contributionEndpoint;
+  const activeAlertEndpoint = cleanCaptureMode ? '' : alertEndpoint;
   const [activeView, setActiveView] = useState(() => getInitialView());
   const [hasAccess, setHasAccess] = useState(() => {
     try {
@@ -245,6 +270,32 @@ function App() {
       return [];
     }
   });
+  const [onboardingProgress, setOnboardingProgress] = useState(() => {
+    try {
+      if (cleanCaptureMode) {
+        return defaultOnboardingProgress;
+      }
+
+      return {
+        ...defaultOnboardingProgress,
+        ...(JSON.parse(window.localStorage.getItem(onboardingStorageKey)) ?? {}),
+      };
+    } catch {
+      return defaultOnboardingProgress;
+    }
+  });
+  const [betaAlertSetup, setBetaAlertSetup] = useState(() => {
+    try {
+      if (cleanCaptureMode) {
+        return null;
+      }
+
+      return JSON.parse(window.localStorage.getItem(betaAlertSetupStorageKey)) ?? null;
+    } catch {
+      return null;
+    }
+  });
+  const [lastSavedId, setLastSavedId] = useState(null);
 
   const opportunityRecords = useMemo(
     () =>
@@ -295,7 +346,10 @@ function App() {
       return (
         (!normalizedQuery || searchText.includes(normalizedQuery)) &&
         (roleTrack === 'all' || getOpportunityTracks(opportunity).includes(roleTrack)) &&
-        (priority === 'all' || getMonitorSignal(opportunity).priority === priority) &&
+        (priority === 'all' ||
+          (priority === 'recommended'
+            ? ['high', 'watch'].includes(getMonitorSignal(opportunity).priority)
+            : getMonitorSignal(opportunity).priority === priority)) &&
         (!showInternalTools || verification === 'all' || getVerificationState(opportunity) === verification) &&
         (category === 'all' || opportunity.category === category) &&
         (classYear === 'all' || opportunity.classYears.includes(classYear)) &&
@@ -334,6 +388,17 @@ function App() {
   const readySoonCount = opportunityRecords.filter((item) =>
     ['open', 'expectedSoon', 'deadlineSoon'].includes(item.status),
   ).length;
+  const guideProgress = {
+    ...onboardingProgress,
+    saved: onboardingProgress.saved || savedIds.length > 0,
+    focused:
+      onboardingProgress.focused ||
+      [alertPrefs.classYear, alertPrefs.roleTrack, alertPrefs.sendTiming].every(Boolean),
+    alerted: onboardingProgress.alerted || Boolean(betaAlertSetup),
+    improved: onboardingProgress.improved || studentContributions.length > 0,
+  };
+  const onboardingComplete = ['browsed', 'saved', 'focused', 'alerted', 'improved'].every((step) => guideProgress[step]);
+  const showFirstSessionGuide = !onboardingProgress.dismissed && !onboardingComplete;
 
   useEffect(() => {
     if (cleanCaptureMode) {
@@ -387,6 +452,53 @@ function App() {
     window.localStorage.setItem(contributionStorageKey, JSON.stringify(studentContributions));
   }, [cleanCaptureMode, studentContributions]);
 
+  useEffect(() => {
+    if (cleanCaptureMode) {
+      return;
+    }
+
+    window.localStorage.setItem(onboardingStorageKey, JSON.stringify(onboardingProgress));
+  }, [cleanCaptureMode, onboardingProgress]);
+
+  useEffect(() => {
+    if (cleanCaptureMode) {
+      return;
+    }
+
+    if (betaAlertSetup) {
+      window.localStorage.setItem(betaAlertSetupStorageKey, JSON.stringify(betaAlertSetup));
+    } else {
+      window.localStorage.removeItem(betaAlertSetupStorageKey);
+    }
+  }, [betaAlertSetup, cleanCaptureMode]);
+
+  const markOnboardingStep = (step) => {
+    setOnboardingProgress((currentProgress) =>
+      currentProgress[step]
+        ? currentProgress
+        : {
+            ...currentProgress,
+            [step]: true,
+          },
+    );
+  };
+
+  const browseProgramsFromGuide = () => {
+    markOnboardingStep('browsed');
+    window.requestAnimationFrame(() => {
+      document.getElementById('library')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+
+  const saveBetaAlertSetup = (setup) => {
+    setBetaAlertSetup({
+      ...setup,
+      savedAt: new Date().toISOString(),
+    });
+    markOnboardingStep('focused');
+    markOnboardingStep('alerted');
+  };
+
   const resetFilters = () => {
     setQuery('');
     setRoleTrack('all');
@@ -401,12 +513,20 @@ function App() {
   const focusOpportunity = (id) => {
     resetFilters();
     setSelectedId(id);
+    markOnboardingStep('browsed');
   };
 
   const toggleSaved = (id) => {
-    setSavedIds((currentIds) =>
-      currentIds.includes(id) ? currentIds.filter((savedId) => savedId !== id) : [...currentIds, id],
-    );
+    const alreadySaved = savedIds.includes(id);
+    if (!alreadySaved) {
+      markOnboardingStep('saved');
+    }
+    setLastSavedId(alreadySaved ? null : id);
+
+    setSavedIds((currentIds) => {
+      const currentlySaved = currentIds.includes(id);
+      return currentlySaved ? currentIds.filter((savedId) => savedId !== id) : [...currentIds, id];
+    });
   };
 
   const saveVerificationEdit = (id, updates) => {
@@ -461,12 +581,12 @@ function App() {
       id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
       type,
       savedAt: new Date().toISOString(),
-      status: contributionEndpoint ? 'Submitting' : 'Saved Locally',
+      status: activeContributionEndpoint ? 'Submitting' : 'Saved Locally',
     };
 
-    if (contributionEndpoint) {
+    if (activeContributionEndpoint) {
       try {
-        const response = await fetch(contributionEndpoint, {
+        const response = await fetch(activeContributionEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -482,16 +602,19 @@ function App() {
         setStudentContributions((currentContributions) =>
           [{ ...contribution, status: 'Submitted for Review' }, ...currentContributions].slice(0, 12),
         );
+        markOnboardingStep('improved');
         return 'submitted';
       } catch {
         setStudentContributions((currentContributions) =>
           [{ ...contribution, status: 'Saved Locally After Endpoint Issue' }, ...currentContributions].slice(0, 12),
         );
+        markOnboardingStep('improved');
         return 'localFallback';
       }
     }
 
     setStudentContributions((currentContributions) => [contribution, ...currentContributions].slice(0, 12));
+    markOnboardingStep('improved');
     return 'savedLocal';
   };
 
@@ -521,7 +644,7 @@ function App() {
         alertPrefs={alertPrefs}
         alertStrategy={alertStrategy}
         waitlistIntent={waitlistIntent}
-        waitlistEndpoint={waitlistEndpoint}
+        waitlistEndpoint={activeWaitlistEndpoint}
         onWaitlistSave={saveWaitlistIntent}
         onWaitlistReset={resetWaitlistIntent}
         onGrantAccess={grantAccess}
@@ -542,44 +665,42 @@ function App() {
       )}
       <main className="workspace">
         {activeView === 'alerts' ? (
-          <section className="settings-view student-alerts-view" aria-label="Alert settings">
+          <section className="settings-view student-alerts-view" aria-label="My Focus settings">
             <section className="alert-hero" aria-label="ApplyFirst alert overview">
               <div>
-                <span>Preferences</span>
-                <h1>Tell ApplyFirst What to Watch.</h1>
-                <p>
-                  Set the student context that shapes your matches, saved programs, and future opening reminders.
-                  Nothing here should feel like admin work.
-                </p>
+                <span>My Focus</span>
+                <h1>Set Your Focus.</h1>
+                <p>Choose what ApplyFirst should watch first.</p>
               </div>
               <div className="alert-hero-card" aria-label="Beta alert status">
                 <span>Private Beta</span>
-                <strong>Your Choices Guide the Library.</strong>
-                <p>Start with what you care about most, then save an email only if you want beta follow-up.</p>
+                <strong>Reviewed Alerts, Not Noise.</strong>
+                <p>Every beta alert is reviewed before sending.</p>
               </div>
             </section>
-            <AlertSetupPanel
-              alertPrefs={alertPrefs}
-              setAlertPrefs={setAlertPrefs}
-              matchCount={alertPreviewMatches.length}
+              <AlertSetupPanel
+                alertPrefs={alertPrefs}
+                setAlertPrefs={setAlertPrefs}
+                onFocusChange={() => markOnboardingStep('focused')}
+                matchCount={alertPreviewMatches.length}
+              alertMatches={alertPreviewMatches}
               savedOpportunities={savedOpportunities}
               onSavedSelect={(id) => {
                 setSelectedId(id);
                 setActiveView('monitor');
               }}
               alertStrategy={alertStrategy}
+              betaAlertSetup={betaAlertSetup}
+              onBetaAlertSetupSave={saveBetaAlertSetup}
               waitlistIntent={waitlistIntent}
-              waitlistEndpoint={waitlistEndpoint}
-              onWaitlistSave={saveWaitlistIntent}
-              onWaitlistReset={resetWaitlistIntent}
+              alertEndpoint={activeAlertEndpoint}
             />
-            <TrustPolicyPanel />
           </section>
         ) : activeView === 'contribute' ? (
           <ContributeView
             contributions={studentContributions}
             opportunities={opportunityRecords}
-            captureEndpoint={contributionEndpoint}
+            captureEndpoint={activeContributionEndpoint}
             onSubmit={addStudentContribution}
           />
         ) : (
@@ -587,30 +708,25 @@ function App() {
             <section className="library-summary" aria-label="ApplyFirst overview">
               <div className="library-summary-copy">
                 <span>Opportunity Library</span>
-                <h1>Find Early Programs Before They Get Crowded.</h1>
-                <p>
-                  ApplyFirst organizes underclassmen-friendly programs, fellowships, scholarships, technical
-                  communities, and conference funding paths into one place to compare and prepare earlier.
-                </p>
-                <div className="recommendation-guide" aria-label="Library label guide">
-                  <strong>Library Labels</strong>
-                  <p>You will see these badges on program cards and in the Library Label filter.</p>
-                  <dl>
-                    <div>
-                      <dt className="priority-chip priority-high">Recommended</dt>
-                      <dd>Programs worth reviewing, saving, or preparing for early.</dd>
-                    </div>
-                    <div>
-                      <dt className="priority-chip priority-foundation">Foundation</dt>
-                      <dd>Prep, funding, access, and community resources.</dd>
-                    </div>
-                  </dl>
-                </div>
+                <h1>
+                  <span className="headline-line">Find Early Programs</span>
+                  <span className="headline-line headline-highlight">Before They Get Crowded.</span>
+                </h1>
+                <p>Compare early programs, fellowships, funding, communities, and timing in one place.</p>
+                <label className="global-search hero-search">
+                  <span className="sr-only">Search Programs</span>
+                  <input
+                    type="search"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Search program, role, timing, or source..."
+                  />
+                </label>
               </div>
               <aside className="library-stats" aria-label="Current library status">
                 <div className="library-stat-heading">
-                  <span>At A Glance</span>
-                  <p>Current Beta Library</p>
+                  <span>Library Snapshot</span>
+                  <p>Beta Library</p>
                 </div>
                 <dl className="library-stat-grid">
                   <div>
@@ -634,15 +750,6 @@ function App() {
             </section>
 
             <section className="library-controls" aria-label="Search and filter opportunities">
-              <label className="global-search">
-                <span>Search Programs</span>
-                <input
-                  type="search"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search program, role, timing, or source..."
-                />
-              </label>
               <div className="view-controls" aria-label="Class-year view">
                 <span>Class-Year View</span>
                 <div className="segmented-control">
@@ -676,6 +783,17 @@ function App() {
               />
             </section>
 
+            {showFirstSessionGuide ? (
+              <FirstSessionGuide
+                progress={guideProgress}
+                savedCount={savedIds.length}
+                onBrowse={browseProgramsFromGuide}
+                onFocusSetup={() => setActiveView('alerts')}
+                onImproveLibrary={() => setActiveView('contribute')}
+                onDismiss={() => markOnboardingStep('dismissed')}
+              />
+            ) : null}
+
             {showInternalTools ? <VerificationQueuePanel queueItems={verificationQueueItems} onSelect={focusOpportunity} /> : null}
 
             <section className="library-workspace" id="library" aria-label="Opportunity library workspace">
@@ -697,7 +815,10 @@ function App() {
                         opportunity={opportunity}
                         selected={selectedOpportunity?.id === opportunity.id}
                         saved={savedIds.includes(opportunity.id)}
-                        onSelect={() => setSelectedId(opportunity.id)}
+                        onSelect={() => {
+                          setSelectedId(opportunity.id);
+                          markOnboardingStep('browsed');
+                        }}
                         onSave={() => toggleSaved(opportunity.id)}
                       />
                     ))
@@ -712,6 +833,11 @@ function App() {
                   opportunity={selectedOpportunity}
                   saved={selectedOpportunity ? savedIds.includes(selectedOpportunity.id) : false}
                   onSave={() => selectedOpportunity && toggleSaved(selectedOpportunity.id)}
+                  justSaved={Boolean(
+                    selectedOpportunity && selectedOpportunity.id === lastSavedId && savedIds.includes(selectedOpportunity.id),
+                  )}
+                  onFocusSetup={() => setActiveView('alerts')}
+                  onImproveLibrary={() => setActiveView('contribute')}
                   onVerificationSave={saveVerificationEdit}
                   onVerificationReset={resetVerificationEdit}
                   sourceCheckEntries={selectedOpportunity ? sourceCheckLog[selectedOpportunity.id] ?? [] : []}
@@ -729,10 +855,12 @@ function App() {
                 verifiedCount={verifiedCount}
                 target={phaseOneTarget}
               />
-              <ReviewModeControl
-                enabled={showInternalTools}
-                onToggle={() => setShowInternalTools((current) => !current)}
-              />
+              {cleanCaptureMode ? null : (
+                <ReviewModeControl
+                  enabled={showInternalTools}
+                  onToggle={() => setShowInternalTools((current) => !current)}
+                />
+              )}
             </section>
           </section>
         )}
@@ -783,10 +911,16 @@ function LandingPage({
         <section className="landing-hero" aria-label="ApplyFirst private beta">
           <div className="landing-copy">
             <span>Stop Checking Scattered Lists Manually</span>
-            <h1>Apply Before the Crowd</h1>
+            <h1 className="landing-headline">
+              <span className="landing-headline-text headline-highlight">Apply Before The Crowd</span>
+            </h1>
             <p>
               ApplyFirst helps students find high-signal programs, track timing, and prepare before applications open.
             </p>
+                <div className="beta-status-note" aria-label="Private beta status">
+                  <strong>Beta Focus</strong>
+                  <span>Library, saved programs, My Focus, reviewed beta email alerts, and feedback are ready to test.</span>
+                </div>
             <div className="landing-actions">
               <a className="button primary" href="#waitlist">
                 Join the Waitlist
@@ -806,6 +940,9 @@ function LandingPage({
               <span>Student Feedback</span>
               <span>No Noisy Alerts</span>
             </div>
+            <p className="beta-panel-note">
+              Beta email alerts are reviewed before sending while ApplyFirst tests the library and timing model.
+            </p>
             {showAccess ? (
               <form className="invite-form" onSubmit={submitInviteCode}>
                 <label>
@@ -896,6 +1033,23 @@ function ProductPreviewSection() {
           </article>
         </div>
       </div>
+      <BetaExampleStrip />
+    </section>
+  );
+}
+
+function BetaExampleStrip() {
+  return (
+    <section className="beta-example-strip" aria-label="Trusted beta examples">
+      <div>
+        <span>Good Starting Points</span>
+        <p>Explore programs with enough source context to compare timing, fit, and next steps.</p>
+      </div>
+      <div className="beta-example-list">
+        {betaReadyExamples.map((program) => (
+          <em key={program}>{program}</em>
+        ))}
+      </div>
     </section>
   );
 }
@@ -905,33 +1059,44 @@ function VisualBenefitSection() {
     {
       label: 'Before',
       title: 'Scattered Lists',
+      tone: 'before',
       items: ['GitHub Repos', 'School Links', 'Old Spreadsheets', 'Official Pages'],
     },
     {
       label: 'ApplyFirst',
       title: 'One Watchlist',
+      tone: 'applyfirst',
       items: ['Program Fit', 'Timing Notes', 'Source Status', 'Next Step'],
     },
     {
       label: 'Outcome',
       title: 'Apply Earlier',
+      tone: 'outcome',
       items: ['Prepare Ahead', 'Catch Openings', 'Avoid Stale Links', 'Move Faster'],
     },
   ];
 
   return (
     <section className="visual-benefits" aria-label="ApplyFirst benefits">
-      {benefits.map((benefit) => (
-        <article key={benefit.label}>
-          <span>{benefit.label}</span>
-          <h2>{benefit.title}</h2>
-          <div className="mini-chip-grid">
-            {benefit.items.map((item) => (
-              <em key={item}>{item}</em>
-            ))}
-          </div>
-        </article>
-      ))}
+      <div className="visual-benefits-heading">
+        <span>What Changes</span>
+        <h2>Less Checking. Earlier Action.</h2>
+      </div>
+      <div className="visual-benefit-flow">
+        {benefits.map((benefit) => (
+          <article className={`visual-benefit-card visual-benefit-${benefit.tone}`} key={benefit.label}>
+            <div className="visual-benefit-title">
+              <span>{benefit.label}</span>
+              <h3>{benefit.title}</h3>
+            </div>
+            <ul>
+              {benefit.items.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </article>
+        ))}
+      </div>
     </section>
   );
 }
@@ -1003,7 +1168,7 @@ function HowItWorksSection() {
     <section className="how-it-works" aria-label="How ApplyFirst works">
       <div className="how-it-works-copy">
         <span>How It Works</span>
-        <h2>From Scattered Lists to a Focused Saved List.</h2>
+        <h2>Discover. Save. Prepare. Monitor.</h2>
       </div>
       <div className="how-it-works-steps">
         {steps.map((step) => (
@@ -1013,6 +1178,96 @@ function HowItWorksSection() {
             <p>{step.text}</p>
           </article>
         ))}
+      </div>
+    </section>
+  );
+}
+
+function FirstSessionGuide({ progress, savedCount, onBrowse, onFocusSetup, onImproveLibrary, onDismiss }) {
+  const steps = [
+    {
+      id: 'browsed',
+      label: '1',
+      title: 'Find a Program',
+      text: 'Search or click a card.',
+      actionLabel: 'Search',
+      onAction: onBrowse,
+    },
+    {
+      id: 'saved',
+      label: '2',
+      title: 'Save One',
+      text: savedCount ? `${savedCount} saved.` : 'Click bookmark.',
+      actionLabel: savedCount ? 'Saved' : 'Bookmark',
+    },
+    {
+      id: 'focused',
+      label: '3',
+      title: 'Set My Focus',
+      text: progress.focused ? 'Focus saved.' : 'Choose year, role, timing.',
+      actionLabel: 'Choose',
+      onAction: onFocusSetup,
+    },
+    {
+      id: 'alerted',
+      label: '4',
+      title: 'Join Alerts',
+      text: 'Add email.',
+      actionLabel: 'Add Email',
+      onAction: onFocusSetup,
+    },
+    {
+      id: 'improved',
+      label: '5',
+      title: 'Suggest Updates',
+      text: 'Report stale info.',
+      actionLabel: 'Report',
+      onAction: onImproveLibrary,
+    },
+  ];
+  const completedCount = steps.filter((step) => progress[step.id]).length;
+  const getStepContent = (step) => (
+    <>
+      <span className="first-session-number">{step.label}</span>
+      <span className="first-session-step-copy">
+        <strong>{step.title}</strong>
+        <em>{step.text}</em>
+      </span>
+    </>
+  );
+
+  return (
+    <section className="first-session-guide" aria-label="First ApplyFirst session guide">
+      <div className="first-session-heading">
+        <span>Start Here</span>
+        <h2>Quick Start</h2>
+        <p>Complete these once to test the core flow.</p>
+        <div
+          className="first-session-progress"
+          style={{ '--progress': `${(completedCount / steps.length) * 100}%` }}
+          aria-label={`${completedCount} of ${steps.length} onboarding steps complete`}
+        />
+      </div>
+      <ol className="first-session-steps">
+        {steps.map((step) => (
+          <li key={step.id} className={progress[step.id] ? 'complete' : ''}>
+            {step.onAction ? (
+              <button type="button" onClick={step.onAction} title={step.text}>
+                {getStepContent(step)}
+              </button>
+            ) : (
+              <span className="first-session-step-static" title={step.text}>
+                {getStepContent(step)}
+              </span>
+            )}
+          </li>
+        ))}
+      </ol>
+      <div className="first-session-actions">
+        <strong>{completedCount}/{steps.length} complete</strong>
+        <button type="button" onClick={onDismiss}>
+          Hide
+        </button>
       </div>
     </section>
   );
@@ -1042,14 +1297,14 @@ function Header({ activeView, onViewChange, savedCount, showInternalTools, onRet
             type="button"
             onClick={() => onViewChange('alerts')}
           >
-            Preferences
+            My Focus
           </button>
           <button
             className={activeView === 'contribute' ? 'active' : ''}
             type="button"
             onClick={() => onViewChange('contribute')}
           >
-            Contribute
+            Suggest Updates
           </button>
         </div>
         <div className="nav-status" aria-label="Workspace status">
@@ -1085,29 +1340,6 @@ function ReviewModeControl({ enabled, onToggle }) {
       <button className={enabled ? 'active' : ''} type="button" onClick={onToggle} aria-pressed={enabled}>
         {enabled ? 'On' : 'Off'}
       </button>
-    </section>
-  );
-}
-
-function TrustPolicyPanel() {
-  return (
-    <section className="trust-policy-panel" aria-label="Alert trust policy">
-      <div className="trust-policy-copy">
-        <span>Trust Notes</span>
-        <h2>Why ApplyFirst Is Careful With Alerts</h2>
-        <p>
-          Students need speed, but they also need accuracy. ApplyFirst can help you prepare early, while still treating
-          official program pages as the source of truth.
-        </p>
-      </div>
-      <div className="trust-policy-grid">
-        {trustPolicyItems.map((item) => (
-          <span key={item.label}>
-            <strong>{item.label}</strong>
-            {item.text}
-          </span>
-        ))}
-      </div>
     </section>
   );
 }
@@ -1160,23 +1392,19 @@ function VerificationQueuePanel({ queueItems, onSelect }) {
 function AlertSetupPanel({
   alertPrefs,
   setAlertPrefs,
+  onFocusChange,
   matchCount,
+  alertMatches,
   savedOpportunities,
   onSavedSelect,
   alertStrategy,
+  betaAlertSetup,
+  onBetaAlertSetupSave,
   waitlistIntent,
-  waitlistEndpoint,
-  onWaitlistSave,
-  onWaitlistReset,
+  alertEndpoint,
 }) {
-  const hasIncompletePreferences = [
-    alertPrefs.classYear,
-    alertPrefs.roleTrack,
-    alertPrefs.priority,
-    alertPrefs.sendTiming,
-  ].some(isPreferenceUnset);
-
   const updatePref = (key, value) => {
+    onFocusChange();
     setAlertPrefs((currentPrefs) => ({
       ...currentPrefs,
       [key]: value,
@@ -1185,101 +1413,72 @@ function AlertSetupPanel({
 
   return (
     <section className="alert-setup-panel">
-      <div className="alert-setup-intro">
-        <div className="panel-heading">
-          <span>Your Focus</span>
-          <h2>What Should ApplyFirst Prioritize for You?</h2>
+      <section className="focus-section focus-required-section" aria-label="Required focus setup">
+        <div className="focus-section-heading">
+          <div>
+            <span>Required Setup</span>
+            <h2>Choose What to Watch.</h2>
+          </div>
+          <p>
+            Choose Class Year, Role Track, and Alert Timing. ApplyFirst uses this to preview matching programs and
+            reviewed beta alerts.
+          </p>
         </div>
-        <p>
-          These choices narrow the library to programs that fit your stage and goals. You can still browse everything
-          from Programs whenever you want.
-        </p>
-        <p className="preference-source-note">
-          {waitlistIntent
-            ? 'Pre-filled from your waitlist response. You can change anything here.'
-            : 'No signup context yet. Choose each field so ApplyFirst knows what to prioritize.'}
-        </p>
-      </div>
-      <div className="alert-preference-layout">
-        <article className="alert-preference-card">
-          <span>Profile</span>
-          <h3>Who Are You Applying As?</h3>
-          <p>Class year matters because many early programs are built for specific student stages.</p>
-          <FilterSelect
-            label="Class year"
-            value={alertPrefs.classYear}
-            onChange={(value) => updatePref('classYear', value)}
-            options={filterOptions.classYears}
-            placeholder="Choose Class Year"
-          />
-        </article>
-        <article className="alert-preference-card">
-          <span>Interest</span>
-          <h3>What Career Path Are You Exploring?</h3>
-          <p>Role interest keeps SWE, PM, quant, and access programs from blending into one noisy list.</p>
-          <FilterSelect
-            label="Role interest"
-            value={alertPrefs.roleTrack}
-            onChange={(value) => updatePref('roleTrack', value)}
-            options={filterOptions.roleTracks}
-            placeholder="Choose Role Interest"
-          />
-        </article>
-        <article className="alert-preference-card">
-          <span>Programs</span>
-          <h3>What Should Rise to the Top?</h3>
-          <p>Recommended programs are the ones worth reviewing first; Foundation keeps prep and access resources visible.</p>
-          <FilterSelect
-            label="Program group"
-            value={alertPrefs.priority}
-            onChange={(value) => updatePref('priority', value)}
-            options={filterOptions.priorities}
-            labels={priorityLabels}
-            placeholder="Choose Program Group"
-          />
-          <p>{matchCount} programs match this focus right now.</p>
-        </article>
-        <article className="alert-preference-card">
-          <span>Timing</span>
-          <h3>When Do You Want to Pay Attention?</h3>
-          <p>Some students only want openings; others want prep windows early enough to update resumes or portfolios.</p>
-          <FilterSelect
-            label="Timing preference"
-            value={alertPrefs.sendTiming}
-            onChange={(value) => updatePref('sendTiming', value)}
-            options={Object.keys(sendTimingLabels)}
-            labels={sendTimingLabels}
-            placeholder="Choose Timing"
-          />
-        </article>
-      </div>
-      <div className="student-alert-summary">
-        <div>
-          <span>{hasIncompletePreferences ? 'Finish Setup' : 'Your Match'}</span>
-          <strong>
-            {hasIncompletePreferences ? 'Choose Your Preferences Above.' : `${matchCount} Programs Fit This Setup.`}
-          </strong>
+        {waitlistIntent ? <p className="preference-source-note">Pre-filled from your waitlist. Edit anytime.</p> : null}
+        <div className="alert-preference-layout">
+          <article className="alert-preference-card">
+            <span>Required</span>
+            <h3>Class Year</h3>
+            <p>Match programs to your student stage.</p>
+            <FilterSelect
+              label="Class Year"
+              value={alertPrefs.classYear}
+              onChange={(value) => updatePref('classYear', value)}
+              options={filterOptions.classYears}
+              placeholder="Choose Class Year"
+              includeAll={false}
+            />
+          </article>
+          <article className="alert-preference-card">
+            <span>Required</span>
+            <h3>Role Track</h3>
+            <p>Choose the path you want watched first.</p>
+            <FilterSelect
+              label="Role Interest"
+              value={alertPrefs.roleTrack}
+              onChange={(value) => updatePref('roleTrack', value)}
+              options={filterOptions.roleTracks}
+              placeholder="Choose Role Interest"
+              includeAll={false}
+            />
+          </article>
+          <article className="alert-preference-card">
+            <span>Required</span>
+            <h3>Alert Timing</h3>
+            <p>Decide which moments should reach you.</p>
+            <FilterSelect
+              label="Timing Preference"
+              value={alertPrefs.sendTiming}
+              onChange={(value) => updatePref('sendTiming', value)}
+              options={Object.keys(sendTimingLabels)}
+              labels={sendTimingLabels}
+              placeholder="Choose Timing"
+              includeAll={false}
+            />
+          </article>
         </div>
-        <div>
-          <span>Save Status</span>
-          <strong>Preferences Save Automatically in This Browser.</strong>
-        </div>
-        <p>
-          {hasIncompletePreferences
-            ? 'Once these fields are set, ApplyFirst can make the library and beta follow-up feel less generic.'
-            : 'Opening reminders are not live yet. For the beta, ApplyFirst uses these preferences to shape your saved library and future email follow-up.'}
-        </p>
-      </div>
-      <StudentAlertJourney matchCount={matchCount} alertStrategy={alertStrategy} />
-      <SavedAlertPreview items={savedOpportunities} onSelect={onSavedSelect} />
-      <WaitlistPanel
+      </section>
+      <BetaAlertSystem
         alertPrefs={alertPrefs}
         alertStrategy={alertStrategy}
+        matches={alertMatches}
+        savedOpportunities={savedOpportunities}
+        betaAlertSetup={betaAlertSetup}
+        onSave={onBetaAlertSetupSave}
         waitlistIntent={waitlistIntent}
-        captureEndpoint={waitlistEndpoint}
-        onSave={onWaitlistSave}
-        onReset={onWaitlistReset}
+        captureEndpoint={alertEndpoint}
       />
+      <SavedAlertPreview items={savedOpportunities} onSelect={onSavedSelect} />
     </section>
   );
 }
@@ -1321,43 +1520,238 @@ function SavedAlertPreview({ items, onSelect }) {
   );
 }
 
-function StudentAlertJourney({ matchCount, alertStrategy }) {
-  const workflowSteps = [
-    {
-      label: 'Discover',
-      title: 'Find the Right Programs',
-      text: `${matchCount} programs currently match your focus, so you can start from a smaller list.`,
-    },
-    {
-      label: 'Prepare',
-      title: 'Know What to Get Ready',
-      text: 'Use timing notes, eligibility, and saved programs to prepare before applications open.',
-    },
-    {
-      label: 'Move Early',
-      title: 'Apply When Timing Matters',
-      text: alertStrategy.sendSummary,
-    },
-  ];
+function BetaAlertSystem({
+  alertPrefs,
+  alertStrategy,
+  matches,
+  savedOpportunities,
+  betaAlertSetup,
+  onSave,
+  waitlistIntent,
+  captureEndpoint = '',
+}) {
+  const [email, setEmail] = useState(waitlistIntent?.email ?? betaAlertSetup?.email ?? '');
+  const [submitState, setSubmitState] = useState('idle');
+
+  useEffect(() => {
+    if (waitlistIntent?.email && !email) {
+      setEmail(waitlistIntent.email);
+    }
+  }, [email, waitlistIntent]);
+
+  const requiredFields = [alertPrefs.classYear, alertPrefs.roleTrack, alertPrefs.sendTiming];
+  const hasIncompleteSetup = requiredFields.some(isPreferenceUnset);
+  const hasPreviewFocus = ![alertPrefs.classYear, alertPrefs.roleTrack].some(isPreferenceUnset);
+  const hasEmail = Boolean(email.trim());
+  const alertReadyMatches = matches.filter((item) => getMonitoringReadiness(item).alertable);
+  const needsSourceCheck = hasPreviewFocus ? matches.length - alertReadyMatches.length : 0;
+  const previewPrograms = hasPreviewFocus ? alertReadyMatches.slice(0, 4) : [];
+  const savedProgramIds = new Set(savedOpportunities.map((item) => item.id));
+  const watchedPreview = hasPreviewFocus
+    ? [
+        ...savedOpportunities.slice(0, 3),
+        ...alertReadyMatches.filter((item) => !savedProgramIds.has(item.id)).slice(0, 3),
+      ].slice(0, 5)
+    : [];
+
+  const createSetupPayload = (captureStatus) => ({
+    classYear: alertPrefs.classYear,
+    roleTrack: alertPrefs.roleTrack,
+    priority: alertPrefs.priority || 'all',
+    sendTiming: alertPrefs.sendTiming,
+    email: email.trim(),
+    matchCount: matches.length,
+    alertReadyCount: alertReadyMatches.length,
+    savedCount: savedOpportunities.length,
+    watchedPrograms: watchedPreview.map((item) => item.name),
+    captureStatus,
+  });
+
+  const saveSetup = async () => {
+    const payload = createSetupPayload(captureEndpoint ? 'Submitting' : 'Saved Locally');
+    const prioritySummary =
+      payload.priority === 'all' ? 'All Opportunity Types' : priorityLabels[payload.priority] ?? payload.priority;
+
+    if (captureEndpoint) {
+      setSubmitState('submitting');
+      try {
+        const response = await fetch(captureEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            source: 'applyfirst-beta-email-alert',
+            email: payload.email,
+            classYear: payload.classYear,
+            interest: payload.roleTrack,
+            school: '',
+            note: `Beta email alert setup. Watching: ${payload.watchedPrograms.join(', ') || 'No programs yet'}. Alert-ready: ${payload.alertReadyCount}. Needs source check: ${needsSourceCheck}.`,
+            preferenceSummary: `${payload.classYear} / ${payload.roleTrack} / ${prioritySummary} / ${sendTimingLabels[payload.sendTiming] ?? payload.sendTiming}`,
+            notificationMode: 'Beta Email Alerts',
+            savedAt: new Date().toISOString(),
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Alert endpoint returned an error.');
+        }
+
+        onSave(createSetupPayload('Submitted for Beta Email Alerts'));
+        setSubmitState('submitted');
+        return;
+      } catch {
+        onSave(createSetupPayload('Saved Locally After Endpoint Issue'));
+        setSubmitState('localFallback');
+        return;
+      }
+    }
+
+    onSave(payload);
+    setSubmitState('savedLocal');
+  };
 
   return (
-    <section className="monitoring-workflow-panel student-alert-journey" aria-label="How ApplyFirst updates help students">
-      <div className="monitoring-workflow-copy">
-        <span>How It Helps</span>
-        <h3>From Interest to Action</h3>
+    <section className="beta-alert-system" aria-label="Beta alert setup">
+      <div className="beta-alert-copy">
+        <span>Preview</span>
+        <h3>What ApplyFirst Would Watch</h3>
         <p>
-          The goal is simple: spend less time checking scattered pages and more time getting ready for programs that
-          can actually change your options.
+          {hasPreviewFocus
+            ? 'These numbers update from your focus setup.'
+            : 'Choose Class Year and Role Track to unlock the preview.'}
         </p>
       </div>
-      <div className="monitoring-workflow-steps">
-        {workflowSteps.map((step) => (
-          <article key={step.label}>
-            <span>{step.label}</span>
-            <strong>{step.title}</strong>
-            <p>{step.text}</p>
-          </article>
-        ))}
+      <div className="beta-alert-metrics" aria-label="Beta alert readiness">
+        <span>
+          <strong>{hasPreviewFocus ? matches.length : '-'}</strong>
+          Matches
+        </span>
+        <span>
+          <strong>{hasPreviewFocus ? alertReadyMatches.length : '-'}</strong>
+          Alert-Ready
+        </span>
+        <span>
+          <strong>{hasPreviewFocus ? needsSourceCheck : '-'}</strong>
+          Needs Check
+        </span>
+      </div>
+      <div className="beta-alert-preview">
+        <div>
+          <span>Watchlist Preview</span>
+          <strong>
+            {watchedPreview.length
+              ? watchedPreview.map((item) => item.name).join(', ')
+              : !hasPreviewFocus
+                ? 'Choose focus fields to preview matches.'
+                : 'No reviewed alert matches yet.'}
+          </strong>
+        </div>
+        <div>
+          <span>Send Timing</span>
+          <strong>
+            {hasPreviewFocus
+              ? alertStrategy.sendSummary
+              : 'Choose focus to preview timing.'}
+          </strong>
+        </div>
+        <div>
+          <span>Ready Examples</span>
+          <strong>
+            {previewPrograms.length
+              ? previewPrograms.map((item) => item.name).join(', ')
+              : hasPreviewFocus
+                ? 'No confirmed timing matches for this focus yet.'
+                : 'Appears after focus is selected.'}
+          </strong>
+        </div>
+      </div>
+      <div className="beta-alert-actions">
+        <label>
+          <span>Join Beta Email Alerts</span>
+          <input
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="you@example.com"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={saveSetup}
+          disabled={hasIncompleteSetup || !hasEmail || submitState === 'submitting'}
+          title={
+            hasIncompleteSetup
+              ? 'Choose Class Year, Role Track, and Alert Timing first.'
+              : !hasEmail
+                ? 'Add your email first.'
+                : 'Join beta alerts.'
+          }
+        >
+          {submitState === 'submitting' ? 'Joining...' : 'Join Beta Alerts'}
+        </button>
+        {betaAlertSetup ? (
+          <p>{`${betaAlertSetup.captureStatus ?? 'Saved'} on ${betaAlertSetup.savedAt.slice(0, 10)} with ${betaAlertSetup.alertReadyCount} alert-ready programs.`}</p>
+        ) : null}
+      </div>
+      <BetaAlertFeed
+        alertStrategy={alertStrategy}
+        watchedPrograms={watchedPreview}
+        needsSourceCheck={needsSourceCheck}
+        hasSavedSetup={Boolean(betaAlertSetup)}
+        hasPreviewFocus={hasPreviewFocus}
+      />
+    </section>
+  );
+}
+
+function BetaAlertFeed({ alertStrategy, watchedPrograms, needsSourceCheck, hasSavedSetup, hasPreviewFocus }) {
+  const feedItems = watchedPrograms.slice(0, 3).map((program) => {
+    const readiness = getMonitoringReadiness(program);
+    const signal = getMonitorSignal(program);
+
+    return {
+      id: program.id,
+      name: program.name,
+      organization: program.organization,
+      status: readiness.alertable ? 'Ready for Alerts' : 'Needs Timing Check',
+      message: readiness.alertable
+        ? `${signal.actionLabel}: ${signal.nextAction}`
+        : 'ApplyFirst would hold this until timing is confirmed from an official source.',
+      timing: program.openDate,
+    };
+  });
+
+  return (
+    <section className="beta-alert-feed" aria-label="Beta alert feed preview">
+      <div className="beta-alert-feed-heading">
+        <span>Alert Preview</span>
+        <strong>{hasSavedSetup ? 'Your Saved Alert Setup' : 'Before You Save'}</strong>
+      </div>
+      {feedItems.length ? (
+        <div className="beta-alert-feed-list" role="list">
+          {feedItems.map((item) => (
+            <article key={item.id} role="listitem">
+              <span>{item.status}</span>
+              <strong>{item.name}</strong>
+              <em>{item.organization}</em>
+              <p>{item.message}</p>
+              <small>{item.timing}</small>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <p className="beta-alert-feed-empty">
+          {hasPreviewFocus
+            ? 'Save programs or choose a narrower focus to generate example alerts.'
+            : 'Choose focus fields to preview example alerts.'}
+        </p>
+      )}
+      <div className="beta-alert-feed-note">
+        <strong>{hasPreviewFocus ? alertStrategy.timingLabel : 'Choose Focus'}</strong>
+        <span>
+          {hasPreviewFocus
+            ? `${needsSourceCheck} matching programs need an official timing check before ApplyFirst would alert you.`
+            : 'Alert previews appear after there is enough focus context.'}
+        </span>
       </div>
     </section>
   );
@@ -1403,22 +1797,12 @@ function ContributeView({ contributions, opportunities, captureEndpoint = '', on
     <section className="contribute-view" aria-label="ApplyFirst contribution center">
       <section className="contribute-hero">
         <div>
-          <span>Student Feedback</span>
-          <h1>Share What ApplyFirst Should Know.</h1>
+          <span>Suggest Updates</span>
+          <h1>Suggest a Program or Fix.</h1>
           <p>
-            Add a program you found elsewhere, report stale information, or tell us what felt confusing while testing.
-            Every submission is reviewed before it changes the library.
+            Suggest a missing program, flag stale information, or tell us which opportunities would be worth alerts
+            later. Every submission is reviewed before it changes the library.
           </p>
-        </div>
-        <div className="contribute-facts" aria-label="Contribution status">
-          <span>
-            <strong>{contributions.length}</strong>
-            Shared In This Session
-          </span>
-          <span>
-            <strong>Beta</strong>
-            Human Review First
-          </span>
         </div>
       </section>
 
@@ -1492,12 +1876,9 @@ function ContributeView({ contributions, opportunities, captureEndpoint = '', on
           <label>
             <span>Issue Type</span>
             <select value={feedbackDraft.issueType} onChange={(event) => updateFeedbackDraft('issueType', event.target.value)}>
-              <option>Beta Feedback</option>
-              <option>Outdated Status</option>
-              <option>Broken Link</option>
-              <option>Wrong Eligibility</option>
-              <option>Missing Program</option>
-              <option>Confusing Copy</option>
+              {feedbackIssueTypes.map((issueType) => (
+                <option key={issueType}>{issueType}</option>
+              ))}
             </select>
           </label>
           <label>
@@ -1515,57 +1896,7 @@ function ContributeView({ contributions, opportunities, captureEndpoint = '', on
           <SubmissionHelper state={feedbackSubmitState} captureEndpoint={captureEndpoint} />
         </form>
 
-        <section className="contribution-card contribution-log" aria-label="Saved local contributions">
-          <div className="panel-heading">
-            <span>Review Queue</span>
-            <h2>{contributions.length ? `${contributions.length} Shared` : 'No Feedback Shared Yet'}</h2>
-          </div>
-          {contributions.length ? (
-            <div className="contribution-items" role="list">
-              {contributions.map((item) => (
-                <article key={item.id} role="listitem">
-                  <span>{item.type === 'program' ? 'Program' : 'Feedback'}</span>
-                  <strong>{item.name || item.issueType}</strong>
-                  <p>{item.reason || item.note}</p>
-                  <em>{item.status}</em>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <p>Submissions you add during this session will appear here before review.</p>
-          )}
-        </section>
       </section>
-      <BetaTestingPanel />
-    </section>
-  );
-}
-
-function BetaTestingPanel() {
-  const testingSteps = [
-    'Join the waitlist or enter an invite code.',
-    'Search for a program that matches your year or role.',
-    'Save one program you would actually track.',
-    'Set your Preferences and explain whether the fields make sense.',
-    'Submit one program ApplyFirst should watch.',
-    'Report one piece of stale, confusing, or missing information.',
-  ];
-
-  return (
-    <section className="beta-testing-panel" aria-label="Private Beta Testing Notes">
-      <div>
-        <span>Private Beta</span>
-        <h2>What Students Should Test</h2>
-        <p>
-          Use this checklist during early testing. The goal is to learn whether students understand the product, trust
-          the library, and know what they would want ApplyFirst to watch.
-        </p>
-      </div>
-      <ol>
-        {testingSteps.map((step) => (
-          <li key={step}>{step}</li>
-        ))}
-      </ol>
     </section>
   );
 }
@@ -1585,11 +1916,11 @@ function SubmissionHelper({ state, captureEndpoint }) {
   }
 
   if (state === 'localFallback') {
-    return <p className="form-helper">Saved on This Device Because Beta Capture Was Unavailable.</p>;
+    return <p className="form-helper">Saved here for now. We may ask you to submit again later.</p>;
   }
 
   if (!captureEndpoint) {
-    return <p className="form-helper">Prototype Mode: Saved on This Device.</p>;
+    return <p className="form-helper">Saved in this browser for now.</p>;
   }
 
   return null;
@@ -1598,7 +1929,7 @@ function SubmissionHelper({ state, captureEndpoint }) {
 function createFeedbackDraft(opportunities) {
   return {
     programId: opportunities[0]?.id ?? '',
-    issueType: 'Outdated status',
+    issueType: feedbackIssueTypes[0],
     note: '',
   };
 }
@@ -1632,7 +1963,9 @@ function WaitlistPanel({
       : alertPrefs.roleTrack === 'all'
         ? 'All Role Tracks'
         : alertPrefs.roleTrack,
-    isPreferenceUnset(alertPrefs.priority) ? 'Program Group Not Selected' : priorityLabels[alertPrefs.priority] ?? 'All Recommendations',
+    isPreferenceUnset(alertPrefs.priority) || alertPrefs.priority === 'all'
+      ? 'All Opportunity Types'
+      : priorityLabels[alertPrefs.priority] ?? alertPrefs.priority,
     isPreferenceUnset(alertPrefs.sendTiming) ? 'Timing Not Selected' : sendTimingLabels[alertPrefs.sendTiming],
   ].join(' / ');
   const updateDraft = (field, value) => {
@@ -1718,7 +2051,7 @@ function WaitlistPanel({
           <span>{waitlistIntent.savedAt ? `Saved ${waitlistIntent.savedAt.slice(0, 10)}` : 'Saved Locally'}</span>
           <em>{waitlistIntent.captureStatus ?? 'Saved Locally'}</em>
           <p>{waitlistIntent.note || 'No Notes Added.'}</p>
-          <button type="button" onClick={onReset}>Reset Preferences</button>
+          <button type="button" onClick={onReset}>Reset My Focus</button>
         </div>
       ) : (
         <form className="waitlist-form" onSubmit={saveDraft}>
@@ -1772,11 +2105,11 @@ function WaitlistPanel({
             {submitState === 'submitting' ? 'Saving...' : isLandingContext ? 'Join Waitlist' : 'Save Contact Preference'}
           </button>
           {submitState === 'localFallback' ? (
-            <p className="form-helper">Saved on This Device Because Beta Capture Was Unavailable.</p>
+            <p className="form-helper">Saved here for now. We may ask you to submit again later.</p>
           ) : null}
           {!captureEndpoint ? (
             <p className="form-helper">
-              {isLandingContext ? 'Prototype Mode: Saved on This Device.' : 'Saved on This Device for This Prototype.'}
+              {isLandingContext ? 'Saved in this browser for now.' : 'Saved in this browser for now.'}
             </p>
           ) : null}
         </form>
@@ -1861,11 +2194,11 @@ function FilterStack({
         options={filterOptions.roleTracks}
       />
       <FilterSelect
-        label="Library Label"
+        label="Opportunity Type"
         value={priority}
         onChange={setPriority}
-        options={filterOptions.priorities}
-        labels={priorityLabels}
+        options={Object.keys(libraryPriorityLabels)}
+        labels={libraryPriorityLabels}
       />
       {showInternalTools ? (
         <FilterSelect
@@ -1886,7 +2219,7 @@ function FilterStack({
   );
 }
 
-function FilterSelect({ label, value, onChange, options, labels = {}, placeholder = '' }) {
+function FilterSelect({ label, value, onChange, options, labels = {}, placeholder = '', includeAll = true }) {
   const selectId = `filter-${label.toLowerCase().replaceAll(' ', '-').replaceAll('/', '').replaceAll('&', 'and')}`;
 
   return (
@@ -1900,7 +2233,7 @@ function FilterSelect({ label, value, onChange, options, labels = {}, placeholde
         onChange={(event) => onChange(event.target.value)}
       >
         {placeholder ? <option value="">{placeholder}</option> : null}
-        <option value="all">All</option>
+        {includeAll ? <option value="all">All</option> : null}
         {options.map((option) => (
           <option key={option} value={option}>
             {formatDisplayLabel(labels[option] ?? option)}
@@ -1958,6 +2291,9 @@ function OpportunityDetail({
   opportunity,
   saved,
   onSave,
+  justSaved,
+  onFocusSetup,
+  onImproveLibrary,
   onVerificationSave,
   onVerificationReset,
   sourceCheckEntries,
@@ -2001,6 +2337,18 @@ function OpportunityDetail({
           {saved ? 'Saved' : 'Save'}
         </button>
       </div>
+      {justSaved ? (
+        <section className="save-next-step" aria-label="Saved program next step">
+          <div>
+            <span>Saved</span>
+            <strong>Next: Set My Focus</strong>
+            <p>ApplyFirst can use your class year, interest, and timing to make the library feel more personal.</p>
+          </div>
+          <button type="button" onClick={onFocusSetup}>
+            Set My Focus
+          </button>
+        </section>
+      ) : null}
       <section className="detail-next-step" aria-label="Recommended Next Step">
         <span>Recommended Next Step</span>
         <h3>{monitorSignal.actionLabel}</h3>
@@ -2017,6 +2365,9 @@ function OpportunityDetail({
       </div>
       <DetailSection title="Why this matters">{opportunity.why}</DetailSection>
       <DetailSection title="How to prepare">{opportunity.prep}</DetailSection>
+      <button className="detail-feedback-link" type="button" onClick={onImproveLibrary}>
+        See something missing or stale?
+      </button>
       <div className="metric-grid">
         <Metric label="Best for" value={opportunity.classYears.join(', ')} />
         <Metric label="Track" value={tracks.join(' + ')} />
@@ -2245,7 +2596,7 @@ function getAlertStrategy(alertPrefs, matches, alertableCount) {
       ? 'This stays in your browser for now.'
     : alertPrefs.notificationMode === 'saved'
         ? 'Saved-program reminders can come later after accounts or email consent exist.'
-        : 'Email alerts can come later after a real waitlist and confirmed rules exist.';
+    : 'Beta email alerts can be captured now, then reviewed before sending while signal rules improve.';
   const timingCopy =
     alertPrefs.sendTiming === 'openOnly'
       ? 'program openings'
@@ -2568,4 +2919,8 @@ function EmptyState({ onReset }) {
   );
 }
 
-createRoot(document.getElementById('root')).render(<App />);
+const rootElement = document.getElementById('root');
+const appRoot = rootElement._applyFirstRoot ?? createRoot(rootElement);
+
+rootElement._applyFirstRoot = appRoot;
+appRoot.render(<App />);

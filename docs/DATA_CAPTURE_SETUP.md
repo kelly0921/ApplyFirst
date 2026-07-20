@@ -1,11 +1,12 @@
 # ApplyFirst Data Capture Setup
 
-ApplyFirst has two endpoint hooks for beta testing:
+ApplyFirst has three endpoint hooks for beta testing:
 
-- `VITE_WAITLIST_ENDPOINT`: captures landing-page waitlist requests and Preferences contact follow-up.
-- `VITE_CONTRIBUTION_ENDPOINT`: captures Contribute submissions, missing programs, stale records, and beta feedback.
+- `VITE_WAITLIST_ENDPOINT`: captures landing-page waitlist requests and My Focus contact follow-up.
+- `VITE_CONTRIBUTION_ENDPOINT`: captures Suggest Updates submissions, missing programs, stale records, and beta feedback.
+- `VITE_ALERT_ENDPOINT`: captures beta email alert opt-ins. If blank, ApplyFirst sends beta alert opt-ins to `VITE_WAITLIST_ENDPOINT`.
 
-If either endpoint is blank or unavailable, the app falls back to browser-local storage. That is useful for local demos, but not enough for real student testing.
+If an endpoint is blank or unavailable, the app falls back to browser-local storage. That is useful for local demos, but not enough for real student testing.
 
 ## Recommended Beta Setup
 
@@ -13,19 +14,20 @@ For the first beta, use the fastest durable capture option:
 
 1. Create one capture destination for waitlist/contact requests.
 2. Create one capture destination for contribution and feedback submissions.
-3. Use endpoints that accept JSON `POST` requests.
-4. Add both URLs as Cloudflare Pages environment variables.
-5. Redeploy the site.
-6. Submit one test waitlist entry and one test contribution.
-7. Confirm both entries appear in the destination before inviting students.
+3. Use either the waitlist destination or a dedicated destination for beta email alert opt-ins.
+4. Use endpoints that accept JSON `POST` requests.
+5. Add the endpoint URLs as Cloudflare Pages environment variables.
+6. Redeploy the site.
+7. Submit one test waitlist entry, one beta alert setup, and one Suggest Updates entry.
+8. Confirm all entries appear in the destination before inviting students.
 
-You can also run the repo smoke test after setting both endpoint environment variables:
+You can also run the repo smoke test after setting endpoint environment variables:
 
 ```bash
 npm run capture:smoke
 ```
 
-The command posts one sample waitlist payload and one sample contribution payload. It exits with an error if either endpoint is missing, unavailable, or returns a non-2xx status.
+The command posts one sample waitlist payload, one beta email alert payload, and one contribution payload. It exits with an error if any required endpoint is missing, unavailable, or returns a non-2xx status.
 
 ## Minimum Fields To Capture
 
@@ -54,9 +56,21 @@ Contribution submissions should capture:
 - `status`
 - `createdAt`
 
+Beta email alert opt-ins should capture:
+
+- `source`
+- `email`
+- `classYear`
+- `interest`
+- `note`
+- `preferenceSummary`
+- `notificationMode`
+- `savedAt`
+- `captureStatus`
+
 ## Endpoint Contract
 
-Both endpoints should accept a JSON body and return a successful 2xx status.
+All configured endpoints should accept a JSON body and return a successful 2xx status.
 
 Example request shape:
 
@@ -81,6 +95,7 @@ In Cloudflare Pages:
 4. Add:
    - `VITE_WAITLIST_ENDPOINT`
    - `VITE_CONTRIBUTION_ENDPOINT`
+   - `VITE_ALERT_ENDPOINT` if using a dedicated beta alert endpoint
 5. Save.
 6. Redeploy the latest commit.
 
@@ -104,9 +119,11 @@ Before user testing:
 
 - Waitlist/contact endpoint exists.
 - Contribution endpoint exists.
+- Beta email alert capture exists through `VITE_ALERT_ENDPOINT` or the waitlist endpoint fallback.
 - Cloudflare environment variables are set.
 - Latest commit is deployed.
 - One test waitlist entry appears in the destination.
+- One test beta email alert setup appears in the destination.
 - One test contribution appears in the destination.
 - `npm run capture:smoke` passes with both endpoint URLs configured.
 - Local fallback still works if the endpoint fails.
@@ -116,6 +133,6 @@ Before user testing:
 
 Only ask for data needed for the beta:
 
-- Email is optional inside the app Preferences page.
+- Email is required only when a student explicitly joins the beta email alert list.
 - Landing-page waitlist email can be required because it is explicitly a waitlist request.
 - Do not ask for resume, GPA, demographic data, or private documents in this prototype.

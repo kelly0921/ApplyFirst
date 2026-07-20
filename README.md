@@ -45,7 +45,7 @@ The first version focuses on:
 - Clear notes on why each opportunity matters and how to prepare.
 - A future path toward an Opportunity Signal Tracker.
 
-This version is a private-beta public prototype with a landing page, endpoint-ready waitlist request, invite-code gate, endpoint-ready contribution capture, and the full app behind the gate. The app can show the product direction, curated seed set, student Preferences, student-facing confirmation model, and student submission flow, while outbound opening reminders should wait for stronger official-source confirmation.
+This version is a private-beta public prototype with a landing page, endpoint-ready waitlist request, invite-code gate, endpoint-ready beta email alert opt-in, endpoint-ready student update capture, and the full app behind the gate. The app can show the product direction, curated seed set, student My Focus setup, reviewed alert readiness model, and student submission flow while fully automated alert sending waits for stronger official-source confirmation.
 
 Recommendation is computed from the Phase 1 rules: underclassmen-fit programs in high-leverage categories become Recommended; relevant programs can also be Recommended when they are useful enough to review, save, or prepare for early; scholarships, conferences, communities, and resources are treated as Foundation opportunities. Student actions stay separate from these labels: users save programs they care about, while ApplyFirst monitors confirmed sources for future opening signals. Duplicate appearances across older curated lists are useful for verification, but they are not treated as proof that a program is better.
 
@@ -59,7 +59,7 @@ These codes are for the current prototype gate only and should be replaced befor
 
 After unlocking the prototype, use the `Landing` button in the app header to clear the local access flag and return to the public landing page.
 
-The waitlist/contact form saves locally by default. Set `VITE_WAITLIST_ENDPOINT` to a JSON-compatible form/backend endpoint to submit waitlist and Preferences contact requests externally; if the endpoint fails, the prototype falls back to local browser storage. Student program submissions and feedback save locally by default. Set `VITE_CONTRIBUTION_ENDPOINT` to capture Contribute submissions externally; if the endpoint fails, the prototype falls back to local browser storage. Copy `.env.example` to `.env.local` for local endpoint testing.
+The waitlist/contact form saves locally by default. Set `VITE_WAITLIST_ENDPOINT` to a JSON-compatible form/backend endpoint to submit waitlist and My Focus contact requests externally; if the endpoint fails, the prototype falls back to local browser storage. Set `VITE_ALERT_ENDPOINT` to capture beta email alert opt-ins, or leave it blank to use the waitlist endpoint. Student program submissions and feedback save locally by default. Set `VITE_CONTRIBUTION_ENDPOINT` to capture Suggest Updates submissions externally; if the endpoint fails, the prototype falls back to local browser storage. Copy `.env.example` to `.env.local` for local endpoint testing.
 
 Private beta testing should ask students to join the waitlist, unlock the app with an invite code, save one program, submit one program ApplyFirst should watch, and report one stale or confusing record. Until real accounts and moderation exist, submitted programs and feedback should be treated as review candidates rather than public library records.
 
@@ -151,7 +151,8 @@ The first Phase 2 slice adds:
 
 - Public landing page that explains ApplyFirst, who it is for, what students get, and why access is limited during private beta.
 - Simple invite-code gate before the full program monitor, avoiding premature auth while keeping access intentional.
-- Student Preferences preview by class year, role track, recommendation level, and timing preference.
+- Student My Focus preview by class year, role track, recommendation level, and timing preference.
+- Beta email alert opt-in with alert-ready counts, source-check holds, and in-app alert feed preview.
 - Confirmation-readiness calculations for records that are safe to alert on later.
 - Prioritized source-review queue for records that need official-cycle review before alerts.
 - Direct review flow from queue item to full program detail.
@@ -160,17 +161,17 @@ The first Phase 2 slice adds:
 - Source update plan per record, including watched page, check cadence, next check, alert trigger, and meaningful change signals.
 - Local source-check log with checked date, result, and notes.
 - Student-facing preference and contact flow for future reminders.
-- Contribute view for local student program submissions and stale-info feedback.
+- Suggest Updates view for local student program submissions and stale-info feedback.
 - Alert timing preview for openings, deadlines, and preparation windows.
-- Navigation split between the focused Programs view, student Preferences, and Contribute.
-- Simplified student-facing Preferences section with technical readiness details kept in Maintainer Mode.
+- Navigation split between the focused Programs view, student My Focus, and Suggest Updates.
+- Simplified student-facing My Focus section with technical readiness details kept in Maintainer Mode.
 - Trust copy that separates records ready to alert from records that still need confirmation.
 - Public trust policy for Confirmed, Prep Only, and Needs Confirmation records.
-- Local waitlist-intent workflow before accounts, reminders, or real outbound alerts.
+- Endpoint-ready beta email alert workflow before accounts or fully automated outbound alerts.
 - Maintainer Mode toggle for source-review tools, keeping the default view student-facing.
 - A clear split between public prototype behavior and future live notifications.
 - Student-facing monitoring workflow explanation: save programs, verify official pages, watch opening signals, then notify only when trustworthy.
-- Preferences-page saved-program preview showing bookmarked programs without exposing internal dashboard language.
+- My Focus saved-program preview showing bookmarked programs without exposing internal dashboard language.
 
 Real email alerts, accounts, and automated page-change monitoring are intentionally still future work.
 

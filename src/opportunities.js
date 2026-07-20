@@ -21,7 +21,7 @@ export const verificationLabels = {
 export const priorityLabels = {
   high: 'Recommended',
   watch: 'Recommended',
-  foundation: 'Foundation',
+  foundation: 'Prep Resource',
 };
 
 export const alertReadinessLabels = {
@@ -242,7 +242,7 @@ export function getVerificationPriority(opportunity) {
     reason: underclassmenFit
       ? 'Underclassmen-facing record with alert value once official timing is confirmed.'
       : monitorSignal.priority === 'foundation'
-        ? 'Foundation resource; verify after higher-leverage application programs.'
+      ? 'Prep resource; verify after higher-leverage application programs.'
         : 'Useful record, but lower urgency than underclassmen-first programs.',
   };
 }

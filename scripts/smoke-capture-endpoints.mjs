@@ -1,5 +1,6 @@
 const waitlistEndpoint = process.env.VITE_WAITLIST_ENDPOINT;
 const contributionEndpoint = process.env.VITE_CONTRIBUTION_ENDPOINT;
+const alertEndpoint = process.env.VITE_ALERT_ENDPOINT || waitlistEndpoint;
 
 const samples = [
   {
@@ -31,7 +32,29 @@ const samples = [
       createdAt: new Date().toISOString(),
     },
   },
+  {
+    label: 'alert',
+    endpoint: alertEndpoint,
+    body: {
+      source: 'applyfirst-beta-email-alert-smoke',
+      email: 'applyfirst-alert-smoke@example.com',
+      classYear: 'Freshman',
+      interest: 'Software Engineering',
+      school: '',
+      note: 'Smoke test for beta email alert setup capture.',
+      preferenceSummary: 'Freshman / Software Engineering / Recommended / Openings & Deadlines',
+      notificationMode: 'Beta Email Alerts',
+      savedAt: new Date().toISOString(),
+      captureStatus: 'Smoke test',
+    },
+  },
 ];
+
+const endpointEnvNames = {
+  waitlist: 'VITE_WAITLIST_ENDPOINT',
+  contribution: 'VITE_CONTRIBUTION_ENDPOINT',
+  alert: 'VITE_ALERT_ENDPOINT or VITE_WAITLIST_ENDPOINT',
+};
 
 async function postSample({ label, endpoint, body }) {
   if (!endpoint) {
@@ -39,7 +62,7 @@ async function postSample({ label, endpoint, body }) {
       label,
       ok: false,
       status: 'missing',
-      message: `Set VITE_${label === 'waitlist' ? 'WAITLIST' : 'CONTRIBUTION'}_ENDPOINT before running this smoke test.`,
+      message: `Set ${endpointEnvNames[label]} before running this smoke test.`,
     };
   }
 
