@@ -2255,18 +2255,20 @@ function OpportunityRecord({ opportunity, selected, saved, onSelect, onSave }) {
       <button className="record-main" type="button" onClick={onSelect}>
         <div className="record-title">
           <span className={`status-pill status-${opportunity.status}`}>{statusLabels[opportunity.status]}</span>
-          <h3>{opportunity.name}</h3>
+          <h3>
+            <span>{opportunity.name}</span>
+            {isConfirmed ? (
+              <span className="record-confirmed" aria-label="Confirmed by official source" title="Confirmed by official source">
+                <VerifiedIcon />
+              </span>
+            ) : null}
+          </h3>
           <p>{opportunity.organization}</p>
         </div>
         <div className="record-summary">
           <span>{primaryTrack}</span>
           <span>{opportunity.classYears.join(', ')}</span>
           <span>{opportunity.timing}</span>
-          {isConfirmed ? (
-            <span className="record-confirmed" title="Confirmed by official source">
-              Confirmed
-            </span>
-          ) : null}
         </div>
       </button>
       <div className="record-side">
@@ -2801,6 +2803,15 @@ function BookmarkIcon({ filled }) {
     <svg aria-hidden="true" viewBox="0 0 16 16" focusable="false">
       <path d="M4 2.5C4 1.7 4.7 1 5.5 1h5c.8 0 1.5.7 1.5 1.5V15l-4-2.4L4 15V2.5Z" />
       {!filled ? <path className="bookmark-cutout" d="M5.5 2.4h5c.1 0 .2.1.2.2v10L8 11 5.3 12.6v-10c0-.1.1-.2.2-.2Z" /> : null}
+    </svg>
+  );
+}
+
+function VerifiedIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 16 16" focusable="false">
+      <path d="M8 1.3 9.6 2.6l2.1-.2.6 2 1.8 1.1-.8 1.9.8 1.9-1.8 1.1-.6 2-2.1-.2L8 13.5l-1.6-1.3-2.1.2-.6-2-1.8-1.1.8-1.9-.8-1.9 1.8-1.1.6-2 2.1.2L8 1.3Z" />
+      <path className="verified-icon-check" d="M7.1 9.7 4.9 7.5l.9-.9 1.3 1.3 3.1-3.3.9.8-4 4.3Z" />
     </svg>
   );
 }

@@ -1005,8 +1005,8 @@ a {
 
 .beta-example-strip {
   display: grid;
-  grid-template-columns: minmax(220px, 0.38fr) minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: minmax(430px, 0.48fr) minmax(0, 1fr);
+  gap: 22px;
   align-items: center;
   border: 1px solid rgba(211, 222, 217, 0.88);
   border-radius: 14px;
@@ -3087,6 +3087,22 @@ a {
   -webkit-line-clamp: 2;
 }
 
+.record-title h3 .record-confirmed {
+  display: inline-flex;
+  margin-left: 6px;
+  vertical-align: -2px;
+}
+
+.record-title h3 .record-confirmed svg {
+  width: 14px;
+  height: 14px;
+  fill: var(--green);
+}
+
+.record-title h3 .record-confirmed .verified-icon-check {
+  fill: #ffffff;
+}
+
 .record-title p {
   overflow: hidden;
   margin: 0;
@@ -3130,11 +3146,6 @@ a {
   content: "/";
   margin-right: 6px;
   color: var(--quiet);
-}
-
-.record-summary .record-confirmed {
-  color: var(--green);
-  font-weight: 820;
 }
 
 .priority-chip {
