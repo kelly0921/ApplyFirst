@@ -41,6 +41,7 @@ const phaseOneTarget = 25;
 const waitlistEndpoint = import.meta.env.VITE_WAITLIST_ENDPOINT ?? '';
 const contributionEndpoint = import.meta.env.VITE_CONTRIBUTION_ENDPOINT ?? '';
 const alertEndpoint = import.meta.env.VITE_ALERT_ENDPOINT ?? waitlistEndpoint;
+const watchEndpoint = import.meta.env.VITE_WATCH_ENDPOINT ?? '';
 const defaultAlertPrefs = {
   classYear: '',
   roleTrack: '',
@@ -160,11 +161,26 @@ const betaReadyExamples = [
   'SEO Tech Developer',
 ];
 
+async function postJson(endpoint, body) {
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw new Error('Endpoint returned an error.');
+  }
+
+  return response;
+}
+
 function App() {
   const cleanCaptureMode = isCleanCaptureMode();
   const activeWaitlistEndpoint = cleanCaptureMode ? '' : waitlistEndpoint;
   const activeContributionEndpoint = cleanCaptureMode ? '' : contributionEndpoint;
   const activeAlertEndpoint = cleanCaptureMode ? '' : alertEndpoint;
+  const activeWatchEndpoint = cleanCaptureMode ? '' : watchEndpoint;
   const [activeView, setActiveView] = useState(() => getInitialView());
   const [hasAccess, setHasAccess] = useState(() => {
     try {
@@ -666,16 +682,16 @@ function App() {
       <main className="workspace">
         {activeView === 'alerts' ? (
           <section className="settings-view student-alerts-view" aria-label="My Focus settings">
-            <section className="alert-hero" aria-label="ApplyFirst alert overview">
+            <section className="alert-hero" aria-label="ApplyFirst watch overview">
               <div>
                 <span>My Focus</span>
                 <h1>Set Your Focus.</h1>
                 <p>Choose what ApplyFirst should watch first.</p>
               </div>
-              <div className="alert-hero-card" aria-label="Beta alert status">
+              <div className="alert-hero-card" aria-label="Beta watch status">
                 <span>Private Beta</span>
-                <strong>Reviewed Alerts, Not Noise.</strong>
-                <p>Every beta alert is reviewed before sending.</p>
+                <strong>Reviewed Signals, Not Noise.</strong>
+                <p>Every beta alert candidate is reviewed before sending.</p>
               </div>
             </section>
               <AlertSetupPanel
@@ -694,6 +710,7 @@ function App() {
               onBetaAlertSetupSave={saveBetaAlertSetup}
               waitlistIntent={waitlistIntent}
               alertEndpoint={activeAlertEndpoint}
+              watchEndpoint={activeWatchEndpoint}
             />
           </section>
         ) : activeView === 'contribute' ? (
@@ -919,7 +936,7 @@ function LandingPage({
             </p>
                 <div className="beta-status-note" aria-label="Private beta status">
                   <strong>Beta Focus</strong>
-                  <span>Library, saved programs, My Focus, reviewed beta email alerts, and feedback are ready to test.</span>
+                  <span>Library, saved programs, My Focus, beta watch requests, and feedback are ready to test.</span>
                 </div>
             <div className="landing-actions">
               <a className="button primary" href="#waitlist">
@@ -941,7 +958,7 @@ function LandingPage({
               <span>No Noisy Alerts</span>
             </div>
             <p className="beta-panel-note">
-              Beta email alerts are reviewed before sending while ApplyFirst tests the library and timing model.
+              Beta watch requests are reviewed before any student alert goes out.
             </p>
             {showAccess ? (
               <form className="invite-form" onSubmit={submitInviteCode}>
@@ -1402,6 +1419,7 @@ function AlertSetupPanel({
   onBetaAlertSetupSave,
   waitlistIntent,
   alertEndpoint,
+  watchEndpoint,
 }) {
   const updatePref = (key, value) => {
     onFocusChange();
@@ -1477,6 +1495,7 @@ function AlertSetupPanel({
         onSave={onBetaAlertSetupSave}
         waitlistIntent={waitlistIntent}
         captureEndpoint={alertEndpoint}
+        watchEndpoint={watchEndpoint}
       />
       <SavedAlertPreview items={savedOpportunities} onSelect={onSavedSelect} />
     </section>
@@ -1529,8 +1548,11 @@ function BetaAlertSystem({
   onSave,
   waitlistIntent,
   captureEndpoint = '',
+  watchEndpoint = '',
 }) {
   const [email, setEmail] = useState(waitlistIntent?.email ?? betaAlertSetup?.email ?? '');
+  const [phoneNumber, setPhoneNumber] = useState(betaAlertSetup?.phoneNumber ?? '');
+  const [contactMethod, setContactMethod] = useState(betaAlertSetup?.contactMethod ?? 'email');
   const [submitState, setSubmitState] = useState('idle');
 
   useEffect(() => {
@@ -1539,10 +1561,32 @@ function BetaAlertSystem({
     }
   }, [email, waitlistIntent]);
 
-  const requiredFields = [alertPrefs.classYear, alertPrefs.roleTrack, alertPrefs.sendTiming];
-  const hasIncompleteSetup = requiredFields.some(isPreferenceUnset);
+  const requiredFields = [
+    { label: 'Class Year', value: alertPrefs.classYear },
+    { label: 'Role Track', value: alertPrefs.roleTrack },
+    { label: 'Alert Timing', value: alertPrefs.sendTiming },
+  ];
+  const missingSetupFields = requiredFields
+    .filter((field) => isPreferenceUnset(field.value))
+    .map((field) => field.label);
+  const hasIncompleteSetup = missingSetupFields.length > 0;
   const hasPreviewFocus = ![alertPrefs.classYear, alertPrefs.roleTrack].some(isPreferenceUnset);
   const hasEmail = Boolean(email.trim());
+  const hasPhone = Boolean(phoneNumber.trim());
+  const hasContact = contactMethod === 'phone' ? hasPhone : hasEmail;
+  const missingSetupSummary =
+    missingSetupFields.length > 1
+      ? `${missingSetupFields.slice(0, -1).join(', ')} and ${missingSetupFields.at(-1)}`
+      : missingSetupFields[0];
+  const setupActionMessage = hasIncompleteSetup
+    ? `Choose ${missingSetupSummary} first.`
+    : !hasContact
+      ? contactMethod === 'phone'
+        ? 'Add a phone number to start beta text alerts.'
+        : 'Add an email to start beta opening alerts.'
+      : betaAlertSetup
+        ? `${betaAlertSetup.captureStatus ?? 'Saved'} on ${betaAlertSetup.savedAt.slice(0, 10)} with ${betaAlertSetup.alertReadyCount} alert-ready programs.`
+        : 'Ready to submit this watch setup.';
   const alertReadyMatches = matches.filter((item) => getMonitoringReadiness(item).alertable);
   const needsSourceCheck = hasPreviewFocus ? matches.length - alertReadyMatches.length : 0;
   const previewPrograms = hasPreviewFocus ? alertReadyMatches.slice(0, 4) : [];
@@ -1560,42 +1604,89 @@ function BetaAlertSystem({
     priority: alertPrefs.priority || 'all',
     sendTiming: alertPrefs.sendTiming,
     email: email.trim(),
+    phoneNumber: phoneNumber.trim(),
+    contactMethod,
     matchCount: matches.length,
     alertReadyCount: alertReadyMatches.length,
     savedCount: savedOpportunities.length,
-    watchedPrograms: watchedPreview.map((item) => item.name),
+    needsSourceCheck,
+    matchingProgramIds: matches.map((item) => item.id),
+    alertReadyProgramIds: alertReadyMatches.map((item) => item.id),
+    savedProgramIds: savedOpportunities.map((item) => item.id),
+    watchedProgramIds: watchedPreview.map((item) => item.id),
+    watchedPrograms: watchedPreview.map((item) => ({
+      id: item.id,
+      name: item.name,
+      organization: item.organization,
+      url: item.previousUrl || item.url,
+      readiness: getMonitoringReadiness(item).status,
+      reason: savedProgramIds.has(item.id) ? 'Saved by student' : 'Matches focus setup',
+    })),
     captureStatus,
   });
 
   const saveSetup = async () => {
-    const payload = createSetupPayload(captureEndpoint ? 'Submitting' : 'Saved Locally');
+    const hasRemoteEndpoint = Boolean((captureEndpoint && email.trim()) || watchEndpoint);
+    const payload = createSetupPayload(hasRemoteEndpoint ? 'Submitting' : 'Saved Locally');
     const prioritySummary =
       payload.priority === 'all' ? 'All Opportunity Types' : priorityLabels[payload.priority] ?? payload.priority;
+    const preferenceSummary = `${payload.classYear} / ${payload.roleTrack} / ${prioritySummary} / ${sendTimingLabels[payload.sendTiming] ?? payload.sendTiming}`;
+    const watchedProgramNames = payload.watchedPrograms.map((program) => program.name).filter(Boolean);
+    const notificationConsentText =
+      'I agree to receive ApplyFirst beta opening alerts for programs I choose to watch.';
 
-    if (captureEndpoint) {
+    if (hasRemoteEndpoint) {
       setSubmitState('submitting');
       try {
-        const response = await fetch(captureEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            source: 'applyfirst-beta-email-alert',
-            email: payload.email,
-            classYear: payload.classYear,
-            interest: payload.roleTrack,
-            school: '',
-            note: `Beta email alert setup. Watching: ${payload.watchedPrograms.join(', ') || 'No programs yet'}. Alert-ready: ${payload.alertReadyCount}. Needs source check: ${needsSourceCheck}.`,
-            preferenceSummary: `${payload.classYear} / ${payload.roleTrack} / ${prioritySummary} / ${sendTimingLabels[payload.sendTiming] ?? payload.sendTiming}`,
-            notificationMode: 'Beta Email Alerts',
-            savedAt: new Date().toISOString(),
-          }),
-        });
+        const requests = [];
 
-        if (!response.ok) {
-          throw new Error('Alert endpoint returned an error.');
+        if (captureEndpoint && payload.email) {
+          requests.push(
+            postJson(captureEndpoint, {
+              source: 'applyfirst-beta-email-alert',
+              email: payload.email,
+              classYear: payload.classYear,
+              interest: payload.roleTrack,
+              school: '',
+              note: `Beta email alert setup. Watching: ${watchedProgramNames.join(', ') || 'No programs yet'}. Alert-ready: ${payload.alertReadyCount}. Needs source check: ${needsSourceCheck}.`,
+              preferenceSummary,
+              notificationMode: 'Beta Email Alerts',
+              savedAt: new Date().toISOString(),
+            }),
+          );
         }
 
-        onSave(createSetupPayload('Submitted for Beta Email Alerts'));
+        if (watchEndpoint) {
+          requests.push(
+            postJson(watchEndpoint, {
+              source: 'applyfirst-watch-request',
+              email: payload.email,
+              classYear: payload.classYear,
+              roleTrack: payload.roleTrack,
+              priority: payload.priority,
+              sendTiming: payload.sendTiming,
+              phoneNumber: payload.phoneNumber,
+              contactMethod: payload.contactMethod,
+              preferenceSummary,
+              notificationMode: 'Beta Watch Request',
+              notificationConsentAt: new Date().toISOString(),
+              notificationConsentText,
+              matchCount: payload.matchCount,
+              alertReadyCount: payload.alertReadyCount,
+              savedCount: payload.savedCount,
+              needsSourceCheck: payload.needsSourceCheck,
+              matchingProgramIds: payload.matchingProgramIds,
+              alertReadyProgramIds: payload.alertReadyProgramIds,
+              savedProgramIds: payload.savedProgramIds,
+              watchedProgramIds: payload.watchedProgramIds,
+              watchedPrograms: payload.watchedPrograms,
+              requestedAt: new Date().toISOString(),
+            }),
+          );
+        }
+
+        await Promise.all(requests);
+        onSave(createSetupPayload(watchEndpoint ? 'Submitted to Beta Watch Queue' : 'Submitted for Beta Email Alerts'));
         setSubmitState('submitted');
         return;
       } catch {
@@ -1610,13 +1701,13 @@ function BetaAlertSystem({
   };
 
   return (
-    <section className="beta-alert-system" aria-label="Beta alert setup">
+    <section className="beta-alert-system" aria-label="Beta watch setup">
       <div className="beta-alert-copy">
-        <span>Preview</span>
-        <h3>What ApplyFirst Would Watch</h3>
+        <span>Beta Watching</span>
+        <h3>Submit Your Watch Setup</h3>
         <p>
           {hasPreviewFocus
-            ? 'These numbers update from your focus setup.'
+            ? 'ApplyFirst checks official sources first, then reviews alert candidates before sending.'
             : 'Choose Class Year and Role Track to unlock the preview.'}
         </p>
       </div>
@@ -1636,7 +1727,7 @@ function BetaAlertSystem({
       </div>
       <div className="beta-alert-preview">
         <div>
-          <span>Watchlist Preview</span>
+          <span>Watch Queue Preview</span>
           <strong>
             {watchedPreview.length
               ? watchedPreview.map((item) => item.name).join(', ')
@@ -1665,32 +1756,58 @@ function BetaAlertSystem({
         </div>
       </div>
       <div className="beta-alert-actions">
-        <label>
-          <span>Join Beta Email Alerts</span>
-          <input
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="you@example.com"
-          />
-        </label>
+        <div className="contact-method-control" role="group" aria-label="Alert delivery method">
+          <button
+            className={contactMethod === 'email' ? 'active' : ''}
+            type="button"
+            onClick={() => setContactMethod('email')}
+          >
+            Email
+          </button>
+          <button
+            className={contactMethod === 'phone' ? 'active' : ''}
+            type="button"
+            onClick={() => setContactMethod('phone')}
+          >
+            Text
+          </button>
+        </div>
+        {contactMethod === 'phone' ? (
+          <label>
+            <span>Phone For Text Alerts</span>
+            <input
+              type="tel"
+              value={phoneNumber}
+              onChange={(event) => setPhoneNumber(event.target.value)}
+              placeholder="+1 555 123 4567"
+            />
+          </label>
+        ) : (
+          <label>
+            <span>Email For Opening Alerts</span>
+            <input
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="you@example.com"
+            />
+          </label>
+        )}
         <button
           type="button"
           onClick={saveSetup}
-          disabled={hasIncompleteSetup || !hasEmail || submitState === 'submitting'}
-          title={
-            hasIncompleteSetup
-              ? 'Choose Class Year, Role Track, and Alert Timing first.'
-              : !hasEmail
-                ? 'Add your email first.'
-                : 'Join beta alerts.'
-          }
+          disabled={hasIncompleteSetup || !hasContact || submitState === 'submitting'}
+          title={setupActionMessage}
         >
-          {submitState === 'submitting' ? 'Joining...' : 'Join Beta Alerts'}
+          {submitState === 'submitting' ? 'Submitting...' : 'Start Watching'}
         </button>
-        {betaAlertSetup ? (
-          <p>{`${betaAlertSetup.captureStatus ?? 'Saved'} on ${betaAlertSetup.savedAt.slice(0, 10)} with ${betaAlertSetup.alertReadyCount} alert-ready programs.`}</p>
-        ) : null}
+        {hasIncompleteSetup || !hasContact || betaAlertSetup ? (
+          <p className={hasIncompleteSetup || !hasContact ? 'setup-readiness-note needs-action' : 'setup-readiness-note'}>
+            {setupActionMessage}
+          </p>
+        ) : (
+          <p className="setup-readiness-note">By starting, you agree to beta alerts only for programs you choose to watch.</p>
+        )}
       </div>
       <BetaAlertFeed
         alertStrategy={alertStrategy}
@@ -1721,10 +1838,10 @@ function BetaAlertFeed({ alertStrategy, watchedPrograms, needsSourceCheck, hasSa
   });
 
   return (
-    <section className="beta-alert-feed" aria-label="Beta alert feed preview">
+    <section className="beta-alert-feed" aria-label="Beta watch preview">
       <div className="beta-alert-feed-heading">
-        <span>Alert Preview</span>
-        <strong>{hasSavedSetup ? 'Your Saved Alert Setup' : 'Before You Save'}</strong>
+        <span>Watch Preview</span>
+        <strong>{hasSavedSetup ? 'Your Saved Watch Setup' : 'Before You Save'}</strong>
       </div>
       {feedItems.length ? (
         <div className="beta-alert-feed-list" role="list">

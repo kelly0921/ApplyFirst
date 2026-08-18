@@ -1,0 +1,20 @@
+name = "applyfirst-watch"
+main = "workers/applyfirst-watch-worker.js"
+compatibility_date = "2026-08-18"
+compatibility_flags = ["nodejs_compat"]
+
+[triggers]
+crons = ["*/30 * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "applyfirst-watch"
+database_id = "5b13abd5-8970-4403-8cb9-2e5634186cd2"
+migrations_dir = "cloudflare/d1"
+
+[[send_email]]
+name = "EMAIL"
+
+[observability]
+enabled = true
+head_sampling_rate = 1

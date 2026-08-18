@@ -18,9 +18,9 @@ Before each test:
 
 1. Confirm the deployed site loads.
 2. Confirm the invite code works.
-3. Submit one waitlist/contact request, one beta email alert setup, and one Suggest Updates request from the deployed site, then confirm all reach the capture backend.
+3. Submit one waitlist/contact request, one beta watch setup, and one Suggest Updates request from the deployed site, then confirm all reach the capture backend.
 4. Pick 5-7 manually reviewed programs to mention if the tester asks for examples.
-5. Keep this note ready: students can join the beta email alert list, but sends should be reviewed while the monitoring rules are still being tested.
+5. Keep this note ready: students can submit a beta watch setup by email or text, but sends should be reviewed while the monitoring rules are still being tested.
 
 Suggested first examples:
 
@@ -52,7 +52,7 @@ Ask the tester to share their screen and think out loud.
 
 4. My Focus
    - Ask them to open My Focus and set their class year, career interest, program group, and timing preference.
-   - Ask them to review the beta alert preview, inspect the beta alert feed, add an email, and join the beta email alert list.
+   - Ask them to review the watch preview, choose email or text, add contact info, and submit a beta watch setup.
    - Ask: Do these fields match how you think about opportunities?
    - Ask: Is it clear which programs ApplyFirst would watch and which still need source checks?
    - Ask: Is anything missing, unnecessary, or worded oddly?
@@ -77,7 +77,8 @@ The beta is working if:
 - Students save at least one program they would actually track.
 - Students understand Start Here as a short onboarding path, not a permanent dashboard widget.
 - My Focus feels useful rather than like arbitrary settings.
-- Students understand beta email alerts are opt-in and reviewed while the product is still testing signal quality.
+- Students understand beta watch requests are opt-in and reviewed while the product is still testing signal quality.
+- Students understand when ApplyFirst would email or text them.
 - Students understand fully automated opening reminders are coming later.
 - Students can submit feedback without feeling like they are using an internal tool.
 
@@ -86,7 +87,7 @@ The beta is working if:
 Pause and revise if:
 
 - Students think ApplyFirst is a normal internship board.
-- Students cannot tell the difference between reviewed beta email alerts and fully automated alerts.
+- Students cannot tell the difference between reviewed beta watch requests and fully automated alerts.
 - Students do not understand Recommended vs Foundation.
 - Students find the preference fields too abstract.
 - Students do not trust the program data.
@@ -101,6 +102,7 @@ Ask these at the end:
 - What opportunity type matters most to you?
 - What would make this worth checking weekly?
 - Would you give ApplyFirst your email for opening reminders?
+- Would you rather get ApplyFirst alerts by email or text?
 - What should ApplyFirst watch that is missing today?
 
 ## Notes Template

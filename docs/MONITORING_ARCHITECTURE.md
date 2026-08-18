@@ -2,7 +2,7 @@
 
 ## Goal
 
-Prove that ApplyFirst can notice meaningful changes on official program pages before building accounts, email alerts, or fully automated notifications.
+Prove that ApplyFirst can notice meaningful changes on official program pages before building accounts or fully automated notifications.
 
 The first production-worthy monitoring promise should be:
 
@@ -14,16 +14,16 @@ The first production-worthy monitoring promise should be:
 
 ## Recommended Backend Direction
 
-Use Supabase first if the product moves beyond a local prototype.
+Use Cloudflare Workers plus D1 for the beta watch layer because the public prototype is already on Cloudflare and the first durable need is small: save watch requests, fetch official pages, and create review candidates.
 
 Why:
 
-- Postgres fits program records, source checks, page snapshots, alert candidates, and user preferences.
-- Auth can be added later without changing the core model.
-- Row-level security can separate public records from maintainer-only review data.
-- Scheduled checks can run from a separate worker or scheduled function.
+- A Worker can accept `/watch` requests directly from the app.
+- Cron Triggers can run official-page checks without another scheduler.
+- D1 is enough for beta watch requests, official sources, page snapshots, source checks, and alert candidates.
+- The static site can stay simple while the watch Worker evolves separately.
 
-Cloudflare D1 and Workers are also viable because the frontend is already on Cloudflare Pages, but Supabase is faster for iteration while the data model is still evolving.
+Supabase remains a viable later option if the product needs richer auth, maintainer dashboards, or relational admin tooling faster than D1/Workers can provide.
 
 ## Core Data Model
 
@@ -58,6 +58,36 @@ Pages ApplyFirst should monitor.
 - `enabled`
 - `last_snapshot_id`
 - `last_checked_at`
+
+### watch_requests
+
+Student-submitted My Focus setup for beta monitoring.
+
+- `id`
+- `email`
+- `class_year`
+- `role_track`
+- `send_timing`
+- `preference_summary`
+- `match_count`
+- `alert_ready_count`
+- `saved_count`
+- `needs_source_check`
+- `status`
+- `created_at`
+
+### watch_request_programs
+
+Programs connected to a watch request.
+
+- `id`
+- `watch_request_id`
+- `program_id`
+- `program_name`
+- `official_url`
+- `readiness`
+- `reason`
+- `created_at`
 
 ### page_snapshots
 
@@ -99,6 +129,21 @@ Review queue for changes that may become student alerts.
 - `status`
 - `reviewed_by`
 - `reviewed_at`
+- `created_at`
+
+### alert_deliveries
+
+Audit log for reviewed student notifications.
+
+- `id`
+- `alert_candidate_id`
+- `watch_request_id`
+- `channel`
+- `destination`
+- `status`
+- `provider_message_id`
+- `error_message`
+- `sent_at`
 - `created_at`
 
 ### saved_programs
@@ -222,10 +267,25 @@ node scripts/monitor-official-pages.mjs --live
 
 The live path is not production-ready yet. It does not respect per-site rate limits, retry failures, handle JavaScript-rendered pages, or persist records anywhere durable.
 
+## Current Beta Worker
+
+The Cloudflare watch Worker adds the first durable monitoring path:
+
+- `POST /watch` saves a student's My Focus watch request and program context in D1.
+- `GET /watch/status` returns safe aggregate counts for smoke checks.
+- `POST /watch/run` manually triggers a source check pass and requires `WATCH_ADMIN_TOKEN`.
+- `GET /watch/candidates` lists pending review candidates and requires `WATCH_ADMIN_TOKEN`.
+- `POST /watch/candidates/:id/send` sends reviewed email notifications and logs delivery status.
+- Phone/SMS delivery is supported through an optional `SMS_WEBHOOK_URL`, but should not be enabled until consent and provider setup are reviewed.
+- Cron Triggers run scheduled source checks every 30 minutes.
+- Source checks save snapshots, compare hashes, classify opening/deadline signals, and create `pending_review` alert candidates.
+
+The Worker can send email after review. A maintainer still reviews candidates before students are notified unless `AUTO_SEND_OPEN_ALERTS=true` is deliberately enabled.
+
 ## Next Implementation Steps
 
-1. Replace local snapshot state with persisted `page_snapshots`.
-2. Add a real database-backed `source_checks` table.
+1. Deploy the watch Worker with a real D1 binding.
+2. Seed and review the first official source rows.
 3. Add a maintainer review screen for `alert_candidates`.
-4. Add scheduled checks for a small pilot set of official pages.
-5. Add notification delivery only after review, consent, unsubscribe, and audit trails exist.
+4. Replace the admin curl send flow with a simple maintainer approval UI.
+5. Decide whether to keep D1 long term or move richer account/review workflows to Supabase.

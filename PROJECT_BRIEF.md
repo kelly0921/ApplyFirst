@@ -183,19 +183,21 @@ Core Phase 1 features:
 
 Phase 1 is successful if the product feels like a useful public prototype for deciding what to watch, why it matters, and what to do next.
 
-It is ready to show as a public prototype, but not public-alert ready until the records are verified against official sources and the monitoring workflow is defined.
+It is ready to show as a public prototype, but public student alerts should still wait for official-source verification, maintainer review, and notification consent.
 
 ## Beta User Testing Readiness
 
-ApplyFirst can be tested with a small private beta when the goal is product clarity, preference-flow feedback, library trust, and contribution behavior. It should not be described as a live alert product yet.
+ApplyFirst can be tested with a small private beta when the goal is product clarity, preference-flow feedback, library trust, contribution behavior, and beta watch-request interest. It should not be described as a fully automated alert product yet.
 
 Before inviting students, the beta should have:
 
 - Durable waitlist/contact capture through `VITE_WAITLIST_ENDPOINT`.
 - Durable contribution and beta-feedback capture through `VITE_CONTRIBUTION_ENDPOINT`.
-- A short user-testing script focused on first impression, program discovery, My Focus, saved programs, beta email alert opt-in, and feedback submission.
+- Durable beta watch-request capture through `VITE_WATCH_ENDPOINT`.
+- Cloudflare D1 source-check schema and seeded official-source rows.
+- A short user-testing script focused on first impression, program discovery, My Focus, saved programs, email/text watch setup, and feedback submission.
 - A manually reviewed set of high-visibility seed records so testers do not immediately hit stale examples.
-- Honest product copy that says opening reminders are coming later.
+- Honest product copy that says ApplyFirst is testing reviewed beta alerts, not automatic unreviewed notifications.
 - A deployment checklist confirming the public Cloudflare build is current before sharing the link.
 
 The current beta questions are:
@@ -249,7 +251,7 @@ Potential case-study headline:
 
 ## Current Readiness
 
-Current status: Phase 2 started after Phase 1 public prototype MVP.
+Current status: Private beta prototype with monitoring foundation.
 
 Ready to show:
 
@@ -264,6 +266,8 @@ Ready to show:
 - Recommendation, application status, and source-coverage framing.
 - Source-confidence framing.
 - Local alert preference preview.
+- Endpoint-backed beta watch request capture.
+- Cloudflare Worker/D1 source-check foundation.
 - Monitoring-readiness framing for which records are safe to alert on later.
 
 Needs more work before live alerts:
@@ -273,6 +277,8 @@ Needs more work before live alerts:
 - Monitoring architecture.
 - Notification design.
 - Privacy and account model if personalized alerts are added.
+- Maintainer approval UI for sending reviewed alert candidates.
+- SMS provider setup if text alerts are enabled.
 - Public copy and trust language.
 
 ## Phase 2 Direction
@@ -298,12 +304,14 @@ The first Phase 2 slice is intentionally local and trust-focused:
 - Explain matching programs, alert readiness, and programs needing confirmation in student-facing language.
 - Keep technical monitoring-readiness details in Maintainer Mode instead of the default public alert surface.
 - Display a public trust policy explaining Confirmed, Prep Only, and Needs Confirmation records, with a hard rule that outbound alerts should not come from unconfirmed records.
-- Use an endpoint-backed waitlist/contact and beta email alert workflow before accounts or fully automated outbound alerts.
+- Use an endpoint-backed waitlist/contact and beta email/text notification workflow before accounts or fully automated outbound alerts.
+- Submit My Focus plus saved-program context to a beta watch endpoint when `VITE_WATCH_ENDPOINT` is configured.
 - Save waitlist intent with email, student context, notes, selected My Focus values, and saved timestamp.
 - Connect saved programs to the My Focus experience so bookmarked records feel like the future reminder list, not a disconnected sidebar.
 - Keep maintainer-only source-review tools behind Maintainer Mode so the default public view stays student-focused.
 - Make it clear that public notifications should not launch until official-source verification and monitoring rules are reliable.
 - Explain the future monitoring workflow in student-facing language: save the programs that matter, verify official pages, watch opening signals, and notify only when records are trustworthy.
+- Keep unreviewed automatic outbound sending out of scope until the source rules are reliable.
 
 Recommended waitlist fields:
 
@@ -328,7 +336,7 @@ Next Phase 2 steps:
 2. Add a minimal backend only when user preferences or outbound notifications need persistence beyond the browser.
 3. Decide whether local source-check logs should be promoted into a durable admin workflow.
 4. Connect the local waitlist-intent workflow to Tally, Google Forms, Airtable, or a minimal backend when ready.
-5. Design the backend boundary only if alerts need persistence beyond the browser.
+5. Keep the Cloudflare watch Worker separate from the static app so beta monitoring can mature without overbuilding auth.
 
 ## Phase 2.5 Source Monitoring Foundation
 
@@ -340,7 +348,7 @@ The assistant is intentionally conservative with official-page ambiguity. Intere
 
 The next layer is a maintainer review decision. The assistant separates raw classification from operational action by labeling checks as alert candidates, deadline candidates, prep watch, watch only, or manual review. This makes the future pipeline clearer: page interpretation creates a review artifact, then a human decides whether the record can move closer to notification readiness.
 
-The important product decision is that AI-like interpretation does not directly send public alerts. It creates a maintainer review artifact first. Public alerting should still wait for backend storage, scheduled page checks, OpenAI-powered interpretation, durable audit logs, and notification consent.
+The important product decision is that AI-like interpretation does not directly send public alerts. It creates a maintainer review artifact first. Public alerting should still wait for stronger official-source coverage, durable audit logs, and notification consent.
 
 ## Phase 3 Monitoring Pipeline Foundation
 
@@ -356,11 +364,13 @@ The next iteration adds a generated maintainer review export, so the local queue
 
 The next iteration adds a backend seed export that converts the current curated records into normalized program rows and official source watch rows. This reduces migration friction when the project moves from local prototype data to Supabase or another persistent backend.
 
-The next iteration adds a draft Supabase schema for the durable monitoring backend: programs, official sources, page snapshots, source checks, alert candidates, saved programs, and alert preferences. It keeps maintainer write policies out of scope until auth and admin roles are designed.
+The next iteration adds a draft Supabase schema for a possible durable monitoring backend: programs, official sources, page snapshots, source checks, alert candidates, saved programs, and alert preferences. It keeps maintainer write policies out of scope until auth and admin roles are designed.
 
 The next iteration adds a Supabase seed SQL generator for program and official source upserts, so the prototype data can move into a real backend with less manual translation.
 
-The recommended backend path is Supabase first, because Postgres fits programs, official sources, page snapshots, source checks, alert candidates, saved programs, and future alert preferences. Cloudflare D1 and Workers remain viable later because the public prototype already deploys on Cloudflare, but Supabase is faster while the data model is still changing.
+The beta backend path is Cloudflare Workers plus D1 because the public prototype already deploys on Cloudflare and the first durable need is focused: capture watch requests, check official pages on a schedule, store page snapshots/source checks, and create alert candidates for maintainer review.
+
+Supabase remains a possible later backend if ApplyFirst needs richer accounts, row-level security, and maintainer review tooling faster than the Cloudflare stack can support.
 
 The product guardrail remains the same: monitoring can create alert candidates, but it should not send student notifications until a maintainer confirms the official source and notification consent exists.
 
@@ -447,6 +457,8 @@ Stack:
 - JavaScript.
 - CSS.
 - Browser `localStorage` for persistent shortlist state.
+- Cloudflare Pages for the public prototype.
+- Cloudflare Workers and D1 for beta watch-request capture and scheduled source checks.
 
 Architecture and implementation notes:
 
@@ -454,14 +466,13 @@ Architecture and implementation notes:
 - Uses a structured local JavaScript data model for opportunity records, including status, confidence, class year, timing, funding, previous URL, last checked date, source note, and prep notes.
 - Adds computed helper functions for role-track classification, recommendation status, application status, source-coverage labeling, and next-action guidance.
 - Uses client-side filtering and search for a fast Phase 1 MVP without backend complexity.
-- Keeps automation and notifications out of Phase 1 until the data model and source-verification workflow are trustworthy.
+- Adds a separate watch Worker so beta monitoring can persist source checks without overbuilding auth.
+- Keeps automatic outbound notifications behind maintainer review until the source-verification workflow is trustworthy.
 
 Future technical direction:
 
-- Official-page monitoring.
-- Application-page change detection.
 - User accounts and saved alert preferences.
-- Email or SMS notifications.
+- SMS provider integration beyond the generic webhook path.
 - Admin workflow for source verification and record updates.
 
 ### 8. Product Thinking
@@ -481,11 +492,11 @@ The main tradeoff was choosing a curated, trustworthy MVP over a larger automate
 
 ### 9. Current Status
 
-Current status: **Phase 1 public prototype MVP**
+Current status: **Private beta prototype with monitoring foundation**
 
-The standalone local MVP is built and functional. It includes the core monitor UI, structured opportunity records, filters, detail views, source-confidence framing, shortlist behavior, and program-specific status labels.
+The standalone MVP is built and functional. It includes the core monitor UI, structured opportunity records, filters, detail views, source-confidence framing, shortlist behavior, program-specific status labels, endpoint-backed beta watch requests, and a Cloudflare Worker/D1 foundation for scheduled source checks.
 
-Not yet public-alert ready. Before positioning it as a live alerting resource, the project still needs official verification for core records, a repeatable source-update workflow, notification design, and public trust language.
+Not yet public-alert ready. Before positioning it as a live alerting resource, the project still needs broader official verification, a maintainer review surface, production deliverability checks, SMS provider setup, and public trust language.
 
 ### 10. What I Learned
 
@@ -536,15 +547,18 @@ I decided to prioritize underclassmen, exclude generic internships, treat PM and
 - Recommendation and application-status logic.
 - Source-coverage and confidence labeling.
 - Persistent shortlist using `localStorage`.
+- Endpoint-backed beta watch setup from My Focus and saved programs.
+- Cloudflare D1 schema for watch requests, official sources, snapshots, source checks, and alert candidates.
+- Scheduled Cloudflare Worker foundation for official-page checks.
 - Responsive dashboard-style interface with detail and next-action panels.
 
 #### Current Status
 
-Phase 1 is a functional public prototype MVP. The product surface is ready to show as a prototype or portfolio case study, while live alert functionality should wait until official-source verification and notification workflows are complete.
+ApplyFirst is a functional private-beta prototype. The product surface is ready to show as a prototype or portfolio case study, and beta watch requests plus reviewed email delivery can be tested, while unreviewed live alert automation should wait until official-source verification is stronger.
 
 #### What I Learned
 
-This project helped me practice turning scattered information into a product system. I learned to make sharper scope decisions, design for trust in a manually curated dataset, and build an MVP that is useful now while leaving room for future automation.
+This project helped me practice turning scattered information into a product system. I learned to make sharper scope decisions, design for trust in a manually curated dataset, and build a product that starts useful while leaving room for reviewed automation.
 
 ### 12. Short Card Copy
 
@@ -604,6 +618,6 @@ Details to confirm before publishing:
 - Whether there will be a live deployed URL or only a local/prototype case study.
 - Which 10-15 programs should be officially verified first.
 - Whether screenshots should show real program names or anonymized/demo records.
-- Whether notification features should be described as planned, prototyped, or in development.
+- Whether notification features should be described as reviewed beta delivery, not fully automated alerts.
 - Whether the portfolio card should frame this as a product MVP, case study, or concept prototype.
 - Final visual identity: logo, icon, color treatment, and screenshot style.

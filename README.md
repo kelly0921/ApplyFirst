@@ -31,7 +31,7 @@ ApplyFirst combines two connected layers:
 - **Student Opportunity Library**: the public foundation for curated programs, fellowships, scholarships, grants, technical communities, and conference funding paths.
 - **Opportunity Signal Tracker**: the product layer for tracking official-page changes, old vs new URLs, application season patterns, sponsor announcements, confidence scores, and human/community verification.
 
-The library is the front door. The tracker is the moat. The current app starts with the library and local monitoring scaffolding, then grows toward trustworthy alerts.
+The library is the front door. The tracker is the moat. The current app starts with the library, student watch requests, and a Cloudflare D1 source-check worker, then grows toward trustworthy reviewed alerts.
 
 The product belief: ApplyFirst should help students apply earlier and discover what kinds of companies, cultures, mentors, products, and industries fit them. Early-career programs are not only resume builders; they are exposure, confidence, network, and career-agency builders.
 
@@ -45,7 +45,7 @@ The first version focuses on:
 - Clear notes on why each opportunity matters and how to prepare.
 - A future path toward an Opportunity Signal Tracker.
 
-This version is a private-beta public prototype with a landing page, endpoint-ready waitlist request, invite-code gate, endpoint-ready beta email alert opt-in, endpoint-ready student update capture, and the full app behind the gate. The app can show the product direction, curated seed set, student My Focus setup, reviewed alert readiness model, and student submission flow while fully automated alert sending waits for stronger official-source confirmation.
+This version is a private-beta public prototype with a landing page, endpoint-ready waitlist request, invite-code gate, endpoint-ready beta watch setup, endpoint-ready student update capture, and the full app behind the gate. The app can show the product direction, curated seed set, student My Focus setup, reviewed alert readiness model, student submission flow, and a Cloudflare Worker path for checking official source pages into a review queue.
 
 Recommendation is computed from the Phase 1 rules: underclassmen-fit programs in high-leverage categories become Recommended; relevant programs can also be Recommended when they are useful enough to review, save, or prepare for early; scholarships, conferences, communities, and resources are treated as Foundation opportunities. Student actions stay separate from these labels: users save programs they care about, while ApplyFirst monitors confirmed sources for future opening signals. Duplicate appearances across older curated lists are useful for verification, but they are not treated as proof that a program is better.
 
@@ -59,7 +59,7 @@ These codes are for the current prototype gate only and should be replaced befor
 
 After unlocking the prototype, use the `Landing` button in the app header to clear the local access flag and return to the public landing page.
 
-The waitlist/contact form saves locally by default. Set `VITE_WAITLIST_ENDPOINT` to a JSON-compatible form/backend endpoint to submit waitlist and My Focus contact requests externally; if the endpoint fails, the prototype falls back to local browser storage. Set `VITE_ALERT_ENDPOINT` to capture beta email alert opt-ins, or leave it blank to use the waitlist endpoint. Student program submissions and feedback save locally by default. Set `VITE_CONTRIBUTION_ENDPOINT` to capture Suggest Updates submissions externally; if the endpoint fails, the prototype falls back to local browser storage. Copy `.env.example` to `.env.local` for local endpoint testing.
+The waitlist/contact form saves locally by default. Set `VITE_WAITLIST_ENDPOINT` to a JSON-compatible form/backend endpoint to submit waitlist and My Focus contact requests externally; if the endpoint fails, the prototype falls back to local browser storage. Set `VITE_ALERT_ENDPOINT` to capture beta email alert opt-ins, or leave it blank to use the waitlist endpoint. Set `VITE_WATCH_ENDPOINT` to a deployed ApplyFirst watch Worker `/watch` route to save beta watch requests for source monitoring. Student program submissions and feedback save locally by default. Set `VITE_CONTRIBUTION_ENDPOINT` to capture Suggest Updates submissions externally; if the endpoint fails, the prototype falls back to local browser storage. Copy `.env.example` to `.env.local` for local endpoint testing.
 
 Private beta testing should ask students to join the waitlist, unlock the app with an invite code, save one program, submit one program ApplyFirst should watch, and report one stale or confusing record. Until real accounts and moderation exist, submitted programs and feedback should be treated as review candidates rather than public library records.
 
@@ -139,11 +139,80 @@ For the backend/data model plan, see [docs/MONITORING_ARCHITECTURE.md](./docs/MO
 
 For the draft Supabase schema and future import plan, see [docs/SUPABASE_SETUP.md](./docs/SUPABASE_SETUP.md).
 
-To smoke-test beta capture endpoints after setting `VITE_WAITLIST_ENDPOINT` and `VITE_CONTRIBUTION_ENDPOINT`:
+To smoke-test beta capture endpoints after setting `VITE_WAITLIST_ENDPOINT` and `VITE_CONTRIBUTION_ENDPOINT`, plus optional `VITE_WATCH_ENDPOINT`:
 
 ```bash
 npm run capture:smoke
 ```
+
+## Cloudflare Watch Worker
+
+The beta watching slice lives in a separate Worker so the static site deployment stays simple.
+
+1. Create a Cloudflare D1 database named `applyfirst-watch`.
+2. Replace `REPLACE_WITH_D1_DATABASE_ID` in `wrangler.watch.toml` with the D1 database ID.
+3. Apply the schema:
+
+```bash
+npx wrangler d1 migrations apply applyfirst-watch --config wrangler.watch.toml --remote
+```
+
+4. Generate and import official source seed rows:
+
+```bash
+npm run watch:seed:d1:write
+npx wrangler d1 execute applyfirst-watch --config wrangler.watch.toml --remote --file cloudflare/d1/watch-seed.generated.sql
+```
+
+5. Onboard an email sending domain in Cloudflare Email Service:
+
+```bash
+npx wrangler email sending enable yourdomain.com
+```
+
+Cloudflare Email Sending requires the sending domain to use Cloudflare DNS. The email binding is configured in `wrangler.watch.toml` as `EMAIL`.
+
+6. Add Worker secrets/vars for admin actions and delivery:
+
+```bash
+npx wrangler secret put WATCH_ADMIN_TOKEN --config wrangler.watch.toml
+npx wrangler secret put ALERT_FROM_EMAIL --config wrangler.watch.toml
+```
+
+Use a sender such as `alerts@yourdomain.com` for `ALERT_FROM_EMAIL`. Optional Worker variables/secrets:
+
+- `ALERT_FROM_NAME=ApplyFirst`
+- `ALERT_REPLY_TO=hello@yourdomain.com`
+- `PUBLIC_APP_URL=https://applyfirst-careers.pages.dev`
+- `WATCH_WORKER_PUBLIC_URL=https://applyfirst-watch.YOUR-SUBDOMAIN.workers.dev`
+- `SMS_WEBHOOK_URL` for a future SMS provider webhook
+- `SMS_WEBHOOK_TOKEN` if that webhook needs a bearer token
+- `AUTO_SEND_OPEN_ALERTS=true` only if you intentionally want unreviewed automatic sends
+
+7. Deploy the watch Worker:
+
+```bash
+npm run watch:worker:deploy
+```
+
+8. Add the deployed `/watch` URL to Cloudflare Pages as `VITE_WATCH_ENDPOINT`, for example:
+
+```text
+https://applyfirst-watch.YOUR-SUBDOMAIN.workers.dev/watch
+```
+
+The Worker stores beta watch requests, checks enabled official source pages every 30 minutes, saves page snapshots/source checks, creates `pending_review` alert candidates for meaningful opening or deadline changes, and can send reviewed email notifications after a candidate is approved.
+
+To dry-run a candidate delivery:
+
+```bash
+curl -X POST "https://applyfirst-watch.YOUR-SUBDOMAIN.workers.dev/watch/candidates/CANDIDATE_ID/send" \
+  -H "Authorization: Bearer YOUR_WATCH_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"dryRun\": true}"
+```
+
+To send after review, use the same request with `{"dryRun": false}` or omit `dryRun`.
 
 ## Phase 2 Start
 
@@ -152,7 +221,7 @@ The first Phase 2 slice adds:
 - Public landing page that explains ApplyFirst, who it is for, what students get, and why access is limited during private beta.
 - Simple invite-code gate before the full program monitor, avoiding premature auth while keeping access intentional.
 - Student My Focus preview by class year, role track, recommendation level, and timing preference.
-- Beta email alert opt-in with alert-ready counts, source-check holds, and in-app alert feed preview.
+- Beta notification opt-in with email/text choice, alert-ready counts, source-check holds, and in-app watch preview.
 - Confirmation-readiness calculations for records that are safe to alert on later.
 - Prioritized source-review queue for records that need official-cycle review before alerts.
 - Direct review flow from queue item to full program detail.
@@ -167,13 +236,14 @@ The first Phase 2 slice adds:
 - Simplified student-facing My Focus section with technical readiness details kept in Maintainer Mode.
 - Trust copy that separates records ready to alert from records that still need confirmation.
 - Public trust policy for Confirmed, Prep Only, and Needs Confirmation records.
-- Endpoint-ready beta email alert workflow before accounts or fully automated outbound alerts.
+- Endpoint-ready beta notification workflow before accounts or fully automated outbound alerts.
+- Endpoint-ready beta watch workflow that can submit My Focus plus saved-program context into the Cloudflare watch queue.
 - Maintainer Mode toggle for source-review tools, keeping the default view student-facing.
 - A clear split between public prototype behavior and future live notifications.
 - Student-facing monitoring workflow explanation: save programs, verify official pages, watch opening signals, then notify only when trustworthy.
 - My Focus saved-program preview showing bookmarked programs without exposing internal dashboard language.
 
-Real email alerts, accounts, and automated page-change monitoring are intentionally still future work.
+Real accounts and unreviewed automatic outbound sending are intentionally still future work. Scheduled page-change monitoring and reviewed email delivery now exist as the beta Worker foundation.
 
 ## Phase 2.5 Source Monitoring Foundation
 
@@ -188,7 +258,7 @@ The first source-monitoring slice keeps the workflow maintainer-controlled inste
 - One-click local verification update for open window, deadline, last checked date, confidence, status, and source note.
 - Human confirmation remains required before any record is treated as alert-ready.
 
-Still future work: backend storage, scheduled crawling, OpenAI-powered interpretation, durable review queues, accounts, and outbound notifications.
+Still future work: OpenAI-powered interpretation, a maintainer review UI for pending candidates, accounts, and outbound notifications.
 
 ## Phase 3 Monitoring Pipeline Foundation
 
@@ -203,5 +273,6 @@ The first Phase 3 slice adds:
 - Backend seed export for normalized program records and official source watch rows.
 - Draft Supabase schema for programs, official sources, snapshots, checks, alert candidates, saved programs, and alert preferences.
 - Supabase seed SQL generator for program and official source upserts.
+- Cloudflare D1 watch schema, source seed exporter, and scheduled Worker for beta source checks.
 - JSON report output for future automation.
 - Monitoring architecture documentation covering backend tables, alert-candidate review, and the human confirmation gate.

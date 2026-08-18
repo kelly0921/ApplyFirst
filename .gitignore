@@ -6,3 +6,4 @@ dist
 data/monitoring-seed.generated.json
 data/monitoring-review.generated.json
 supabase/seed.generated.sql
+cloudflare/d1/watch-seed.generated.sql

@@ -1,6 +1,7 @@
 const waitlistEndpoint = process.env.VITE_WAITLIST_ENDPOINT;
 const contributionEndpoint = process.env.VITE_CONTRIBUTION_ENDPOINT;
 const alertEndpoint = process.env.VITE_ALERT_ENDPOINT || waitlistEndpoint;
+const watchEndpoint = process.env.VITE_WATCH_ENDPOINT;
 
 const samples = [
   {
@@ -48,16 +49,64 @@ const samples = [
       captureStatus: 'Smoke test',
     },
   },
+  {
+    label: 'watch',
+    endpoint: watchEndpoint,
+    optional: true,
+    body: {
+      source: 'applyfirst-watch-request-smoke',
+      email: 'applyfirst-watch-smoke@example.com',
+      classYear: 'Freshman',
+      roleTrack: 'Software Engineering',
+      priority: 'all',
+      sendTiming: 'openAndDeadline',
+      phoneNumber: '+15551234567',
+      contactMethod: 'email',
+      preferenceSummary: 'Freshman / Software Engineering / All Opportunity Types / Openings & Deadlines',
+      notificationMode: 'Beta Watch Request',
+      notificationConsentAt: new Date().toISOString(),
+      notificationConsentText: 'I agree to receive ApplyFirst beta opening alerts for programs I choose to watch.',
+      matchCount: 1,
+      alertReadyCount: 1,
+      savedCount: 1,
+      needsSourceCheck: 0,
+      matchingProgramIds: ['nasa-internships'],
+      alertReadyProgramIds: ['nasa-internships'],
+      savedProgramIds: ['nasa-internships'],
+      watchedProgramIds: ['nasa-internships'],
+      watchedPrograms: [
+        {
+          id: 'nasa-internships',
+          name: 'NASA Internships',
+          organization: 'NASA',
+          url: 'https://intern.nasa.gov/',
+          readiness: 'Monitoring Ready',
+          reason: 'Smoke test',
+        },
+      ],
+      requestedAt: new Date().toISOString(),
+    },
+  },
 ];
 
 const endpointEnvNames = {
   waitlist: 'VITE_WAITLIST_ENDPOINT',
   contribution: 'VITE_CONTRIBUTION_ENDPOINT',
   alert: 'VITE_ALERT_ENDPOINT or VITE_WAITLIST_ENDPOINT',
+  watch: 'VITE_WATCH_ENDPOINT',
 };
 
-async function postSample({ label, endpoint, body }) {
+async function postSample({ label, endpoint, body, optional = false }) {
   if (!endpoint) {
+    if (optional) {
+      return {
+        label,
+        ok: true,
+        status: 'skipped',
+        message: `Set ${endpointEnvNames[label]} to smoke-test this optional beta endpoint.`,
+      };
+    }
+
     return {
       label,
       ok: false,
