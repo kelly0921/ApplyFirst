@@ -19,8 +19,12 @@ Before each test:
 1. Confirm the deployed site loads.
 2. Confirm the invite code works.
 3. Submit one waitlist/contact request, one beta watch setup, and one Suggest Updates request from the deployed site, then confirm all reach the capture backend.
-4. Pick 5-7 manually reviewed programs to mention if the tester asks for examples.
-5. Keep this note ready: students can submit a beta watch setup by email or text, but sends should be reviewed while the monitoring rules are still being tested.
+4. Turn on Maintainer Mode, open Review, enter the Worker admin token, and load the live queues.
+5. Run one dry-run discovery search and confirm any saved candidates appear as review items.
+6. Dry-run one pending alert candidate if available. Only send a real test email to yourself.
+7. Turn Maintainer Mode back off before the student session so the tester only sees the student-facing product.
+8. Pick 5-7 manually reviewed programs to mention if the tester asks for examples.
+9. Keep this note ready: students can submit a beta watch setup by email or text. High-confidence official opening signals can send automatically; uncertain signals stay in review.
 
 Suggested first examples:
 
@@ -77,9 +81,9 @@ The beta is working if:
 - Students save at least one program they would actually track.
 - Students understand Start Here as a short onboarding path, not a permanent dashboard widget.
 - My Focus feels useful rather than like arbitrary settings.
-- Students understand beta watch requests are opt-in and reviewed while the product is still testing signal quality.
+- Students understand beta watch requests are opt-in, high-confidence openings can email automatically, and uncertain signals stay in review while signal quality is tested.
 - Students understand when ApplyFirst would email or text them.
-- Students understand fully automated opening reminders are coming later.
+- Students understand the current automation is intentionally limited to high-confidence official opening signals.
 - Students can submit feedback without feeling like they are using an internal tool.
 
 ## Red Flags
@@ -87,7 +91,7 @@ The beta is working if:
 Pause and revise if:
 
 - Students think ApplyFirst is a normal internship board.
-- Students cannot tell the difference between reviewed beta watch requests and fully automated alerts.
+- Students cannot tell the difference between automatic high-confidence alerts and items that are still waiting for review.
 - Students do not understand Recommended vs Foundation.
 - Students find the preference fields too abstract.
 - Students do not trust the program data.

@@ -3,6 +3,16 @@ main = "workers/applyfirst-watch-worker.js"
 compatibility_date = "2026-08-18"
 compatibility_flags = ["nodejs_compat"]
 
+[vars]
+WATCH_RUN_LIMIT = "25"
+AUTO_SEND_WATCHED_OPEN_ALERTS = "true"
+AUTO_ALERT_EXISTING_OPEN_ON_WATCH = "true"
+DISCOVERY_SEARCH_PROVIDER = "brave"
+DISCOVERY_SEARCH_COUNTRY = "US"
+DISCOVERY_SEARCH_LIMIT = "5"
+DISCOVERY_SEARCH_QUERIES_PER_PROGRAM = "3"
+DISCOVERY_SEARCH_RESULTS_PER_QUERY = "5"
+
 [triggers]
 crons = ["*/30 * * * *"]
 

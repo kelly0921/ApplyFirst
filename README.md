@@ -31,7 +31,7 @@ ApplyFirst combines two connected layers:
 - **Student Opportunity Library**: the public foundation for curated programs, fellowships, scholarships, grants, technical communities, and conference funding paths.
 - **Opportunity Signal Tracker**: the product layer for tracking official-page changes, old vs new URLs, application season patterns, sponsor announcements, confidence scores, and human/community verification.
 
-The library is the front door. The tracker is the moat. The current app starts with the library, student watch requests, and a Cloudflare D1 source-check worker, then grows toward trustworthy reviewed alerts.
+The library is the front door. The tracker is the moat. The current app starts with the library, student watch requests, and a Cloudflare D1 source-check worker that can send beta opening alerts for high-confidence official-source signals.
 
 The product belief: ApplyFirst should help students apply earlier and discover what kinds of companies, cultures, mentors, products, and industries fit them. Early-career programs are not only resume builders; they are exposure, confidence, network, and career-agency builders.
 
@@ -45,7 +45,7 @@ The first version focuses on:
 - Clear notes on why each opportunity matters and how to prepare.
 - A future path toward an Opportunity Signal Tracker.
 
-This version is a private-beta public prototype with a landing page, endpoint-ready waitlist request, invite-code gate, endpoint-ready beta watch setup, endpoint-ready student update capture, and the full app behind the gate. The app can show the product direction, curated seed set, student My Focus setup, reviewed alert readiness model, student submission flow, and a Cloudflare Worker path for checking official source pages into a review queue.
+This version is a private-beta public prototype with a landing page, endpoint-ready waitlist request, invite-code gate, endpoint-ready beta watch setup, endpoint-ready student update capture, and the full app behind the gate. The app can show the product direction, curated seed set, student My Focus setup, alert readiness model, student submission flow, and a Cloudflare Worker path for checking official source pages, sending high-confidence opening alerts, and holding uncertain changes for review.
 
 Recommendation is computed from the Phase 1 rules: underclassmen-fit programs in high-leverage categories become Recommended; relevant programs can also be Recommended when they are useful enough to review, save, or prepare for early; scholarships, conferences, communities, and resources are treated as Foundation opportunities. Student actions stay separate from these labels: users save programs they care about, while ApplyFirst monitors confirmed sources for future opening signals. Duplicate appearances across older curated lists are useful for verification, but they are not treated as proof that a program is better.
 
@@ -150,11 +150,15 @@ npm run capture:smoke
 The beta watching slice lives in a separate Worker so the static site deployment stays simple.
 
 1. Create a Cloudflare D1 database named `applyfirst-watch`.
-2. Replace `REPLACE_WITH_D1_DATABASE_ID` in `wrangler.watch.toml` with the D1 database ID.
+2. Confirm the D1 `database_id` in `wrangler.watch.toml`.
 3. Apply the schema:
 
 ```bash
-npx wrangler d1 migrations apply applyfirst-watch --config wrangler.watch.toml --remote
+npx wrangler d1 execute applyfirst-watch --config wrangler.watch.toml --remote --file cloudflare/d1/001_watch_foundation.sql
+npx wrangler d1 execute applyfirst-watch --config wrangler.watch.toml --remote --file cloudflare/d1/002_automatic_watch_alerts.sql
+npx wrangler d1 execute applyfirst-watch --config wrangler.watch.toml --remote --file cloudflare/d1/003_seasonal_source_schedules.sql
+npx wrangler d1 execute applyfirst-watch --config wrangler.watch.toml --remote --file cloudflare/d1/004_discovery_candidates.sql
+npx wrangler d1 execute applyfirst-watch --config wrangler.watch.toml --remote --file cloudflare/d1/005_discovery_search_runs.sql
 ```
 
 4. Generate and import official source seed rows:
@@ -187,7 +191,22 @@ Use a sender such as `alerts@yourdomain.com` for `ALERT_FROM_EMAIL`. Optional Wo
 - `WATCH_WORKER_PUBLIC_URL=https://applyfirst-watch.YOUR-SUBDOMAIN.workers.dev`
 - `SMS_WEBHOOK_URL` for a future SMS provider webhook
 - `SMS_WEBHOOK_TOKEN` if that webhook needs a bearer token
-- `AUTO_SEND_OPEN_ALERTS=true` only if you intentionally want unreviewed automatic sends
+- `WATCH_RUN_LIMIT=25` to cap each scheduled run
+- `AUTO_SEND_WATCHED_OPEN_ALERTS=true` to email high-confidence opening transitions automatically
+- `AUTO_ALERT_EXISTING_OPEN_ON_WATCH=true` to notify a new watcher when a followed program is already open
+- `DISCOVERY_SEARCH_PROVIDER=brave` or `tavily` for current-cycle URL discovery search
+- `DISCOVERY_SEARCH_COUNTRY=US` for search localization
+- `DISCOVERY_SEARCH_LIMIT=5`, `DISCOVERY_SEARCH_QUERIES_PER_PROGRAM=3`, and `DISCOVERY_SEARCH_RESULTS_PER_QUERY=5` to cap discovery search cost and noise
+
+Optional search-provider secrets:
+
+```bash
+npx wrangler secret put BRAVE_SEARCH_API_KEY --config wrangler.watch.toml
+# or
+npx wrangler secret put TAVILY_API_KEY --config wrangler.watch.toml
+```
+
+Use one provider key at a time. The Worker also accepts `DISCOVERY_SEARCH_API_KEY` as a generic fallback secret.
 
 7. Deploy the watch Worker:
 
@@ -201,7 +220,54 @@ npm run watch:worker:deploy
 https://applyfirst-watch.YOUR-SUBDOMAIN.workers.dev/watch
 ```
 
-The Worker stores beta watch requests, checks enabled official source pages every 30 minutes, saves page snapshots/source checks, creates `pending_review` alert candidates for meaningful opening or deadline changes, and can send reviewed email notifications after a candidate is approved.
+The Worker stores beta watch requests, checks only sources that are due, saves page snapshots/source checks, tracks each program's latest alert state, automatically emails watched students when a high-confidence official opening appears, and keeps ambiguous source changes in `pending_review`. Source schedules use cycle frequency, expected opening months, active lead time, dormant cadence, active cadence, and source volatility so ApplyFirst can start checking more often before an expected application season instead of polling every record forever.
+
+Manual source runs respect the due schedule by default. Use `force` for smoke tests:
+
+```bash
+curl -X POST "https://applyfirst-watch.YOUR-SUBDOMAIN.workers.dev/watch/run" \
+  -H "Authorization: Bearer YOUR_WATCH_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"limit\": 25, \"force\": true}"
+```
+
+To see programs that need current-cycle URL discovery:
+
+```bash
+curl "https://applyfirst-watch.YOUR-SUBDOMAIN.workers.dev/watch/discovery" \
+  -H "Authorization: Bearer YOUR_WATCH_ADMIN_TOKEN"
+```
+
+Discovery items include structured query packs, priority labels, active watcher counts, pending URL candidate counts, and review reasons.
+
+To ask the configured search provider to run the due query packs and save candidate URLs for review:
+
+```bash
+curl -X POST "https://applyfirst-watch.YOUR-SUBDOMAIN.workers.dev/watch/discovery/search" \
+  -H "Authorization: Bearer YOUR_WATCH_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"limit\": 5, \"maxQueriesPerProgram\": 3, \"maxResultsPerQuery\": 5}"
+```
+
+Add `"dryRun": true` to preview results without saving candidates. Add `"force": true` for smoke tests against records that are not currently discovery-due.
+
+To save a possible current-cycle URL manually:
+
+```bash
+curl -X POST "https://applyfirst-watch.YOUR-SUBDOMAIN.workers.dev/watch/discovery/candidates" \
+  -H "Authorization: Bearer YOUR_WATCH_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"programId\":\"nasa-internships\",\"url\":\"https://example.edu/current-cycle\",\"title\":\"Candidate page\",\"source\":\"manual-search\"}"
+```
+
+To accept a candidate and queue the source for immediate verification:
+
+```bash
+curl -X POST "https://applyfirst-watch.YOUR-SUBDOMAIN.workers.dev/watch/discovery/candidates/CANDIDATE_ID/review" \
+  -H "Authorization: Bearer YOUR_WATCH_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"status\":\"accepted\",\"reviewNote\":\"Official current-cycle page.\"}"
+```
 
 To dry-run a candidate delivery:
 
@@ -236,18 +302,18 @@ The first Phase 2 slice adds:
 - Simplified student-facing My Focus section with technical readiness details kept in Maintainer Mode.
 - Trust copy that separates records ready to alert from records that still need confirmation.
 - Public trust policy for Confirmed, Prep Only, and Needs Confirmation records.
-- Endpoint-ready beta notification workflow before accounts or fully automated outbound alerts.
+- Endpoint-ready beta notification workflow before accounts or broader outbound alert automation.
 - Endpoint-ready beta watch workflow that can submit My Focus plus saved-program context into the Cloudflare watch queue.
 - Maintainer Mode toggle for source-review tools, keeping the default view student-facing.
-- A clear split between public prototype behavior and future live notifications.
+- A clear split between public prototype behavior, beta high-confidence opening alerts, and future account-backed notifications.
 - Student-facing monitoring workflow explanation: save programs, verify official pages, watch opening signals, then notify only when trustworthy.
 - My Focus saved-program preview showing bookmarked programs without exposing internal dashboard language.
 
-Real accounts and unreviewed automatic outbound sending are intentionally still future work. Scheduled page-change monitoring and reviewed email delivery now exist as the beta Worker foundation.
+Real accounts and broad unreviewed outbound sending are intentionally still future work. Scheduled page-change monitoring, high-confidence watched-program email alerts, and reviewed fallback delivery now exist as the beta Worker foundation.
 
 ## Phase 2.5 Source Monitoring Foundation
 
-The first source-monitoring slice keeps the workflow maintainer-controlled instead of sending autonomous alerts.
+The source-monitoring slice keeps uncertain signals maintainer-controlled while allowing high-confidence watched-program openings to send through the beta Worker.
 
 - Maintainer-only monitoring assistant for pasted official-page text.
 - Local classification of page text into application opened, dates updated, eligibility changed, no material change, or needs follow-up.
@@ -256,9 +322,11 @@ The first source-monitoring slice keeps the workflow maintainer-controlled inste
 - Suggested program status and confidence updates before a maintainer confirms them.
 - One-click local source-check log entry from the assistant's suggestion.
 - One-click local verification update for open window, deadline, last checked date, confidence, status, and source note.
-- Human confirmation remains required before any record is treated as alert-ready.
+- Hidden maintainer review console for live D1 discovery candidates and alert candidates.
+- Maintainer dry-run and send controls for reviewed fallback email delivery.
+- Human confirmation remains required for uncertain or medium-confidence signals before they are treated as alert-ready.
 
-Still future work: OpenAI-powered interpretation, a maintainer review UI for pending candidates, accounts, and outbound notifications.
+Still future work: OpenAI-powered interpretation, real accounts and roles, SMS provider setup, and production-scale alert policy hardening.
 
 ## Phase 3 Monitoring Pipeline Foundation
 

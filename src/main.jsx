@@ -25,7 +25,7 @@ const quickViews = [
   { id: 'All class years', label: 'All years' },
 ];
 
-const appViews = ['monitor', 'alerts', 'contribute'];
+const appViews = ['monitor', 'alerts', 'contribute', 'maintainer'];
 
 const savedStorageKey = 'applyfirst-shortlist';
 const alertStorageKey = 'applyfirst-alert-preview';
@@ -203,6 +203,7 @@ function App() {
   const [status, setStatus] = useState('all');
   const [selectedId, setSelectedId] = useState(opportunities[0].id);
   const [showInternalTools, setShowInternalTools] = useState(false);
+  const [maintainerToken, setMaintainerToken] = useState('');
   const [verificationEdits, setVerificationEdits] = useState(() => {
     try {
       if (cleanCaptureMode) {
@@ -488,6 +489,12 @@ function App() {
     }
   }, [betaAlertSetup, cleanCaptureMode]);
 
+  useEffect(() => {
+    if (!showInternalTools && activeView === 'maintainer') {
+      setActiveView('monitor');
+    }
+  }, [activeView, showInternalTools]);
+
   const markOnboardingStep = (step) => {
     setOnboardingProgress((currentProgress) =>
       currentProgress[step]
@@ -680,7 +687,13 @@ function App() {
         />
       )}
       <main className="workspace">
-        {activeView === 'alerts' ? (
+        {activeView === 'maintainer' && showInternalTools ? (
+          <MaintainerReviewConsole
+            watchEndpoint={activeWatchEndpoint}
+            adminToken={maintainerToken}
+            onAdminTokenChange={setMaintainerToken}
+          />
+        ) : activeView === 'alerts' ? (
           <section className="settings-view student-alerts-view" aria-label="My Focus settings">
             <section className="alert-hero" aria-label="ApplyFirst watch overview">
               <div>
@@ -690,8 +703,8 @@ function App() {
               </div>
               <div className="alert-hero-card" aria-label="Beta watch status">
                 <span>Private Beta</span>
-                <strong>Reviewed Signals, Not Noise.</strong>
-                <p>Every beta alert candidate is reviewed before sending.</p>
+                <strong>Openings Without Noise.</strong>
+                <p>High-confidence opening signals can email automatically; uncertain matches stay in review.</p>
               </div>
             </section>
               <AlertSetupPanel
@@ -958,7 +971,7 @@ function LandingPage({
               <span>No Noisy Alerts</span>
             </div>
             <p className="beta-panel-note">
-              Beta watch requests are reviewed before any student alert goes out.
+              High-confidence opening alerts can send automatically; uncertain source changes stay in review.
             </p>
             {showAccess ? (
               <form className="invite-form" onSubmit={submitInviteCode}>
@@ -1323,6 +1336,15 @@ function Header({ activeView, onViewChange, savedCount, showInternalTools, onRet
           >
             Suggest Updates
           </button>
+          {showInternalTools ? (
+            <button
+              className={activeView === 'maintainer' ? 'active' : ''}
+              type="button"
+              onClick={() => onViewChange('maintainer')}
+            >
+              Review
+            </button>
+          ) : null}
         </div>
         <div className="nav-status" aria-label="Workspace status">
           <span>{savedCount} Saved</span>
@@ -1359,6 +1381,422 @@ function ReviewModeControl({ enabled, onToggle }) {
       </button>
     </section>
   );
+}
+
+function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange }) {
+  const [status, setStatus] = useState(null);
+  const [discoveryCandidates, setDiscoveryCandidates] = useState([]);
+  const [alertCandidates, setAlertCandidates] = useState([]);
+  const [searchResult, setSearchResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [actionMessage, setActionMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [searchDraft, setSearchDraft] = useState({
+    limit: '5',
+    maxQueriesPerProgram: '3',
+    maxResultsPerQuery: '5',
+    force: false,
+  });
+  const workerBaseUrl = getWorkerBaseUrl(watchEndpoint);
+  const canLoad = Boolean(workerBaseUrl && adminToken.trim());
+
+  const updateSearchDraft = (field, value) => {
+    setSearchDraft((currentDraft) => ({
+      ...currentDraft,
+      [field]: value,
+    }));
+  };
+
+  const callAdminEndpoint = async (path, options = {}) => {
+    const payload = await fetchMaintainerJson({
+      workerBaseUrl,
+      adminToken,
+      path,
+      method: options.method ?? 'GET',
+      body: options.body,
+    });
+
+    return payload;
+  };
+
+  const loadQueues = async ({ quiet = false } = {}) => {
+    setLoading(true);
+    setErrorMessage('');
+    if (!quiet) {
+      setActionMessage('');
+    }
+
+    try {
+      const [statusPayload, discoveryPayload, alertPayload] = await Promise.all([
+        callAdminEndpoint('/watch/status'),
+        callAdminEndpoint('/watch/discovery/candidates?status=pending_review'),
+        callAdminEndpoint('/watch/candidates'),
+      ]);
+
+      setStatus(statusPayload);
+      setDiscoveryCandidates(discoveryPayload.candidates ?? []);
+      setAlertCandidates(alertPayload.candidates ?? []);
+      if (!quiet) {
+        setActionMessage('Review queues refreshed.');
+      }
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const runDiscoverySearch = async (dryRun) => {
+    setLoading(true);
+    setErrorMessage('');
+    setActionMessage('');
+
+    try {
+      const payload = await callAdminEndpoint('/watch/discovery/search', {
+        method: 'POST',
+        body: {
+          limit: Number(searchDraft.limit) || 5,
+          maxQueriesPerProgram: Number(searchDraft.maxQueriesPerProgram) || 3,
+          maxResultsPerQuery: Number(searchDraft.maxResultsPerQuery) || 5,
+          force: Boolean(searchDraft.force),
+          dryRun,
+        },
+      });
+
+      setSearchResult(payload);
+      setActionMessage(
+        dryRun
+          ? 'Discovery dry run completed.'
+          : `Discovery saved ${payload.savedCandidates ?? 0} new and updated ${payload.updatedCandidates ?? 0} existing candidate${payload.updatedCandidates === 1 ? '' : 's'}.`,
+      );
+
+      if (!dryRun) {
+        await loadQueues({ quiet: true });
+      }
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const reviewDiscoveryCandidate = async (candidate, statusValue) => {
+    setLoading(true);
+    setErrorMessage('');
+    setActionMessage('');
+
+    try {
+      await callAdminEndpoint(`/watch/discovery/candidates/${candidate.id}/review`, {
+        method: 'POST',
+        body: {
+          status: statusValue,
+          reviewedBy: 'applyfirst-maintainer-console',
+          reviewNote:
+            statusValue === 'accepted'
+              ? 'Accepted in maintainer console; source queued for verification.'
+              : 'Rejected in maintainer console.',
+        },
+      });
+      setActionMessage(`${candidate.programName || candidate.program_id} marked ${formatDisplayLabel(statusValue)}.`);
+      await loadQueues({ quiet: true });
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sendAlertCandidate = async (candidate, dryRun) => {
+    if (!dryRun && !window.confirm(`Send this alert to opted-in students watching ${candidate.programName}?`)) {
+      return;
+    }
+
+    setLoading(true);
+    setErrorMessage('');
+    setActionMessage('');
+
+    try {
+      const payload = await callAdminEndpoint(`/watch/candidates/${candidate.id}/send`, {
+        method: 'POST',
+        body: { dryRun },
+      });
+      const sentCount = (payload.deliveries ?? []).filter((delivery) =>
+        ['sent', 'queued', 'already_sent', 'ready'].includes(delivery.status),
+      ).length;
+      setActionMessage(
+        dryRun
+          ? `Dry run ready for ${sentCount} recipient${sentCount === 1 ? '' : 's'}.`
+          : `Alert send attempted for ${sentCount} recipient${sentCount === 1 ? '' : 's'}.`,
+      );
+      await loadQueues({ quiet: true });
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <section className="maintainer-review-view" aria-label="ApplyFirst maintainer review">
+      <section className="maintainer-hero">
+        <div>
+          <span>Maintainer Review</span>
+          <h1>Review Signals Before They Reach Students.</h1>
+          <p>
+            Use this beta console to review discovered source URLs, inspect alert candidates, and keep high-risk
+            actions behind a maintainer decision.
+          </p>
+        </div>
+        <div className="maintainer-access-card">
+          <span>Admin Session</span>
+          <label>
+            <span>Worker Admin Token</span>
+            <input
+              type="password"
+              value={adminToken}
+              onChange={(event) => onAdminTokenChange(event.target.value)}
+              placeholder="Paste token for this session"
+              autoComplete="off"
+            />
+          </label>
+          <p>{workerBaseUrl ? `Connected to ${workerBaseUrl}` : 'Set VITE_WATCH_ENDPOINT to enable live review.'}</p>
+          <button type="button" onClick={loadQueues} disabled={!canLoad || loading}>
+            {loading ? 'Loading...' : 'Load Queues'}
+          </button>
+        </div>
+      </section>
+
+      {errorMessage ? <p className="maintainer-message error">{errorMessage}</p> : null}
+      {actionMessage ? <p className="maintainer-message">{actionMessage}</p> : null}
+
+      <section className="maintainer-status-grid" aria-label="Worker status">
+        <MaintainerMetric label="Watch Requests" value={status?.watchRequests ?? '-'} />
+        <MaintainerMetric label="Pending Source Alerts" value={status?.pendingCandidates ?? '-'} />
+        <MaintainerMetric label="Discovery Candidates" value={status?.pendingDiscoveryCandidates ?? discoveryCandidates.length} />
+        <MaintainerMetric label="Open Programs" value={status?.openPrograms ?? '-'} />
+      </section>
+
+      <section className="maintainer-review-grid">
+        <section className="maintainer-panel">
+          <div className="maintainer-panel-heading">
+            <div>
+              <span>Discovery Search</span>
+              <h2>Find Current Official URLs</h2>
+            </div>
+            <p>Run query packs carefully. Dry run first, then save only when the result quality looks clean.</p>
+          </div>
+          <div className="maintainer-search-form">
+            <label>
+              <span>Programs</span>
+              <input
+                type="number"
+                min="1"
+                max="20"
+                value={searchDraft.limit}
+                onChange={(event) => updateSearchDraft('limit', event.target.value)}
+              />
+            </label>
+            <label>
+              <span>Queries</span>
+              <input
+                type="number"
+                min="1"
+                max="8"
+                value={searchDraft.maxQueriesPerProgram}
+                onChange={(event) => updateSearchDraft('maxQueriesPerProgram', event.target.value)}
+              />
+            </label>
+            <label>
+              <span>Results</span>
+              <input
+                type="number"
+                min="1"
+                max="10"
+                value={searchDraft.maxResultsPerQuery}
+                onChange={(event) => updateSearchDraft('maxResultsPerQuery', event.target.value)}
+              />
+            </label>
+            <label className="maintainer-checkbox">
+              <input
+                type="checkbox"
+                checked={searchDraft.force}
+                onChange={(event) => updateSearchDraft('force', event.target.checked)}
+              />
+              <span>Ignore due schedule for smoke tests</span>
+            </label>
+          </div>
+          <div className="maintainer-actions">
+            <button type="button" onClick={() => runDiscoverySearch(true)} disabled={!canLoad || loading}>
+              Dry Run Search
+            </button>
+            <button type="button" onClick={() => runDiscoverySearch(false)} disabled={!canLoad || loading}>
+              Save Candidates
+            </button>
+          </div>
+          {searchResult ? <DiscoverySearchSummary result={searchResult} /> : null}
+        </section>
+
+        <section className="maintainer-panel">
+          <div className="maintainer-panel-heading">
+            <div>
+              <span>Source URL Review</span>
+              <h2>{discoveryCandidates.length} Candidate{discoveryCandidates.length === 1 ? '' : 's'}</h2>
+            </div>
+            <p>Accept only official or organization-owned pages. Rejected items stay in D1 for audit.</p>
+          </div>
+          <div className="maintainer-card-list">
+            {discoveryCandidates.length ? (
+              discoveryCandidates.map((candidate) => (
+                <article className="maintainer-candidate-card" key={candidate.id}>
+                  <div>
+                    <span>{formatDisplayLabel(candidate.confidence)}</span>
+                    <h3>{candidate.programName || candidate.program_id}</h3>
+                    <p>{candidate.title || 'Untitled candidate'}</p>
+                    <a href={candidate.candidate_url} target="_blank" rel="noreferrer">
+                      Open Candidate Source
+                    </a>
+                  </div>
+                  <p>{candidate.reason || 'Needs maintainer review.'}</p>
+                  {candidate.snippet ? <blockquote>{stripHtml(candidate.snippet)}</blockquote> : null}
+                  <div className="maintainer-actions">
+                    <button type="button" onClick={() => reviewDiscoveryCandidate(candidate, 'accepted')} disabled={loading}>
+                      Accept
+                    </button>
+                    <button type="button" onClick={() => reviewDiscoveryCandidate(candidate, 'rejected')} disabled={loading}>
+                      Reject
+                    </button>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <p className="maintainer-empty">No pending discovery candidates.</p>
+            )}
+          </div>
+        </section>
+      </section>
+
+      <section className="maintainer-panel">
+        <div className="maintainer-panel-heading">
+          <div>
+            <span>Alert Candidate Review</span>
+            <h2>{alertCandidates.length} Pending Alert{alertCandidates.length === 1 ? '' : 's'}</h2>
+          </div>
+          <p>Dry run first. Send only after the official source and student-facing email copy look safe.</p>
+        </div>
+        <div className="maintainer-card-list maintainer-alert-list">
+          {alertCandidates.length ? (
+            alertCandidates.map((candidate) => (
+              <article className="maintainer-candidate-card" key={candidate.id}>
+                <div>
+                  <span>{formatDisplayLabel(candidate.candidateType)}</span>
+                  <h3>{candidate.programName || candidate.program_id}</h3>
+                  <p>{candidate.summary || candidate.title}</p>
+                  {candidate.url ? (
+                    <a href={candidate.url} target="_blank" rel="noreferrer">
+                      Open Official Source
+                    </a>
+                  ) : null}
+                </div>
+                <div className="maintainer-actions">
+                  <button type="button" onClick={() => sendAlertCandidate(candidate, true)} disabled={loading}>
+                    Dry Run
+                  </button>
+                  <button type="button" onClick={() => sendAlertCandidate(candidate, false)} disabled={loading}>
+                    Send
+                  </button>
+                </div>
+              </article>
+            ))
+          ) : (
+            <p className="maintainer-empty">No pending alert candidates.</p>
+          )}
+        </div>
+      </section>
+    </section>
+  );
+}
+
+function MaintainerMetric({ label, value }) {
+  return (
+    <span className="maintainer-metric">
+      <strong>{value}</strong>
+      {label}
+    </span>
+  );
+}
+
+function DiscoverySearchSummary({ result }) {
+  const keptPrograms = (result.results ?? []).filter((item) => item.candidates?.length);
+
+  return (
+    <section className="discovery-search-summary" aria-label="Discovery search result summary">
+      <div>
+        <span>{result.provider}</span>
+        <strong>{result.searchedQueries} Queries</strong>
+        <p>
+          Found {result.foundResults} results, saved {result.savedCandidates ?? 0}, updated{' '}
+          {result.updatedCandidates ?? 0}.
+        </p>
+      </div>
+      {keptPrograms.length ? (
+        <ul>
+          {keptPrograms.map((program) => (
+            <li key={program.programId}>
+              <strong>{program.programName}</strong>
+              <span>{program.candidates.length} candidate{program.candidates.length === 1 ? '' : 's'}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p>No candidate URLs passed the official-source filter.</p>
+      )}
+    </section>
+  );
+}
+
+async function fetchMaintainerJson({ workerBaseUrl, adminToken, path, method = 'GET', body }) {
+  if (!workerBaseUrl) {
+    throw new Error('Set VITE_WATCH_ENDPOINT before using the maintainer console.');
+  }
+
+  if (!adminToken.trim()) {
+    throw new Error('Paste the Worker admin token for this session.');
+  }
+
+  const headers = {
+    Authorization: `Bearer ${adminToken.trim()}`,
+  };
+
+  if (body) {
+    headers['Content-Type'] = 'application/json';
+  }
+
+  const response = await fetch(`${workerBaseUrl}${path}`, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(payload.error || `Worker returned HTTP ${response.status}.`);
+  }
+
+  return payload;
+}
+
+function getWorkerBaseUrl(endpoint) {
+  const value = String(endpoint ?? '').trim().replace(/\/+$/, '');
+
+  if (!value) {
+    return '';
+  }
+
+  return value.endsWith('/watch') ? value.slice(0, -6) : value;
+}
+
+function stripHtml(value) {
+  return cleanText(String(value ?? '').replace(/<[^>]+>/g, ' ')).slice(0, 320);
 }
 
 function VerificationQueuePanel({ queueItems, onSelect }) {
@@ -1439,7 +1877,7 @@ function AlertSetupPanel({
           </div>
           <p>
             Choose Class Year, Role Track, and Alert Timing. ApplyFirst uses this to preview matching programs and
-            reviewed beta alerts.
+            beta opening alerts.
           </p>
         </div>
         {waitlistIntent ? <p className="preference-source-note">Pre-filled from your waitlist. Edit anytime.</p> : null}
@@ -1707,7 +2145,7 @@ function BetaAlertSystem({
         <h3>Submit Your Watch Setup</h3>
         <p>
           {hasPreviewFocus
-            ? 'ApplyFirst checks official sources first, then reviews alert candidates before sending.'
+            ? 'ApplyFirst emails high-confidence opening signals and keeps uncertain matches in review.'
             : 'Choose Class Year and Role Track to unlock the preview.'}
         </p>
       </div>
@@ -1733,7 +2171,7 @@ function BetaAlertSystem({
               ? watchedPreview.map((item) => item.name).join(', ')
               : !hasPreviewFocus
                 ? 'Choose focus fields to preview matches.'
-                : 'No reviewed alert matches yet.'}
+                : 'No alert-ready matches yet.'}
           </strong>
         </div>
         <div>
@@ -2715,7 +3153,7 @@ function getAlertStrategy(alertPrefs, matches, alertableCount) {
       ? 'This stays in your browser for now.'
     : alertPrefs.notificationMode === 'saved'
         ? 'Saved-program reminders can come later after accounts or email consent exist.'
-    : 'Beta email alerts can be captured now, then reviewed before sending while signal rules improve.';
+    : 'Beta email alerts can send for high-confidence openings while uncertain signals stay in review.';
   const timingCopy =
     alertPrefs.sendTiming === 'openOnly'
       ? 'program openings'
@@ -2995,9 +3433,21 @@ function formatDisplayLabel(value) {
     'Stipend': 'Stipend',
     'Free': 'Free',
     'Varies': 'Varies',
+    high: 'High',
+    medium: 'Medium',
+    needs_review: 'Needs Review',
+    pending_review: 'Pending Review',
+    accepted: 'Accepted',
+    rejected: 'Rejected',
+    source_change: 'Source Change',
+    deadline: 'Deadline',
   };
 
   return labelMap[value] ?? value;
+}
+
+function cleanText(value) {
+  return String(value ?? '').replace(/\s+/g, ' ').trim();
 }
 
 function DetailSection({ title, children }) {

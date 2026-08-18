@@ -6,11 +6,11 @@ Prove that ApplyFirst can notice meaningful changes on official program pages be
 
 The first production-worthy monitoring promise should be:
 
-1. Fetch official program pages on a schedule.
-2. Normalize page text into a comparable snapshot.
-3. Detect whether the page changed.
-4. Classify the change into an operational review decision.
-5. Create a human-reviewed alert candidate instead of sending directly.
+1. Store each program's cycle cadence, expected opening months, and URL volatility.
+2. Start source checks before the expected opening season instead of polling every record forever.
+3. Fetch due official program pages and normalize page text into comparable snapshots.
+4. Detect whether the page changed and classify the result into an operational review decision.
+5. Send high-confidence watched-program opening alerts automatically and hold uncertain candidates for review.
 
 ## Recommended Backend Direction
 
@@ -58,6 +58,61 @@ Pages ApplyFirst should monitor.
 - `enabled`
 - `last_snapshot_id`
 - `last_checked_at`
+
+### source_schedule_profiles
+
+Seasonal source schedule for efficient monitoring and discovery.
+
+- `official_source_id`
+- `program_id`
+- `cycle_frequency`
+- `expected_open_months_json`
+- `last_known_open_at`
+- `active_lead_days`
+- `active_check_interval_hours`
+- `warmup_check_interval_hours`
+- `dormant_check_interval_days`
+- `discovery_check_interval_hours`
+- `source_volatility`
+- `discovery_queries_json`
+- `current_phase`
+- `next_check_at`
+- `next_discovery_at`
+- `schedule_note`
+
+### discovery_candidates
+
+Possible current-cycle source URLs found through manual search, Browser Run, or the configured search provider.
+
+- `id`
+- `program_id`
+- `official_source_id`
+- `candidate_url`
+- `title`
+- `source`
+- `discovery_query`
+- `snippet`
+- `confidence`
+- `status`
+- `reason`
+- `review_note`
+- `reviewed_by`
+- `reviewed_at`
+
+### discovery_search_runs
+
+Admin-triggered search-provider runs that execute the seasonal query packs and save candidate URLs for review.
+
+- `id`
+- `provider`
+- `trigger`
+- `status`
+- `searched_programs`
+- `searched_queries`
+- `found_results`
+- `saved_candidates`
+- `error_message`
+- `raw_summary_json`
 
 ### watch_requests
 
@@ -131,9 +186,25 @@ Review queue for changes that may become student alerts.
 - `reviewed_at`
 - `created_at`
 
+### program_alert_states
+
+Latest program-level monitoring state used to avoid duplicate opening emails.
+
+- `program_id`
+- `official_source_id`
+- `status`
+- `confidence`
+- `review_decision`
+- `result`
+- `last_source_check_id`
+- `last_alert_candidate_id`
+- `last_changed_at`
+- `last_checked_at`
+- `auto_alerted_at`
+
 ### alert_deliveries
 
-Audit log for reviewed student notifications.
+Audit log for automatic and reviewed student notifications.
 
 - `id`
 - `alert_candidate_id`
@@ -194,7 +265,7 @@ The local monitoring classifier currently produces:
 - `Monitor Only`: the page is worth monitoring but not actionable.
 - `Manual Review`: the page text is ambiguous or failed to fetch.
 
-No decision sends a public alert by itself.
+Only high-confidence opening transitions tied to opted-in watched programs can send automatically in beta. Deadline changes, medium-confidence openings, large-page failures, and ambiguous source changes stay in review.
 
 ## Current Local Prototype
 
@@ -225,15 +296,15 @@ Persisted reports separate:
 - `New alert candidates`: changed pages whose latest source signal should enter review.
 - `Current alert-like signals`: pages that still look open or deadline-relevant, even when they have not changed since the last saved snapshot.
 
-Maintainer review queue output is available with:
+Maintainer review queue output is available locally with:
 
 ```bash
 npm run monitor:review
 ```
 
-This is the local stand-in for the future `alert_candidates` admin queue. It only shows changed alert candidates and manual-review checks, then gives each item a priority, reason, URL, and next step.
+This is still useful for local diagnostics. The live app also includes a hidden Maintainer Mode review console that can load D1 alert candidates, run discovery search, review discovered URLs, and dry-run or send reviewed candidate emails.
 
-Use `npm run monitor:review:write` to write the queue to `data/monitoring-review.generated.json` for local review tooling or a future maintainer console.
+Use `npm run monitor:review:write` to write the queue to `data/monitoring-review.generated.json` for local review tooling.
 
 Backend seed export is available with:
 
@@ -274,18 +345,28 @@ The Cloudflare watch Worker adds the first durable monitoring path:
 - `POST /watch` saves a student's My Focus watch request and program context in D1.
 - `GET /watch/status` returns safe aggregate counts for smoke checks.
 - `POST /watch/run` manually triggers a source check pass and requires `WATCH_ADMIN_TOKEN`.
+- `GET /watch/discovery` lists seasonally due current-cycle URL discovery tasks, structured query packs, priority labels, active watcher counts, and candidate counts. Requires `WATCH_ADMIN_TOKEN`.
+- `GET /watch/discovery/candidates` lists discovered URL candidates. Requires `WATCH_ADMIN_TOKEN`.
+- `POST /watch/discovery/search` runs the due discovery query packs through the configured search provider, filters low-signal results, saves candidate URLs for review, and records a discovery search run. Requires `WATCH_ADMIN_TOKEN`.
+- `POST /watch/discovery/candidates` saves a possible current-cycle URL for review. Requires `WATCH_ADMIN_TOKEN`.
+- `POST /watch/discovery/candidates/:id/review` accepts or rejects a discovered URL. Accepted candidates can update the official source URL and queue it for immediate verification.
 - `GET /watch/candidates` lists pending review candidates and requires `WATCH_ADMIN_TOKEN`.
 - `POST /watch/candidates/:id/send` sends reviewed email notifications and logs delivery status.
 - Phone/SMS delivery is supported through an optional `SMS_WEBHOOK_URL`, but should not be enabled until consent and provider setup are reviewed.
-- Cron Triggers run scheduled source checks every 30 minutes.
-- Source checks save snapshots, compare hashes, classify opening/deadline signals, and create `pending_review` alert candidates.
+- Cron Triggers run every 30 minutes, but source selection is due-based.
+- Source schedules move between `dormant`, `warmup`, `active`, and `unknown` phases based on expected opening months, current status, and watcher demand.
+- Dormant records back off to monthly checks, warmup records check weekly or more often, active watched records check daily, and fetch failures back off instead of retrying every cron tick.
+- Source checks save snapshots, compare hashes, classify opening/deadline signals, update `program_alert_states`, update the next due check, and create alert candidates only when the program enters an alert-worthy state.
 
-The Worker can send email after review. A maintainer still reviews candidates before students are notified unless `AUTO_SEND_OPEN_ALERTS=true` is deliberately enabled.
+The Worker can send beta email automatically when an official source has a high-confidence opening signal for a program a student follows. Deadline changes, medium-confidence openings, large-page failures, and ambiguous eligibility changes stay in review.
+
+Student alert emails must be generated from a clean student-facing template. Internal source-check notes, raw page excerpts, classifier labels, and maintainer instructions stay in D1 for review and should not appear in outbound student notifications.
 
 ## Next Implementation Steps
 
-1. Deploy the watch Worker with a real D1 binding.
-2. Seed and review the first official source rows.
-3. Add a maintainer review screen for `alert_candidates`.
-4. Replace the admin curl send flow with a simple maintainer approval UI.
-5. Decide whether to keep D1 long term or move richer account/review workflows to Supabase.
+1. Review the first `source_schedule_profiles` rows for cycle accuracy.
+2. Use the Maintainer Mode review console to smoke-test discovery search, candidate review, alert dry runs, and reviewed sends before each beta round.
+3. Review search-provider result quality, then decide whether JavaScript-heavy or search-hostile programs need a Browser Run fallback workflow.
+4. Add role-based maintainer access before sharing the review console with anyone else.
+5. Add richer review history for search runs, source changes, accepted URLs, rejected URLs, and sent alert decisions.
+6. Decide whether to keep D1 long term or move richer account/review workflows to Supabase.
