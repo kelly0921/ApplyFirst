@@ -8,7 +8,7 @@ Use this checklist before sharing the public prototype link with beta testers.
 - Browser-check landing page, invite code flow, Programs, My Focus, and Suggest Updates.
 - Confirm mobile has no horizontal overflow.
 - Confirm waitlist/contact copy says beta watch requests are available and high-confidence opening alerts can email automatically.
-- Confirm My Focus can submit a beta watch setup by email or text, shows the watch preview, and clearly says high-confidence opening signals can email automatically while uncertain signals stay in review.
+- Confirm My Focus can submit a beta watch setup by email or text, shows the watch plan and submitted receipt, and clearly says high-confidence opening signals can email automatically while uncertain signals stay in review.
 - Confirm My Focus says beta alerts are opt-in and can be unsubscribed from email.
 - Confirm Suggest Updates feels student-facing, not maintainer-only.
 - Confirm Suggest Updates asks for wrong dates, wrong eligibility, broken links, outdated status, missing programs, alert requests, confusing labels, duplicates, and other feedback.

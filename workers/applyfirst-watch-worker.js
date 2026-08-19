@@ -67,6 +67,11 @@ async function handleRequest(request, env, ctx) {
       return jsonResponse(env, await getReadinessQueue(env));
     }
 
+    if (request.method === 'GET' && url.pathname === '/watch/history') {
+      await requireAdminToken(request, env);
+      return jsonResponse(env, await getReviewHistory(env, url));
+    }
+
     if ((request.method === 'GET' || request.method === 'POST') && url.pathname === '/watch/unsubscribe') {
       return handleUnsubscribe(request, url, env);
     }
@@ -2338,6 +2343,163 @@ async function getWatchStatus(env) {
   };
 }
 
+async function getReviewHistory(env, url) {
+  const limit = Math.max(1, Math.min(Number(url.searchParams.get('limit')) || 8, 25));
+  const [searchRuns, reviewedUrls, sourceChecks, deliveries] = await Promise.all([
+    env.DB.prepare(
+      `select
+        id,
+        provider,
+        trigger,
+        status,
+        searched_programs as searchedPrograms,
+        searched_queries as searchedQueries,
+        found_results as foundResults,
+        saved_candidates as savedCandidates,
+        error_message as errorMessage,
+        raw_summary_json as rawSummaryJson,
+        created_at as createdAt
+      from discovery_search_runs
+      order by created_at desc
+      limit ?`,
+    )
+      .bind(limit)
+      .all(),
+    env.DB.prepare(
+      `select
+        discovery_candidates.id,
+        discovery_candidates.program_id as programId,
+        official_sources.program_name as programName,
+        discovery_candidates.candidate_url as candidateUrl,
+        official_sources.url as currentOfficialUrl,
+        discovery_candidates.title,
+        discovery_candidates.confidence,
+        discovery_candidates.status,
+        discovery_candidates.reason,
+        discovery_candidates.review_note as reviewNote,
+        discovery_candidates.reviewed_by as reviewedBy,
+        discovery_candidates.reviewed_at as reviewedAt,
+        discovery_candidates.updated_at as updatedAt
+      from discovery_candidates
+      left join official_sources
+        on official_sources.id = discovery_candidates.official_source_id
+      where discovery_candidates.status != 'pending_review'
+         or discovery_candidates.reviewed_at is not null
+      order by coalesce(discovery_candidates.reviewed_at, discovery_candidates.updated_at) desc
+      limit ?`,
+    )
+      .bind(limit)
+      .all(),
+    env.DB.prepare(
+      `select
+        source_checks.id,
+        source_checks.program_id as programId,
+        official_sources.program_name as programName,
+        source_checks.result,
+        source_checks.suggested_status as suggestedStatus,
+        source_checks.suggested_confidence as suggestedConfidence,
+        source_checks.review_decision as reviewDecision,
+        source_checks.changed,
+        source_checks.new_alert_candidate as newAlertCandidate,
+        source_checks.note,
+        source_checks.created_at as createdAt
+      from source_checks
+      left join official_sources
+        on official_sources.id = source_checks.official_source_id
+      order by source_checks.created_at desc
+      limit ?`,
+    )
+      .bind(limit)
+      .all(),
+    env.DB.prepare(
+      `select
+        alert_deliveries.id,
+        alert_deliveries.alert_candidate_id as alertCandidateId,
+        alert_candidates.program_id as programId,
+        official_sources.program_name as programName,
+        alert_candidates.title as candidateTitle,
+        alert_deliveries.channel,
+        alert_deliveries.destination,
+        alert_deliveries.status,
+        alert_deliveries.error_message as errorMessage,
+        alert_deliveries.sent_at as sentAt,
+        alert_deliveries.created_at as createdAt
+      from alert_deliveries
+      left join alert_candidates
+        on alert_candidates.id = alert_deliveries.alert_candidate_id
+      left join official_sources
+        on official_sources.id = alert_candidates.official_source_id
+      order by alert_deliveries.created_at desc
+      limit ?`,
+    )
+      .bind(limit)
+      .all(),
+  ]);
+
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    limit,
+    searchRuns: (searchRuns.results || []).map(formatDiscoverySearchRunHistory),
+    reviewedUrls: reviewedUrls.results || [],
+    sourceChecks: (sourceChecks.results || []).map((check) => ({
+      ...check,
+      changed: Boolean(check.changed),
+      newAlertCandidate: Boolean(check.newAlertCandidate),
+    })),
+    alertDeliveries: (deliveries.results || []).map((delivery) => ({
+      ...delivery,
+      destination: maskAlertDestination(delivery.destination),
+    })),
+  };
+}
+
+function formatDiscoverySearchRunHistory(row) {
+  const summary = parseJsonObject(row.rawSummaryJson);
+  const results = Array.isArray(summary.results) ? summary.results : [];
+  const keptCandidates = results.reduce((total, program) => total + (program.candidates?.length || 0), 0);
+  const ignoredResults = results.reduce(
+    (total, program) =>
+      total + (program.queries || []).reduce((queryTotal, query) => queryTotal + numberOrZero(query.ignored), 0),
+    0,
+  );
+
+  return {
+    id: row.id,
+    provider: row.provider,
+    trigger: row.trigger,
+    status: row.status,
+    dryRun: Boolean(summary.dryRun),
+    force: Boolean(summary.force),
+    searchedPrograms: numberOrZero(row.searchedPrograms),
+    searchedQueries: numberOrZero(row.searchedQueries),
+    foundResults: numberOrZero(row.foundResults),
+    savedCandidates: numberOrZero(row.savedCandidates),
+    updatedCandidates: numberOrZero(summary.updatedCandidates),
+    keptCandidates,
+    ignoredResults,
+    errorCount: numberOrZero(summary.errorCount),
+    errorMessage: row.errorMessage || '',
+    programNames: results.map((program) => cleanString(program.programName, 120)).filter(Boolean).slice(0, 4),
+    createdAt: row.createdAt,
+  };
+}
+
+function maskAlertDestination(value) {
+  const destination = cleanString(value, 180);
+
+  if (!destination) {
+    return '';
+  }
+
+  if (destination.includes('@')) {
+    const [name, domain] = destination.split('@');
+    return `${name.slice(0, 2)}***@${domain}`;
+  }
+
+  return `${destination.slice(0, 3)}***${destination.slice(-2)}`;
+}
+
 async function getReadinessQueue(env) {
   const now = new Date().toISOString();
   const rows = await env.DB.prepare(
@@ -2599,7 +2761,8 @@ function compareReadinessItems(left, right) {
 }
 
 async function getPendingCandidates(env) {
-  const candidates = await env.DB.prepare(
+  const [candidates, pendingTotal] = await Promise.all([
+    env.DB.prepare(
     `select
       alert_candidates.id,
       alert_candidates.program_id as programId,
@@ -2615,10 +2778,17 @@ async function getPendingCandidates(env) {
     where alert_candidates.status = 'pending_review'
     order by alert_candidates.created_at desc
     limit 50`,
-  ).all();
+    ).all(),
+    env.DB.prepare(
+      `select count(*) as total
+       from alert_candidates
+       where status = 'pending_review'`,
+    ).first(),
+  ]);
 
   return {
     ok: true,
+    totalPending: pendingTotal?.total ?? candidates.results?.length ?? 0,
     candidates: candidates.results || [],
   };
 }

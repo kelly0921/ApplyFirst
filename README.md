@@ -255,6 +255,15 @@ curl "https://applyfirst-watch.YOUR-SUBDOMAIN.workers.dev/watch/readiness" \
 
 The queue groups sources into `Needs Attention`, `Open or Deadline`, `Closed or Old Cycle`, and `Warmup or Monitor`.
 
+To review recent maintainer audit history:
+
+```bash
+curl "https://applyfirst-watch.YOUR-SUBDOMAIN.workers.dev/watch/history" \
+  -H "Authorization: Bearer YOUR_WATCH_ADMIN_TOKEN"
+```
+
+History includes recent discovery search runs, reviewed URL decisions, source checks, and masked alert delivery attempts.
+
 To see programs that need current-cycle URL discovery:
 
 ```bash
@@ -319,7 +328,7 @@ The first Phase 2 slice adds:
 - Public landing page that explains ApplyFirst, who it is for, what students get, and why access is limited during private beta.
 - Simple invite-code gate before the full program monitor, avoiding premature auth while keeping access intentional.
 - Student My Focus preview by class year, role track, recommendation level, and timing preference.
-- Beta notification opt-in with email/text choice, alert-ready counts, source-check holds, and in-app watch preview.
+- Beta notification opt-in with email/text choice, alert-ready counts, source-check holds, and an in-app watch plan.
 - Confirmation-readiness calculations for records that are safe to alert on later.
 - Prioritized source-review queue for records that need official-cycle review before alerts.
 - Direct review flow from queue item to full program detail.
@@ -339,7 +348,7 @@ The first Phase 2 slice adds:
 - Maintainer Mode toggle for source-review tools, keeping the default view student-facing.
 - A clear split between public prototype behavior, beta high-confidence opening alerts, and future account-backed notifications.
 - Student-facing monitoring workflow explanation: save programs, verify official pages, watch opening signals, then notify only when trustworthy.
-- My Focus saved-program preview showing bookmarked programs without exposing internal dashboard language.
+- My Focus watch plan showing bookmarked programs, matching programs, and submitted beta alert receipt without exposing internal dashboard language.
 
 Real accounts and broad unreviewed outbound sending are intentionally still future work. Scheduled page-change monitoring, high-confidence watched-program email alerts, and reviewed fallback delivery now exist as the beta Worker foundation.
 

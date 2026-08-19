@@ -707,17 +707,13 @@ function App() {
                 <p>High-confidence opening signals can email automatically; uncertain matches stay in review.</p>
               </div>
             </section>
-              <AlertSetupPanel
-                alertPrefs={alertPrefs}
-                setAlertPrefs={setAlertPrefs}
-                onFocusChange={() => markOnboardingStep('focused')}
-                matchCount={alertPreviewMatches.length}
+            <AlertSetupPanel
+              alertPrefs={alertPrefs}
+              setAlertPrefs={setAlertPrefs}
+              onFocusChange={() => markOnboardingStep('focused')}
+              matchCount={alertPreviewMatches.length}
               alertMatches={alertPreviewMatches}
               savedOpportunities={savedOpportunities}
-              onSavedSelect={(id) => {
-                setSelectedId(id);
-                setActiveView('monitor');
-              }}
               alertStrategy={alertStrategy}
               betaAlertSetup={betaAlertSetup}
               onBetaAlertSetupSave={saveBetaAlertSetup}
@@ -1386,11 +1382,17 @@ function ReviewModeControl({ enabled, onToggle }) {
 function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange }) {
   const [status, setStatus] = useState(null);
   const [readinessQueue, setReadinessQueue] = useState(null);
+  const [reviewHistory, setReviewHistory] = useState(null);
   const [discoveryCandidates, setDiscoveryCandidates] = useState([]);
   const [alertCandidates, setAlertCandidates] = useState([]);
+  const [alertCandidateTotal, setAlertCandidateTotal] = useState(0);
   const [searchResult, setSearchResult] = useState(null);
   const [sourceRunResult, setSourceRunResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [readinessActionByProgramId, setReadinessActionByProgramId] = useState({});
+  const [alertActionByCandidateId, setAlertActionByCandidateId] = useState({});
+  const [alertResultByCandidateId, setAlertResultByCandidateId] = useState({});
+  const [showAllAlertCandidates, setShowAllAlertCandidates] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [sourceRunDraft, setSourceRunDraft] = useState({
@@ -1405,6 +1407,9 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
   });
   const workerBaseUrl = getWorkerBaseUrl(watchEndpoint);
   const canLoad = Boolean(workerBaseUrl && adminToken.trim());
+  const pendingAlertTotal = alertCandidateTotal || alertCandidates.length;
+  const visibleAlertCandidates = showAllAlertCandidates ? alertCandidates : alertCandidates.slice(0, 6);
+  const hiddenAlertCandidateCount = Math.max(alertCandidates.length - visibleAlertCandidates.length, 0);
 
   const updateSearchDraft = (field, value) => {
     setSearchDraft((currentDraft) => ({
@@ -1432,44 +1437,59 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
     return payload;
   };
 
-  const loadQueues = async ({ quiet = false } = {}) => {
-    setLoading(true);
+  const loadQueues = async ({ quiet = false, showLoading = true } = {}) => {
+    if (showLoading) {
+      setLoading(true);
+    }
     setErrorMessage('');
     if (!quiet) {
       setActionMessage('');
     }
 
     try {
-      const [statusPayload, readinessPayload, discoveryPayload, alertPayload] = await Promise.all([
+      const [statusPayload, readinessPayload, historyPayload, discoveryPayload, alertPayload] = await Promise.all([
         callAdminEndpoint('/watch/status'),
         callAdminEndpoint('/watch/readiness'),
+        callAdminEndpoint('/watch/history'),
         callAdminEndpoint('/watch/discovery/candidates?status=pending_review'),
         callAdminEndpoint('/watch/candidates'),
       ]);
 
       setStatus(statusPayload);
       setReadinessQueue(readinessPayload);
+      setReviewHistory(historyPayload);
       setDiscoveryCandidates(discoveryPayload.candidates ?? []);
       setAlertCandidates(alertPayload.candidates ?? []);
+      setAlertCandidateTotal(alertPayload.totalPending ?? alertPayload.candidates?.length ?? 0);
       if (!quiet) {
         setActionMessage('Review queues refreshed.');
       }
     } catch (error) {
       setErrorMessage(error.message);
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   };
 
-  const runSourceDryRun = async (programIdsOverride = null) => {
+  const runSourceDryRun = async (programIdsOverride = null, actionProgramId = '') => {
     const programIds = programIdsOverride ?? parseProgramIds(sourceRunDraft.programIds);
+    const scopedProgramId = actionProgramId || '';
 
     if (!programIds.length) {
       setErrorMessage('Add at least one program ID before running a source check.');
       return;
     }
 
-    setLoading(true);
+    if (scopedProgramId) {
+      setReadinessActionByProgramId((currentActions) => ({
+        ...currentActions,
+        [scopedProgramId]: 'source',
+      }));
+    } else {
+      setLoading(true);
+    }
     setErrorMessage('');
     setActionMessage('');
 
@@ -1487,15 +1507,31 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
     } catch (error) {
       setErrorMessage(error.message);
     } finally {
-      setLoading(false);
+      if (scopedProgramId) {
+        setReadinessActionByProgramId((currentActions) => {
+          const nextActions = { ...currentActions };
+          delete nextActions[scopedProgramId];
+          return nextActions;
+        });
+      } else {
+        setLoading(false);
+      }
     }
   };
 
-  const runDiscoverySearch = async (dryRun, programIdsOverride = []) => {
+  const runDiscoverySearch = async (dryRun, programIdsOverride = [], actionProgramId = '') => {
     const targetedProgramIds = programIdsOverride.length ? programIdsOverride.filter(Boolean) : parseProgramIds(searchDraft.programIds);
     const targetLabel =
       targetedProgramIds.length === 1 ? targetedProgramIds[0] : `${targetedProgramIds.length} targeted programs`;
-    setLoading(true);
+    const scopedProgramId = actionProgramId || '';
+    if (scopedProgramId) {
+      setReadinessActionByProgramId((currentActions) => ({
+        ...currentActions,
+        [scopedProgramId]: 'url',
+      }));
+    } else {
+      setLoading(true);
+    }
     setErrorMessage('');
     setActionMessage('');
 
@@ -1524,12 +1560,20 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
       );
 
       if (!dryRun) {
-        await loadQueues({ quiet: true });
+        await loadQueues({ quiet: true, showLoading: !scopedProgramId });
       }
     } catch (error) {
       setErrorMessage(error.message);
     } finally {
-      setLoading(false);
+      if (scopedProgramId) {
+        setReadinessActionByProgramId((currentActions) => {
+          const nextActions = { ...currentActions };
+          delete nextActions[scopedProgramId];
+          return nextActions;
+        });
+      } else {
+        setLoading(false);
+      }
     }
   };
 
@@ -1574,7 +1618,16 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
       return;
     }
 
-    setLoading(true);
+    const actionLabel = dryRun ? 'dryRun' : 'send';
+    setAlertActionByCandidateId((currentActions) => ({
+      ...currentActions,
+      [candidate.id]: actionLabel,
+    }));
+    setAlertResultByCandidateId((currentResults) => {
+      const nextResults = { ...currentResults };
+      delete nextResults[candidate.id];
+      return nextResults;
+    });
     setErrorMessage('');
     setActionMessage('');
 
@@ -1586,16 +1639,51 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
       const sentCount = (payload.deliveries ?? []).filter((delivery) =>
         ['sent', 'queued', 'already_sent', 'ready'].includes(delivery.status),
       ).length;
+      const failedCount = (payload.deliveries ?? []).filter((delivery) => delivery.status === 'failed').length;
+      setAlertResultByCandidateId((currentResults) => ({
+        ...currentResults,
+        [candidate.id]: {
+          tone: failedCount ? 'warning' : 'success',
+          title: dryRun
+            ? `${payload.recipients ?? sentCount} recipient${(payload.recipients ?? sentCount) === 1 ? '' : 's'} matched this alert.`
+            : `${sentCount} delivery ${sentCount === 1 ? 'was' : 'attempts were'} recorded.`,
+          detail: dryRun
+            ? 'Preview only. No email was sent.'
+            : failedCount
+              ? `${failedCount} delivery ${failedCount === 1 ? 'needs' : 'need'} review.`
+              : 'Email delivery was sent or already recorded.',
+          deliveries: payload.deliveries ?? [],
+          dryRun,
+          generatedAt: new Date().toISOString(),
+        },
+      }));
       setActionMessage(
         dryRun
           ? `Dry run ready for ${sentCount} recipient${sentCount === 1 ? '' : 's'}.`
           : `Alert send attempted for ${sentCount} recipient${sentCount === 1 ? '' : 's'}.`,
       );
-      await loadQueues({ quiet: true });
+      if (!dryRun) {
+        await loadQueues({ quiet: true, showLoading: false });
+      }
     } catch (error) {
       setErrorMessage(error.message);
+      setAlertResultByCandidateId((currentResults) => ({
+        ...currentResults,
+        [candidate.id]: {
+          tone: 'error',
+          title: 'Alert action failed.',
+          detail: error.message,
+          deliveries: [],
+          dryRun,
+          generatedAt: new Date().toISOString(),
+        },
+      }));
     } finally {
-      setLoading(false);
+      setAlertActionByCandidateId((currentActions) => {
+        const nextActions = { ...currentActions };
+        delete nextActions[candidate.id];
+        return nextActions;
+      });
     }
   };
 
@@ -1639,14 +1727,17 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
         <MaintainerMetric label="Discovery Candidates" value={status?.pendingDiscoveryCandidates ?? discoveryCandidates.length} />
       </section>
 
+      {reviewHistory ? <ReviewHistoryPanel history={reviewHistory} /> : null}
+
       {readinessQueue ? (
         <MonitoringReadinessQueue
           queue={readinessQueue}
-          onCheckSource={(programId) => runSourceDryRun([programId])}
+          onCheckSource={(programId) => runSourceDryRun([programId], programId)}
           onFindUrl={(programId) => {
             updateSearchDraft('programIds', programId);
-            runDiscoverySearch(true, [programId]);
+            runDiscoverySearch(true, [programId], programId);
           }}
+          readinessActions={readinessActionByProgramId}
           loading={loading}
           canLoad={canLoad}
         />
@@ -1655,17 +1746,17 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
       <section className="maintainer-panel source-run-panel">
         <div className="maintainer-panel-heading source-run-heading">
           <div>
-            <span>Source Signal Check</span>
-            <h2>Dry Run Program Sources</h2>
+            <span>Check Existing Source</span>
+            <h2>Test Saved Source Pages</h2>
           </div>
           <p>
-            Check official pages without writing snapshots, creating alert candidates, updating schedules, or sending
-            emails.
+            Fetch saved source URLs for the IDs you enter. Use one ID for one program, or paste multiple IDs for a
+            targeted batch.
           </p>
         </div>
         <div className="source-run-form">
           <label>
-            <span>Program IDs</span>
+            <span>Program IDs to Test</span>
             <textarea
               value={sourceRunDraft.programIds}
               onChange={(event) => updateSourceRunDraft('programIds', event.target.value)}
@@ -1673,7 +1764,7 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
             />
           </label>
           <button type="button" onClick={() => runSourceDryRun()} disabled={!canLoad || loading}>
-            Dry Run Sources
+            Test Listed Sources
           </button>
         </div>
         {sourceRunResult ? <SourceRunSummary result={sourceRunResult} /> : null}
@@ -1684,9 +1775,12 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
           <div className="maintainer-panel-heading">
             <div>
               <span>Discovery Search</span>
-              <h2>Find Current Official URLs</h2>
+              <h2>Find Updated Source URLs</h2>
             </div>
-            <p>Run query packs carefully. Dry run first, then save only when the result quality looks clean.</p>
+            <p>
+              Search for newer official pages. Add Target Program IDs to search only those programs; leave it blank to
+              search due programs by the limit.
+            </p>
           </div>
           <div className="maintainer-search-form">
             <label>
@@ -1739,7 +1833,7 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
           </div>
           <div className="maintainer-actions">
             <button type="button" onClick={() => runDiscoverySearch(true)} disabled={!canLoad || loading}>
-              Dry Run Search
+              Dry Run URL Search
             </button>
             <button type="button" onClick={() => runDiscoverySearch(false)} disabled={!canLoad || loading}>
               Save Candidates
@@ -1817,44 +1911,97 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
         <div className="maintainer-panel-heading">
           <div>
             <span>Alert Candidate Review</span>
-            <h2>{alertCandidates.length} Pending Alert{alertCandidates.length === 1 ? '' : 's'}</h2>
+            <h2>{pendingAlertTotal} Pending Alert{pendingAlertTotal === 1 ? '' : 's'}</h2>
           </div>
-          <p>Dry run first. Send only after the official source and student-facing email copy look safe.</p>
+          <p>
+            Actions affect one alert candidate at a time. A dry run previews recipients watching that program; Send
+            emails only those matching recipients.
+          </p>
         </div>
+        {pendingAlertTotal > alertCandidates.length ? (
+          <p className="maintainer-queue-note">
+            Showing the newest {alertCandidates.length} loaded alerts. Use the Worker API for deeper paging when the queue grows.
+          </p>
+        ) : null}
         <div className="maintainer-card-list maintainer-alert-list">
           {alertCandidates.length ? (
-            alertCandidates.map((candidate) => (
-              <article className="maintainer-candidate-card" key={candidate.id}>
-                <div>
-                  <span>{formatDisplayLabel(candidate.candidateType)}</span>
-                  <h3>{candidate.programName || candidate.program_id}</h3>
-                  <p>{candidate.summary || candidate.title}</p>
-                  {candidate.url ? (
-                    <a href={candidate.url} target="_blank" rel="noreferrer">
-                      Open Official Source
-                    </a>
-                  ) : null}
-                </div>
-                <div className="maintainer-actions">
-                  <button type="button" onClick={() => sendAlertCandidate(candidate, true)} disabled={loading}>
-                    Dry Run
-                  </button>
-                  <button type="button" onClick={() => sendAlertCandidate(candidate, false)} disabled={loading}>
-                    Send
-                  </button>
-                </div>
-              </article>
-            ))
+            visibleAlertCandidates.map((candidate) => {
+              const activeAction = alertActionByCandidateId[candidate.id];
+              const actionResult = alertResultByCandidateId[candidate.id];
+              const isDryRunning = activeAction === 'dryRun';
+              const isSending = activeAction === 'send';
+
+              return (
+                <article className={`maintainer-candidate-card ${activeAction ? 'is-busy' : ''}`} key={candidate.id}>
+                  <div>
+                    <span>{formatDisplayLabel(candidate.candidateType)}</span>
+                    <h3>{candidate.programName || candidate.program_id}</h3>
+                    <p>{candidate.summary || candidate.title}</p>
+                    {candidate.url ? (
+                      <a href={candidate.url} target="_blank" rel="noreferrer">
+                        Open Official Source
+                      </a>
+                    ) : null}
+                  </div>
+                  <div className="maintainer-actions">
+                    <button type="button" onClick={() => sendAlertCandidate(candidate, true)} disabled={loading || Boolean(activeAction)}>
+                      {isDryRunning ? 'Checking...' : 'Preview Recipients'}
+                    </button>
+                    <button type="button" onClick={() => sendAlertCandidate(candidate, false)} disabled={loading || Boolean(activeAction)}>
+                      {isSending ? 'Sending...' : 'Send This Alert'}
+                    </button>
+                  </div>
+                  {actionResult ? <AlertCandidateActionResult result={actionResult} /> : null}
+                </article>
+              );
+            })
           ) : (
             <p className="maintainer-empty">No pending alert candidates.</p>
           )}
         </div>
+        {hiddenAlertCandidateCount ? (
+          <button className="maintainer-show-more" type="button" onClick={() => setShowAllAlertCandidates(true)}>
+            Show {hiddenAlertCandidateCount} More Pending Alert{hiddenAlertCandidateCount === 1 ? '' : 's'}
+          </button>
+        ) : showAllAlertCandidates && alertCandidates.length > 6 ? (
+          <button className="maintainer-show-more" type="button" onClick={() => setShowAllAlertCandidates(false)}>
+            Show Fewer Pending Alerts
+          </button>
+        ) : null}
       </section>
     </section>
   );
 }
 
-function MonitoringReadinessQueue({ queue, onCheckSource, onFindUrl, loading, canLoad }) {
+function AlertCandidateActionResult({ result }) {
+  const deliveries = result.deliveries ?? [];
+  const previewDeliveries = deliveries.slice(0, 3);
+  const hiddenDeliveryCount = Math.max(deliveries.length - previewDeliveries.length, 0);
+
+  return (
+    <section className={`alert-action-result ${result.tone}`} aria-label="Alert action result">
+      <div className="alert-action-result-heading">
+        <strong>{result.title}</strong>
+        <time dateTime={result.generatedAt}>{formatDateTime(result.generatedAt)}</time>
+      </div>
+      <p>{result.detail}</p>
+      {previewDeliveries.length ? (
+        <ul>
+          {previewDeliveries.map((delivery, index) => (
+            <li key={`${delivery.destination}-${delivery.status}-${index}`}>
+              <span>{formatDisplayLabel(delivery.status)}</span>
+              <em>{delivery.channel || 'email'} / {delivery.destination || 'recipient hidden'}</em>
+              {delivery.errorMessage ? <small>{delivery.errorMessage}</small> : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {hiddenDeliveryCount ? <p>{hiddenDeliveryCount} more delivery result{hiddenDeliveryCount === 1 ? '' : 's'} hidden.</p> : null}
+    </section>
+  );
+}
+
+function MonitoringReadinessQueue({ queue, onCheckSource, onFindUrl, readinessActions, loading, canLoad }) {
   const groups = queue.groups ?? [];
 
   return (
@@ -1886,6 +2033,7 @@ function MonitoringReadinessQueue({ queue, onCheckSource, onFindUrl, loading, ca
                       key={item.programId}
                       onCheckSource={onCheckSource}
                       onFindUrl={onFindUrl}
+                      activeAction={readinessActions[item.programId] ?? ''}
                       loading={loading}
                       canLoad={canLoad}
                     />
@@ -1901,9 +2049,13 @@ function MonitoringReadinessQueue({ queue, onCheckSource, onFindUrl, loading, ca
   );
 }
 
-function ReadinessItemCard({ item, onCheckSource, onFindUrl, loading, canLoad }) {
+function ReadinessItemCard({ item, onCheckSource, onFindUrl, activeAction, loading, canLoad }) {
+  const isCheckingSource = activeAction === 'source';
+  const isFindingUrl = activeAction === 'url';
+  const hasLocalAction = Boolean(activeAction);
+
   return (
-    <article className={`readiness-item-card source-state-${getSourceStateTone(item.state)}`}>
+    <article className={`readiness-item-card source-state-${getSourceStateTone(item.state)}${hasLocalAction ? ' is-busy' : ''}`}>
       <div className="readiness-item-main">
         <div>
           <span>{item.state}</span>
@@ -1929,11 +2081,11 @@ function ReadinessItemCard({ item, onCheckSource, onFindUrl, loading, canLoad })
         </div>
       </dl>
       <div className="readiness-item-actions">
-        <button type="button" onClick={() => onCheckSource(item.programId)} disabled={!canLoad || loading}>
-          Check Source
+        <button type="button" onClick={() => onCheckSource(item.programId)} disabled={!canLoad || loading || hasLocalAction}>
+          {isCheckingSource ? 'Checking...' : 'Check This Source'}
         </button>
-        <button type="button" onClick={() => onFindUrl(item.programId)} disabled={!canLoad || loading}>
-          Find URL
+        <button type="button" onClick={() => onFindUrl(item.programId)} disabled={!canLoad || loading || hasLocalAction}>
+          {isFindingUrl ? 'Finding...' : 'Find URL for This'}
         </button>
       </div>
     </article>
@@ -1960,6 +2112,214 @@ function MaintainerMetric({ label, value }) {
       {label}
     </span>
   );
+}
+
+function ReviewHistoryPanel({ history }) {
+  const [activeHistoryFilter, setActiveHistoryFilter] = useState('all');
+  const [showExpandedHistory, setShowExpandedHistory] = useState(false);
+  const allEvents = buildReviewHistoryEvents(history);
+  const attentionCount = allEvents.filter((event) => event.needsAttention).length;
+  const latestEvent = allEvents[0];
+  const filters = [
+    { id: 'all', label: 'All', count: allEvents.length },
+    { id: 'attention', label: 'Needs Review', count: attentionCount },
+    { id: 'source', label: 'Sources', count: allEvents.filter((event) => event.category === 'source').length },
+    { id: 'alert', label: 'Alerts', count: allEvents.filter((event) => event.category === 'alert').length },
+  ];
+  const filteredEvents = filterReviewHistoryEvents(allEvents, activeHistoryFilter);
+  const compactHistory = filteredEvents.length > 5;
+  const visibleHistoryCount = compactHistory && !showExpandedHistory ? 4 : 12;
+  const events = filteredEvents.slice(0, visibleHistoryCount);
+  const hiddenHistoryCount = Math.max(filteredEvents.length - events.length, 0);
+
+  return (
+    <section className="maintainer-panel review-history-panel" aria-label="Maintainer review history">
+      <div className="maintainer-panel-heading review-history-heading">
+        <div>
+          <span>Audit Trail</span>
+          <h2>Recent Maintainer Activity</h2>
+        </div>
+        <p>Review the latest search runs, source checks, URL decisions, and alert attempts in one timeline.</p>
+      </div>
+
+      <div className="review-history-toolbar">
+        <div className="review-history-kpis" aria-label="Review history summary">
+          <span>
+            <strong>{allEvents.length}</strong>
+            Recent Events
+          </span>
+          <span className={attentionCount ? 'needs-attention' : ''}>
+            <strong>{attentionCount}</strong>
+            Need Review
+          </span>
+          <span>
+            <strong>{latestEvent ? formatDateTime(latestEvent.timestamp) : '-'}</strong>
+            Latest
+          </span>
+        </div>
+        <div className="review-history-filters" role="group" aria-label="Filter audit trail">
+          {filters.map((filter) => (
+            <button
+              className={activeHistoryFilter === filter.id ? 'active' : ''}
+              type="button"
+              key={filter.id}
+              onClick={() => setActiveHistoryFilter(filter.id)}
+            >
+              {filter.label}
+              <span>{filter.count}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="review-history-list">
+        {events.length ? (
+          <>
+            {events.map((event) => (
+              <article className={`history-event ${event.kind} ${event.tone}`} key={event.id}>
+                <span className="history-event-marker" aria-hidden="true" />
+                <div className="history-event-body">
+                  <div className="history-event-topline">
+                    <span>{event.type}</span>
+                    <time dateTime={event.timestamp}>{formatDateTime(event.timestamp)}</time>
+                  </div>
+                  <strong>{event.title}</strong>
+                  <p>{event.description}</p>
+                  {event.meta.length ? (
+                    <div className="history-event-meta">
+                      {event.meta.map((item) => (
+                        <span key={item}>{item}</span>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              </article>
+            ))}
+            {hiddenHistoryCount ? (
+              <button className="review-history-toggle" type="button" onClick={() => setShowExpandedHistory(true)}>
+                Show {hiddenHistoryCount} More Recent Event{hiddenHistoryCount === 1 ? '' : 's'}
+              </button>
+            ) : showExpandedHistory && compactHistory ? (
+              <button className="review-history-toggle" type="button" onClick={() => setShowExpandedHistory(false)}>
+                Show Fewer Events
+              </button>
+            ) : null}
+          </>
+        ) : (
+          <p className="maintainer-empty">
+            {activeHistoryFilter === 'attention'
+              ? 'No recent events need review.'
+              : 'No review history yet. Run search, review a URL, or check a source to start the audit trail.'}
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function buildReviewHistoryEvents(history) {
+  const searchRuns = (history.searchRuns ?? []).map((run) => ({
+    id: `search-${run.id}`,
+    kind: 'history-event-search',
+    category: 'search',
+    tone: run.status === 'completed' && !Number(run.errorCount || 0) ? 'neutral' : 'attention',
+    needsAttention: run.status !== 'completed' || Number(run.errorCount || 0) > 0,
+    type: 'Search Run',
+    title: `${formatDisplayLabel(run.provider)} ${run.dryRun ? 'Dry Run' : 'Search'}`,
+    description: `${run.searchedPrograms} program${run.searchedPrograms === 1 ? '' : 's'}, ${run.searchedQueries} quer${run.searchedQueries === 1 ? 'y' : 'ies'}, ${run.keptCandidates} kept, ${run.ignoredResults} ignored.`,
+    meta: [
+      formatDisplayLabel(run.status),
+      run.force ? 'Forced' : '',
+      run.programNames?.length ? run.programNames.join(', ') : '',
+    ].filter(Boolean),
+    timestamp: run.createdAt,
+  }));
+
+  const reviewedUrls = (history.reviewedUrls ?? []).map((candidate) => ({
+    id: `url-${candidate.id}`,
+    kind: candidate.status === 'accepted' ? 'history-event-accepted' : 'history-event-review',
+    category: 'url',
+    tone: candidate.status === 'accepted' ? 'success' : 'neutral',
+    needsAttention: false,
+    type: 'URL Decision',
+    title: candidate.programName || candidate.programId || 'Discovered URL',
+    description: candidate.reviewNote || candidate.reason || 'Reviewed discovered URL candidate.',
+    meta: [formatDisplayLabel(candidate.status), getDisplayHost(candidate.candidateUrl)].filter(Boolean),
+    timestamp: candidate.reviewedAt || candidate.updatedAt,
+  }));
+
+  const sourceChecks = (history.sourceChecks ?? []).map((check) => ({
+    id: `check-${check.id}`,
+    kind: check.newAlertCandidate || check.changed ? 'history-event-source-active' : 'history-event-source',
+    category: 'source',
+    tone: getSourceCheckNeedsAttention(check) ? 'attention' : 'neutral',
+    needsAttention: getSourceCheckNeedsAttention(check),
+    type: 'Source Check',
+    title: check.programName || check.programId || 'Program source',
+    description: check.note ? summarizeSentence(check.note, 150) : check.reviewDecision || 'Source checked.',
+    meta: [
+      formatDisplayLabel(check.result),
+      check.reviewDecision,
+      check.changed ? 'Changed' : 'No Material Change',
+    ].filter(Boolean),
+    timestamp: check.createdAt,
+  }));
+
+  const alertDeliveries = (history.alertDeliveries ?? []).map((delivery) => ({
+    id: `delivery-${delivery.id}`,
+    kind: delivery.status === 'sent' ? 'history-event-delivery-sent' : 'history-event-delivery',
+    category: 'alert',
+    tone: delivery.status === 'sent' ? 'success' : 'attention',
+    needsAttention: !['sent', 'queued', 'already_sent', 'ready'].includes(String(delivery.status || '').toLowerCase()),
+    type: 'Alert Attempt',
+    title: delivery.programName || delivery.programId || 'Tracked program',
+    description: delivery.errorMessage || `${formatDisplayLabel(delivery.channel)} alert to ${delivery.destination || 'masked destination'}.`,
+    meta: [formatDisplayLabel(delivery.status), delivery.destination].filter(Boolean),
+    timestamp: delivery.sentAt || delivery.createdAt,
+  }));
+
+  return [...searchRuns, ...reviewedUrls, ...sourceChecks, ...alertDeliveries].sort(
+    (first, second) => getTimestamp(second.timestamp) - getTimestamp(first.timestamp),
+  );
+}
+
+function filterReviewHistoryEvents(events, filter) {
+  switch (filter) {
+    case 'attention':
+      return events.filter((event) => event.needsAttention);
+    case 'source':
+    case 'alert':
+      return events.filter((event) => event.category === filter);
+    default:
+      return events;
+  }
+}
+
+function getSourceCheckNeedsAttention(check) {
+  const reviewDecision = String(check.reviewDecision || '').toLowerCase();
+  const result = String(check.result || '').toLowerCase();
+  const suggestedStatus = String(check.suggestedStatus || '').toLowerCase();
+
+  return (
+    Boolean(check.newAlertCandidate) ||
+    Boolean(check.changed) ||
+    reviewDecision.includes('manual') ||
+    result.includes('needs') ||
+    suggestedStatus.includes('review')
+  );
+}
+
+function getTimestamp(value) {
+  const parsed = value ? Date.parse(value) : Number.NaN;
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function summarizeSentence(value, maxLength) {
+  if (!value || value.length <= maxLength) {
+    return value || '';
+  }
+
+  return `${value.slice(0, maxLength).trim()}...`;
 }
 
 function DiscoverySearchSummary({ result }) {
@@ -2251,7 +2611,6 @@ function AlertSetupPanel({
   matchCount,
   alertMatches,
   savedOpportunities,
-  onSavedSelect,
   alertStrategy,
   betaAlertSetup,
   onBetaAlertSetupSave,
@@ -2335,44 +2694,6 @@ function AlertSetupPanel({
         captureEndpoint={alertEndpoint}
         watchEndpoint={watchEndpoint}
       />
-      <SavedAlertPreview items={savedOpportunities} onSelect={onSavedSelect} />
-    </section>
-  );
-}
-
-function SavedAlertPreview({ items, onSelect }) {
-  const alertReadyCount = items.filter((item) => getMonitoringReadiness(item).alertable).length;
-
-  return (
-    <section className="saved-alert-preview" aria-label="Saved program alert preview">
-      <div className="saved-alert-heading">
-        <div>
-          <span>Saved Programs</span>
-          <h3>{items.length ? `${items.length} Programs in Your Watchlist` : 'No Saved Programs Yet'}</h3>
-        </div>
-        {items.length ? <strong>{alertReadyCount} With Confirmed Timing</strong> : null}
-      </div>
-      {items.length ? (
-        <div className="saved-alert-list" role="list">
-          {items.slice(0, 4).map((item) => {
-            const signal = getMonitorSignal(item);
-            const readiness = getMonitoringReadiness(item);
-
-            return (
-              <button key={item.id} type="button" onClick={() => onSelect(item.id)} role="listitem">
-                <span>{item.name}</span>
-                <strong>{signal.actionLabel}</strong>
-                <em>{readiness.alertable ? 'Official Timing Found' : 'Timing Needs a Source Check'}</em>
-              </button>
-            );
-          })}
-        </div>
-      ) : (
-        <p>
-          Start on Programs and bookmark opportunities you would actually apply to. Saved programs become your personal
-          watchlist for future reminders.
-        </p>
-      )}
     </section>
   );
 }
@@ -2423,11 +2744,10 @@ function BetaAlertSystem({
         ? 'Add a phone number to start beta text alerts.'
         : 'Add an email to start beta opening alerts.'
       : betaAlertSetup
-        ? `${betaAlertSetup.captureStatus ?? 'Saved'} on ${betaAlertSetup.savedAt.slice(0, 10)} with ${betaAlertSetup.alertReadyCount} alert-ready programs.`
+        ? `${betaAlertSetup.captureStatus ?? 'Saved'} on ${betaAlertSetup.savedAt?.slice(0, 10) ?? 'recently'} with ${betaAlertSetup.alertReadyCount} alert-ready programs.`
         : 'Ready to submit this watch setup.';
   const alertReadyMatches = matches.filter((item) => getMonitoringReadiness(item).alertable);
   const needsSourceCheck = hasPreviewFocus ? matches.length - alertReadyMatches.length : 0;
-  const previewPrograms = hasPreviewFocus ? alertReadyMatches.slice(0, 4) : [];
   const savedProgramIds = new Set(savedOpportunities.map((item) => item.id));
   const watchedPreview = hasPreviewFocus
     ? [
@@ -2435,6 +2755,23 @@ function BetaAlertSystem({
         ...alertReadyMatches.filter((item) => !savedProgramIds.has(item.id)).slice(0, 3),
       ].slice(0, 5)
     : [];
+  const watchSteps = [
+    {
+      label: 'Set Focus',
+      complete: !hasIncompleteSetup,
+      detail: hasIncompleteSetup ? `Missing ${missingSetupSummary}.` : `${alertPrefs.classYear} / ${alertPrefs.roleTrack}`,
+    },
+    {
+      label: 'Add Contact',
+      complete: hasContact,
+      detail: hasContact ? `${contactMethod === 'phone' ? 'Text' : 'Email'} ready` : 'Add contact info',
+    },
+    {
+      label: 'Submit',
+      complete: Boolean(betaAlertSetup),
+      detail: betaAlertSetup ? 'Watch setup saved' : 'Start when ready',
+    },
+  ];
 
   const createSetupPayload = (captureStatus) => ({
     classYear: alertPrefs.classYear,
@@ -2542,57 +2879,59 @@ function BetaAlertSystem({
     <section className="beta-alert-system" aria-label="Beta watch setup">
       <div className="beta-alert-copy">
         <span>Beta Watching</span>
-        <h3>Submit Your Watch Setup</h3>
+        <h3>Your Watch Plan</h3>
         <p>
           {hasPreviewFocus
-            ? 'ApplyFirst emails high-confidence opening signals. Every beta alert includes an unsubscribe link.'
-            : 'Choose Class Year and Role Track to unlock the preview.'}
+            ? 'Review what ApplyFirst would track, add contact info, then start beta alerts.'
+            : 'Choose your focus to see the watch plan.'}
         </p>
       </div>
-      <div className="beta-alert-metrics" aria-label="Beta alert readiness">
-        <span>
-          <strong>{hasPreviewFocus ? matches.length : '-'}</strong>
-          Matches
-        </span>
-        <span>
-          <strong>{hasPreviewFocus ? alertReadyMatches.length : '-'}</strong>
-          Alert-Ready
-        </span>
-        <span>
-          <strong>{hasPreviewFocus ? needsSourceCheck : '-'}</strong>
-          Needs Check
-        </span>
+      <div className="watch-plan-steps" aria-label="Watch setup progress">
+        {watchSteps.map((step) => (
+          <span className={step.complete ? 'complete' : ''} key={step.label}>
+            <strong>{step.complete ? 'Done' : 'Next'}</strong>
+            {step.label}
+            <em>{step.detail}</em>
+          </span>
+        ))}
       </div>
-      <div className="beta-alert-preview">
+
+      <div className="watch-plan-summary" aria-label="Watch plan summary">
         <div>
-          <span>Watch Queue Preview</span>
+          <span>Programs</span>
           <strong>
             {watchedPreview.length
-              ? watchedPreview.map((item) => item.name).join(', ')
+              ? `${watchedPreview.length} program${watchedPreview.length === 1 ? '' : 's'}`
               : !hasPreviewFocus
-                ? 'Choose focus fields to preview matches.'
+                ? 'Choose focus fields'
                 : 'No alert-ready matches yet.'}
           </strong>
-        </div>
-        <div>
-          <span>Send Timing</span>
-          <strong>
-            {hasPreviewFocus
-              ? alertStrategy.sendSummary
-              : 'Choose focus to preview timing.'}
-          </strong>
-        </div>
-        <div>
-          <span>Ready Examples</span>
-          <strong>
-            {previewPrograms.length
-              ? previewPrograms.map((item) => item.name).join(', ')
+          <p>
+            {savedOpportunities.length
+              ? `${savedOpportunities.length} saved by you. Saved programs are watched first.`
               : hasPreviewFocus
-                ? 'No confirmed timing matches for this focus yet.'
-                : 'Appears after focus is selected.'}
-          </strong>
+                ? 'Save programs to make the watch list more personal.'
+                : 'Your preview appears after setup.'}
+          </p>
+        </div>
+        <div>
+          <span>Alert Rule</span>
+          <strong>{hasPreviewFocus ? alertStrategy.timingLabel : 'Choose Timing'}</strong>
+          <p>{hasPreviewFocus ? alertStrategy.sendSummary : 'Pick when ApplyFirst should notify you.'}</p>
+        </div>
+        <div>
+          <span>Source Status</span>
+          <strong>{hasPreviewFocus ? `${alertReadyMatches.length} Ready / ${needsSourceCheck} Need Check` : 'Pending'}</strong>
+          <p>
+            {hasPreviewFocus
+              ? 'Only high-confidence official openings can send automatically.'
+              : 'Source status appears with matches.'}
+          </p>
         </div>
       </div>
+
+      {betaAlertSetup ? <WatchSetupReceipt setup={betaAlertSetup} /> : null}
+
       <div className="beta-alert-actions">
         <div className="contact-method-control" role="group" aria-label="Alert delivery method">
           <button
@@ -2637,7 +2976,7 @@ function BetaAlertSystem({
           disabled={hasIncompleteSetup || !hasContact || submitState === 'submitting'}
           title={setupActionMessage}
         >
-          {submitState === 'submitting' ? 'Submitting...' : 'Start Watching'}
+          {submitState === 'submitting' ? 'Submitting...' : betaAlertSetup ? 'Update Watch Setup' : 'Start Watching'}
         </button>
         {hasIncompleteSetup || !hasContact || betaAlertSetup ? (
           <p className={hasIncompleteSetup || !hasContact ? 'setup-readiness-note needs-action' : 'setup-readiness-note'}>
@@ -2654,6 +2993,26 @@ function BetaAlertSystem({
         hasSavedSetup={Boolean(betaAlertSetup)}
         hasPreviewFocus={hasPreviewFocus}
       />
+    </section>
+  );
+}
+
+function WatchSetupReceipt({ setup }) {
+  const contactLabel = setup.contactMethod === 'phone' ? 'Text Alerts' : 'Email Alerts';
+  const savedDate = setup.savedAt ? formatDateTime(setup.savedAt) : 'Saved';
+
+  return (
+    <section className="watch-setup-receipt" aria-label="Saved watch setup receipt">
+      <div>
+        <span>Submitted</span>
+        <strong>{setup.captureStatus ?? 'Watch Setup Saved'}</strong>
+        <p>{contactLabel} / {savedDate}</p>
+      </div>
+      <div>
+        <span>Watching</span>
+        <strong>{setup.watchedProgramIds?.length ?? 0} Programs</strong>
+        <p>{setup.alertReadyCount ?? 0} alert-ready, {setup.needsSourceCheck ?? 0} need source checks.</p>
+      </div>
     </section>
   );
 }
@@ -2676,10 +3035,10 @@ function BetaAlertFeed({ alertStrategy, watchedPrograms, needsSourceCheck, hasSa
   });
 
   return (
-    <section className="beta-alert-feed" aria-label="Beta watch preview">
+    <section className="beta-alert-feed" aria-label="Beta watch programs">
       <div className="beta-alert-feed-heading">
-        <span>Watch Preview</span>
-        <strong>{hasSavedSetup ? 'Your Saved Watch Setup' : 'Before You Save'}</strong>
+        <span>{hasSavedSetup ? 'Watching Now' : 'Preview'}</span>
+        <strong>{hasSavedSetup ? 'Tracked Programs' : 'Programs in This Plan'}</strong>
       </div>
       {feedItems.length ? (
         <div className="beta-alert-feed-list" role="list">

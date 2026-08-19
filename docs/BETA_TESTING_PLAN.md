@@ -57,10 +57,10 @@ Ask the tester to share their screen and think out loud.
    - Ask: Does the Start Here guide make it clear what to do next?
 
 4. My Focus
-   - Ask them to open My Focus and set their class year, career interest, program group, and timing preference.
-   - Ask them to review the watch preview, choose email or text, add contact info, and submit a beta watch setup.
+   - Ask them to open My Focus and set their class year, role track, and timing preference.
+   - Ask them to review the watch plan, choose email or text, add contact info, and submit a beta watch setup.
    - Ask: Do these fields match how you think about opportunities?
-   - Ask: Is it clear which programs ApplyFirst would watch and which still need source checks?
+   - Ask: Is it clear what ApplyFirst would watch, which saved programs are prioritized, and which programs still need source checks?
    - Ask: Is anything missing, unnecessary, or worded oddly?
 
 5. Suggest Updates / feedback
@@ -83,6 +83,7 @@ The beta is working if:
 - Students save at least one program they would actually track.
 - Students understand Start Here as a short onboarding path, not a permanent dashboard widget.
 - My Focus feels useful rather than like arbitrary settings.
+- Students understand the watch plan receipt after submitting beta alerts.
 - Students understand beta watch requests are opt-in, high-confidence openings can email automatically, and uncertain signals stay in review while signal quality is tested.
 - Students understand when ApplyFirst would email or text them.
 - Students understand they can unsubscribe from beta email alerts.

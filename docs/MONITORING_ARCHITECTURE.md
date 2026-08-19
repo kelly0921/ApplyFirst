@@ -360,6 +360,7 @@ The Cloudflare watch Worker adds the first durable monitoring path:
 - `GET /watch/status` returns safe aggregate counts for smoke checks.
 - `GET /watch/unsubscribe?token=...` and `POST /watch/unsubscribe?token=...` unsubscribe a beta watch setup. Legacy `requestId` links are still supported for older test emails.
 - `GET /watch/readiness` returns the maintainer readiness queue grouped by source attention state. Requires `WATCH_ADMIN_TOKEN`.
+- `GET /watch/history` returns recent discovery search runs, reviewed URL decisions, source checks, and masked alert-delivery attempts for maintainer audit review. Requires `WATCH_ADMIN_TOKEN`.
 - `POST /watch/run` manually triggers a source check pass and requires `WATCH_ADMIN_TOKEN`. It also accepts `programId`, `programIds`, and `dryRun: true` for maintainer-safe targeted checks that fetch and classify sources without writing snapshots, creating candidates, updating schedules, or sending emails.
 - `GET /watch/discovery` lists seasonally due current-cycle URL discovery tasks, structured query packs, priority labels, active watcher counts, and candidate counts. Requires `WATCH_ADMIN_TOKEN`.
 - `GET /watch/discovery/candidates` lists discovered URL candidates. Requires `WATCH_ADMIN_TOKEN`.
