@@ -1534,6 +1534,15 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
   };
 
   const reviewDiscoveryCandidate = async (candidate, statusValue) => {
+    if (
+      statusValue === 'accepted' &&
+      !window.confirm(
+        `Accept this URL for ${candidate.programName || candidate.program_id}? This will replace the monitored source and queue an immediate source check.`,
+      )
+    ) {
+      return;
+    }
+
     setLoading(true);
     setErrorMessage('');
     setActionMessage('');
@@ -1543,6 +1552,7 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
         method: 'POST',
         body: {
           status: statusValue,
+          applyToOfficialSource: statusValue === 'accepted',
           reviewedBy: 'applyfirst-maintainer-console',
           reviewNote:
             statusValue === 'accepted'
@@ -1754,18 +1764,44 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
                     <span>{formatDisplayLabel(candidate.confidence)}</span>
                     <h3>{candidate.programName || candidate.program_id}</h3>
                     <p>{candidate.title || 'Untitled candidate'}</p>
-                    <a href={candidate.candidate_url} target="_blank" rel="noreferrer">
-                      Open Candidate Source
-                    </a>
+                    <div className="candidate-link-row">
+                      <a href={candidate.candidate_url} target="_blank" rel="noreferrer">
+                        Open Candidate Source
+                      </a>
+                      {candidate.currentOfficialUrl ? (
+                        <a href={candidate.currentOfficialUrl} target="_blank" rel="noreferrer">
+                          Current Source
+                        </a>
+                      ) : null}
+                    </div>
                   </div>
+                  <dl className="candidate-source-compare">
+                    <div>
+                      <dt>Candidate Host</dt>
+                      <dd>{getDisplayHost(candidate.candidate_url)}</dd>
+                    </div>
+                    <div>
+                      <dt>Current Host</dt>
+                      <dd>{getDisplayHost(candidate.currentOfficialUrl)}</dd>
+                    </div>
+                    <div>
+                      <dt>Query</dt>
+                      <dd>{candidate.discovery_query || '-'}</dd>
+                    </div>
+                  </dl>
                   <p>{candidate.reason || 'Needs maintainer review.'}</p>
                   {candidate.snippet ? <blockquote>{stripHtml(candidate.snippet)}</blockquote> : null}
+                  <ul className="candidate-review-checklist" aria-label="Review checks before accepting">
+                    <li>Official or organization-owned page</li>
+                    <li>Current-cycle application, deadline, or program page</li>
+                    <li>Program name and student audience match</li>
+                  </ul>
                   <div className="maintainer-actions">
                     <button type="button" onClick={() => reviewDiscoveryCandidate(candidate, 'accepted')} disabled={loading}>
-                      Accept
+                      Accept & Queue Check
                     </button>
                     <button type="button" onClick={() => reviewDiscoveryCandidate(candidate, 'rejected')} disabled={loading}>
-                      Reject
+                      Reject URL
                     </button>
                   </div>
                 </article>
@@ -1927,29 +1963,86 @@ function MaintainerMetric({ label, value }) {
 }
 
 function DiscoverySearchSummary({ result }) {
-  const keptPrograms = (result.results ?? []).filter((item) => item.candidates?.length);
+  const programs = result.results ?? [];
+  const keptCount = programs.reduce((total, program) => total + (program.candidates?.length ?? 0), 0);
+  const ignoredCount = programs.reduce(
+    (total, program) => total + (program.queries ?? []).reduce((queryTotal, query) => queryTotal + (query.ignored ?? 0), 0),
+    0,
+  );
 
   return (
     <section className="discovery-search-summary" aria-label="Discovery search result summary">
-      <div>
+      <div className="discovery-summary-heading">
         <span>{result.provider}</span>
-        <strong>{result.searchedQueries} Queries</strong>
+        <strong>{result.searchedQueries} Queries Reviewed</strong>
         <p>
           Found {result.foundResults} results, saved {result.savedCandidates ?? 0}, updated{' '}
           {result.updatedCandidates ?? 0}.
         </p>
       </div>
-      {keptPrograms.length ? (
-        <ul>
-          {keptPrograms.map((program) => (
-            <li key={program.programId}>
-              <strong>{program.programName}</strong>
-              <span>{program.candidates.length} candidate{program.candidates.length === 1 ? '' : 's'}</span>
-            </li>
+      <div className="discovery-summary-metrics">
+        <MaintainerMetric label="Kept" value={keptCount} />
+        <MaintainerMetric label="Ignored" value={ignoredCount} />
+        <MaintainerMetric label="Errors" value={result.errorCount ?? 0} />
+      </div>
+      {programs.length ? (
+        <div className="discovery-program-audit-list">
+          {programs.map((program) => (
+            <article className="discovery-program-audit" key={program.programId}>
+              <div className="discovery-program-heading">
+                <div>
+                  <span>{program.programId}</span>
+                  <h3>{program.programName}</h3>
+                </div>
+                <strong>{program.candidates?.length ?? 0} Kept</strong>
+              </div>
+              {program.candidates?.length ? (
+                <ul className="discovery-kept-list" aria-label={`${program.programName} kept candidates`}>
+                  {program.candidates.map((candidate) => (
+                    <li key={`${program.programId}-${candidate.url}`}>
+                      <div>
+                        <a href={candidate.url} target="_blank" rel="noreferrer">
+                          {candidate.title || candidate.url}
+                        </a>
+                        <span>{formatDisplayLabel(candidate.confidence)}</span>
+                      </div>
+                      <p>{candidate.reason || 'Needs maintainer review.'}</p>
+                      {candidate.matchType || candidate.signals?.length ? (
+                        <em>{[candidate.matchType, ...(candidate.signals ?? [])].filter(Boolean).join(' / ')}</em>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              <ul className="discovery-query-audit-list" aria-label={`${program.programName} query audit`}>
+                {(program.queries ?? []).map((query) => (
+                  <li key={`${program.programId}-${query.query}`}>
+                    <div>
+                      <strong>{query.query}</strong>
+                      <span>
+                        {query.kept ?? 0} kept / {query.ignored ?? 0} ignored
+                      </span>
+                    </div>
+                    {query.error ? <p className="source-check-error">Error: {query.error}</p> : null}
+                    {query.ignoredSamples?.length ? (
+                      <ul className="discovery-ignored-list">
+                        {query.ignoredSamples.map((sample) => (
+                          <li key={`${query.query}-${sample.url || sample.title || sample.filter}`}>
+                            <span>{formatDisplayLabel(sample.filter)}</span>
+                            <p>{sample.reason}</p>
+                            {sample.title ? <em>{sample.title}</em> : null}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </article>
           ))}
-        </ul>
+        </div>
       ) : (
-        <p>No candidate URLs passed the official-source filter.</p>
+        <p>No programs were searched.</p>
       )}
     </section>
   );
@@ -3755,6 +3848,14 @@ function formatDisplayLabel(value) {
 
 function cleanText(value) {
   return String(value ?? '').replace(/\s+/g, ' ').trim();
+}
+
+function getDisplayHost(value) {
+  try {
+    return new URL(value).hostname.replace(/^www\./, '') || '-';
+  } catch {
+    return '-';
+  }
 }
 
 function DetailSection({ title, children }) {

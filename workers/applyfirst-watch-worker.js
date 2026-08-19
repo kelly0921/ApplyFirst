@@ -987,10 +987,21 @@ async function runDiscoverySearch(env, body = {}) {
           country,
           maxResults: maxResultsPerQuery,
         });
-        const keptResults = providerResults.filter((result) => isRelevantDiscoverySearchResult(item, result));
+        const evaluationSeenCandidateUrls = new Set(seenCandidateUrls);
+        const evaluatedResults = providerResults.map((result) => {
+          const evaluation = evaluateDiscoverySearchResult(item, result, evaluationSeenCandidateUrls);
+
+          if (evaluation.keep && evaluation.candidateKey) {
+            evaluationSeenCandidateUrls.add(evaluation.candidateKey);
+          }
+
+          return evaluation;
+        });
+        const keptResults = evaluatedResults.filter((evaluation) => evaluation.keep);
         foundResults += providerResults.length;
 
-        for (const result of keptResults.slice(0, maxResultsPerQuery)) {
+        for (const evaluation of keptResults.slice(0, maxResultsPerQuery)) {
+          const result = evaluation.result;
           const candidateKey = comparableUrl(result.url);
 
           if (!candidateKey || seenCandidateUrls.has(candidateKey)) {
@@ -999,7 +1010,7 @@ async function runDiscoverySearch(env, body = {}) {
 
           seenCandidateUrls.add(candidateKey);
 
-          const score = scoreDiscoverySearchResult(item, result);
+          const score = scoreDiscoverySearchResult(item, result, evaluation);
           const candidateInput = {
             programId: item.programId,
             candidateUrl: result.url,
@@ -1017,6 +1028,8 @@ async function runDiscoverySearch(env, body = {}) {
               title: candidateInput.title,
               confidence: candidateInput.confidence,
               reason: candidateInput.reason,
+              matchType: score.matchType,
+              signals: score.signals,
             });
             continue;
           }
@@ -1035,6 +1048,9 @@ async function runDiscoverySearch(env, body = {}) {
             confidence: saved.confidence,
             status: saved.status,
             action: saved.wasExisting ? 'updated_existing' : 'created',
+            reason: saved.reason,
+            matchType: score.matchType,
+            signals: score.signals,
           });
         }
 
@@ -1043,6 +1059,8 @@ async function runDiscoverySearch(env, body = {}) {
           query: queryInfo.query,
           found: providerResults.length,
           kept: keptResults.length,
+          ignored: evaluatedResults.filter((evaluation) => !evaluation.keep).length,
+          ignoredSamples: summarizeDiscoveryIgnoredResults(evaluatedResults),
         });
       } catch (error) {
         errorCount += 1;
@@ -1237,43 +1255,179 @@ async function readProviderError(response) {
 }
 
 function isRelevantDiscoverySearchResult(item, result) {
+  return evaluateDiscoverySearchResult(item, result).keep;
+}
+
+function evaluateDiscoverySearchResult(item, result, seenCandidateUrls = new Set()) {
   const candidateUrl = normalizeUrl(result.url);
   const candidateHost = getUrlHost(candidateUrl);
 
-  if (
-    !candidateUrl ||
-    isSameComparableUrl(candidateUrl, item.url) ||
-    LOW_SIGNAL_DISCOVERY_HOSTS.has(candidateHost) ||
-    isLikelyRepostUrl(candidateUrl)
-  ) {
-    return false;
+  if (!candidateUrl) {
+    return buildDiscoveryEvaluation(result, {
+      filter: 'invalid_url',
+      reason: 'Result did not include a valid HTTP or HTTPS URL.',
+    });
+  }
+
+  const candidateKey = comparableUrl(candidateUrl);
+
+  if (!candidateKey) {
+    return buildDiscoveryEvaluation(result, {
+      filter: 'invalid_url',
+      reason: 'Result URL could not be normalized for review.',
+      candidateHost,
+    });
+  }
+
+  if (seenCandidateUrls.has(candidateKey)) {
+    return buildDiscoveryEvaluation(result, {
+      filter: 'duplicate_url',
+      reason: 'Same candidate URL already appeared in this search run.',
+      candidateHost,
+      candidateKey,
+    });
+  }
+
+  if (isSameComparableUrl(candidateUrl, item.url)) {
+    return buildDiscoveryEvaluation(result, {
+      filter: 'current_source',
+      reason: 'Same as the current official source, so there is no new URL to review.',
+      candidateHost,
+      candidateKey,
+    });
+  }
+
+  if (LOW_SIGNAL_DISCOVERY_HOSTS.has(candidateHost)) {
+    return buildDiscoveryEvaluation(result, {
+      filter: 'low_signal_host',
+      reason: `${candidateHost} is a broad listing, social, or source-repo host instead of an official program source.`,
+      candidateHost,
+      candidateKey,
+    });
+  }
+
+  if (isLikelyRepostUrl(candidateUrl)) {
+    return buildDiscoveryEvaluation(result, {
+      filter: 'repost_or_news',
+      reason: 'Looks like a blog, article, or news repost rather than a stable program source.',
+      candidateHost,
+      candidateKey,
+    });
   }
 
   const text = buildDiscoverySearchText(result);
   const hostMatch = getDiscoveryHostMatch(item, candidateUrl);
+  const hasContext = DISCOVERY_CONTEXT_PATTERN.test(text);
 
   if (hostMatch === 'known_official_host' || hostMatch === 'known_official_domain') {
-    return true;
+    return buildDiscoveryEvaluation(result, {
+      keep: true,
+      filter: 'kept',
+      reason:
+        hostMatch === 'known_official_host'
+          ? 'Kept because it is on the known official host.'
+          : 'Kept because it is on the same official domain family.',
+      candidateHost,
+      candidateKey,
+      hostMatch,
+      signals: getDiscoverySignals(text),
+      hasContext,
+    });
   }
 
   if (hostMatch !== 'organization_host') {
-    return false;
+    return buildDiscoveryEvaluation(result, {
+      filter: 'unmatched_host',
+      reason: 'Host does not match the known source, prior source, or recognizable organization/program tokens.',
+      candidateHost,
+      candidateKey,
+      hostMatch,
+    });
   }
 
   const tokens = significantDiscoveryTokens(`${item.programName} ${item.organization}`);
   const matchedTokens = tokens.filter((token) => text.includes(token)).length;
+  const requiredTokens = Math.min(2, tokens.length || 2);
 
-  return matchedTokens >= Math.min(2, tokens.length || 2) && DISCOVERY_CONTEXT_PATTERN.test(text);
+  if (matchedTokens < requiredTokens) {
+    return buildDiscoveryEvaluation(result, {
+      filter: 'weak_program_match',
+      reason: `Only matched ${matchedTokens}/${requiredTokens} useful program or organization token${requiredTokens === 1 ? '' : 's'}.`,
+      candidateHost,
+      candidateKey,
+      hostMatch,
+      matchedTokens,
+      requiredTokens,
+    });
+  }
+
+  if (!hasContext) {
+    return buildDiscoveryEvaluation(result, {
+      filter: 'missing_timing_context',
+      reason: 'Matched the organization, but did not mention application, deadline, program, or student timing context.',
+      candidateHost,
+      candidateKey,
+      hostMatch,
+      matchedTokens,
+      requiredTokens,
+    });
+  }
+
+  return buildDiscoveryEvaluation(result, {
+    keep: true,
+    filter: 'kept',
+    reason: 'Kept because the host looks organization-owned and the result mentions program/timing context.',
+    candidateHost,
+    candidateKey,
+    hostMatch,
+    matchedTokens,
+    requiredTokens,
+    signals: getDiscoverySignals(text),
+    hasContext,
+  });
 }
 
-function scoreDiscoverySearchResult(item, result) {
-  const hostMatch = getDiscoveryHostMatch(item, result.url);
+function buildDiscoveryEvaluation(result, options = {}) {
+  return {
+    keep: Boolean(options.keep),
+    result,
+    filter: cleanString(options.filter || 'unknown', 80),
+    reason: cleanString(options.reason || 'Needs maintainer review.', 260),
+    candidateHost: cleanString(options.candidateHost, 200),
+    candidateKey: cleanString(options.candidateKey, 700),
+    hostMatch: cleanString(options.hostMatch || 'unknown', 80),
+    matchedTokens: numberOrZero(options.matchedTokens),
+    requiredTokens: numberOrZero(options.requiredTokens),
+    signals: Array.isArray(options.signals) ? options.signals : [],
+    hasContext: Boolean(options.hasContext),
+  };
+}
+
+function summarizeDiscoveryIgnoredResults(evaluatedResults) {
+  return evaluatedResults
+    .filter((evaluation) => !evaluation.keep)
+    .slice(0, 4)
+    .map((evaluation) => ({
+      title: cleanString(evaluation.result?.title, 160),
+      url: normalizeUrl(evaluation.result?.url),
+      host: evaluation.candidateHost,
+      filter: evaluation.filter,
+      reason: evaluation.reason,
+    }));
+}
+
+function scoreDiscoverySearchResult(item, result, evaluation = null) {
+  const hostMatch = evaluation?.hostMatch || getDiscoveryHostMatch(item, result.url);
   const text = buildDiscoverySearchText(result);
+  const signals = getDiscoverySignals(text);
+  const matchType = formatDiscoveryHostMatch(hostMatch);
 
   if (hostMatch === 'known_official_host') {
     return {
       confidence: DISCOVERY_CONTEXT_PATTERN.test(text) ? 'high' : 'medium',
       reason: 'Search result is on the known official host and may point to a more specific current-cycle page.',
+      matchType,
+      signals,
     };
   }
 
@@ -1281,6 +1435,8 @@ function scoreDiscoverySearchResult(item, result) {
     return {
       confidence: DISCOVERY_CONTEXT_PATTERN.test(text) ? 'high' : 'medium',
       reason: 'Search result is on the same official domain family as the known source.',
+      matchType,
+      signals,
     };
   }
 
@@ -1288,17 +1444,57 @@ function scoreDiscoverySearchResult(item, result) {
     return {
       confidence: 'medium',
       reason: 'Search result is on a likely organization-owned host, but needs maintainer confirmation.',
+      matchType,
+      signals,
     };
   }
 
   return {
     confidence: 'needs_review',
     reason: 'Search result may be relevant, but needs maintainer confirmation.',
+    matchType,
+    signals,
   };
 }
 
 function buildDiscoverySearchText(result) {
   return `${result.title || ''} ${result.snippet || ''} ${result.url || ''}`.toLowerCase();
+}
+
+function getDiscoverySignals(text) {
+  const normalized = cleanString(text, 1200).toLowerCase();
+  const signals = [];
+
+  if (/\b(apply|application|applications|submit your application)\b/i.test(normalized)) {
+    signals.push('Application');
+  }
+
+  if (/\b(deadline|deadlines|due date)\b/i.test(normalized)) {
+    signals.push('Deadline');
+  }
+
+  if (/\b(open|opens|opening|now accepting|currently accepting)\b/i.test(normalized)) {
+    signals.push('Opening');
+  }
+
+  if (/\b(internship|fellowship|scholarship|conference|academy|program|cohort)\b/i.test(normalized)) {
+    signals.push('Program Context');
+  }
+
+  return uniqueStrings(signals).slice(0, 4);
+}
+
+function formatDiscoveryHostMatch(hostMatch) {
+  switch (hostMatch) {
+    case 'known_official_host':
+      return 'Known Official Host';
+    case 'known_official_domain':
+      return 'Official Domain Family';
+    case 'organization_host':
+      return 'Likely Organization Host';
+    default:
+      return 'Unmatched Host';
+  }
 }
 
 function getDiscoveryHostMatch(item, candidateUrl) {

@@ -273,7 +273,8 @@ curl -X POST "https://applyfirst-watch.YOUR-SUBDOMAIN.workers.dev/watch/discover
   -d "{\"limit\": 5, \"maxQueriesPerProgram\": 3, \"maxResultsPerQuery\": 5}"
 ```
 
-Add `"dryRun": true` to preview results without saving candidates. Add `"force": true` for smoke tests against records that are not currently discovery-due.
+Add `"dryRun": true` to preview results without saving candidates. Dry-run responses include kept candidates plus representative ignored results and reasons, so maintainers can tune query quality before saving.
+Add `"force": true` for smoke tests against records that are not currently discovery-due.
 Add `programId` or `programIds` to target specific programs from the maintainer readiness queue.
 
 To save a possible current-cycle URL manually:
