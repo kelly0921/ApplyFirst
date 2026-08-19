@@ -98,7 +98,7 @@ const repeatedProgramIds = new Set([
   'google-summer-of-code',
   'outreachy',
   'mlh-fellowship',
-  'coding-it-forward',
+  'coding-it-forward-fellowship',
   'new-technologists-academy',
   'seo-tech-developer-core',
   'headstart-fellowship-watch',
@@ -157,10 +157,13 @@ export function getMonitoringReadiness(opportunity) {
     !opportunity.openDate.toLowerCase().includes('verify');
   const hasDeadline =
     opportunity.deadline &&
+    !opportunity.deadline.toLowerCase().includes('watch') &&
     !opportunity.deadline.toLowerCase().includes('verify') &&
     !opportunity.deadline.toLowerCase().includes('varies');
   const verificationState = getVerificationState(opportunity);
   const monitorSignal = getMonitorSignal(opportunity);
+  const hasCurrentCycleTiming = Boolean(hasActionableWindow || hasDeadline);
+  const sendsUsefulAlerts = !['Technical community', 'Special program / resource'].includes(opportunity.category);
 
   if (!hasOfficialUrl) {
     missing.push('Official URL');
@@ -182,6 +185,8 @@ export function getMonitoringReadiness(opportunity) {
     hasOfficialUrl &&
     hasCheckedDate &&
     verificationState === 'verified' &&
+    hasCurrentCycleTiming &&
+    sendsUsefulAlerts &&
     ['openNow', 'opensSoon', 'deadlineSoon', 'watching'].includes(monitorSignal.alertReadiness);
 
   return {
@@ -265,7 +270,7 @@ export function getSourceUpdatePlan(opportunity) {
         : needsOfficialCycleCheck || needsTimingCheck
           ? 'Weekly until the official cycle page is clear'
           : 'Monthly until the next expected season';
-  const watchedPage = opportunity.previousUrl || opportunity.url;
+  const watchedPage = opportunity.url;
   const changeSignals = [
     'Application, apply, deadline, eligibility, or program-year language changes',
     hasSpecificTiming ? 'Opening or deadline date changes from the current record' : 'A new current-cycle date appears',
@@ -364,20 +369,21 @@ export const opportunities = [
     classYears: ['Freshman'],
     timing: 'Summer',
     status: 'verifyManually',
-    confidence: 'needsReview',
+    confidence: 'medium',
     funding: 'Paid internship',
     location: 'Varies by posting',
-    url: 'https://careers.microsoft.com/',
+    url: 'https://careers.microsoft.com/v2/global/en/exploremicrosoft',
     previousUrl: '',
-    openDate: 'Watch summer and early fall postings',
-    deadline: 'Verify current posting',
+    openDate: 'Watch late summer and early fall postings',
+    deadline: 'Verify current application posting',
     tags: ['Software engineering', 'Big tech', 'Underclassmen'],
     why:
       'A classic freshman-targeted software engineering internship signal that helps students get industry experience before junior-year recruiting.',
     prep:
       'Track Microsoft careers for Explore-specific role titles, prepare a freshman-friendly project story, and verify eligibility before sharing.',
     sourceNote:
-      'Inspired by the underclassmen-internships repo taxonomy; official posting must be verified before public alerts.',
+      'Official Microsoft page confirms Explore is for first- and second-year students; current application posting and deadline still need cycle verification.',
+    lastChecked: '2026-08-18',
   },
   {
     id: 'palantir-path-watch',
@@ -392,15 +398,16 @@ export const opportunities = [
     location: 'Varies by posting',
     url: 'https://www.palantir.com/careers/',
     previousUrl: '',
-    openDate: 'Watch summer and early fall postings',
-    deadline: 'Verify current posting',
+    openDate: 'Watch official student and early-talent pages for Path or Launch-style programs',
+    deadline: 'Verify whether Path has a current-cycle official posting',
     tags: ['Software engineering', 'Product engineering', 'Underclassmen'],
     why:
       'A focused underclassmen internship path for students interested in product-heavy engineering and complex customer-facing systems.',
     prep:
       'Prepare systems and project examples, then check whether the current cycle lists Path separately from standard internship roles.',
     sourceNote:
-      'Inspired by the underclassmen-internships repo taxonomy; official posting must be verified before public alerts.',
+      'Current official Palantir student pages show standard internships, new grad roles, Launch, and Meritocracy Fellowship; Path was not confirmed as a current official program.',
+    lastChecked: '2026-08-18',
   },
   {
     id: 'nasa-internships',
@@ -409,13 +416,13 @@ export const opportunities = [
     category: 'Internship',
     classYears: ['All class years'],
     timing: 'Rolling',
-    status: 'watching',
+    status: 'deadlineSoon',
     confidence: 'high',
     funding: 'Paid internship',
     location: 'In person, hybrid, or remote by posting',
-    url: 'https://intern.nasa.gov/',
+    url: 'https://www.nasa.gov/learning-resources/internship-programs/',
     previousUrl: '',
-    openDate: 'Three annual sessions listed by NASA',
+    openDate: 'Spring, Summer, and Fall 2027 sessions listed by NASA',
     deadline: 'Spring 2027: Sep 14, 2026; Summer 2027: Feb 26, 2027; Fall 2027: May 21, 2027',
     tags: ['Government', 'Research', 'Engineering'],
     why:
@@ -424,7 +431,7 @@ export const opportunities = [
       'Search by major, location, and class year. Save postings that explicitly include freshman or sophomore eligibility.',
     sourceNote:
       'Official NASA internship page lists OSTEM and Pathways programs, paid internships, eligibility details, and 2027 session deadlines.',
-    lastChecked: '2026-07-10',
+    lastChecked: '2026-08-18',
   },
   {
     id: 'jane-street-fttp-watch',
@@ -434,19 +441,21 @@ export const opportunities = [
     classYears: ['Freshman'],
     timing: 'Spring',
     status: 'verifyManually',
-    confidence: 'needsReview',
+    confidence: 'medium',
     funding: 'Varies',
     location: 'Insight program',
-    url: 'https://www.janestreet.com/join-jane-street/',
+    url: 'https://www.janestreet.com/join-jane-street/programs-and-events/fttp/',
     previousUrl: '',
-    openDate: 'Watch fall and winter',
-    deadline: 'Verify current program cycle',
+    openDate: 'Watch fall and winter for current FTTP sessions',
+    deadline: 'Sign up to be notified; exact current deadline varies by program location',
     tags: ['Trading', 'Finance', 'Insight program'],
     why:
       'Short early-exposure programs help freshmen decide whether trading, math, finance, and technology environments are worth pursuing.',
     prep:
       'Prepare a concise interest note and track insight-program pages, not only internship pages.',
-    sourceNote: 'Inspired by the repo section for externships and insight series.',
+    sourceNote:
+      'Official Jane Street FTTP page confirms the first-year undergraduate program; exact current-cycle sessions should be checked before alerts.',
+    lastChecked: '2026-08-18',
   },
   {
     id: 'virtu-womens-winternship-watch',
@@ -455,20 +464,22 @@ export const opportunities = [
     category: 'Winternship',
     classYears: ['Sophomore'],
     timing: 'Winter',
-    status: 'verifyManually',
-    confidence: 'needsReview',
+    status: 'open',
+    confidence: 'high',
     funding: 'Varies',
     location: 'Winter program',
-    url: 'https://www.virtu.com/careers/',
-    previousUrl: '',
-    openDate: 'Watch fall postings',
-    deadline: 'Verify current posting',
+    url: 'https://job-boards.greenhouse.io/virtu',
+    previousUrl: 'https://www.virtu.com/careers/',
+    openDate: 'January 2027 winternship postings are open in New York, Dublin, and Singapore',
+    deadline: 'Singapore deadline: Oct 30, 2026; New York and Dublin deadlines are not listed',
     tags: ['Trading', 'Finance', 'Women in tech'],
     why:
       'Winternships can create a real signal during school breaks without requiring a full summer internship.',
     prep:
       'Search company careers for winternship language and prepare finance-plus-technology interest notes before fall deadlines.',
-    sourceNote: 'Inspired by the repo winternship section.',
+    sourceNote:
+      'Official Virtu Greenhouse board lists January 2027 Women\'s Winternship postings in New York, Dublin, and Singapore; Singapore lists an Oct 30, 2026 deadline.',
+    lastChecked: '2026-08-18',
   },
   {
     id: 'google-summer-of-code',
@@ -483,8 +494,8 @@ export const opportunities = [
     location: 'Remote',
     url: 'https://summerofcode.withgoogle.com/',
     previousUrl: '',
-    openDate: 'Contributor applications open March 16, 2026',
-    deadline: 'Contributor application deadline: March 31, 2026',
+    openDate: 'Watch winter for the next timeline; 2026 contributor applications opened March 16',
+    deadline: '2026 contributor application deadline was March 31; watch for the 2027 timeline',
     tags: ['Open source', 'Mentorship', 'Remote'],
     why:
       'A strong nontraditional path for students who need credible technical experience without waiting for a company internship.',
@@ -492,7 +503,7 @@ export const opportunities = [
       'Review past organizations early, make small open-source contributions before applying, and choose projects where current skills can compound.',
     sourceNote:
       'Official GSoC site confirms the open-source contributor program and 2026 application timeline.',
-    lastChecked: '2026-07-10',
+    lastChecked: '2026-08-18',
   },
   {
     id: 'outreachy',
@@ -502,20 +513,21 @@ export const opportunities = [
     classYears: ['All class years'],
     timing: 'Rolling',
     status: 'expectedSoon',
-    confidence: 'high',
+    confidence: 'medium',
     funding: 'Stipend',
     location: 'Remote',
     url: 'https://www.outreachy.org/',
     previousUrl: '',
-    openDate: 'December 2026 applications expected early to mid August',
-    deadline: 'May 2026 applications closed February 13, 2026; next cycle dates listed as August window',
+    openDate: 'Watch late August or early September for the next initial application window',
+    deadline: 'Verify exact December 2026 initial application deadline',
     tags: ['Open source', 'Diversity in tech', 'Remote'],
     why:
       'A practical route into open-source contribution, mentorship, and paid technical experience for students who may not yet have internship access.',
     prep:
       'Read eligibility carefully, complete initial applications early, and budget time for contribution periods before final project selection.',
-    sourceNote: 'Official Outreachy site lists paid remote 3-month internships, May and December cycles, and current 2026 dates.',
-    lastChecked: '2026-07-10',
+    sourceNote:
+      'Official Outreachy pages confirm May and December internship cycles; the homepage lists December 2026 applications as early-to-mid August but does not give a specific deadline.',
+    lastChecked: '2026-08-18',
   },
   {
     id: 'mlh-fellowship',
@@ -524,14 +536,14 @@ export const opportunities = [
     category: 'Fellowship',
     classYears: ['All class years'],
     timing: 'Rolling',
-    status: 'watching',
+    status: 'open',
     confidence: 'high',
     funding: 'Stipend',
     location: 'Remote',
-    url: 'https://fellowship.mlh.com/',
+    url: 'https://fellowship.mlh.com/programs/open-source',
     previousUrl: 'https://fellowship.mlh.io/',
-    openDate: 'Varies by cohort',
-    deadline: 'Varies by start date',
+    openDate: 'Rolling applications by cohort',
+    deadline: 'Applications close a few weeks before each batch',
     tags: ['Open source', 'Software engineering', 'Production engineering'],
     why:
       'Internship-alternative experience with real open-source or partner-backed projects, mentors, peers, and a concrete portfolio signal.',
@@ -539,7 +551,7 @@ export const opportunities = [
       'Prepare a technical project story, GitHub links, and collaboration examples. Track cohort start dates because timing changes by track.',
     sourceNote:
       'Official MLH Fellowship site describes a fully remote 12-week internship alternative with stipend and open-source project work.',
-    lastChecked: '2026-07-10',
+    lastChecked: '2026-08-18',
   },
   {
     id: 'coding-it-forward-fellowship',
@@ -549,21 +561,21 @@ export const opportunities = [
     classYears: ['All class years'],
     timing: 'Winter',
     status: 'watching',
-    confidence: 'high',
+    confidence: 'medium',
     funding: 'Paid fellowship',
     location: 'United States',
     url: 'https://codingitforward.com/fellowship',
     previousUrl: '',
-    openDate: 'Watch October through winter',
-    deadline: 'Seasonal application cycle; confirm exact dates on official apply page',
+    openDate: 'Watch winter for the next fellowship application cycle',
+    deadline: 'Verify next-cycle deadline on the official site',
     tags: ['Civic tech', 'Public interest tech', 'Software engineering'],
     why:
       'Distinctive path for students who want mission-driven technical work, government context, and public-service impact.',
     prep:
       'Prepare examples of technical ownership, communication with non-technical stakeholders, and interest in public interest technology.',
     sourceNote:
-      'Official Coding it Forward page describes a paid 10-week fellowship for early-career technologists across software, product, data, design, and cybersecurity.',
-    lastChecked: '2026-07-10',
+      'Official Coding it Forward page confirms a paid 10-week fellowship across software, product, data, design, and cybersecurity; current-cycle dates need application-page verification.',
+    lastChecked: '2026-08-18',
   },
   {
     id: 'codepath-career-ready-courses',
@@ -572,13 +584,13 @@ export const opportunities = [
     category: 'Training program',
     classYears: ['All class years'],
     timing: 'Fall',
-    status: 'open',
+    status: 'deadlineSoon',
     confidence: 'high',
     funding: 'Free',
     location: 'Virtual',
     url: 'https://www.codepath.org/courses',
     previousUrl: '',
-    openDate: 'Varies by term',
+    openDate: 'Fall 2026 applications are open by pathway',
     deadline: 'Fall 2026 course page lists closing dates such as August 23 by pathway',
     tags: ['Technical interview prep', 'Applied AI', 'Cybersecurity', 'Web development'],
     why:
@@ -587,7 +599,7 @@ export const opportunities = [
       'Match the pathway to the next bottleneck: interview prep, AI projects, cybersecurity, or web development.',
     sourceNote:
       'Official CodePath courses page lists no-cost virtual courses, current application links, and visible pathway close dates.',
-    lastChecked: '2026-07-10',
+    lastChecked: '2026-08-18',
   },
   {
     id: 'forage-virtual-experience',
@@ -625,8 +637,8 @@ export const opportunities = [
     location: 'In person',
     url: 'https://newtechnologists.com/',
     previousUrl: '',
-    openDate: 'Summer 2026 listed on official site',
-    deadline: 'Verify exact application deadline on official site',
+    openDate: 'Watch winter and spring for the next Academy cycle; official site still lists Summer 2026',
+    deadline: 'Verify exact next-cycle application deadline on official site',
     tags: ['Underclassmen', 'AI projects', 'Mentorship', 'Nontraditional backgrounds'],
     why:
       'A paid 7-week academy explicitly aimed at college freshmen and sophomores who want hands-on tech exposure, mentorship, and real-world project experience.',
@@ -634,7 +646,7 @@ export const opportunities = [
       'Prepare a clear story around curiosity, project-building, and why hands-on exposure would help you convert potential into a stronger technical path.',
     sourceNote:
       'Official site describes TNT Academy as a 7-week in-person program for college freshmen and sophomores.',
-    lastChecked: '2026-07-10',
+    lastChecked: '2026-08-18',
   },
   {
     id: 'new-technologists-fellowship',
@@ -644,13 +656,13 @@ export const opportunities = [
     classYears: ['All class years'],
     timing: 'Winter',
     status: 'watching',
-    confidence: 'high',
+    confidence: 'medium',
     funding: 'Varies',
     location: 'Virtual',
     url: 'https://newtechnologists.com/',
     previousUrl: '',
-    openDate: 'Runs January through September',
-    deadline: 'Verify exact application deadline on official site',
+    openDate: 'Watch fall and winter for the next fellowship cycle; official site says the program runs January through September',
+    deadline: 'Verify exact next-cycle application deadline on official site',
     tags: ['Early-career', 'Project building', 'Mentorship', 'Professional development'],
     why:
       'A longer part-time technical and professional development track that can help emerging technologists build portfolio-worthy work over time.',
@@ -658,7 +670,7 @@ export const opportunities = [
       'Gather project examples and be ready to explain where you want deeper technical confidence, collaboration practice, and mentorship.',
     sourceNote:
       'Official site describes the fellowship as a nine-month virtual experience with project building, coding challenges, and professional development.',
-    lastChecked: '2026-07-10',
+    lastChecked: '2026-08-18',
   },
   {
     id: 'seo-tech-developer-core',
@@ -673,8 +685,8 @@ export const opportunities = [
     location: 'Virtual',
     url: 'https://tech.seo-usa.org/',
     previousUrl: '',
-    openDate: 'January 2026 through March 2026',
-    deadline: 'March 2026 application window listed',
+    openDate: 'Watch January for the next core program cycle; 2026 applications ran January through March',
+    deadline: '2026 application window ended in March; verify next-cycle deadline',
     tags: ['Sophomore', 'Interview prep', 'Technical training', 'Stipend'],
     why:
       'A free intensive program for sophomore CS and software engineering students, with technical training, mentoring, interview prep, and a listed stipend.',
@@ -682,7 +694,7 @@ export const opportunities = [
       'Prepare resume, programming-language examples, and a story about why structured technical coaching will help you compete for stronger internships.',
     sourceNote:
       'Official site lists a January-March 2026 application timeline and sophomore eligibility criteria.',
-    lastChecked: '2026-07-10',
+    lastChecked: '2026-08-18',
   },
   {
     id: 'seo-tech-developer-first-year-academy',
@@ -697,7 +709,7 @@ export const opportunities = [
     location: 'Virtual',
     url: 'https://tech.seo-usa.org/',
     previousUrl: '',
-    openDate: 'Applications open November 12, 2025',
+    openDate: 'Watch November for the next first-year cycle; prior cycle opened November 12, 2025',
     deadline: 'Verify current application close date',
     tags: ['Freshman', 'Python basics', 'Portfolio project', 'Training'],
     why:
@@ -706,7 +718,7 @@ export const opportunities = [
       'Use the fall to prepare a basic resume, list coursework or self-study, and get ready to explain your interest in computer science fundamentals.',
     sourceNote:
       'Official site describes a two-part first-year training program with spring and summer phases.',
-    lastChecked: '2026-07-10',
+    lastChecked: '2026-08-18',
   },
   {
     id: 'headstart-fellowship-watch',
@@ -715,22 +727,22 @@ export const opportunities = [
     category: 'Fellowship',
     classYears: ['Freshman', 'Sophomore'],
     timing: 'Fall',
-    status: 'verifyManually',
-    confidence: 'needsReview',
+    status: 'deadlineSoon',
+    confidence: 'high',
     funding: 'Free',
     location: 'Virtual',
-    url: 'https://www.headstartfellowship.com/',
+    url: 'https://www.headstartfellowship.com/fellowship',
     previousUrl: '',
-    openDate: 'Watch fall and spring cycles',
-    deadline: 'Verify current application cycle',
+    openDate: 'Fall 2026 applications are open',
+    deadline: 'Fall 2026 applications close Aug 28, 2026 at 11:59 p.m. ET',
     tags: ['Mentorship', 'Career prep', 'Underclassmen', 'Virtual'],
     why:
       'A mentorship and education-style fellowship that appears frequently in underclassmen opportunity lists as an early career preparation path.',
     prep:
       'Confirm the current cycle, then prepare a short interest statement and a resume that shows technical curiosity even if your experience is early.',
     sourceNote:
-      'Included from underclassmen opportunity-list inspiration; needs current official-cycle verification before public alerts.',
-    lastChecked: '2026-07-10',
+      'Official HeadStart Fellowship pages confirm Fall 2026 applications, freshman/sophomore eligibility, a virtual format, and the Aug 28, 2026 close date.',
+    lastChecked: '2026-08-18',
   },
   {
     id: 'hack-diversity-fellowship-watch',
@@ -740,21 +752,21 @@ export const opportunities = [
     classYears: ['All class years'],
     timing: 'Winter',
     status: 'verifyManually',
-    confidence: 'needsReview',
+    confidence: 'medium',
     funding: 'Paid internship',
     location: 'Boston or NYC region',
     url: 'https://www.hackdiversity.com/',
     previousUrl: '',
-    openDate: 'Watch winter application cycle',
-    deadline: 'Verify current application cycle',
+    openDate: 'Watch fall and winter for the next fellowship application page',
+    deadline: 'Verify the current application deadline on the official application page',
     tags: ['Internship matching', 'Technical training', 'Underrepresented students'],
     why:
       'A strong internship-matching model for students who would benefit from structured technical training, partner access, and support through placement.',
     prep:
       'Verify city eligibility, polish resume, and prepare examples of persistence, collaboration, and technical learning.',
     sourceNote:
-      'Needs current official fellowship page verification before public alerts.',
-    lastChecked: '2026-07-10',
+      'Official site confirms the fellowship model and regional focus, but a current-cycle application page was not found during this audit.',
+    lastChecked: '2026-08-18',
   },
   {
     id: 'jane-street-see-watch',
@@ -767,18 +779,18 @@ export const opportunities = [
     confidence: 'needsReview',
     funding: 'Varies',
     location: 'Insight program',
-    url: 'https://www.janestreet.com/join-jane-street/',
+    url: 'https://www.janestreet.com/join-jane-street/programs-and-events/see/',
     previousUrl: '',
-    openDate: 'Watch fall and winter',
-    deadline: 'Verify current program cycle',
+    openDate: 'Watch fall and winter for current SEE sessions',
+    deadline: 'Sign up to be notified; exact current deadline varies by program location',
     tags: ['Computer science', 'Math', 'Finance', 'Insight program'],
     why:
       'A focused early-exposure program for students curious about the intersection of computer science, math, and finance.',
     prep:
       'Prepare to explain interest in technical problem solving, probability/math, and why a trading-technology environment is worth exploring.',
     sourceNote:
-      'Included from underclassmen opportunity-list inspiration; exact current cycle should be checked on Jane Street careers.',
-    lastChecked: '2026-07-10',
+      'Official Jane Street SEE page confirms the early-exposure program; exact current-cycle sessions should be checked before alerts.',
+    lastChecked: '2026-08-18',
   },
   {
     id: 'jpmorgan-career-ed-you-watch',
@@ -787,22 +799,22 @@ export const opportunities = [
     category: 'Externship / insight series',
     classYears: ['Sophomore'],
     timing: 'Spring',
-    status: 'verifyManually',
-    confidence: 'needsReview',
+    status: 'watching',
+    confidence: 'medium',
     funding: 'Varies',
     location: 'Varies by program',
-    url: 'https://careers.jpmorgan.com/',
+    url: 'https://www.jpmorganchase.com/careers/explore-opportunities/programs/career-edyou',
     previousUrl: '',
-    openDate: 'Watch fall and winter recruiting windows',
-    deadline: 'Verify current posting',
+    openDate: 'Registration is currently closed; watch fall and winter for the next sophomore cohort',
+    deadline: 'Verify the next registration deadline when JPMorganChase reopens locations',
     tags: ['Finance', 'Technology', 'Career exposure', 'Sophomore'],
     why:
       'Bank early-insight programs can help sophomores understand financial technology roles before applying for larger internship pipelines.',
     prep:
       'Search JPMorgan Chase careers directly, confirm the program name and location, and prepare a finance-plus-technology interest story.',
     sourceNote:
-      'Included from underclassmen opportunity-list inspiration; needs official current posting verification.',
-    lastChecked: '2026-07-10',
+      'Official JPMorganChase page confirms Career.edYOU for U.S. college sophomores and says registration is currently closed.',
+    lastChecked: '2026-08-18',
   },
   {
     id: 'acm-w-research-conference-scholarships',
@@ -811,20 +823,22 @@ export const opportunities = [
     category: 'Conference funding',
     classYears: ['All class years'],
     timing: 'Rolling',
-    status: 'watching',
+    status: 'deadlineSoon',
     confidence: 'high',
     funding: 'Travel support',
     location: 'Conference travel',
     url: 'https://women.acm.org/scholarships/',
     previousUrl: '',
-    openDate: 'Rolling deadline groups',
-    deadline: 'Deadline groups vary by conference date',
+    openDate: 'Six conference-date deadline groups run throughout the year',
+    deadline: 'Next listed deadline: Oct 15, 2026 for Dec 1, 2026-Jan 30, 2027 conferences',
     tags: ['Research conference', 'CS research', 'Women in computing'],
     why:
       'Useful for students who want to attend research conferences before they have a large travel budget or strong academic network.',
     prep:
       'Pick the conference first, draft why attendance supports your path, and ask an advisor early for the support letter.',
-    sourceNote: 'Good candidate for the future conference funding layer.',
+    sourceNote:
+      'Official ACM-W scholarship page lists recurring conference-date groups and the next Oct 15, 2026 deadline.',
+    lastChecked: '2026-08-18',
   },
   {
     id: 'rewriting-the-code-community',
@@ -846,8 +860,9 @@ export const opportunities = [
       'High-signal community layer for women in tech that combines peer support, career programming, company access, and practical resources.',
     prep:
       'Join the community first, then watch the member portal, events calendar, and company programs for higher-leverage opportunities.',
-    sourceNote: 'Community as opportunity infrastructure, not just a social group.',
-    lastChecked: '2026-07-10',
+    sourceNote:
+      'Official Rewriting the Code site confirms free community access, student and early-career programming, and year-round member support.',
+    lastChecked: '2026-08-18',
   },
   {
     id: 'colorstack-membership',
@@ -860,16 +875,17 @@ export const opportunities = [
     confidence: 'high',
     funding: 'Free',
     location: 'Virtual community and events',
-    url: 'https://www.colorstack.org/',
+    url: 'https://www.colorstack.org/students',
     previousUrl: '',
-    openDate: 'Rolling',
-    deadline: 'Membership and events vary',
+    openDate: 'Rolling membership application',
+    deadline: 'Membership is open; events and partner programs vary',
     tags: ['Black CS students', 'Latinx CS students', 'Career fairs'],
     why:
       'A strong example of community as opportunity infrastructure: Slack support, workshops, resume visibility, and partner events.',
     prep: 'Join early, keep resume materials updated, and watch monthly opportunities and career fair announcements.',
-    sourceNote: 'Strong community resource for students navigating tech without a dense network.',
-    lastChecked: '2026-07-10',
+    sourceNote:
+      'Official ColorStack student page confirms the member application for Black and Latinx undergraduate CS students in the US.',
+    lastChecked: '2026-08-18',
   },
   {
     id: 'nsf-reu-computer-science',
@@ -878,20 +894,22 @@ export const opportunities = [
     category: 'Fellowship',
     classYears: ['All class years'],
     timing: 'Winter',
-    status: 'expectedSoon',
+    status: 'watching',
     confidence: 'medium',
     funding: 'Stipend',
     location: 'Host-site dependent',
     url: 'https://www.nsf.gov/funding/initiatives/reu',
     previousUrl: '',
-    openDate: 'Watch winter site deadlines',
-    deadline: 'Site-specific deadlines often cluster in winter',
+    openDate: 'Watch individual REU sites and NSF ETAP for winter application openings',
+    deadline: 'Site-specific student deadlines vary by host site',
     tags: ['Research', 'Graduate school prep', 'Summer'],
     why:
       'High-value research pathway for undergraduates considering graduate school, research careers, or deeper technical specialization.',
     prep:
       'Search for CS-adjacent REU sites, request references early, and tailor statements to each lab or research theme.',
-    sourceNote: 'A research-oriented path that complements internship lists.',
+    sourceNote:
+      'Official NSF REU page confirms undergraduate research sites, stipends, and the student application path through host sites or NSF ETAP.',
+    lastChecked: '2026-08-18',
   },
   {
     id: 'swe-scholarships',
@@ -901,19 +919,21 @@ export const opportunities = [
     classYears: ['All class years'],
     timing: 'Winter',
     status: 'watching',
-    confidence: 'medium',
+    confidence: 'high',
     funding: 'Scholarship',
     location: 'Scholarship',
     url: 'https://swe.org/scholarships-overview/',
-    previousUrl: 'https://swe.org/scholarships/',
-    openDate: 'Watch winter scholarship cycle',
-    deadline: 'Annual cycle; verify current dates',
+    previousUrl: 'https://swe.org/apply-for-a-swe-scholarship/',
+    openDate: 'Watch December for Collegiate/Graduate and February for Emerging First Year; the 2026-27 cycle is closed',
+    deadline: 'Watch January and March scholarship deadlines by application type',
     tags: ['Engineering', 'Women in STEM', 'Scholarship'],
     why:
       'Broad scholarship pool for women in engineering and related technical disciplines, often worth watching early in the year.',
     prep:
       'Check membership requirements, gather academic details, and save scholarships that match year, major, and identity criteria.',
-    sourceNote: 'Useful for the funding side of the opportunity library.',
+    sourceNote:
+      'Official SWE scholarship overview confirms the 2026-27 cycle is closed and links to the 2027-2028 interest form; the apply page keeps the detailed application timeline.',
+    lastChecked: '2026-08-18',
   },
   {
     id: 'ghc-scholarship-watch',
@@ -922,20 +942,22 @@ export const opportunities = [
     category: 'Conference funding',
     classYears: ['All class years'],
     timing: 'Spring',
-    status: 'verifyManually',
-    confidence: 'needsReview',
+    status: 'expectedSoon',
+    confidence: 'medium',
     funding: 'Travel support',
     location: 'Conference',
-    url: 'https://ghc.anitab.org/',
+    url: 'https://ghc.anitab.org/awards-programs/scholarships',
     previousUrl: '',
-    openDate: 'Watch spring conference cycle',
-    deadline: 'Verify current GHC scholarship cycle',
+    openDate: 'Scholarship pages are closed or interest-list only; Kamala Scholars says 2026 applications are coming soon',
+    deadline: 'Verify the current scholarship application window when GHC or AnitaB posts it',
     tags: ['GHC', 'Women in computing', 'Conference funding'],
     why:
       'Major women-in-computing conference pathway with recruiting, community, technical sessions, and visibility for students.',
     prep:
       'Track the official GHC site, school sponsorship paths, employer sponsorships, and local women-in-tech group funding options.',
-    sourceNote: 'Needs official annual verification before public alerts.',
+    sourceNote:
+      'Official AnitaB pages confirm GHC scholarship interest-list status and the Kamala Scholars program, but exact current scholarship dates are not posted.',
+    lastChecked: '2026-08-18',
   },
 ];
 

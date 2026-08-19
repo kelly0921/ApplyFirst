@@ -270,13 +270,14 @@ Ready to show:
 - Endpoint-backed beta watch request capture.
 - Cloudflare Worker/D1 source-check foundation with seasonal due checks and high-confidence beta email alerts.
 - Hidden Maintainer Mode review console for discovered URL candidates and reviewed alert sends.
+- Tokenized unsubscribe links and one-click unsubscribe headers for beta email alerts.
 - Monitoring-readiness framing for which records are safe to alert on later.
 
 Needs more work before broader production launch:
 
 - Official verification for every record.
 - Broader source-update workflow for changing official URLs.
-- Production deliverability checks, unsubscribe handling, and alert policy guardrails.
+- Production deliverability checks, account-level alert preferences, and alert policy guardrails.
 - Privacy and account model if personalized alerts are added.
 - SMS provider setup if text alerts are enabled.
 - Public copy and trust language.
@@ -335,7 +336,7 @@ Next Phase 2 steps:
 1. Review seasonal source schedule profiles for cycle accuracy.
 2. Use the Maintainer Mode console before each beta round to check discovery candidates, alert candidates, dry runs, and reviewed sends.
 3. Decide which local verification edits should be promoted back into the source dataset or D1 official-source records.
-4. Add role-based maintainer access, unsubscribe handling, and production email policy guardrails.
+4. Add role-based maintainer access, account-level alert preference management, and production email policy guardrails.
 5. Keep the Cloudflare watch Worker separate from the static app so beta monitoring, seasonal scheduling, and discovery queues can mature without overbuilding auth.
 
 ## Phase 2.5 Source Monitoring Foundation
@@ -497,7 +498,7 @@ Current status: **Private beta prototype with seasonal monitoring foundation**
 
 The standalone MVP is built and functional. It includes the core monitor UI, structured opportunity records, filters, detail views, source-confidence framing, shortlist behavior, program-specific status labels, endpoint-backed beta watch requests, and a Cloudflare Worker/D1 foundation for seasonal source checks.
 
-High-confidence beta email alerts are testable, and uncertain signals can now be handled through a hidden Maintainer Mode review console. Before positioning ApplyFirst as a broad live alerting resource, the project still needs broader official verification, production deliverability checks, SMS provider setup, account/privacy decisions, and public trust language.
+High-confidence beta email alerts are testable, uncertain signals can now be handled through a hidden Maintainer Mode review console, and beta email alerts include unsubscribe handling. Before positioning ApplyFirst as a broad live alerting resource, the project still needs broader official verification, production deliverability checks, SMS provider setup, account/privacy decisions, and public trust language.
 
 ### 10. What I Learned
 
@@ -555,7 +556,7 @@ I decided to prioritize underclassmen, exclude generic internships, treat PM and
 
 #### Current Status
 
-ApplyFirst is a functional private-beta prototype. The product surface is ready to show as a prototype or portfolio case study, and beta watch requests plus high-confidence opening email delivery can be tested. Seasonal source scheduling now reduces unnecessary checks by focusing monitoring around expected opening windows, while ambiguous live alert automation should wait until official-source verification is stronger.
+ApplyFirst is a functional private-beta prototype. The product surface is ready to show as a prototype or portfolio case study, and beta watch requests plus high-confidence opening email delivery can be tested with unsubscribe handling. Seasonal source scheduling now reduces unnecessary checks by focusing monitoring around expected opening windows, while ambiguous live alert automation should wait until official-source verification is stronger.
 
 #### What I Learned
 
@@ -617,7 +618,7 @@ Details to confirm before publishing:
 
 - Whether the portfolio should mention **Opportunity Systems** as the broader product umbrella or keep the card focused only on **ApplyFirst**.
 - Whether there will be a live deployed URL or only a local/prototype case study.
-- Which 10-15 programs should be officially verified first.
+- Whether the first verified seed/schedule audit should expand beyond the initial official-source set in `docs/VERIFIED_SEED_SCHEDULE_AUDIT.md`.
 - Whether screenshots should show real program names or anonymized/demo records.
 - Whether notification features should be described as automatic for high-confidence watched openings, seasonally monitored, and reviewed for uncertain signals.
 - Whether the portfolio card should frame this as a product MVP, case study, or concept prototype.

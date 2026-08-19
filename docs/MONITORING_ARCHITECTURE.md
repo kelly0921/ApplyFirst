@@ -128,6 +128,9 @@ Student-submitted My Focus setup for beta monitoring.
 - `alert_ready_count`
 - `saved_count`
 - `needs_source_check`
+- `unsubscribe_token`
+- `unsubscribed_at`
+- `unsubscribe_reason`
 - `status`
 - `created_at`
 
@@ -267,6 +270,17 @@ The local monitoring classifier currently produces:
 
 Only high-confidence opening transitions tied to opted-in watched programs can send automatically in beta. Deadline changes, medium-confidence openings, large-page failures, and ambiguous source changes stay in review.
 
+Maintainer source runs also return a `sourceState` and `sourceAction` pair:
+
+- `Open`: create an alert candidate; auto-send only if the signal is high-confidence and fresh.
+- `Closed`: keep monitoring; do not send a student opening alert.
+- `Old Cycle`: ignore as a fresh opening and wait for the next cycle.
+- `Exact Posting Needed`: a broad official job board mentions the program, but alerts should use a specific posting URL.
+- `Deadline`: review before sending a deadline reminder.
+- `Warmup`: useful prep timing, not an opening alert.
+- `Monitor`: useful source, not alert-ready.
+- `Needs Review` or `Fetch Error`: inspect manually or choose a better source.
+
 ## Current Local Prototype
 
 The local script is intentionally limited:
@@ -344,7 +358,9 @@ The Cloudflare watch Worker adds the first durable monitoring path:
 
 - `POST /watch` saves a student's My Focus watch request and program context in D1.
 - `GET /watch/status` returns safe aggregate counts for smoke checks.
-- `POST /watch/run` manually triggers a source check pass and requires `WATCH_ADMIN_TOKEN`.
+- `GET /watch/unsubscribe?token=...` and `POST /watch/unsubscribe?token=...` unsubscribe a beta watch setup. Legacy `requestId` links are still supported for older test emails.
+- `GET /watch/readiness` returns the maintainer readiness queue grouped by source attention state. Requires `WATCH_ADMIN_TOKEN`.
+- `POST /watch/run` manually triggers a source check pass and requires `WATCH_ADMIN_TOKEN`. It also accepts `programId`, `programIds`, and `dryRun: true` for maintainer-safe targeted checks that fetch and classify sources without writing snapshots, creating candidates, updating schedules, or sending emails.
 - `GET /watch/discovery` lists seasonally due current-cycle URL discovery tasks, structured query packs, priority labels, active watcher counts, and candidate counts. Requires `WATCH_ADMIN_TOKEN`.
 - `GET /watch/discovery/candidates` lists discovered URL candidates. Requires `WATCH_ADMIN_TOKEN`.
 - `POST /watch/discovery/search` runs the due discovery query packs through the configured search provider, filters low-signal results, saves candidate URLs for review, and records a discovery search run. Requires `WATCH_ADMIN_TOKEN`.
@@ -358,15 +374,18 @@ The Cloudflare watch Worker adds the first durable monitoring path:
 - Dormant records back off to monthly checks, warmup records check weekly or more often, active watched records check daily, and fetch failures back off instead of retrying every cron tick.
 - Source checks save snapshots, compare hashes, classify opening/deadline signals, update `program_alert_states`, update the next due check, and create alert candidates only when the program enters an alert-worthy state.
 
+The first official seed/schedule audit lives in `docs/VERIFIED_SEED_SCHEDULE_AUDIT.md`. It documents which records are confirmed from official sources, which have current-cycle dates, which are discovery-first, and which expected opening months drive D1 `source_schedule_profiles`.
+
 The Worker can send beta email automatically when an official source has a high-confidence opening signal for a program a student follows. Deadline changes, medium-confidence openings, large-page failures, and ambiguous eligibility changes stay in review.
 
-Student alert emails must be generated from a clean student-facing template. Internal source-check notes, raw page excerpts, classifier labels, and maintainer instructions stay in D1 for review and should not appear in outbound student notifications.
+Student alert emails must be generated from a clean student-facing template. Internal source-check notes, raw page excerpts, classifier labels, and maintainer instructions stay in D1 for review and should not appear in outbound student notifications. Each email includes a tokenized unsubscribe link plus `List-Unsubscribe` and one-click unsubscribe headers; unsubscribed watch requests are excluded before delivery.
 
 ## Next Implementation Steps
 
-1. Review the first `source_schedule_profiles` rows for cycle accuracy.
+1. Import the regenerated D1 seed after each verified seed/schedule audit update.
 2. Use the Maintainer Mode review console to smoke-test discovery search, candidate review, alert dry runs, and reviewed sends before each beta round.
 3. Review search-provider result quality, then decide whether JavaScript-heavy or search-hostile programs need a Browser Run fallback workflow.
 4. Add role-based maintainer access before sharing the review console with anyone else.
-5. Add richer review history for search runs, source changes, accepted URLs, rejected URLs, and sent alert decisions.
-6. Decide whether to keep D1 long term or move richer account/review workflows to Supabase.
+5. Add account-level alert preferences and unsubscribe management if students need to manage multiple watch setups from one place.
+6. Add richer review history for search runs, source changes, accepted URLs, rejected URLs, and sent alert decisions.
+7. Decide whether to keep D1 long term or move richer account/review workflows to Supabase.

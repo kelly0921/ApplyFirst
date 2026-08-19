@@ -94,6 +94,12 @@ Beta watch requests should capture:
 - `watchedPrograms`
 - `requestedAt`
 
+The watch Worker also stores:
+
+- `unsubscribe_token`
+- `unsubscribed_at`
+- `unsubscribe_reason`
+
 ## Endpoint Contract
 
 All configured endpoints should accept a JSON body and return a successful 2xx status.
@@ -154,6 +160,7 @@ Before user testing:
 - One test beta email alert setup appears in the destination.
 - One test beta watch request appears in D1.
 - Reviewed notification delivery is configured through Cloudflare Email Service or intentionally disabled for the test.
+- A real test email includes a tokenized unsubscribe link, and opening it changes the watch request to `unsubscribed`.
 - One test contribution appears in the destination.
 - `npm run capture:smoke` passes with both endpoint URLs configured.
 - Local fallback still works if the endpoint fails.

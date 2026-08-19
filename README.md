@@ -69,6 +69,7 @@ Beta-readiness references:
 - [Beta testing plan](./docs/BETA_TESTING_PLAN.md)
 - [Seed data review checklist](./docs/SEED_DATA_REVIEW.md)
 - [Beta seed review results](./docs/BETA_SEED_REVIEW_RESULTS.md)
+- [Verified seed schedule audit](./docs/VERIFIED_SEED_SCHEDULE_AUDIT.md)
 - [Deployment checklist](./docs/DEPLOYMENT_CHECKLIST.md)
 
 ## Source Strategy
@@ -159,6 +160,7 @@ npx wrangler d1 execute applyfirst-watch --config wrangler.watch.toml --remote -
 npx wrangler d1 execute applyfirst-watch --config wrangler.watch.toml --remote --file cloudflare/d1/003_seasonal_source_schedules.sql
 npx wrangler d1 execute applyfirst-watch --config wrangler.watch.toml --remote --file cloudflare/d1/004_discovery_candidates.sql
 npx wrangler d1 execute applyfirst-watch --config wrangler.watch.toml --remote --file cloudflare/d1/005_discovery_search_runs.sql
+npx wrangler d1 execute applyfirst-watch --config wrangler.watch.toml --remote --file cloudflare/d1/006_unsubscribe_safety.sql
 ```
 
 4. Generate and import official source seed rows:
@@ -222,6 +224,8 @@ https://applyfirst-watch.YOUR-SUBDOMAIN.workers.dev/watch
 
 The Worker stores beta watch requests, checks only sources that are due, saves page snapshots/source checks, tracks each program's latest alert state, automatically emails watched students when a high-confidence official opening appears, and keeps ambiguous source changes in `pending_review`. Source schedules use cycle frequency, expected opening months, active lead time, dormant cadence, active cadence, and source volatility so ApplyFirst can start checking more often before an expected application season instead of polling every record forever.
 
+The first audited seed set and its schedule decisions live in [Verified seed schedule audit](./docs/VERIFIED_SEED_SCHEDULE_AUDIT.md). Regenerate and import `cloudflare/d1/watch-seed.generated.sql` after changing audited source URLs, expected months, or alert-safety decisions.
+
 Manual source runs respect the due schedule by default. Use `force` for smoke tests:
 
 ```bash
@@ -230,6 +234,26 @@ curl -X POST "https://applyfirst-watch.YOUR-SUBDOMAIN.workers.dev/watch/run" \
   -H "Content-Type: application/json" \
   -d "{\"limit\": 25, \"force\": true}"
 ```
+
+For maintainer-safe source testing, use `dryRun` with one or more `programIds`. This fetches and classifies the official source but skips page snapshots, source checks, alert candidates, schedule updates, and email sends:
+
+```powershell
+Invoke-RestMethod -Method Post -Uri "$worker/watch/run" `
+  -Headers @{ Authorization = "Bearer $token" } `
+  -ContentType "application/json" `
+  -Body '{"programIds":["swe-scholarships","virtu-womens-winternship-watch"],"dryRun":true}'
+```
+
+Dry-run checks include `sourceState` and `sourceAction` so source decisions are easier to audit. Key states are `Open`, `Closed`, `Old Cycle`, `Exact Posting Needed`, `Deadline`, `Warmup`, `Monitor`, `Needs Review`, and `Fetch Error`.
+
+To see the maintainer monitoring readiness queue:
+
+```bash
+curl "https://applyfirst-watch.YOUR-SUBDOMAIN.workers.dev/watch/readiness" \
+  -H "Authorization: Bearer YOUR_WATCH_ADMIN_TOKEN"
+```
+
+The queue groups sources into `Needs Attention`, `Open or Deadline`, `Closed or Old Cycle`, and `Warmup or Monitor`.
 
 To see programs that need current-cycle URL discovery:
 
@@ -279,6 +303,12 @@ curl -X POST "https://applyfirst-watch.YOUR-SUBDOMAIN.workers.dev/watch/candidat
 ```
 
 To send after review, use the same request with `{"dryRun": false}` or omit `dryRun`.
+
+Every beta email alert includes a tokenized unsubscribe link and `List-Unsubscribe` headers. To smoke-test an unsubscribe link, open the URL from a test email or call:
+
+```bash
+curl "https://applyfirst-watch.YOUR-SUBDOMAIN.workers.dev/watch/unsubscribe?token=UNSUBSCRIBE_TOKEN"
+```
 
 ## Phase 2 Start
 

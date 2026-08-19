@@ -22,9 +22,11 @@ Before each test:
 4. Turn on Maintainer Mode, open Review, enter the Worker admin token, and load the live queues.
 5. Run one dry-run discovery search and confirm any saved candidates appear as review items.
 6. Dry-run one pending alert candidate if available. Only send a real test email to yourself.
-7. Turn Maintainer Mode back off before the student session so the tester only sees the student-facing product.
-8. Pick 5-7 manually reviewed programs to mention if the tester asks for examples.
-9. Keep this note ready: students can submit a beta watch setup by email or text. High-confidence official opening signals can send automatically; uncertain signals stay in review.
+7. Confirm the real test email includes an unsubscribe link, then open that link and verify the watch request becomes unsubscribed.
+8. Create a fresh watch request after the unsubscribe smoke test if you need another active test recipient.
+9. Turn Maintainer Mode back off before the student session so the tester only sees the student-facing product.
+10. Pick 5-7 manually reviewed programs to mention if the tester asks for examples.
+11. Keep this note ready: students can submit a beta watch setup by email or text. High-confidence official opening signals can send automatically; uncertain signals stay in review, and every beta email includes an unsubscribe link.
 
 Suggested first examples:
 
@@ -83,6 +85,7 @@ The beta is working if:
 - My Focus feels useful rather than like arbitrary settings.
 - Students understand beta watch requests are opt-in, high-confidence openings can email automatically, and uncertain signals stay in review while signal quality is tested.
 - Students understand when ApplyFirst would email or text them.
+- Students understand they can unsubscribe from beta email alerts.
 - Students understand the current automation is intentionally limited to high-confidence official opening signals.
 - Students can submit feedback without feeling like they are using an internal tool.
 

@@ -17,6 +17,9 @@ create table if not exists watch_requests (
   saved_count integer not null default 0,
   needs_source_check integer not null default 0,
   requested_at text,
+  unsubscribe_token text,
+  unsubscribed_at text,
+  unsubscribe_reason text,
   status text not null default 'active',
   raw_payload_json text,
   created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
@@ -115,6 +118,10 @@ create table if not exists alert_deliveries (
 create index if not exists idx_watch_requests_email on watch_requests(email);
 create index if not exists idx_watch_requests_phone on watch_requests(phone);
 create index if not exists idx_watch_requests_status on watch_requests(status);
+create unique index if not exists idx_watch_requests_unsubscribe_token
+  on watch_requests(unsubscribe_token)
+  where unsubscribe_token is not null and unsubscribe_token != '';
+create index if not exists idx_watch_requests_unsubscribed_at on watch_requests(unsubscribed_at);
 create index if not exists idx_watch_request_programs_program on watch_request_programs(program_id);
 create index if not exists idx_official_sources_enabled on official_sources(enabled, last_checked_at);
 create index if not exists idx_page_snapshots_source_time on page_snapshots(official_source_id, fetched_at desc);

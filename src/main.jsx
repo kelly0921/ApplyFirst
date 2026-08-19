@@ -1385,12 +1385,17 @@ function ReviewModeControl({ enabled, onToggle }) {
 
 function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange }) {
   const [status, setStatus] = useState(null);
+  const [readinessQueue, setReadinessQueue] = useState(null);
   const [discoveryCandidates, setDiscoveryCandidates] = useState([]);
   const [alertCandidates, setAlertCandidates] = useState([]);
   const [searchResult, setSearchResult] = useState(null);
+  const [sourceRunResult, setSourceRunResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [sourceRunDraft, setSourceRunDraft] = useState({
+    programIds: '',
+  });
   const [searchDraft, setSearchDraft] = useState({
     limit: '5',
     maxQueriesPerProgram: '3',
@@ -1402,6 +1407,13 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
 
   const updateSearchDraft = (field, value) => {
     setSearchDraft((currentDraft) => ({
+      ...currentDraft,
+      [field]: value,
+    }));
+  };
+
+  const updateSourceRunDraft = (field, value) => {
+    setSourceRunDraft((currentDraft) => ({
       ...currentDraft,
       [field]: value,
     }));
@@ -1427,18 +1439,50 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
     }
 
     try {
-      const [statusPayload, discoveryPayload, alertPayload] = await Promise.all([
+      const [statusPayload, readinessPayload, discoveryPayload, alertPayload] = await Promise.all([
         callAdminEndpoint('/watch/status'),
+        callAdminEndpoint('/watch/readiness'),
         callAdminEndpoint('/watch/discovery/candidates?status=pending_review'),
         callAdminEndpoint('/watch/candidates'),
       ]);
 
       setStatus(statusPayload);
+      setReadinessQueue(readinessPayload);
       setDiscoveryCandidates(discoveryPayload.candidates ?? []);
       setAlertCandidates(alertPayload.candidates ?? []);
       if (!quiet) {
         setActionMessage('Review queues refreshed.');
       }
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const runSourceDryRun = async () => {
+    const programIds = parseProgramIds(sourceRunDraft.programIds);
+
+    if (!programIds.length) {
+      setErrorMessage('Add at least one program ID before running a source check.');
+      return;
+    }
+
+    setLoading(true);
+    setErrorMessage('');
+    setActionMessage('');
+
+    try {
+      const payload = await callAdminEndpoint('/watch/run', {
+        method: 'POST',
+        body: {
+          programIds,
+          dryRun: true,
+        },
+      });
+
+      setSourceRunResult(payload);
+      setActionMessage(`Source dry run checked ${payload.checked ?? 0} program${payload.checked === 1 ? '' : 's'}.`);
     } catch (error) {
       setErrorMessage(error.message);
     } finally {
@@ -1570,10 +1614,39 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
       {actionMessage ? <p className="maintainer-message">{actionMessage}</p> : null}
 
       <section className="maintainer-status-grid" aria-label="Worker status">
-        <MaintainerMetric label="Watch Requests" value={status?.watchRequests ?? '-'} />
+        <MaintainerMetric label="Active Watches" value={status?.activeWatchRequests ?? status?.watchRequests ?? '-'} />
+        <MaintainerMetric label="Unsubscribed" value={status?.unsubscribedWatchRequests ?? '-'} />
         <MaintainerMetric label="Pending Source Alerts" value={status?.pendingCandidates ?? '-'} />
         <MaintainerMetric label="Discovery Candidates" value={status?.pendingDiscoveryCandidates ?? discoveryCandidates.length} />
-        <MaintainerMetric label="Open Programs" value={status?.openPrograms ?? '-'} />
+      </section>
+
+      {readinessQueue ? <MonitoringReadinessQueue queue={readinessQueue} /> : null}
+
+      <section className="maintainer-panel source-run-panel">
+        <div className="maintainer-panel-heading source-run-heading">
+          <div>
+            <span>Source Signal Check</span>
+            <h2>Dry Run Program Sources</h2>
+          </div>
+          <p>
+            Check official pages without writing snapshots, creating alert candidates, updating schedules, or sending
+            emails.
+          </p>
+        </div>
+        <div className="source-run-form">
+          <label>
+            <span>Program IDs</span>
+            <textarea
+              value={sourceRunDraft.programIds}
+              onChange={(event) => updateSourceRunDraft('programIds', event.target.value)}
+              placeholder="swe-scholarships, virtu-womens-winternship-watch, jpmorgan-career-ed-you-watch"
+            />
+          </label>
+          <button type="button" onClick={runSourceDryRun} disabled={!canLoad || loading}>
+            Dry Run Sources
+          </button>
+        </div>
+        {sourceRunResult ? <SourceRunSummary result={sourceRunResult} /> : null}
       </section>
 
       <section className="maintainer-review-grid">
@@ -1716,6 +1789,86 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
   );
 }
 
+function MonitoringReadinessQueue({ queue }) {
+  const groups = queue.groups ?? [];
+
+  return (
+    <section className="maintainer-panel monitoring-readiness-panel" aria-label="Monitoring readiness queue">
+      <div className="maintainer-panel-heading readiness-heading">
+        <div>
+          <span>Monitoring Readiness</span>
+          <h2>{queue.needsAttention ?? 0} Program{queue.needsAttention === 1 ? '' : 's'} Need Attention</h2>
+        </div>
+        <p>Use this queue to decide what to fix before students rely on alerts.</p>
+      </div>
+      <div className="readiness-groups">
+        {groups.map((group) => (
+          <section className="readiness-group" key={group.key}>
+            <div className="readiness-group-heading">
+              <div>
+                <span>{group.label}</span>
+                <strong>{group.items?.length ?? 0}</strong>
+              </div>
+              <p>{getReadinessGroupDescription(group.key)}</p>
+            </div>
+            <div className="readiness-item-list">
+              {group.items?.length ? (
+                group.items.slice(0, 6).map((item) => <ReadinessItemCard item={item} key={item.programId} />)
+              ) : (
+                <p className="maintainer-empty">Nothing in this group.</p>
+              )}
+            </div>
+          </section>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ReadinessItemCard({ item }) {
+  return (
+    <article className={`readiness-item-card source-state-${getSourceStateTone(item.state)}`}>
+      <div className="readiness-item-main">
+        <div>
+          <span>{item.state}</span>
+          <h3>{item.programName}</h3>
+          <p>{item.action}</p>
+        </div>
+        <a href={item.url} target="_blank" rel="noreferrer">
+          Source
+        </a>
+      </div>
+      <dl>
+        <div>
+          <dt>Watchers</dt>
+          <dd>{item.activeWatchCount ?? 0}</dd>
+        </div>
+        <div>
+          <dt>Phase</dt>
+          <dd>{formatDisplayLabel(item.schedulePhase || '-')}</dd>
+        </div>
+        <div>
+          <dt>Next Check</dt>
+          <dd>{formatDateTime(item.nextCheckAt)}</dd>
+        </div>
+      </dl>
+    </article>
+  );
+}
+
+function getReadinessGroupDescription(key) {
+  switch (key) {
+    case 'attention':
+      return 'Fix these first: review alerts, accept exact source URLs, or resolve unclear sources.';
+    case 'ready':
+      return 'Programs with open or deadline signals that may affect watched students.';
+    case 'closed':
+      return 'Safe to keep watching, but not alert-worthy right now.';
+    default:
+      return 'Healthy monitored records waiting for their useful window.';
+  }
+}
+
 function MaintainerMetric({ label, value }) {
   return (
     <span className="maintainer-metric">
@@ -1754,6 +1907,64 @@ function DiscoverySearchSummary({ result }) {
   );
 }
 
+function SourceRunSummary({ result }) {
+  const checks = result.checks ?? [];
+
+  return (
+    <section className="source-run-summary" aria-label="Source dry run summary">
+      <div className="source-run-metrics" aria-label="Source dry run metrics">
+        <MaintainerMetric label="Checked" value={result.checked ?? checks.length} />
+        <MaintainerMetric label="Manual Review" value={result.manualReview ?? '-'} />
+        <MaintainerMetric label="Alert Candidates" value={result.alertCandidates ?? '-'} />
+        <MaintainerMetric label="Writes Skipped" value={result.writesSkipped ? 'Yes' : 'No'} />
+      </div>
+      <div className="source-check-list">
+        {checks.length ? (
+          checks.map((check) => (
+            <article className={`source-check-card source-state-${getSourceStateTone(check.sourceState)}`} key={check.programId}>
+              <div className="source-check-card-heading">
+                <div>
+                  <span>{check.programId}</span>
+                  <h3>{check.name || check.programId}</h3>
+                </div>
+                <strong>{check.sourceState || formatDisplayLabel(check.status || check.reviewDecision)}</strong>
+              </div>
+              <p>{check.sourceAction || 'Review the official source before deciding whether to update this record.'}</p>
+              <dl>
+                <div>
+                  <dt>Result</dt>
+                  <dd>{check.result || '-'}</dd>
+                </div>
+                <div>
+                  <dt>Decision</dt>
+                  <dd>{check.reviewDecision || '-'}</dd>
+                </div>
+                <div>
+                  <dt>Status</dt>
+                  <dd>{formatDisplayLabel(check.status || '-')}</dd>
+                </div>
+                <div>
+                  <dt>Next Check</dt>
+                  <dd>{formatDateTime(check.nextCheckAt)}</dd>
+                </div>
+              </dl>
+              {check.detectedSignal ? <em>Signal: {check.detectedSignal}</em> : null}
+              {check.error ? <em className="source-check-error">Error: {check.error}</em> : null}
+              {check.url ? (
+                <a href={check.url} target="_blank" rel="noreferrer">
+                  Open Official Source
+                </a>
+              ) : null}
+            </article>
+          ))
+        ) : (
+          <p className="maintainer-empty">No source checks returned.</p>
+        )}
+      </div>
+    </section>
+  );
+}
+
 async function fetchMaintainerJson({ workerBaseUrl, adminToken, path, method = 'GET', body }) {
   if (!workerBaseUrl) {
     throw new Error('Set VITE_WATCH_ENDPOINT before using the maintainer console.');
@@ -1783,6 +1994,54 @@ async function fetchMaintainerJson({ workerBaseUrl, adminToken, path, method = '
   }
 
   return payload;
+}
+
+function parseProgramIds(value) {
+  return String(value ?? '')
+    .split(/[\n,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function getSourceStateTone(sourceState) {
+  const normalized = String(sourceState ?? '').toLowerCase();
+
+  if (normalized.includes('open') && !normalized.includes('old')) {
+    return 'open';
+  }
+
+  if (normalized.includes('closed') || normalized.includes('old') || normalized.includes('monitor')) {
+    return 'monitor';
+  }
+
+  if (normalized.includes('exact') || normalized.includes('deadline') || normalized.includes('warmup')) {
+    return 'watch';
+  }
+
+  if (normalized.includes('error') || normalized.includes('review')) {
+    return 'review';
+  }
+
+  return 'neutral';
+}
+
+function formatDateTime(value) {
+  if (!value) {
+    return '-';
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 }
 
 function getWorkerBaseUrl(endpoint) {
@@ -2071,7 +2330,7 @@ function BetaAlertSystem({
     const preferenceSummary = `${payload.classYear} / ${payload.roleTrack} / ${prioritySummary} / ${sendTimingLabels[payload.sendTiming] ?? payload.sendTiming}`;
     const watchedProgramNames = payload.watchedPrograms.map((program) => program.name).filter(Boolean);
     const notificationConsentText =
-      'I agree to receive ApplyFirst beta opening alerts for programs I choose to watch.';
+      'I agree to receive ApplyFirst beta opening alerts for programs I choose to watch. I can unsubscribe from any alert email.';
 
     if (hasRemoteEndpoint) {
       setSubmitState('submitting');
@@ -2145,7 +2404,7 @@ function BetaAlertSystem({
         <h3>Submit Your Watch Setup</h3>
         <p>
           {hasPreviewFocus
-            ? 'ApplyFirst emails high-confidence opening signals and keeps uncertain matches in review.'
+            ? 'ApplyFirst emails high-confidence opening signals. Every beta alert includes an unsubscribe link.'
             : 'Choose Class Year and Role Track to unlock the preview.'}
         </p>
       </div>
@@ -2244,7 +2503,7 @@ function BetaAlertSystem({
             {setupActionMessage}
           </p>
         ) : (
-          <p className="setup-readiness-note">By starting, you agree to beta alerts only for programs you choose to watch.</p>
+          <p className="setup-readiness-note">By starting, you agree to beta alerts only for programs you choose to watch. You can unsubscribe from any alert email.</p>
         )}
       </div>
       <BetaAlertFeed

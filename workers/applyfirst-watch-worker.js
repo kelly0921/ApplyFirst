@@ -6,6 +6,14 @@ const DEFAULT_DISCOVERY_QUERIES_PER_PROGRAM = 3;
 const DEFAULT_DISCOVERY_RESULTS_PER_QUERY = 5;
 const AUTO_SENDABLE_CONFIDENCES = new Set(['high']);
 const DISCOVERY_SEARCH_PROVIDERS = new Set(['brave', 'tavily']);
+const SOURCE_TRUNCATION_NOTICE = 'ApplyFirst note: source page was truncated at the monitoring byte limit.';
+const JOB_BOARD_HOSTS = new Set([
+  'boards.greenhouse.io',
+  'job-boards.greenhouse.io',
+  'jobs.ashbyhq.com',
+  'jobs.lever.co',
+  'lever.co',
+]);
 const DISCOVERY_CONTEXT_PATTERN =
   /\b(apply|application|applications|deadline|deadlines|open|opens|opening|internship|fellowship|scholarship|program|academy|conference|summer|student|students|cohort)\b/i;
 const LOW_SIGNAL_DISCOVERY_HOSTS = new Set([
@@ -54,8 +62,13 @@ async function handleRequest(request, env, ctx) {
       return jsonResponse(env, await getWatchStatus(env));
     }
 
-    if (request.method === 'GET' && url.pathname === '/watch/unsubscribe') {
-      return handleUnsubscribe(url, env);
+    if (request.method === 'GET' && url.pathname === '/watch/readiness') {
+      await requireAdminToken(request, env);
+      return jsonResponse(env, await getReadinessQueue(env));
+    }
+
+    if ((request.method === 'GET' || request.method === 'POST') && url.pathname === '/watch/unsubscribe') {
+      return handleUnsubscribe(request, url, env);
     }
 
     if (request.method === 'GET' && url.pathname === '/watch/candidates') {
@@ -106,6 +119,8 @@ async function handleRequest(request, env, ctx) {
       const result = await runMonitoring(env, {
         limit: Number(body.limit || env.WATCH_RUN_LIMIT || DEFAULT_MONITOR_LIMIT),
         force: Boolean(body.force),
+        dryRun: Boolean(body.dryRun),
+        programIds: getRunProgramIds(body),
         trigger: 'manual',
       });
       return jsonResponse(env, result);
@@ -140,6 +155,7 @@ async function saveWatchRequest(request, env, ctx) {
   }
 
   const id = crypto.randomUUID();
+  const unsubscribeToken = createSecureToken();
   const now = new Date().toISOString();
   const watchedPrograms = normalizeWatchedPrograms(body.watchedPrograms);
   const watchedProgramIds = uniqueStrings([
@@ -168,9 +184,10 @@ async function saveWatchRequest(request, env, ctx) {
       saved_count,
       needs_source_check,
       requested_at,
+      unsubscribe_token,
       status,
       raw_payload_json
-    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       id,
@@ -187,7 +204,7 @@ async function saveWatchRequest(request, env, ctx) {
       cleanString(body.notificationConsentAt || now, 80),
       cleanString(
         body.notificationConsentText ||
-          'I agree to receive ApplyFirst beta opening alerts for programs I choose to watch.',
+          'I agree to receive ApplyFirst beta opening alerts for programs I choose to watch. I can unsubscribe from any alert email.',
         260,
       ),
       numberOrZero(body.matchCount),
@@ -195,6 +212,7 @@ async function saveWatchRequest(request, env, ctx) {
       numberOrZero(body.savedCount),
       numberOrZero(body.needsSourceCheck),
       cleanString(body.requestedAt || body.savedAt || now, 80),
+      unsubscribeToken,
       'active',
       JSON.stringify({
         matchingProgramIds: arrayify(body.matchingProgramIds).slice(0, 100),
@@ -264,24 +282,31 @@ async function saveWatchRequest(request, env, ctx) {
 }
 
 async function runMonitoring(env, options = {}) {
-  const limit = Math.max(1, Math.min(Number(options.limit) || DEFAULT_MONITOR_LIMIT, 50));
+  const programIds = uniqueStrings(options.programIds || []);
+  const defaultLimit = programIds.length || DEFAULT_MONITOR_LIMIT;
+  const limit = Math.max(1, Math.min(Number(options.limit) || defaultLimit, 50));
+  const dryRun = Boolean(options.dryRun);
   const generatedAt = new Date().toISOString();
   const sources = await getSourcesForMonitoring(env, {
     limit,
     now: generatedAt,
     force: Boolean(options.force),
+    programIds,
   });
 
   const checks = [];
 
   for (const source of sources) {
-    checks.push(await checkOfficialSource(env, source));
+    checks.push(await checkOfficialSource(env, source, { dryRun }));
   }
 
   return {
     ok: true,
     trigger: options.trigger || 'manual',
     force: Boolean(options.force),
+    dryRun,
+    writesSkipped: dryRun,
+    requestedProgramIds: programIds,
     checked: checks.length,
     changed: checks.filter((check) => check.changed).length,
     alertCandidates: checks.filter((check) => check.newAlertCandidate).length,
@@ -291,14 +316,26 @@ async function runMonitoring(env, options = {}) {
   };
 }
 
-async function getSourcesForMonitoring(env, { limit, now, force }) {
-  const dueFilter = force
-    ? ''
-    : `and (
+async function getSourcesForMonitoring(env, { limit, now, force, programIds = [] }) {
+  const filters = ['official_sources.enabled = 1'];
+  const bindings = [];
+  const selectedProgramIds = uniqueStrings(programIds);
+  const shouldUseDueFilter = !force && !selectedProgramIds.length;
+
+  if (selectedProgramIds.length) {
+    filters.push(`official_sources.program_id in (${selectedProgramIds.map(() => '?').join(', ')})`);
+    bindings.push(...selectedProgramIds);
+  }
+
+  if (shouldUseDueFilter) {
+    filters.push(`(
         source_schedule_profiles.next_check_at is null
         or source_schedule_profiles.next_check_at = ''
         or source_schedule_profiles.next_check_at <= ?
-      )`;
+      )`);
+    bindings.push(now);
+  }
+
   const query = `select
       official_sources.*,
       source_schedule_profiles.cycle_frequency,
@@ -330,8 +367,7 @@ async function getSourcesForMonitoring(env, { limit, now, force }) {
       group by watch_request_programs.program_id
     ) watched
       on watched.program_id = official_sources.program_id
-    where official_sources.enabled = 1
-      ${dueFilter}
+    where ${filters.join('\n      and ')}
     order by
       coalesce(watched.active_watch_count, 0) desc,
       case source_schedule_profiles.current_phase
@@ -345,13 +381,16 @@ async function getSourcesForMonitoring(env, { limit, now, force }) {
       coalesce(official_sources.last_checked_at, '') asc,
       official_sources.program_name asc
     limit ?`;
+  bindings.push(limit);
+
   const statement = env.DB.prepare(query);
-  const result = force ? await statement.bind(limit).all() : await statement.bind(now, limit).all();
+  const result = await statement.bind(...bindings).all();
 
   return result.results || [];
 }
 
-async function checkOfficialSource(env, source) {
+async function checkOfficialSource(env, source, options = {}) {
+  const dryRun = Boolean(options.dryRun);
   const [previousSnapshot, previousAlertState] = await Promise.all([
     env.DB.prepare(
       `select id, content_hash
@@ -417,6 +456,8 @@ async function checkOfficialSource(env, source) {
         suggestedConfidence: 'needsReview',
         reviewDecision: 'Manual Review',
         candidateType: '',
+        sourceState: 'Fetch Error',
+        sourceAction: 'Open the official source manually or choose a lighter source URL before trusting alerts.',
         note: `Fetch failed for ${source.program_name}. ${errorMessage}`,
       }
     : classifySourceText(normalizedText, source);
@@ -433,6 +474,38 @@ async function checkOfficialSource(env, source) {
   let candidateId = '';
   let autoSendResult = null;
   const newAlertCandidate = shouldCreateAlertCandidate;
+  const nextSchedule = calculateSourceScheduleAfterCheck({
+    source,
+    detectedStatus,
+    analysis,
+    checkedAt: fetchedAt,
+    errorMessage,
+  });
+
+  if (dryRun) {
+    return {
+      programId: source.program_id,
+      name: source.program_name,
+      url: source.url,
+      dryRun: true,
+      writesSkipped: true,
+      changed,
+      result: analysis.result,
+      sourceState: analysis.sourceState,
+      sourceAction: analysis.sourceAction,
+      reviewDecision: analysis.reviewDecision,
+      detectedSignal: analysis.detectedSignal || '',
+      newAlertCandidate,
+      wouldCreateAlertCandidate: shouldCreateAlertCandidate,
+      status: detectedStatus,
+      autoAlerted: false,
+      wouldAutoSend: openTransition && shouldAutoSendWatchedOpenAlerts(env),
+      schedulePhase: nextSchedule.currentPhase,
+      nextCheckAt: nextSchedule.nextCheckAt,
+      nextDiscoveryAt: nextSchedule.nextDiscoveryAt,
+      error: errorMessage || null,
+    };
+  }
 
   await env.DB.prepare(
     `insert into page_snapshots (
@@ -514,13 +587,7 @@ async function checkOfficialSource(env, source) {
     .bind(fetchedAt, httpStatus, contentHash, errorMessage, fetchedAt, source.id)
     .run();
 
-  const nextSchedule = await upsertSourceScheduleAfterCheck(env, {
-    source,
-    detectedStatus,
-    analysis,
-    checkedAt: fetchedAt,
-    errorMessage,
-  });
+  await upsertSourceScheduleAfterCheck(env, nextSchedule);
 
   return {
     programId: source.program_id,
@@ -528,7 +595,10 @@ async function checkOfficialSource(env, source) {
     url: source.url,
     changed,
     result: analysis.result,
+    sourceState: analysis.sourceState,
+    sourceAction: analysis.sourceAction,
     reviewDecision: analysis.reviewDecision,
+    detectedSignal: analysis.detectedSignal || '',
     newAlertCandidate,
     status: detectedStatus,
     autoAlerted: hasSuccessfulDelivery(autoSendResult),
@@ -537,6 +607,27 @@ async function checkOfficialSource(env, source) {
     nextDiscoveryAt: nextSchedule.nextDiscoveryAt,
     error: errorMessage || null,
   };
+}
+
+function getRunProgramIds(body) {
+  return uniqueStrings([
+    ...normalizeProgramIdInput(body.programId),
+    ...normalizeProgramIdInput(body.programIds),
+    ...normalizeProgramIdInput(body.opportunityId),
+    ...normalizeProgramIdInput(body.opportunityIds),
+  ]);
+}
+
+function normalizeProgramIdInput(value) {
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => normalizeProgramIdInput(item));
+  }
+
+  if (typeof value === 'string') {
+    return value.split(',').map((item) => item.trim());
+  }
+
+  return value ? [value] : [];
 }
 
 async function getProgramAlertState(env, programId) {
@@ -550,7 +641,7 @@ async function getProgramAlertState(env, programId) {
     .first();
 }
 
-async function upsertSourceScheduleAfterCheck(env, { source, detectedStatus, analysis, checkedAt, errorMessage }) {
+function calculateSourceScheduleAfterCheck({ source, detectedStatus, analysis, checkedAt, errorMessage }) {
   const profile = normalizeSourceScheduleProfile(source);
   const checkedDate = new Date(checkedAt);
   const currentPhase = determineSchedulePhase(profile, detectedStatus, checkedDate);
@@ -569,6 +660,20 @@ async function upsertSourceScheduleAfterCheck(env, { source, detectedStatus, ana
     intervalHours,
     activeWatchCount: numberOrZero(source.active_watch_count),
   });
+
+  return {
+    source,
+    profile,
+    checkedAt,
+    currentPhase,
+    nextCheckAt,
+    nextDiscoveryAt,
+    scheduleNote,
+  };
+}
+
+async function upsertSourceScheduleAfterCheck(env, schedule) {
+  const { source, profile, checkedAt, currentPhase, nextCheckAt, nextDiscoveryAt, scheduleNote } = schedule;
 
   await env.DB.prepare(
     `insert into source_schedule_profiles (
@@ -1980,6 +2085,8 @@ async function getWatchStatus(env) {
   const now = new Date().toISOString();
   const [
     requests,
+    activeRequests,
+    unsubscribedRequests,
     programs,
     sources,
     scheduledSources,
@@ -1993,6 +2100,8 @@ async function getWatchStatus(env) {
     latestCheck,
   ] = await Promise.all([
     getCount(env, 'watch_requests'),
+    getCount(env, 'watch_requests', "status = 'active' and (unsubscribed_at is null or unsubscribed_at = '')"),
+    getCount(env, 'watch_requests', "status = 'unsubscribed' or unsubscribed_at is not null"),
     getCount(env, 'watch_request_programs'),
     getCount(env, 'official_sources'),
     getCount(env, 'source_schedule_profiles'),
@@ -2013,6 +2122,8 @@ async function getWatchStatus(env) {
   return {
     ok: true,
     watchRequests: requests,
+    activeWatchRequests: activeRequests,
+    unsubscribedWatchRequests: unsubscribedRequests,
     watchedPrograms: programs,
     officialSources: sources,
     scheduledSources,
@@ -2025,6 +2136,266 @@ async function getWatchStatus(env) {
     alertDeliveries: deliveries,
     lastCheckedAt: latestCheck?.latest || null,
   };
+}
+
+async function getReadinessQueue(env) {
+  const now = new Date().toISOString();
+  const rows = await env.DB.prepare(
+    `select
+      official_sources.id as officialSourceId,
+      official_sources.program_id as programId,
+      official_sources.program_name as programName,
+      official_sources.organization,
+      official_sources.url,
+      official_sources.previous_url as previousUrl,
+      official_sources.last_checked_at as sourceLastCheckedAt,
+      official_sources.last_http_status as lastHttpStatus,
+      official_sources.last_error_message as lastErrorMessage,
+      source_schedule_profiles.current_phase as schedulePhase,
+      source_schedule_profiles.next_check_at as nextCheckAt,
+      source_schedule_profiles.next_discovery_at as nextDiscoveryAt,
+      source_schedule_profiles.source_volatility as sourceVolatility,
+      program_alert_states.status as alertStatus,
+      program_alert_states.confidence,
+      program_alert_states.review_decision as reviewDecision,
+      program_alert_states.result,
+      program_alert_states.last_changed_at as lastChangedAt,
+      program_alert_states.last_checked_at as programLastCheckedAt,
+      coalesce(watched.active_watch_count, 0) as activeWatchCount,
+      coalesce(alerts.pending_alert_count, 0) as pendingAlertCount,
+      coalesce(alerts.auto_alert_count, 0) as automaticAlertCount,
+      coalesce(discovery.pending_discovery_count, 0) as pendingDiscoveryCount,
+      case
+        when source_schedule_profiles.next_check_at is null
+          or source_schedule_profiles.next_check_at = ''
+          or source_schedule_profiles.next_check_at <= ?
+          then 1
+        else 0
+      end as isDue,
+      case
+        when source_schedule_profiles.source_volatility = 'moving_cycle_page'
+          and source_schedule_profiles.current_phase in ('warmup', 'active', 'unknown')
+          and (
+            source_schedule_profiles.next_discovery_at is null
+            or source_schedule_profiles.next_discovery_at = ''
+            or source_schedule_profiles.next_discovery_at <= ?
+          )
+          then 1
+        else 0
+      end as isDiscoveryDue
+    from official_sources
+    left join source_schedule_profiles
+      on source_schedule_profiles.official_source_id = official_sources.id
+    left join program_alert_states
+      on program_alert_states.program_id = official_sources.program_id
+    left join (
+      select
+        watch_request_programs.program_id,
+        count(distinct watch_request_programs.watch_request_id) as active_watch_count
+      from watch_request_programs
+      inner join watch_requests
+        on watch_requests.id = watch_request_programs.watch_request_id
+      where watch_requests.status = 'active'
+        and (watch_requests.unsubscribed_at is null or watch_requests.unsubscribed_at = '')
+      group by watch_request_programs.program_id
+    ) watched
+      on watched.program_id = official_sources.program_id
+    left join (
+      select
+        program_id,
+        sum(case when status = 'pending_review' then 1 else 0 end) as pending_alert_count,
+        sum(case when status in ('auto_ready', 'auto_sent') then 1 else 0 end) as auto_alert_count
+      from alert_candidates
+      group by program_id
+    ) alerts
+      on alerts.program_id = official_sources.program_id
+    left join (
+      select
+        program_id,
+        count(*) as pending_discovery_count
+      from discovery_candidates
+      where status = 'pending_review'
+      group by program_id
+    ) discovery
+      on discovery.program_id = official_sources.program_id
+    where official_sources.enabled = 1
+    order by
+      coalesce(watched.active_watch_count, 0) desc,
+      coalesce(alerts.pending_alert_count, 0) desc,
+      coalesce(discovery.pending_discovery_count, 0) desc,
+      official_sources.program_name asc
+    limit 100`,
+  )
+    .bind(now, now)
+    .all();
+
+  const items = (rows.results || []).map((row) => buildReadinessItem(row));
+  const groups = groupReadinessItems(items);
+
+  return {
+    ok: true,
+    generatedAt: now,
+    total: items.length,
+    needsAttention: items.filter((item) => item.needsAttention).length,
+    groups,
+  };
+}
+
+function buildReadinessItem(row) {
+  const state = inferReadinessState(row);
+  const action = getReadinessAction(state, row);
+
+  return {
+    programId: row.programId,
+    programName: row.programName,
+    organization: row.organization || '',
+    url: row.url || '',
+    previousUrl: row.previousUrl || '',
+    state,
+    action,
+    result: row.result || '',
+    reviewDecision: row.reviewDecision || '',
+    alertStatus: row.alertStatus || 'unknown',
+    confidence: row.confidence || '',
+    schedulePhase: row.schedulePhase || 'unknown',
+    sourceVolatility: row.sourceVolatility || '',
+    activeWatchCount: Number(row.activeWatchCount || 0),
+    pendingAlertCount: Number(row.pendingAlertCount || 0),
+    automaticAlertCount: Number(row.automaticAlertCount || 0),
+    pendingDiscoveryCount: Number(row.pendingDiscoveryCount || 0),
+    isDue: Boolean(row.isDue),
+    isDiscoveryDue: Boolean(row.isDiscoveryDue),
+    lastCheckedAt: row.programLastCheckedAt || row.sourceLastCheckedAt || '',
+    nextCheckAt: row.nextCheckAt || '',
+    nextDiscoveryAt: row.nextDiscoveryAt || '',
+    lastHttpStatus: row.lastHttpStatus || null,
+    lastErrorMessage: row.lastErrorMessage || '',
+    needsAttention: isReadinessAttentionState(state),
+  };
+}
+
+function inferReadinessState(row) {
+  const result = cleanString(row.result, 120).toLowerCase();
+  const reviewDecision = cleanString(row.reviewDecision, 120).toLowerCase();
+  const alertStatus = cleanString(row.alertStatus, 80).toLowerCase();
+  const schedulePhase = cleanString(row.schedulePhase, 80).toLowerCase();
+
+  if (cleanString(row.lastErrorMessage, 500)) {
+    return 'Fetch Error';
+  }
+
+  if (Number(row.pendingAlertCount || 0) > 0 || alertStatus === 'open_review') {
+    return 'Alert Review';
+  }
+
+  if (Number(row.pendingDiscoveryCount || 0) > 0) {
+    return 'Source Candidate Review';
+  }
+
+  if (alertStatus === 'open') {
+    return 'Open';
+  }
+
+  if (alertStatus === 'deadline' || reviewDecision === 'deadline candidate') {
+    return 'Deadline';
+  }
+
+  if (result === 'registration closed' || isKnownClosedReadinessRow(row)) {
+    return 'Closed';
+  }
+
+  if (result === 'old-cycle signal') {
+    return 'Old Cycle';
+  }
+
+  if (isBroadJobBoardUrl(row.url) && ['needs_review', 'watching', 'unknown', ''].includes(alertStatus)) {
+    return 'Exact Posting Needed';
+  }
+
+  if (alertStatus === 'needs_review' || reviewDecision === 'manual review') {
+    return 'Needs Review';
+  }
+
+  if (['opening_soon', 'prep'].includes(alertStatus) || ['warmup', 'active'].includes(schedulePhase)) {
+    return 'Warmup';
+  }
+
+  return 'Monitor';
+}
+
+function isKnownClosedReadinessRow(row) {
+  return cleanString(row.programId, 160) === 'jpmorgan-career-ed-you-watch';
+}
+
+function getReadinessAction(state, row) {
+  switch (state) {
+    case 'Alert Review':
+      return 'Review pending alert candidates, dry run recipients, then send only if the official source is clear.';
+    case 'Source Candidate Review':
+      return 'Review discovered URLs and accept only an official current-cycle source.';
+    case 'Fetch Error':
+      return 'Open the source manually or choose a lighter URL before trusting automation.';
+    case 'Exact Posting Needed':
+      return 'Find the exact posting URL before alerting watched students.';
+    case 'Needs Review':
+      return 'Run a source dry run or inspect the official page before changing alert status.';
+    case 'Open':
+      return Number(row.activeWatchCount || 0)
+        ? 'Open state is active; confirm whether watched students already received the alert.'
+        : 'Open state is active, but no students are currently watching this program.';
+    case 'Deadline':
+      return 'Review the deadline and decide whether students need a reminder.';
+    case 'Closed':
+      return 'Keep monitoring for reopened registration; no student opening alert right now.';
+    case 'Old Cycle':
+      return 'Ignore as a fresh opening and wait for the next cycle or a new official page.';
+    case 'Warmup':
+      return 'Useful for preparation timing; keep checking as the expected opening window approaches.';
+    default:
+      return 'Keep monitoring on schedule.';
+  }
+}
+
+function isReadinessAttentionState(state) {
+  return ['Alert Review', 'Source Candidate Review', 'Fetch Error', 'Exact Posting Needed', 'Needs Review'].includes(state);
+}
+
+function groupReadinessItems(items) {
+  const groupDefinitions = [
+    { key: 'attention', label: 'Needs Attention', states: ['Alert Review', 'Source Candidate Review', 'Fetch Error', 'Exact Posting Needed', 'Needs Review'] },
+    { key: 'ready', label: 'Open or Deadline', states: ['Open', 'Deadline'] },
+    { key: 'closed', label: 'Closed or Old Cycle', states: ['Closed', 'Old Cycle'] },
+    { key: 'watching', label: 'Warmup or Monitor', states: ['Warmup', 'Monitor'] },
+  ];
+
+  return groupDefinitions.map((group) => ({
+    ...group,
+    items: items
+      .filter((item) => group.states.includes(item.state))
+      .sort(compareReadinessItems),
+  }));
+}
+
+function compareReadinessItems(left, right) {
+  const attentionDelta = Number(right.needsAttention) - Number(left.needsAttention);
+
+  if (attentionDelta) {
+    return attentionDelta;
+  }
+
+  const watcherDelta = right.activeWatchCount - left.activeWatchCount;
+
+  if (watcherDelta) {
+    return watcherDelta;
+  }
+
+  const dueDelta = Number(right.isDue) - Number(left.isDue);
+
+  if (dueDelta) {
+    return dueDelta;
+  }
+
+  return left.programName.localeCompare(right.programName);
 }
 
 async function getPendingCandidates(env) {
@@ -2084,11 +2455,13 @@ async function sendCandidateNotifications(env, candidateId, options = {}) {
       watch_requests.email,
       watch_requests.phone,
       watch_requests.preferred_contact_method as preferredContactMethod,
+      watch_requests.unsubscribe_token as unsubscribeToken,
       watch_requests.raw_payload_json as rawPayloadJson
     from watch_requests
     inner join watch_request_programs
       on watch_request_programs.watch_request_id = watch_requests.id
     where watch_requests.status = 'active'
+      and (watch_requests.unsubscribed_at is null or watch_requests.unsubscribed_at = '')
       and watch_request_programs.program_id = ?
     order by case when watch_requests.id = ? then 0 else 1 end,
       watch_requests.created_at asc
@@ -2213,7 +2586,7 @@ async function deliverAlert(env, { candidate, recipient, channel, destination, d
   }
 
   const delivery = channel === 'phone'
-    ? await sendPhoneAlert(env, candidate, destination)
+    ? await sendPhoneAlert(env, candidate, recipient, destination)
     : await sendEmailAlert(env, candidate, recipient, destination);
 
   await recordAlertDelivery(env, {
@@ -2241,7 +2614,8 @@ async function sendEmailAlert(env, candidate, recipient, destination) {
     };
   }
 
-  const message = buildAlertMessage(env, candidate, recipient);
+  const unsubscribeToken = await getOrCreateUnsubscribeToken(env, recipient);
+  const message = buildAlertMessage(env, candidate, { ...recipient, unsubscribeToken });
 
   try {
     const response = await env.EMAIL.send({
@@ -2254,6 +2628,7 @@ async function sendEmailAlert(env, candidate, recipient, destination) {
       headers: message.unsubscribeUrl
         ? {
             'List-Unsubscribe': `<${message.unsubscribeUrl}>`,
+            'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
           }
         : undefined,
     });
@@ -2270,7 +2645,7 @@ async function sendEmailAlert(env, candidate, recipient, destination) {
   }
 }
 
-async function sendPhoneAlert(env, candidate, destination) {
+async function sendPhoneAlert(env, candidate, recipient, destination) {
   if (!env.SMS_WEBHOOK_URL) {
     return {
       status: 'not_configured',
@@ -2278,7 +2653,9 @@ async function sendPhoneAlert(env, candidate, destination) {
     };
   }
 
-  const message = buildSmsMessage(candidate);
+  const unsubscribeToken = await getOrCreateUnsubscribeToken(env, recipient);
+  const unsubscribeUrl = buildUnsubscribeUrl(env, { ...recipient, unsubscribeToken });
+  const message = buildSmsMessage(candidate, unsubscribeUrl);
   const headers = { 'content-type': 'application/json' };
 
   if (env.SMS_WEBHOOK_TOKEN) {
@@ -2347,29 +2724,94 @@ async function recordAlertDelivery(env, delivery) {
     .run();
 }
 
-async function handleUnsubscribe(url, env) {
+async function handleUnsubscribe(request, url, env) {
+  const token = cleanString(url.searchParams.get('token'), 180);
   const requestId = cleanString(url.searchParams.get('requestId'), 120);
 
-  if (!requestId) {
-    return new Response('Missing unsubscribe request id.', {
+  if (!token && !requestId) {
+    return new Response('Missing unsubscribe token.', {
       status: 400,
       headers: { ...corsHeaders(env), 'content-type': 'text/plain; charset=utf-8' },
     });
   }
 
-  await env.DB.prepare(
-    `update watch_requests
-     set status = 'unsubscribed',
-         updated_at = ?
-     where id = ?`,
-  )
-    .bind(new Date().toISOString(), requestId)
-    .run();
-
-  return new Response('You have been unsubscribed from this ApplyFirst watch setup.', {
-    status: 200,
-    headers: { ...corsHeaders(env), 'content-type': 'text/plain; charset=utf-8' },
+  const result = await unsubscribeWatchRequest(env, {
+    token,
+    requestId,
+    reason: request.method === 'POST' ? 'list_unsubscribe_post' : 'email_unsubscribe_link',
   });
+
+  return new Response(renderUnsubscribePage(result), {
+    status: 200,
+    headers: {
+      ...corsHeaders(env),
+      'content-type': 'text/html; charset=utf-8',
+      'cache-control': 'no-store',
+    },
+  });
+}
+
+async function unsubscribeWatchRequest(env, { token, requestId, reason }) {
+  const now = new Date().toISOString();
+  const statement = token
+    ? env.DB.prepare(
+        `update watch_requests
+         set status = 'unsubscribed',
+             unsubscribed_at = ?,
+             unsubscribe_reason = ?,
+             updated_at = ?
+         where unsubscribe_token = ?`,
+      ).bind(now, reason, now, token)
+    : env.DB.prepare(
+        `update watch_requests
+         set status = 'unsubscribed',
+             unsubscribed_at = ?,
+             unsubscribe_reason = ?,
+             updated_at = ?
+         where id = ?`,
+      ).bind(now, reason, now, requestId);
+  const result = await statement.run();
+  const changes = Number(result?.meta?.changes ?? result?.changes ?? 0);
+
+  return {
+    ok: changes > 0,
+    unsubscribedAt: now,
+  };
+}
+
+function renderUnsubscribePage(result) {
+  const title = result.ok ? 'You Are Unsubscribed' : 'This Link Is No Longer Active';
+  const message = result.ok
+    ? 'ApplyFirst will stop sending alerts for this watch setup.'
+    : 'This watch setup may already be unsubscribed, removed, or using an older link.';
+
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>${escapeHtml(title)} | ApplyFirst</title>
+    <style>
+      body{margin:0;background:#f6f8fb;color:#17212f;font-family:Inter,Arial,sans-serif}
+      main{min-height:100vh;display:grid;place-items:center;padding:24px}
+      section{max-width:560px;background:#fff;border:1px solid #dce5ee;border-radius:16px;padding:28px;box-shadow:0 18px 42px rgba(23,33,47,.08)}
+      span{display:inline-flex;margin-bottom:14px;color:#0f7f96;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+      h1{margin:0 0 10px;font-size:30px;line-height:1.15}
+      p{margin:0;color:#425066;line-height:1.6}
+      a{display:inline-flex;margin-top:22px;color:#0f7f96;font-weight:800;text-decoration:none}
+    </style>
+  </head>
+  <body>
+    <main>
+      <section>
+        <span>ApplyFirst Alerts</span>
+        <h1>${escapeHtml(title)}</h1>
+        <p>${escapeHtml(message)}</p>
+        <a href="https://applyfirst-careers.pages.dev/">Return To ApplyFirst</a>
+      </section>
+    </main>
+  </body>
+</html>`;
 }
 
 async function getCount(env, tableName, whereClause = '') {
@@ -2389,12 +2831,6 @@ async function readJson(request, fallback) {
 }
 
 async function readTextWithLimit(response, maxBytes) {
-  const contentLength = Number(response.headers.get('content-length') || 0);
-
-  if (contentLength > maxBytes) {
-    throw new Error(`Source page is larger than ${maxBytes} bytes.`);
-  }
-
   if (!response.body) {
     return response.text();
   }
@@ -2411,12 +2847,18 @@ async function readTextWithLimit(response, maxBytes) {
       break;
     }
 
-    totalBytes += value.byteLength;
+    if (totalBytes + value.byteLength > maxBytes) {
+      const remainingBytes = maxBytes - totalBytes;
 
-    if (totalBytes > maxBytes) {
-      throw new Error(`Source page exceeded ${maxBytes} bytes.`);
+      if (remainingBytes > 0) {
+        output += decoder.decode(value.slice(0, remainingBytes), { stream: true });
+      }
+
+      await reader.cancel('ApplyFirst source byte limit reached.');
+      return `${output}${decoder.decode()} ${SOURCE_TRUNCATION_NOTICE}`;
     }
 
+    totalBytes += value.byteLength;
     output += decoder.decode(value, { stream: true });
   }
 
@@ -2432,15 +2874,23 @@ function classifySourceText(sourceText, source) {
     true,
   );
   const saysNotOpenYet =
-    /\b(not yet open|not open yet|applications? (are )?not open|not currently accepting|not accepting applications|no longer taking applications)\b/i.test(
+    /\b(not yet open|not open yet|applications? (are )?not open|not currently accepting|not accepting applications|no longer taking applications|not currently open)\b/i.test(
       normalized,
     );
+  const hasInformationalOpenMention =
+    /\b(when|once|if|before|until)\s+applications?\s+(are\s+)?open\b/i.test(normalized) ||
+    /\b(first|be first)\s+to\s+know\s+when\s+applications?\s+(are\s+)?open\b/i.test(normalized);
   const saysOpen =
-    /\b(apply now|applications? (are )?open|now accepting|currently accepting|accepting applications|submit your application)\b/i.test(
+    /\b(apply now|applications? (are )?open|now accepting|currently accepting|accepting applications|submit your application|register now|registration (is )?open|registration has opened|registrations? (are )?open)\b/i.test(
       normalized,
-    ) && !saysNotOpenYet;
-  const saysClosed = /\b(closed|applications? (are )?closed|no longer accepting|deadline has passed)\b/i.test(normalized);
-  const saysSoon = /\b(open soon|coming soon|check back|next cycle|next application cycle|will open|opens on|opens in)\b/i.test(
+    ) &&
+    !saysNotOpenYet &&
+    !hasInformationalOpenMention;
+  const saysClosed =
+    /\b(registration (is )?(currently )?closed|registration has closed|registrations? (are )?(currently )?closed|currently closed|applications? (are )?(currently )?closed|application cycle (is )?closed|cycle (is )?closed|no longer accepting|deadline has passed|submissions? (are )?closed)\b/i.test(
+      normalized,
+    );
+  const saysSoon = /\b(open soon|coming soon|applications? (are )?coming soon|will be back soon|check back|next cycle|next application cycle|will open|opens on|opens in)\b/i.test(
     normalized,
   );
   const hasInterestForm =
@@ -2456,41 +2906,105 @@ function classifySourceText(sourceText, source) {
   );
   const mentionsEligibility =
     /\b(freshman|first-year|sophomore|underclass|student|eligible|eligibility|class year)\b/i.test(normalized);
+  const detectedDate = deadline || openWindow;
+  const staleDateSignal = isStaleDateSignal(detectedDate);
+  const exactPostingNeeded = isExactPostingNeededSource(source, normalized);
 
-  if (saysRolling && saysOpen) {
-    return buildAnalysis('Application opened', 'open', mentionsEligibility || deadline ? 'high' : 'medium', 'Alert Candidate', 'opening', source, normalized, deadline);
-  }
-
-  if (saysOpen) {
-    return buildAnalysis('Application opened', 'open', mentionsEligibility || openWindow || deadline ? 'high' : 'medium', 'Alert Candidate', 'opening', source, normalized, deadline || openWindow);
-  }
-
-  if (deadline && !saysClosed) {
-    return buildAnalysis('Dates updated', 'deadlineSoon', mentionsEligibility ? 'high' : 'medium', 'Deadline Candidate', 'deadline', source, normalized, deadline);
+  if ((saysClosed || saysNotOpenYet) && saysOpen) {
+    return buildAnalysis('Conflicting source signals', 'verifyManually', 'needsReview', 'Manual Review', '', source, normalized, deadline || openWindow, {
+      sourceState: 'Needs Review',
+      sourceAction: 'Open the source manually because the page contains both open and closed language.',
+    });
   }
 
   if (saysClosed) {
-    return buildAnalysis('No material change', suggestsNextCycle ? 'expectedSoon' : 'watching', mentionsEligibility ? 'medium' : 'needsReview', 'Monitor Only', '', source, normalized, deadline || openWindow);
+    return buildAnalysis('Registration closed', suggestsNextCycle || saysSoon ? 'expectedSoon' : 'watching', mentionsEligibility ? 'medium' : 'needsReview', 'Monitor Only', '', source, normalized, deadline || openWindow, {
+      sourceState: 'Closed',
+      sourceAction: 'Keep monitoring the official source; do not send a student opening alert.',
+    });
+  }
+
+  if (hasKnownClosedFallback(source, normalized) && !saysOpen && !deadline && !openWindow) {
+    return buildAnalysis('Registration closed', 'watching', 'medium', 'Monitor Only', '', source, normalized, deadline || openWindow, {
+      sourceState: 'Closed',
+      sourceAction: 'Known official page is currently closed; keep watching for reopened registration language.',
+    });
+  }
+
+  if (exactPostingNeeded) {
+    return buildAnalysis('Exact posting needed', 'verifyManually', 'medium', 'Manual Review', '', source, normalized, deadline || openWindow, {
+      sourceState: 'Exact Posting Needed',
+      sourceAction: 'Find or accept the specific posting URL before sending alerts to watched students.',
+    });
+  }
+
+  if (saysNotOpenYet || saysSoon) {
+    return buildAnalysis('Dates updated', 'expectedSoon', mentionsEligibility || openWindow ? 'medium' : 'needsReview', 'Prep Watch', 'prep_window', source, normalized, openWindow || deadline, {
+      sourceState: 'Warmup',
+      sourceAction: 'Use this for preparation timing, not an opening alert yet.',
+    });
+  }
+
+  if (staleDateSignal && (saysOpen || deadline || openWindow)) {
+    return buildAnalysis('Old-cycle signal', suggestsNextCycle ? 'expectedSoon' : 'watching', mentionsEligibility ? 'medium' : 'needsReview', saysOpen ? 'Manual Review' : 'Monitor Only', '', source, normalized, detectedDate, {
+      sourceState: 'Old Cycle',
+      sourceAction: 'Keep monitoring for the next cycle; do not treat this as a fresh opening.',
+    });
+  }
+
+  if (saysRolling && saysOpen) {
+    return buildAnalysis('Application opened', 'open', mentionsEligibility || deadline ? 'high' : 'medium', 'Alert Candidate', 'opening', source, normalized, deadline, {
+      sourceState: 'Open',
+      sourceAction: 'Create an alert candidate; auto-send only when the signal is high-confidence and fresh.',
+    });
+  }
+
+  if (saysOpen) {
+    return buildAnalysis('Application opened', 'open', mentionsEligibility || openWindow || deadline ? 'high' : 'medium', 'Alert Candidate', 'opening', source, normalized, deadline || openWindow, {
+      sourceState: 'Open',
+      sourceAction: 'Create an alert candidate; auto-send only when the signal is high-confidence and fresh.',
+    });
+  }
+
+  if (deadline && !saysClosed) {
+    return buildAnalysis('Dates updated', 'deadlineSoon', mentionsEligibility ? 'high' : 'medium', 'Deadline Candidate', 'deadline', source, normalized, deadline, {
+      sourceState: 'Deadline',
+      sourceAction: 'Review the deadline before sending a reminder or updating the public card.',
+    });
   }
 
   if (hasInterestForm) {
-    return buildAnalysis('Needs follow-up', 'watching', mentionsEligibility || openWindow ? 'medium' : 'needsReview', 'Monitor Only', '', source, normalized, openWindow);
+    return buildAnalysis('Interest form only', 'watching', mentionsEligibility || openWindow ? 'medium' : 'needsReview', 'Monitor Only', '', source, normalized, openWindow, {
+      sourceState: 'Monitor',
+      sourceAction: 'Keep watching; an interest form is useful but is not an application opening.',
+    });
   }
 
-  if (saysNotOpenYet || saysSoon || openWindow || saysRolling) {
-    return buildAnalysis('Dates updated', saysRolling ? 'watching' : 'expectedSoon', mentionsEligibility || openWindow ? 'medium' : 'needsReview', 'Prep Watch', 'prep_window', source, normalized, openWindow);
+  if (openWindow || saysRolling) {
+    return buildAnalysis('Dates updated', saysRolling ? 'watching' : 'expectedSoon', mentionsEligibility || openWindow ? 'medium' : 'needsReview', 'Prep Watch', 'prep_window', source, normalized, openWindow, {
+      sourceState: 'Warmup',
+      sourceAction: 'Track this as prep timing until the page confirms applications are open.',
+    });
   }
 
   if (mentionsEligibility) {
-    return buildAnalysis('Eligibility changed', 'verifyManually', 'medium', 'Manual Review', 'eligibility', source, normalized, '');
+    return buildAnalysis('Eligibility changed', 'verifyManually', 'medium', 'Manual Review', 'eligibility', source, normalized, '', {
+      sourceState: 'Needs Review',
+      sourceAction: 'Review eligibility changes manually before changing the opportunity record.',
+    });
   }
 
-  return buildAnalysis('Needs follow-up', 'verifyManually', 'needsReview', 'Manual Review', '', source, normalized, '');
+  return buildAnalysis('Needs follow-up', 'verifyManually', 'needsReview', 'Manual Review', '', source, normalized, '', {
+    sourceState: 'Needs Review',
+    sourceAction: 'Open the official source manually because the fetched page did not expose enough timing signal.',
+  });
 }
 
-function buildAnalysis(result, suggestedStatus, suggestedConfidence, reviewDecision, candidateType, source, sourceText, detectedSignal) {
+function buildAnalysis(result, suggestedStatus, suggestedConfidence, reviewDecision, candidateType, source, sourceText, detectedSignal, options = {}) {
   const signalCopy = detectedSignal ? ` Detected signal: ${detectedSignal}.` : '';
   const excerpt = sourceText.slice(0, 220);
+  const sourceState = options.sourceState || inferSourceState(result, suggestedStatus, reviewDecision);
+  const sourceAction = options.sourceAction || getSourceAction(sourceState);
 
   return {
     result,
@@ -2498,9 +3012,141 @@ function buildAnalysis(result, suggestedStatus, suggestedConfidence, reviewDecis
     suggestedConfidence,
     reviewDecision,
     candidateType,
+    sourceState,
+    sourceAction,
     detectedSignal,
     note: `${source.program_name}: ${result}. ${reviewDecision} created from official source monitoring.${signalCopy} Review before sending any student alert. Excerpt: ${excerpt}${sourceText.length > 220 ? '...' : ''}`,
   };
+}
+
+function inferSourceState(result, suggestedStatus, reviewDecision) {
+  if (result === 'Application opened' && suggestedStatus === 'open') {
+    return 'Open';
+  }
+
+  if (result === 'Registration closed') {
+    return 'Closed';
+  }
+
+  if (result === 'Old-cycle signal') {
+    return 'Old Cycle';
+  }
+
+  if (result === 'Exact posting needed') {
+    return 'Exact Posting Needed';
+  }
+
+  if (reviewDecision === 'Deadline Candidate') {
+    return 'Deadline';
+  }
+
+  if (reviewDecision === 'Prep Watch') {
+    return 'Warmup';
+  }
+
+  if (reviewDecision === 'Monitor Only') {
+    return 'Monitor';
+  }
+
+  return 'Needs Review';
+}
+
+function getSourceAction(sourceState) {
+  switch (sourceState) {
+    case 'Open':
+      return 'Create an alert candidate; auto-send only when the signal is high-confidence and fresh.';
+    case 'Closed':
+      return 'Keep monitoring the official source; do not send a student opening alert.';
+    case 'Old Cycle':
+      return 'Keep monitoring for the next cycle; do not treat this as a fresh opening.';
+    case 'Exact Posting Needed':
+      return 'Find or accept the specific posting URL before sending alerts to watched students.';
+    case 'Deadline':
+      return 'Review the deadline before sending a reminder or updating the public card.';
+    case 'Warmup':
+      return 'Use this for preparation timing, not an opening alert yet.';
+    case 'Monitor':
+      return 'Keep watching; this source is useful but not alert-ready.';
+    case 'Fetch Error':
+      return 'Open the official source manually or choose a lighter source URL before trusting alerts.';
+    default:
+      return 'Open the official source manually because the fetched page did not expose enough timing signal.';
+  }
+}
+
+function isExactPostingNeededSource(source, normalizedText) {
+  if (!isBroadJobBoardUrl(source.url)) {
+    return false;
+  }
+
+  if (!hasProgramTitleSignal(source, normalizedText)) {
+    return false;
+  }
+
+  return /\b(current openings|open positions|job openings|current jobs|view openings|apply|application|internship|winternship|fellowship)\b/i.test(
+    normalizedText,
+  );
+}
+
+function hasKnownClosedFallback(source, normalizedText) {
+  const programId = cleanString(source.program_id, 160);
+
+  if (programId !== 'jpmorgan-career-ed-you-watch') {
+    return false;
+  }
+
+  const searchableText = normalizeSignalMatchText(`${source.url} ${source.program_name} ${normalizedText}`);
+
+  return (
+    searchableText.includes('career edyou') ||
+    searchableText.includes('career ed you') ||
+    (searchableText.includes('jpmorgan') && searchableText.includes('sophomore'))
+  );
+}
+
+function isBroadJobBoardUrl(value) {
+  const host = getUrlHost(value);
+
+  if (!host || !JOB_BOARD_HOSTS.has(host)) {
+    return false;
+  }
+
+  try {
+    const url = new URL(value);
+    const pathParts = url.pathname.split('/').filter(Boolean);
+    return pathParts.length <= 1;
+  } catch {
+    return true;
+  }
+}
+
+function hasProgramTitleSignal(source, normalizedText) {
+  const title = cleanString(source.program_name, 180);
+
+  if (!title) {
+    return false;
+  }
+
+  const normalizedTitle = normalizeSignalMatchText(title);
+  const normalizedSource = normalizeSignalMatchText(normalizedText);
+
+  if (normalizedTitle && normalizedSource.includes(normalizedTitle)) {
+    return true;
+  }
+
+  const tokens = significantDiscoveryTokens(title).filter((token) => token.length >= 4);
+  const matchedTokens = tokens.filter((token) => normalizedSource.includes(token)).length;
+
+  return tokens.length > 0 && matchedTokens >= Math.min(2, tokens.length);
+}
+
+function normalizeSignalMatchText(value) {
+  return cleanString(value, MAX_STORED_TEXT)
+    .toLowerCase()
+    .replace(/[’']/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function findDateSignal(sourceText, nearbyWords, requireNearby = false) {
@@ -2525,6 +3171,86 @@ function findDateSignal(sourceText, nearbyWords, requireNearby = false) {
   }
 
   return requireNearby ? '' : matches[0][0];
+}
+
+function isStaleDateSignal(signal, referenceDate = new Date()) {
+  const parsedDate = parseDateSignal(signal, referenceDate);
+
+  if (!parsedDate) {
+    return false;
+  }
+
+  const staleCutoff = new Date(
+    Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth(), referenceDate.getUTCDate()),
+  );
+  staleCutoff.setUTCDate(staleCutoff.getUTCDate() - 45);
+
+  return parsedDate.getTime() < staleCutoff.getTime();
+}
+
+function parseDateSignal(signal, referenceDate) {
+  if (!signal) {
+    return null;
+  }
+
+  const normalized = signal.toLowerCase().replace(/\./g, '');
+  const monthNumbers = {
+    jan: 0,
+    january: 0,
+    feb: 1,
+    february: 1,
+    mar: 2,
+    march: 2,
+    apr: 3,
+    april: 3,
+    may: 4,
+    jun: 5,
+    june: 5,
+    jul: 6,
+    july: 6,
+    aug: 7,
+    august: 7,
+    sep: 8,
+    sept: 8,
+    september: 8,
+    oct: 9,
+    october: 9,
+    nov: 10,
+    november: 10,
+    dec: 11,
+    december: 11,
+  };
+  const monthDateMatch = normalized.match(
+    /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:,\s*(\d{4}))?\b/,
+  );
+
+  if (monthDateMatch) {
+    const month = monthNumbers[monthDateMatch[1]];
+    const day = Number(monthDateMatch[2]);
+    const year = monthDateMatch[3] ? Number(monthDateMatch[3]) : referenceDate.getUTCFullYear();
+
+    if (Number.isInteger(month) && day >= 1 && day <= 31) {
+      return new Date(Date.UTC(year, month, day));
+    }
+  }
+
+  const numericDateMatch = normalized.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
+
+  if (numericDateMatch) {
+    const month = Number(numericDateMatch[1]) - 1;
+    const day = Number(numericDateMatch[2]);
+    let year = numericDateMatch[3] ? Number(numericDateMatch[3]) : referenceDate.getUTCFullYear();
+
+    if (year < 100) {
+      year += 2000;
+    }
+
+    if (month >= 0 && month <= 11 && day >= 1 && day <= 31) {
+      return new Date(Date.UTC(year, month, day));
+    }
+  }
+
+  return null;
 }
 
 function normalizePageText(sourceText) {
@@ -2627,7 +3353,7 @@ function parseJsonObject(value) {
 function buildAlertMessage(env, candidate, recipient) {
   const programName = candidate.programName || candidate.title || 'Tracked Program';
   const sourceUrl = candidate.url || publicAppUrl(env);
-  const unsubscribeUrl = `${watchWorkerUrl(env)}/watch/unsubscribe?requestId=${encodeURIComponent(recipient.id)}`;
+  const unsubscribeUrl = buildUnsubscribeUrl(env, recipient);
   const alertCopy = buildStudentAlertCopy(candidate);
   const subject = alertCopy.subject;
   const text = [
@@ -2711,11 +3437,70 @@ function extractDetectedSignal(summary) {
   return cleanString(match[1], 120);
 }
 
-function buildSmsMessage(candidate) {
+function buildSmsMessage(candidate, unsubscribeUrl = '') {
   const programName = candidate.programName || candidate.title || 'Tracked program';
   const sourceUrl = candidate.url || '';
 
-  return `ApplyFirst: ${programName} may have an opening signal. Verify details on the official source: ${sourceUrl}`;
+  return [
+    `ApplyFirst: ${programName} may have an opening signal.`,
+    `Verify details: ${sourceUrl}`,
+    unsubscribeUrl ? `Stop alerts: ${unsubscribeUrl}` : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+async function getOrCreateUnsubscribeToken(env, recipient) {
+  const existingToken = cleanString(recipient.unsubscribeToken, 180);
+
+  if (existingToken) {
+    return existingToken;
+  }
+
+  const token = createSecureToken();
+
+  try {
+    await env.DB.prepare(
+      `update watch_requests
+       set unsubscribe_token = ?,
+           updated_at = ?
+       where id = ?
+         and (unsubscribe_token is null or unsubscribe_token = '')`,
+    )
+      .bind(token, new Date().toISOString(), recipient.id)
+      .run();
+
+    const row = await env.DB.prepare(
+      `select unsubscribe_token
+       from watch_requests
+       where id = ?
+       limit 1`,
+    )
+      .bind(recipient.id)
+      .first();
+
+    return cleanString(row?.unsubscribe_token || token, 180);
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: 'unsubscribe_token_create_failed',
+        watchRequestId: recipient.id,
+        error: error.message,
+      }),
+    );
+    return '';
+  }
+}
+
+function buildUnsubscribeUrl(env, recipient) {
+  const token = cleanString(recipient.unsubscribeToken, 180);
+  const baseUrl = `${watchWorkerUrl(env)}/watch/unsubscribe`;
+
+  if (token) {
+    return `${baseUrl}?token=${encodeURIComponent(token)}`;
+  }
+
+  return `${baseUrl}?requestId=${encodeURIComponent(recipient.id)}`;
 }
 
 function publicAppUrl(env) {
@@ -2747,10 +3532,31 @@ async function requireAdminToken(request, env) {
   }
 
   const header = request.headers.get('authorization') || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
 
-  if (header !== `Bearer ${env.WATCH_ADMIN_TOKEN}`) {
+  if (!token || !timingSafeEqual(token, env.WATCH_ADMIN_TOKEN)) {
     throw httpError(401, 'Admin token required.');
   }
+}
+
+function timingSafeEqual(left, right) {
+  const encoder = new TextEncoder();
+  const leftBytes = encoder.encode(String(left || ''));
+  const rightBytes = encoder.encode(String(right || ''));
+  const length = Math.max(leftBytes.length, rightBytes.length);
+  let diff = leftBytes.length ^ rightBytes.length;
+
+  for (let index = 0; index < length; index += 1) {
+    diff |= (leftBytes[index] || 0) ^ (rightBytes[index] || 0);
+  }
+
+  return diff === 0;
+}
+
+function createSecureToken(byteLength = 32) {
+  const bytes = new Uint8Array(byteLength);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 function httpError(status, message) {
