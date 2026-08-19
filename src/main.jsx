@@ -1398,6 +1398,7 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
   });
   const [searchDraft, setSearchDraft] = useState({
     limit: '5',
+    programIds: '',
     maxQueriesPerProgram: '3',
     maxResultsPerQuery: '5',
     force: false,
@@ -1460,8 +1461,8 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
     }
   };
 
-  const runSourceDryRun = async () => {
-    const programIds = parseProgramIds(sourceRunDraft.programIds);
+  const runSourceDryRun = async (programIdsOverride = null) => {
+    const programIds = programIdsOverride ?? parseProgramIds(sourceRunDraft.programIds);
 
     if (!programIds.length) {
       setErrorMessage('Add at least one program ID before running a source check.');
@@ -1490,7 +1491,10 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
     }
   };
 
-  const runDiscoverySearch = async (dryRun) => {
+  const runDiscoverySearch = async (dryRun, programIdsOverride = []) => {
+    const targetedProgramIds = programIdsOverride.length ? programIdsOverride.filter(Boolean) : parseProgramIds(searchDraft.programIds);
+    const targetLabel =
+      targetedProgramIds.length === 1 ? targetedProgramIds[0] : `${targetedProgramIds.length} targeted programs`;
     setLoading(true);
     setErrorMessage('');
     setActionMessage('');
@@ -1499,19 +1503,24 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
       const payload = await callAdminEndpoint('/watch/discovery/search', {
         method: 'POST',
         body: {
-          limit: Number(searchDraft.limit) || 5,
+          limit: targetedProgramIds.length || Number(searchDraft.limit) || 5,
           maxQueriesPerProgram: Number(searchDraft.maxQueriesPerProgram) || 3,
           maxResultsPerQuery: Number(searchDraft.maxResultsPerQuery) || 5,
-          force: Boolean(searchDraft.force),
+          force: targetedProgramIds.length ? true : Boolean(searchDraft.force),
           dryRun,
+          programIds: targetedProgramIds,
         },
       });
 
       setSearchResult(payload);
       setActionMessage(
-        dryRun
-          ? 'Discovery dry run completed.'
-          : `Discovery saved ${payload.savedCandidates ?? 0} new and updated ${payload.updatedCandidates ?? 0} existing candidate${payload.updatedCandidates === 1 ? '' : 's'}.`,
+        dryRun && targetedProgramIds.length
+          ? `Discovery dry run completed for ${targetLabel}.`
+          : dryRun
+            ? 'Discovery dry run completed.'
+            : targetedProgramIds.length
+              ? `Discovery saved ${payload.savedCandidates ?? 0} new and updated ${payload.updatedCandidates ?? 0} existing candidate${payload.updatedCandidates === 1 ? '' : 's'} for ${targetLabel}.`
+              : `Discovery saved ${payload.savedCandidates ?? 0} new and updated ${payload.updatedCandidates ?? 0} existing candidate${payload.updatedCandidates === 1 ? '' : 's'}.`,
       );
 
       if (!dryRun) {
@@ -1620,7 +1629,18 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
         <MaintainerMetric label="Discovery Candidates" value={status?.pendingDiscoveryCandidates ?? discoveryCandidates.length} />
       </section>
 
-      {readinessQueue ? <MonitoringReadinessQueue queue={readinessQueue} /> : null}
+      {readinessQueue ? (
+        <MonitoringReadinessQueue
+          queue={readinessQueue}
+          onCheckSource={(programId) => runSourceDryRun([programId])}
+          onFindUrl={(programId) => {
+            updateSearchDraft('programIds', programId);
+            runDiscoverySearch(true, [programId]);
+          }}
+          loading={loading}
+          canLoad={canLoad}
+        />
+      ) : null}
 
       <section className="maintainer-panel source-run-panel">
         <div className="maintainer-panel-heading source-run-heading">
@@ -1642,7 +1662,7 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
               placeholder="swe-scholarships, virtu-womens-winternship-watch, jpmorgan-career-ed-you-watch"
             />
           </label>
-          <button type="button" onClick={runSourceDryRun} disabled={!canLoad || loading}>
+          <button type="button" onClick={() => runSourceDryRun()} disabled={!canLoad || loading}>
             Dry Run Sources
           </button>
         </div>
@@ -1667,6 +1687,15 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
                 max="20"
                 value={searchDraft.limit}
                 onChange={(event) => updateSearchDraft('limit', event.target.value)}
+              />
+            </label>
+            <label className="maintainer-wide-field">
+              <span>Target Program IDs</span>
+              <input
+                type="text"
+                value={searchDraft.programIds}
+                onChange={(event) => updateSearchDraft('programIds', event.target.value)}
+                placeholder="Optional: virtu-womens-winternship-watch"
               />
             </label>
             <label>
@@ -1789,7 +1818,7 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
   );
 }
 
-function MonitoringReadinessQueue({ queue }) {
+function MonitoringReadinessQueue({ queue, onCheckSource, onFindUrl, loading, canLoad }) {
   const groups = queue.groups ?? [];
 
   return (
@@ -1813,7 +1842,18 @@ function MonitoringReadinessQueue({ queue }) {
             </div>
             <div className="readiness-item-list">
               {group.items?.length ? (
-                group.items.slice(0, 6).map((item) => <ReadinessItemCard item={item} key={item.programId} />)
+                group.items
+                  .slice(0, 6)
+                  .map((item) => (
+                    <ReadinessItemCard
+                      item={item}
+                      key={item.programId}
+                      onCheckSource={onCheckSource}
+                      onFindUrl={onFindUrl}
+                      loading={loading}
+                      canLoad={canLoad}
+                    />
+                  ))
               ) : (
                 <p className="maintainer-empty">Nothing in this group.</p>
               )}
@@ -1825,7 +1865,7 @@ function MonitoringReadinessQueue({ queue }) {
   );
 }
 
-function ReadinessItemCard({ item }) {
+function ReadinessItemCard({ item, onCheckSource, onFindUrl, loading, canLoad }) {
   return (
     <article className={`readiness-item-card source-state-${getSourceStateTone(item.state)}`}>
       <div className="readiness-item-main">
@@ -1852,6 +1892,14 @@ function ReadinessItemCard({ item }) {
           <dd>{formatDateTime(item.nextCheckAt)}</dd>
         </div>
       </dl>
+      <div className="readiness-item-actions">
+        <button type="button" onClick={() => onCheckSource(item.programId)} disabled={!canLoad || loading}>
+          Check Source
+        </button>
+        <button type="button" onClick={() => onFindUrl(item.programId)} disabled={!canLoad || loading}>
+          Find URL
+        </button>
+      </div>
     </article>
   );
 }

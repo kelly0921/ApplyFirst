@@ -363,7 +363,7 @@ The Cloudflare watch Worker adds the first durable monitoring path:
 - `POST /watch/run` manually triggers a source check pass and requires `WATCH_ADMIN_TOKEN`. It also accepts `programId`, `programIds`, and `dryRun: true` for maintainer-safe targeted checks that fetch and classify sources without writing snapshots, creating candidates, updating schedules, or sending emails.
 - `GET /watch/discovery` lists seasonally due current-cycle URL discovery tasks, structured query packs, priority labels, active watcher counts, and candidate counts. Requires `WATCH_ADMIN_TOKEN`.
 - `GET /watch/discovery/candidates` lists discovered URL candidates. Requires `WATCH_ADMIN_TOKEN`.
-- `POST /watch/discovery/search` runs the due discovery query packs through the configured search provider, filters low-signal results, saves candidate URLs for review, and records a discovery search run. Requires `WATCH_ADMIN_TOKEN`.
+- `POST /watch/discovery/search` runs the due discovery query packs through the configured search provider, filters low-signal results, saves candidate URLs for review, and records a discovery search run. It accepts `programId` or `programIds` for targeted maintainer queue actions. Requires `WATCH_ADMIN_TOKEN`.
 - `POST /watch/discovery/candidates` saves a possible current-cycle URL for review. Requires `WATCH_ADMIN_TOKEN`.
 - `POST /watch/discovery/candidates/:id/review` accepts or rejects a discovered URL. Accepted candidates can update the official source URL and queue it for immediate verification.
 - `GET /watch/candidates` lists pending review candidates and requires `WATCH_ADMIN_TOKEN`.

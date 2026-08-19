@@ -274,6 +274,7 @@ curl -X POST "https://applyfirst-watch.YOUR-SUBDOMAIN.workers.dev/watch/discover
 ```
 
 Add `"dryRun": true` to preview results without saving candidates. Add `"force": true` for smoke tests against records that are not currently discovery-due.
+Add `programId` or `programIds` to target specific programs from the maintainer readiness queue.
 
 To save a possible current-cycle URL manually:
 

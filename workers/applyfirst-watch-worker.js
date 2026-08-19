@@ -744,9 +744,13 @@ async function upsertSourceScheduleAfterCheck(env, schedule) {
 }
 
 async function getDiscoveryQueue(env, url) {
-  const limit = Math.max(1, Math.min(Number(url.searchParams.get('limit')) || 25, 100));
+  const programIds = uniqueStrings([
+    ...url.searchParams.getAll('programId').flatMap((value) => normalizeProgramIdInput(value)),
+    ...url.searchParams.getAll('programIds').flatMap((value) => normalizeProgramIdInput(value)),
+  ]);
+  const defaultLimit = programIds.length || 25;
+  const limit = Math.max(1, Math.min(Number(url.searchParams.get('limit')) || defaultLimit, 100));
   const force = url.searchParams.get('force') === 'true';
-  const programId = cleanString(url.searchParams.get('programId'), 120);
   const now = new Date().toISOString();
   const conditions = [
     'official_sources.enabled = 1',
@@ -755,9 +759,9 @@ async function getDiscoveryQueue(env, url) {
   ];
   const bindings = [];
 
-  if (programId) {
-    conditions.push('official_sources.program_id = ?');
-    bindings.push(programId);
+  if (programIds.length) {
+    conditions.push(`official_sources.program_id in (${programIds.map(() => '?').join(', ')})`);
+    bindings.push(...programIds);
   }
 
   if (!force) {
@@ -922,7 +926,7 @@ async function runDiscoverySearch(env, body = {}) {
   const country = cleanString(body.country || env.DISCOVERY_SEARCH_COUNTRY || 'US', 40);
   const force = Boolean(body.force);
   const dryRun = Boolean(body.dryRun);
-  const programId = cleanString(body.programId, 120);
+  const programIds = getRunProgramIds(body);
   const generatedAt = new Date().toISOString();
   const runId = crypto.randomUUID();
 
@@ -931,8 +935,8 @@ async function runDiscoverySearch(env, body = {}) {
   if (force) {
     queueUrl.searchParams.set('force', 'true');
   }
-  if (programId) {
-    queueUrl.searchParams.set('programId', programId);
+  for (const programId of programIds) {
+    queueUrl.searchParams.append('programId', programId);
   }
 
   const queue = await getDiscoveryQueue(env, queueUrl);

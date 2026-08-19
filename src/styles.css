@@ -2909,6 +2909,10 @@ a {
   gap: 10px;
 }
 
+.maintainer-wide-field {
+  grid-column: 1 / -1;
+}
+
 .source-run-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -3067,6 +3071,32 @@ a {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
   margin: 0;
+}
+
+.readiness-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.readiness-item-actions button {
+  border: 1px solid rgba(47, 91, 214, 0.2);
+  border-radius: 7px;
+  background: var(--blue);
+  color: #ffffff;
+  padding: 7px 9px;
+  font-size: 0.74rem;
+  font-weight: 850;
+}
+
+.readiness-item-actions button + button {
+  background: #ffffff;
+  color: var(--blue);
+}
+
+.readiness-item-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .readiness-item-card dl div {
