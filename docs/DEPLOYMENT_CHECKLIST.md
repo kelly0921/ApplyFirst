@@ -30,7 +30,7 @@ After push:
 
 1. Wait for Cloudflare Pages to build the latest commit.
 2. Open the production URL.
-3. Confirm the deployed build shows the latest nav: Programs / My Focus / Suggest Updates.
+3. Confirm the deployed build shows the latest nav: Programs / My Focus / Suggest Updates / About.
 4. Confirm invite code access works.
 5. Submit one test waitlist/contact entry.
 6. Submit one test beta watch setup.
@@ -56,7 +56,7 @@ Share the public prototype only after:
 - Capture endpoints are working, or you intentionally accept local-only testing.
 - The tester has an invite code.
 - The tester knows ApplyFirst can email high-confidence official opening signals automatically, while uncertain candidates are reviewed before sending.
-- The tester has a simple task path: join or unlock, browse Programs, save one program, set My Focus, submit a beta watch setup, and submit one piece of feedback.
+- The tester has a simple task path: read About, join or unlock, browse Programs, open one expanded program detail, save one program, set My Focus, submit a beta watch setup, and submit one piece of feedback.
 
 ## Rollback Plan
 

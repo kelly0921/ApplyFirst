@@ -22,7 +22,7 @@ const quickViews = [
   { id: 'all', label: 'All' },
   { id: 'Freshman', label: 'Freshman' },
   { id: 'Sophomore', label: 'Sophomore' },
-  { id: 'All class years', label: 'All years' },
+  { id: 'All class years', label: 'All Years' },
 ];
 
 const appViews = ['monitor', 'alerts', 'contribute', 'maintainer'];
@@ -106,6 +106,18 @@ function createAlertPrefsFromIntent(intent, basePrefs = defaultAlertPrefs) {
   };
 }
 
+function getDefaultClassYearForOpportunity(opportunity) {
+  if (opportunity.classYears.includes('Freshman')) {
+    return 'Freshman';
+  }
+
+  if (opportunity.classYears.includes('Sophomore')) {
+    return 'Sophomore';
+  }
+
+  return 'All class years';
+}
+
 function isPreferenceUnset(value) {
   return !value;
 }
@@ -116,6 +128,15 @@ function getInitialView() {
     return appViews.includes(requestedView) ? requestedView : 'monitor';
   } catch {
     return 'monitor';
+  }
+}
+
+function isReviewToolsRequested() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.has('reviewTools') || params.has('maintainer') || params.get('view') === 'maintainer';
+  } catch {
+    return false;
   }
 }
 
@@ -201,8 +222,9 @@ function App() {
   const [classYear, setClassYear] = useState('all');
   const [timing, setTiming] = useState('all');
   const [status, setStatus] = useState('all');
+  const [savedOnly, setSavedOnly] = useState(false);
   const [selectedId, setSelectedId] = useState(opportunities[0].id);
-  const [showInternalTools, setShowInternalTools] = useState(false);
+  const [showInternalTools, setShowInternalTools] = useState(() => isReviewToolsRequested());
   const [maintainerToken, setMaintainerToken] = useState('');
   const [verificationEdits, setVerificationEdits] = useState(() => {
     try {
@@ -312,6 +334,7 @@ function App() {
       return null;
     }
   });
+  const [watchIntentProgramIds, setWatchIntentProgramIds] = useState([]);
   const [lastSavedId, setLastSavedId] = useState(null);
 
   const opportunityRecords = useMemo(
@@ -362,6 +385,7 @@ function App() {
 
       return (
         (!normalizedQuery || searchText.includes(normalizedQuery)) &&
+        (!savedOnly || savedIds.includes(opportunity.id)) &&
         (roleTrack === 'all' || getOpportunityTracks(opportunity).includes(roleTrack)) &&
         (priority === 'all' ||
           (priority === 'recommended'
@@ -374,10 +398,11 @@ function App() {
         (status === 'all' || opportunity.status === status)
       );
     });
-  }, [category, classYear, opportunityRecords, priority, query, roleTrack, showInternalTools, status, timing, verification]);
+  }, [category, classYear, opportunityRecords, priority, query, roleTrack, savedIds, savedOnly, showInternalTools, status, timing, verification]);
 
   const selectedOpportunity = filtered.find((item) => item.id === selectedId) ?? filtered[0] ?? null;
   const savedOpportunities = opportunityRecords.filter((item) => savedIds.includes(item.id));
+  const watchIntentOpportunities = opportunityRecords.filter((item) => watchIntentProgramIds.includes(item.id));
   const alertPreviewMatches = useMemo(
     () =>
       opportunityRecords.filter((opportunity) => {
@@ -405,6 +430,10 @@ function App() {
   const readySoonCount = opportunityRecords.filter((item) =>
     ['open', 'expectedSoon', 'deadlineSoon'].includes(item.status),
   ).length;
+  const showReviewToolsToggle =
+    showInternalTools ||
+    isReviewToolsRequested();
+
   const guideProgress = {
     ...onboardingProgress,
     saved: onboardingProgress.saved || savedIds.length > 0,
@@ -531,6 +560,7 @@ function App() {
     setClassYear('all');
     setTiming('all');
     setStatus('all');
+    setSavedOnly(false);
   };
 
   const focusOpportunity = (id) => {
@@ -550,6 +580,44 @@ function App() {
       const currentlySaved = currentIds.includes(id);
       return currentlySaved ? currentIds.filter((savedId) => savedId !== id) : [...currentIds, id];
     });
+
+    if (alreadySaved) {
+      setWatchIntentProgramIds((currentIds) => currentIds.filter((programId) => programId !== id));
+    }
+  };
+
+  const startAlertsForOpportunity = (id) => {
+    const opportunity = opportunityRecords.find((item) => item.id === id);
+
+    if (!opportunity) {
+      setActiveView('alerts');
+      return;
+    }
+
+    setSelectedId(id);
+    setLastSavedId(id);
+    markOnboardingStep('browsed');
+    markOnboardingStep('saved');
+    markOnboardingStep('focused');
+
+    setSavedIds((currentIds) => (currentIds.includes(id) ? currentIds : [...currentIds, id]));
+    setWatchIntentProgramIds((currentIds) => [id, ...currentIds.filter((programId) => programId !== id)].slice(0, 10));
+    setAlertPrefs((currentPrefs) => {
+      const tracks = getOpportunityTracks(opportunity);
+
+      return {
+        ...currentPrefs,
+        classYear: isPreferenceUnset(currentPrefs.classYear)
+          ? getDefaultClassYearForOpportunity(opportunity)
+          : currentPrefs.classYear,
+        roleTrack: isPreferenceUnset(currentPrefs.roleTrack) ? tracks[0] : currentPrefs.roleTrack,
+        sendTiming: isPreferenceUnset(currentPrefs.sendTiming) ? 'openOnly' : currentPrefs.sendTiming,
+      };
+    });
+    setActiveView('alerts');
+    window.setTimeout(() => {
+      document.getElementById('watch-plan')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 0);
   };
 
   const saveVerificationEdit = (id, updates) => {
@@ -681,8 +749,9 @@ function App() {
         <Header
           activeView={activeView}
           onViewChange={setActiveView}
-          savedCount={savedIds.length}
           showInternalTools={showInternalTools}
+          showReviewToolsToggle={showReviewToolsToggle}
+          onToggleInternalTools={() => setShowInternalTools((current) => !current)}
           onReturnToLanding={returnToLanding}
         />
       )}
@@ -698,13 +767,8 @@ function App() {
             <section className="alert-hero" aria-label="ApplyFirst watch overview">
               <div>
                 <span>My Focus</span>
-                <h1>Set Your Focus.</h1>
-                <p>Choose what ApplyFirst should watch first.</p>
-              </div>
-              <div className="alert-hero-card" aria-label="Beta watch status">
-                <span>Private Beta</span>
-                <strong>Openings Without Noise.</strong>
-                <p>High-confidence opening signals can email automatically; uncertain matches stay in review.</p>
+                <h1 className="page-hero-title">Choose What ApplyFirst Watches.</h1>
+                <p>Set your focus, save a few target programs, and add your contact method so alerts arrive when openings are ready.</p>
               </div>
             </section>
             <AlertSetupPanel
@@ -714,6 +778,7 @@ function App() {
               matchCount={alertPreviewMatches.length}
               alertMatches={alertPreviewMatches}
               savedOpportunities={savedOpportunities}
+              watchIntentOpportunities={watchIntentOpportunities}
               alertStrategy={alertStrategy}
               betaAlertSetup={betaAlertSetup}
               onBetaAlertSetupSave={saveBetaAlertSetup}
@@ -734,7 +799,7 @@ function App() {
             <section className="library-summary" aria-label="ApplyFirst overview">
               <div className="library-summary-copy">
                 <span>Opportunity Library</span>
-                <h1>
+                <h1 className="page-hero-title">
                   <span className="headline-line">Find Early Programs</span>
                   <span className="headline-line headline-highlight">Before They Get Crowded.</span>
                 </h1>
@@ -826,27 +891,46 @@ function App() {
               <section className="results-board">
                 <div className="board-toolbar">
                   <div>
-                    <span>Library Results</span>
-                    <strong>{filtered.length} programs</strong>
+                    <span>{savedOnly ? 'Saved Programs' : 'Library Results'}</span>
+                    <strong>{filtered.length} {filtered.length === 1 ? 'program' : 'programs'}</strong>
                   </div>
-                  <button type="button" onClick={resetFilters}>
-                    Clear
-                  </button>
+                  <div className="board-toolbar-actions">
+                    <div className="result-view-switch" aria-label="Program list view">
+                      <button
+                        className={!savedOnly ? 'active' : ''}
+                        type="button"
+                        aria-pressed={!savedOnly}
+                        onClick={() => setSavedOnly(false)}
+                      >
+                        All
+                      </button>
+                      <button
+                        className={savedOnly ? 'active' : ''}
+                        type="button"
+                        aria-pressed={savedOnly}
+                        onClick={() => setSavedOnly(true)}
+                        disabled={!savedIds.length && !savedOnly}
+                      >
+                        Saved
+                        <span>{savedIds.length}</span>
+                      </button>
+                    </div>
+                    <button type="button" onClick={resetFilters}>
+                      Clear
+                    </button>
+                  </div>
                 </div>
                 <div className="record-table" role="list">
                   {filtered.length ? (
                     filtered.map((opportunity) => (
-                      <OpportunityRecord
-                        key={opportunity.id}
-                        opportunity={opportunity}
-                        selected={selectedOpportunity?.id === opportunity.id}
-                        saved={savedIds.includes(opportunity.id)}
-                        onSelect={() => {
-                          setSelectedId(opportunity.id);
-                          markOnboardingStep('browsed');
-                        }}
-                        onSave={() => toggleSaved(opportunity.id)}
-                      />
+                        <OpportunityRecord
+                          key={opportunity.id}
+                          opportunity={opportunity}
+                          selected={selectedId === opportunity.id}
+                          saved={savedIds.includes(opportunity.id)}
+                          onSelect={() => focusOpportunity(opportunity.id)}
+                          onSave={() => toggleSaved(opportunity.id)}
+                        />
                     ))
                   ) : (
                     <EmptyState onReset={resetFilters} />
@@ -854,7 +938,7 @@ function App() {
                 </div>
               </section>
 
-              <aside className="opportunity-detail-column">
+              <aside className="opportunity-detail-column" aria-label="Selected program details">
                 <OpportunityDetail
                   opportunity={selectedOpportunity}
                   saved={selectedOpportunity ? savedIds.includes(selectedOpportunity.id) : false}
@@ -862,7 +946,7 @@ function App() {
                   justSaved={Boolean(
                     selectedOpportunity && selectedOpportunity.id === lastSavedId && savedIds.includes(selectedOpportunity.id),
                   )}
-                  onFocusSetup={() => setActiveView('alerts')}
+                  onFocusSetup={() => selectedOpportunity && startAlertsForOpportunity(selectedOpportunity.id)}
                   onImproveLibrary={() => setActiveView('contribute')}
                   onVerificationSave={saveVerificationEdit}
                   onVerificationReset={resetVerificationEdit}
@@ -873,21 +957,23 @@ function App() {
               </aside>
             </section>
 
-            <section className="library-support-row" aria-label="Saved Programs and Beta Coverage">
-              <Shortlist items={savedOpportunities} onSelect={setSelectedId} />
-              <ReadinessPanel
-                readinessPercent={readinessPercent}
-                recordCount={opportunityRecords.length}
-                verifiedCount={verifiedCount}
-                target={phaseOneTarget}
-              />
-              {cleanCaptureMode ? null : (
-                <ReviewModeControl
-                  enabled={showInternalTools}
-                  onToggle={() => setShowInternalTools((current) => !current)}
+            {showInternalTools ? (
+              <section className="library-support-row" aria-label="Saved Programs and Beta Coverage">
+                <Shortlist items={savedOpportunities} onSelect={focusOpportunity} />
+                <ReadinessPanel
+                  readinessPercent={readinessPercent}
+                  recordCount={opportunityRecords.length}
+                  verifiedCount={verifiedCount}
+                  target={phaseOneTarget}
                 />
-              )}
-            </section>
+                {cleanCaptureMode ? null : (
+                  <ReviewModeControl
+                    enabled={showInternalTools}
+                    onToggle={() => setShowInternalTools((current) => !current)}
+                  />
+                )}
+              </section>
+            ) : null}
           </section>
         )}
       </main>
@@ -937,16 +1023,12 @@ function LandingPage({
         <section className="landing-hero" aria-label="ApplyFirst private beta">
           <div className="landing-copy">
             <span>Stop Checking Scattered Lists Manually</span>
-            <h1 className="landing-headline">
+            <h1 className="landing-headline page-hero-title">
               <span className="landing-headline-text headline-highlight">Apply Before The Crowd</span>
             </h1>
             <p>
               ApplyFirst helps students find high-signal programs, track timing, and prepare before applications open.
             </p>
-                <div className="beta-status-note" aria-label="Private beta status">
-                  <strong>Beta Focus</strong>
-                  <span>Library, saved programs, My Focus, beta watch requests, and feedback are ready to test.</span>
-                </div>
             <div className="landing-actions">
               <a className="button primary" href="#waitlist">
                 Join the Waitlist
@@ -956,19 +1038,13 @@ function LandingPage({
 
           <aside className="landing-panel" aria-label="Private Beta Access">
             <span>Private Beta</span>
-            <h2>Early Access for Students Who Want to Move First.</h2>
-            <p>
-              ApplyFirst is open to a small group first so the library, timing notes, and future alerts stay accurate
-              before wider launch.
-            </p>
+            <h2>Start With the Beta Library.</h2>
+            <p>Join the waitlist, or enter an invite code to use the current library and alert setup.</p>
             <div className="beta-panel-points" aria-label="Private Beta Priorities">
               <span>Accuracy First</span>
-              <span>Student Feedback</span>
-              <span>No Noisy Alerts</span>
+              <span>Reviewed Alerts</span>
+              <span>Invite Only</span>
             </div>
-            <p className="beta-panel-note">
-              High-confidence opening alerts can send automatically; uncertain source changes stay in review.
-            </p>
             {showAccess ? (
               <form className="invite-form" onSubmit={submitInviteCode}>
                 <label>
@@ -1000,8 +1076,6 @@ function LandingPage({
 
         <CareerAgencySection />
 
-        <VisualBenefitSection />
-
         <WaitlistPanel
           context="landing"
           alertPrefs={alertPrefs}
@@ -1021,7 +1095,7 @@ function ProductPreviewSection() {
     <section className="product-preview" aria-label="ApplyFirst product preview">
       <div className="product-preview-heading">
         <span>Product Preview</span>
-        <h2>Built Around the Messy Part Students Already Do Manually.</h2>
+        <h2>Built Around Manual Program Tracking.</h2>
         <p>One view for discovery, timing, saved programs, and source confidence.</p>
       </div>
       <div className="product-preview-layout">
@@ -1068,59 +1142,12 @@ function BetaExampleStrip() {
   return (
     <section className="beta-example-strip" aria-label="Trusted beta examples">
       <div>
-        <span>Good Starting Points</span>
+        <span>Example Programs in the Beta Library</span>
         <p>Explore programs with enough source context to compare timing, fit, and next steps.</p>
       </div>
       <div className="beta-example-list">
         {betaReadyExamples.map((program) => (
           <em key={program}>{program}</em>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function VisualBenefitSection() {
-  const benefits = [
-    {
-      label: 'Before',
-      title: 'Scattered Lists',
-      tone: 'before',
-      items: ['GitHub Repos', 'School Links', 'Old Spreadsheets', 'Official Pages'],
-    },
-    {
-      label: 'ApplyFirst',
-      title: 'One Watchlist',
-      tone: 'applyfirst',
-      items: ['Program Fit', 'Timing Notes', 'Source Status', 'Next Step'],
-    },
-    {
-      label: 'Outcome',
-      title: 'Apply Earlier',
-      tone: 'outcome',
-      items: ['Prepare Ahead', 'Catch Openings', 'Avoid Stale Links', 'Move Faster'],
-    },
-  ];
-
-  return (
-    <section className="visual-benefits" aria-label="ApplyFirst benefits">
-      <div className="visual-benefits-heading">
-        <span>What Changes</span>
-        <h2>Less Checking. Earlier Action.</h2>
-      </div>
-      <div className="visual-benefit-flow">
-        {benefits.map((benefit) => (
-          <article className={`visual-benefit-card visual-benefit-${benefit.tone}`} key={benefit.label}>
-            <div className="visual-benefit-title">
-              <span>{benefit.label}</span>
-              <h3>{benefit.title}</h3>
-            </div>
-            <ul>
-              {benefit.items.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </article>
         ))}
       </div>
     </section>
@@ -1170,23 +1197,23 @@ function HowItWorksSection() {
   const steps = [
     {
       label: '1',
-      title: 'Discover',
-      text: 'Find high-signal programs.',
+      title: 'Find',
+      text: 'Search programs by year, role, timing, and source status.',
     },
     {
       label: '2',
       title: 'Save',
-      text: 'Keep a personal saved list.',
+      text: 'Build one focused list instead of checking scattered links.',
     },
     {
       label: '3',
-      title: 'Prepare',
-      text: 'Use timing notes early.',
+      title: 'Set Focus',
+      text: 'Tell ApplyFirst which openings and deadlines matter to you.',
     },
     {
       label: '4',
-      title: 'Monitor',
-      text: 'Track verified openings.',
+      title: 'Get Alerts',
+      text: 'Receive reviewed opening signals when a watched program is ready.',
     },
   ];
 
@@ -1194,7 +1221,8 @@ function HowItWorksSection() {
     <section className="how-it-works" aria-label="How ApplyFirst works">
       <div className="how-it-works-copy">
         <span>How It Works</span>
-        <h2>Discover. Save. Prepare. Monitor.</h2>
+        <h2>Less Checking. Earlier Action.</h2>
+        <p>ApplyFirst turns scattered lists, old spreadsheets, and official pages into one watchlist students can act on earlier.</p>
       </div>
       <div className="how-it-works-steps">
         {steps.map((step) => (
@@ -1215,7 +1243,7 @@ function FirstSessionGuide({ progress, savedCount, onBrowse, onFocusSetup, onImp
       id: 'browsed',
       label: '1',
       title: 'Find a Program',
-      text: 'Search or click a card.',
+      text: 'Search or open a listing.',
       actionLabel: 'Search',
       onAction: onBrowse,
     },
@@ -1223,31 +1251,31 @@ function FirstSessionGuide({ progress, savedCount, onBrowse, onFocusSetup, onImp
       id: 'saved',
       label: '2',
       title: 'Save One',
-      text: savedCount ? `${savedCount} saved.` : 'Click bookmark.',
+      text: savedCount ? `${savedCount} saved` : 'Bookmark one item.',
       actionLabel: savedCount ? 'Saved' : 'Bookmark',
     },
     {
       id: 'focused',
       label: '3',
-      title: 'Set My Focus',
-      text: progress.focused ? 'Focus saved.' : 'Choose year, role, timing.',
-      actionLabel: 'Choose',
+      title: 'Set Focus',
+      text: progress.focused ? 'Focus set.' : 'Add year, role, timing.',
+      actionLabel: 'Set focus',
       onAction: onFocusSetup,
     },
     {
       id: 'alerted',
       label: '4',
-      title: 'Join Alerts',
-      text: 'Add email.',
-      actionLabel: 'Add Email',
+      title: 'Enable Alerts',
+      text: 'Add email or phone.',
+      actionLabel: 'Get alerts',
       onAction: onFocusSetup,
     },
     {
       id: 'improved',
       label: '5',
       title: 'Suggest Updates',
-      text: 'Report stale info.',
-      actionLabel: 'Report',
+      text: 'Report stale info',
+      actionLabel: 'Suggest',
       onAction: onImproveLibrary,
     },
   ];
@@ -1266,8 +1294,8 @@ function FirstSessionGuide({ progress, savedCount, onBrowse, onFocusSetup, onImp
     <section className="first-session-guide" aria-label="First ApplyFirst session guide">
       <div className="first-session-heading">
         <span>Start Here</span>
-        <h2>Quick Start</h2>
-        <p>Complete these once to test the core flow.</p>
+        <h2>First Visit Checklist</h2>
+        <p>Complete the core flow once.</p>
         <div
           className="first-session-progress"
           style={{ '--progress': `${(completedCount / steps.length) * 100}%` }}
@@ -1299,7 +1327,14 @@ function FirstSessionGuide({ progress, savedCount, onBrowse, onFocusSetup, onImp
   );
 }
 
-function Header({ activeView, onViewChange, savedCount, showInternalTools, onReturnToLanding }) {
+function Header({
+  activeView,
+  onViewChange,
+  showInternalTools,
+  showReviewToolsToggle,
+  onToggleInternalTools,
+  onReturnToLanding,
+}) {
   return (
     <header className="site-header">
       <button className="brand" type="button" onClick={() => onViewChange('monitor')} aria-label="ApplyFirst home">
@@ -1343,10 +1378,14 @@ function Header({ activeView, onViewChange, savedCount, showInternalTools, onRet
           ) : null}
         </div>
         <div className="nav-status" aria-label="Workspace status">
-          <span>{savedCount} Saved</span>
           {showInternalTools ? <span className="internal-status">Maintainer</span> : null}
+          {showReviewToolsToggle ? (
+            <button className="internal-tools-toggle" type="button" onClick={onToggleInternalTools}>
+              {showInternalTools ? 'Hide Review' : 'Review Tools'}
+            </button>
+          ) : null}
           <button type="button" onClick={onReturnToLanding}>
-            Landing
+            About
           </button>
         </div>
       </nav>
@@ -1687,12 +1726,20 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
     }
   };
 
+  const dismissAlertCandidateResult = (candidateId) => {
+    setAlertResultByCandidateId((currentResults) => {
+      const nextResults = { ...currentResults };
+      delete nextResults[candidateId];
+      return nextResults;
+    });
+  };
+
   return (
     <section className="maintainer-review-view" aria-label="ApplyFirst maintainer review">
       <section className="maintainer-hero">
         <div>
           <span>Maintainer Review</span>
-          <h1>Review Signals Before They Reach Students.</h1>
+          <h1 className="page-hero-title">Review Signals Before They Reach Students.</h1>
           <p>
             Use this beta console to review discovered source URLs, inspect alert candidates, and keep high-risk
             actions behind a maintainer decision.
@@ -1951,7 +1998,12 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
                       {isSending ? 'Sending...' : 'Send This Alert'}
                     </button>
                   </div>
-                  {actionResult ? <AlertCandidateActionResult result={actionResult} /> : null}
+                  {actionResult ? (
+                    <AlertCandidateActionResult
+                      result={actionResult}
+                      onDismiss={() => dismissAlertCandidateResult(candidate.id)}
+                    />
+                  ) : null}
                 </article>
               );
             })
@@ -1973,7 +2025,7 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
   );
 }
 
-function AlertCandidateActionResult({ result }) {
+function AlertCandidateActionResult({ result, onDismiss }) {
   const deliveries = result.deliveries ?? [];
   const previewDeliveries = deliveries.slice(0, 3);
   const hiddenDeliveryCount = Math.max(deliveries.length - previewDeliveries.length, 0);
@@ -1983,6 +2035,9 @@ function AlertCandidateActionResult({ result }) {
       <div className="alert-action-result-heading">
         <strong>{result.title}</strong>
         <time dateTime={result.generatedAt}>{formatDateTime(result.generatedAt)}</time>
+        <button type="button" onClick={onDismiss} aria-label="Hide alert action result" title="Hide result">
+          x
+        </button>
       </div>
       <p>{result.detail}</p>
       {previewDeliveries.length ? (
@@ -2611,6 +2666,7 @@ function AlertSetupPanel({
   matchCount,
   alertMatches,
   savedOpportunities,
+  watchIntentOpportunities,
   alertStrategy,
   betaAlertSetup,
   onBetaAlertSetupSave,
@@ -2618,6 +2674,9 @@ function AlertSetupPanel({
   alertEndpoint,
   watchEndpoint,
 }) {
+  const getPreferenceCardClassName = (value) =>
+    `alert-preference-card${isPreferenceUnset(value) ? ' is-missing' : ' is-complete'}`;
+
   const updatePref = (key, value) => {
     onFocusChange();
     setAlertPrefs((currentPrefs) => ({
@@ -2631,20 +2690,16 @@ function AlertSetupPanel({
       <section className="focus-section focus-required-section" aria-label="Required focus setup">
         <div className="focus-section-heading">
           <div>
-            <span>Required Setup</span>
-            <h2>Choose What to Watch.</h2>
+            <span>Step 1</span>
+            <h2>Tell ApplyFirst What To Match</h2>
           </div>
-          <p>
-            Choose Class Year, Role Track, and Alert Timing. ApplyFirst uses this to preview matching programs and
-            beta opening alerts.
-          </p>
         </div>
         {waitlistIntent ? <p className="preference-source-note">Pre-filled from your waitlist. Edit anytime.</p> : null}
         <div className="alert-preference-layout">
-          <article className="alert-preference-card">
-            <span>Required</span>
-            <h3>Class Year</h3>
-            <p>Match programs to your student stage.</p>
+          <article className={getPreferenceCardClassName(alertPrefs.classYear)}>
+            <div className="preference-card-heading">
+              <span>Class Year <span className="preference-required-meta" aria-label="required field">Required</span></span>
+            </div>
             <FilterSelect
               label="Class Year"
               value={alertPrefs.classYear}
@@ -2654,10 +2709,10 @@ function AlertSetupPanel({
               includeAll={false}
             />
           </article>
-          <article className="alert-preference-card">
-            <span>Required</span>
-            <h3>Role Track</h3>
-            <p>Choose the path you want watched first.</p>
+          <article className={getPreferenceCardClassName(alertPrefs.roleTrack)}>
+            <div className="preference-card-heading">
+              <span>Role Interest <span className="preference-required-meta" aria-label="required field">Required</span></span>
+            </div>
             <FilterSelect
               label="Role Interest"
               value={alertPrefs.roleTrack}
@@ -2667,10 +2722,10 @@ function AlertSetupPanel({
               includeAll={false}
             />
           </article>
-          <article className="alert-preference-card">
-            <span>Required</span>
-            <h3>Alert Timing</h3>
-            <p>Decide which moments should reach you.</p>
+          <article className={getPreferenceCardClassName(alertPrefs.sendTiming)}>
+            <div className="preference-card-heading">
+              <span>Alert Timing <span className="preference-required-meta" aria-label="required field">Required</span></span>
+            </div>
             <FilterSelect
               label="Timing Preference"
               value={alertPrefs.sendTiming}
@@ -2688,6 +2743,7 @@ function AlertSetupPanel({
         alertStrategy={alertStrategy}
         matches={alertMatches}
         savedOpportunities={savedOpportunities}
+        watchIntentOpportunities={watchIntentOpportunities}
         betaAlertSetup={betaAlertSetup}
         onSave={onBetaAlertSetupSave}
         waitlistIntent={waitlistIntent}
@@ -2703,6 +2759,7 @@ function BetaAlertSystem({
   alertStrategy,
   matches,
   savedOpportunities,
+  watchIntentOpportunities = [],
   betaAlertSetup,
   onSave,
   waitlistIntent,
@@ -2737,41 +2794,59 @@ function BetaAlertSystem({
     missingSetupFields.length > 1
       ? `${missingSetupFields.slice(0, -1).join(', ')} and ${missingSetupFields.at(-1)}`
       : missingSetupFields[0];
+  const alertReadyMatches = matches.filter((item) => getMonitoringReadiness(item).alertable);
+  const savedProgramIds = new Set(savedOpportunities.map((item) => item.id));
+  const watchedPrograms = uniqueOpportunitiesById([...watchIntentOpportunities, ...savedOpportunities]);
+  const watchedPreview = watchedPrograms.slice(0, 6);
+  const watchedProgramIds = new Set(watchedPreview.map((item) => item.id));
+  const suggestedMatches = hasPreviewFocus
+    ? alertReadyMatches.filter((item) => !watchedProgramIds.has(item.id)).slice(0, 3)
+    : [];
+  const hasWatchedPrograms = watchedPreview.length > 0;
+  const watchedAlertReadyCount = watchedPreview.filter((item) => getMonitoringReadiness(item).alertable).length;
+  const watchedNeedsSourceCheck = watchedPreview.length - watchedAlertReadyCount;
+  const currentWatchSetup = {
+    classYear: alertPrefs.classYear,
+    roleTrack: alertPrefs.roleTrack,
+    priority: alertPrefs.priority || 'all',
+    sendTiming: alertPrefs.sendTiming,
+    email: email.trim(),
+    phoneNumber: phoneNumber.trim(),
+    contactMethod,
+    watchedProgramIds: watchedPreview.map((item) => item.id),
+  };
+  const hasUnsavedWatchSetupChanges =
+    Boolean(betaAlertSetup) && !watchSetupMatches(betaAlertSetup, currentWatchSetup);
+  const isSavedWatchSetupCurrent = Boolean(betaAlertSetup) && !hasUnsavedWatchSetupChanges;
   const setupActionMessage = hasIncompleteSetup
     ? `Choose ${missingSetupSummary} first.`
-    : !hasContact
+      : !hasContact
       ? contactMethod === 'phone'
-        ? 'Add a phone number to start beta text alerts.'
-        : 'Add an email to start beta opening alerts.'
-      : betaAlertSetup
-        ? `${betaAlertSetup.captureStatus ?? 'Saved'} on ${betaAlertSetup.savedAt?.slice(0, 10) ?? 'recently'} with ${betaAlertSetup.alertReadyCount} alert-ready programs.`
-        : 'Ready to submit this watch setup.';
-  const alertReadyMatches = matches.filter((item) => getMonitoringReadiness(item).alertable);
-  const needsSourceCheck = hasPreviewFocus ? matches.length - alertReadyMatches.length : 0;
-  const savedProgramIds = new Set(savedOpportunities.map((item) => item.id));
-  const watchedPreview = hasPreviewFocus
-    ? [
-        ...savedOpportunities.slice(0, 3),
-        ...alertReadyMatches.filter((item) => !savedProgramIds.has(item.id)).slice(0, 3),
-      ].slice(0, 5)
-    : [];
-  const watchSteps = [
-    {
-      label: 'Set Focus',
-      complete: !hasIncompleteSetup,
-      detail: hasIncompleteSetup ? `Missing ${missingSetupSummary}.` : `${alertPrefs.classYear} / ${alertPrefs.roleTrack}`,
-    },
-    {
-      label: 'Add Contact',
-      complete: hasContact,
-      detail: hasContact ? `${contactMethod === 'phone' ? 'Text' : 'Email'} ready` : 'Add contact info',
-    },
-    {
-      label: 'Submit',
-      complete: Boolean(betaAlertSetup),
-      detail: betaAlertSetup ? 'Watch setup saved' : 'Start when ready',
-    },
-  ];
+        ? 'Add a phone number to receive text alerts.'
+        : 'Add an email to receive opening alerts.'
+      : !hasWatchedPrograms
+        ? 'Save a program or set My Focus from a listing first.'
+      : isSavedWatchSetupCurrent
+        ? ''
+        : betaAlertSetup
+          ? ''
+          : '';
+  const setupButtonLabel =
+    submitState === 'submitting'
+      ? 'Saving...'
+      : isSavedWatchSetupCurrent
+        ? 'Alert Setup Saved'
+        : betaAlertSetup
+          ? 'Update Alert Setup'
+          : 'Start Alerts';
+  const setupButtonClassName = isSavedWatchSetupCurrent
+    ? 'is-saved'
+    : betaAlertSetup && hasUnsavedWatchSetupChanges
+      ? 'is-dirty'
+      : '';
+  const setupButtonDisabled =
+    hasIncompleteSetup || !hasContact || !hasWatchedPrograms || submitState === 'submitting' || isSavedWatchSetupCurrent;
+  const shouldShowSetupStatus = setupButtonDisabled && !isSavedWatchSetupCurrent;
 
   const createSetupPayload = (captureStatus) => ({
     classYear: alertPrefs.classYear,
@@ -2782,9 +2857,9 @@ function BetaAlertSystem({
     phoneNumber: phoneNumber.trim(),
     contactMethod,
     matchCount: matches.length,
-    alertReadyCount: alertReadyMatches.length,
+    alertReadyCount: watchedAlertReadyCount,
     savedCount: savedOpportunities.length,
-    needsSourceCheck,
+    needsSourceCheck: watchedNeedsSourceCheck,
     matchingProgramIds: matches.map((item) => item.id),
     alertReadyProgramIds: alertReadyMatches.map((item) => item.id),
     savedProgramIds: savedOpportunities.map((item) => item.id),
@@ -2795,7 +2870,11 @@ function BetaAlertSystem({
       organization: item.organization,
       url: item.previousUrl || item.url,
       readiness: getMonitoringReadiness(item).status,
-      reason: savedProgramIds.has(item.id) ? 'Saved by student' : 'Matches focus setup',
+      reason: watchIntentOpportunities.some((watchIntent) => watchIntent.id === item.id)
+        ? 'Selected for alerts'
+        : savedProgramIds.has(item.id)
+          ? 'Saved by student'
+          : 'Matches focus setup',
     })),
     captureStatus,
   });
@@ -2823,7 +2902,7 @@ function BetaAlertSystem({
               classYear: payload.classYear,
               interest: payload.roleTrack,
               school: '',
-              note: `Beta email alert setup. Watching: ${watchedProgramNames.join(', ') || 'No programs yet'}. Alert-ready: ${payload.alertReadyCount}. Needs source check: ${needsSourceCheck}.`,
+              note: `Beta email alert setup. Watching: ${watchedProgramNames.join(', ') || 'No programs yet'}. Alert-ready: ${payload.alertReadyCount}. Needs source check: ${payload.needsSourceCheck}.`,
               preferenceSummary,
               notificationMode: 'Beta Email Alerts',
               savedAt: new Date().toISOString(),
@@ -2861,7 +2940,7 @@ function BetaAlertSystem({
         }
 
         await Promise.all(requests);
-        onSave(createSetupPayload(watchEndpoint ? 'Submitted to Beta Watch Queue' : 'Submitted for Beta Email Alerts'));
+        onSave(createSetupPayload(watchEndpoint ? 'Opening Alerts Submitted' : 'Email Alerts Submitted'));
         setSubmitState('submitted');
         return;
       } catch {
@@ -2876,61 +2955,24 @@ function BetaAlertSystem({
   };
 
   return (
-    <section className="beta-alert-system" aria-label="Beta watch setup">
-      <div className="beta-alert-copy">
-        <span>Beta Watching</span>
-        <h3>Your Watch Plan</h3>
-        <p>
-          {hasPreviewFocus
-            ? 'Review what ApplyFirst would track, add contact info, then start beta alerts.'
-            : 'Choose your focus to see the watch plan.'}
-        </p>
-      </div>
-      <div className="watch-plan-steps" aria-label="Watch setup progress">
-        {watchSteps.map((step) => (
-          <span className={step.complete ? 'complete' : ''} key={step.label}>
-            <strong>{step.complete ? 'Done' : 'Next'}</strong>
-            {step.label}
-            <em>{step.detail}</em>
-          </span>
-        ))}
-      </div>
-
-      <div className="watch-plan-summary" aria-label="Watch plan summary">
-        <div>
-          <span>Programs</span>
-          <strong>
-            {watchedPreview.length
-              ? `${watchedPreview.length} program${watchedPreview.length === 1 ? '' : 's'}`
-              : !hasPreviewFocus
-                ? 'Choose focus fields'
-                : 'No alert-ready matches yet.'}
-          </strong>
-          <p>
-            {savedOpportunities.length
-              ? `${savedOpportunities.length} saved by you. Saved programs are watched first.`
-              : hasPreviewFocus
-                ? 'Save programs to make the watch list more personal.'
-                : 'Your preview appears after setup.'}
-          </p>
-        </div>
-        <div>
-          <span>Alert Rule</span>
-          <strong>{hasPreviewFocus ? alertStrategy.timingLabel : 'Choose Timing'}</strong>
-          <p>{hasPreviewFocus ? alertStrategy.sendSummary : 'Pick when ApplyFirst should notify you.'}</p>
-        </div>
-        <div>
-          <span>Source Status</span>
-          <strong>{hasPreviewFocus ? `${alertReadyMatches.length} Ready / ${needsSourceCheck} Need Check` : 'Pending'}</strong>
+    <section className="beta-alert-system" id="watch-plan" aria-label="Opening alert setup">
+      <div className="watch-plan-header">
+        <div className="beta-alert-copy">
+          <span>Step 2</span>
+          <h3>Choose Alert Delivery</h3>
           <p>
             {hasPreviewFocus
-              ? 'Only high-confidence official openings can send automatically.'
-              : 'Source status appears with matches.'}
+              ? 'Pick how you want to receive reviewed opening alerts.'
+              : 'Finish your focus fields first, then add contact info.'}
           </p>
         </div>
+        {shouldShowSetupStatus ? (
+          <div className="setup-status-pill needs-action" aria-label="Alert setup status">
+            <strong>Still Needed</strong>
+            <span>{setupActionMessage}</span>
+          </div>
+        ) : null}
       </div>
-
-      {betaAlertSetup ? <WatchSetupReceipt setup={betaAlertSetup} /> : null}
 
       <div className="beta-alert-actions">
         <div className="contact-method-control" role="group" aria-label="Alert delivery method">
@@ -2971,28 +3013,53 @@ function BetaAlertSystem({
           </label>
         )}
         <button
+          className={setupButtonClassName}
           type="button"
           onClick={saveSetup}
-          disabled={hasIncompleteSetup || !hasContact || submitState === 'submitting'}
-          title={setupActionMessage}
+          disabled={setupButtonDisabled}
+          title={shouldShowSetupStatus ? setupActionMessage : undefined}
         >
-          {submitState === 'submitting' ? 'Submitting...' : betaAlertSetup ? 'Update Watch Setup' : 'Start Watching'}
+          {setupButtonLabel}
         </button>
-        {hasIncompleteSetup || !hasContact || betaAlertSetup ? (
-          <p className={hasIncompleteSetup || !hasContact ? 'setup-readiness-note needs-action' : 'setup-readiness-note'}>
-            {setupActionMessage}
-          </p>
-        ) : (
-          <p className="setup-readiness-note">By starting, you agree to beta alerts only for programs you choose to watch. You can unsubscribe from any alert email.</p>
-        )}
       </div>
-      <BetaAlertFeed
-        alertStrategy={alertStrategy}
-        watchedPrograms={watchedPreview}
-        needsSourceCheck={needsSourceCheck}
-        hasSavedSetup={Boolean(betaAlertSetup)}
-        hasPreviewFocus={hasPreviewFocus}
-      />
+
+      {betaAlertSetup ? <WatchSetupReceipt setup={betaAlertSetup} /> : null}
+
+      <section className="alert-preview-panel" aria-label="Alert setup preview">
+        <aside className="alert-preview-sidebar">
+          <span>Step 3</span>
+          <strong>Review Alert Preview</strong>
+          <p>Confirm setup before ApplyFirst starts watching.</p>
+          <dl className="alert-preview-stats" aria-label="Alert setup summary">
+            <div>
+              <dt>Selected</dt>
+              <dd>
+                {watchedPreview.length
+                  ? `${watchedPreview.length} ${watchedPreview.length === 1 ? 'Program' : 'Programs'}`
+                  : hasPreviewFocus
+                    ? 'None Yet'
+                    : 'Pending'}
+              </dd>
+            </div>
+            <div>
+              <dt>Ready</dt>
+              <dd>{hasWatchedPrograms ? `${watchedAlertReadyCount}/${watchedPreview.length}` : 'Pending'}</dd>
+            </div>
+            <div>
+              <dt>Window</dt>
+              <dd>{hasPreviewFocus ? alertStrategy.timingLabel : 'Choose Timing'}</dd>
+            </div>
+          </dl>
+        </aside>
+        <div className="alert-preview-main">
+          <BetaAlertFeed
+            watchedPrograms={watchedPreview}
+            suggestedPrograms={suggestedMatches}
+            hasSavedSetup={Boolean(betaAlertSetup)}
+            hasPreviewFocus={hasPreviewFocus}
+          />
+        </div>
+      </section>
     </section>
   );
 }
@@ -3002,70 +3069,116 @@ function WatchSetupReceipt({ setup }) {
   const savedDate = setup.savedAt ? formatDateTime(setup.savedAt) : 'Saved';
 
   return (
-    <section className="watch-setup-receipt" aria-label="Saved watch setup receipt">
+    <section className="watch-setup-receipt" aria-label="Saved alert setup receipt">
       <div>
-        <span>Submitted</span>
-        <strong>{setup.captureStatus ?? 'Watch Setup Saved'}</strong>
+        <span>Alert Setup</span>
+        <strong>{setup.captureStatus ?? 'Alert Setup Saved'}</strong>
         <p>{contactLabel} / {savedDate}</p>
-      </div>
-      <div>
-        <span>Watching</span>
-        <strong>{setup.watchedProgramIds?.length ?? 0} Programs</strong>
-        <p>{setup.alertReadyCount ?? 0} alert-ready, {setup.needsSourceCheck ?? 0} need source checks.</p>
       </div>
     </section>
   );
 }
 
-function BetaAlertFeed({ alertStrategy, watchedPrograms, needsSourceCheck, hasSavedSetup, hasPreviewFocus }) {
+function watchSetupMatches(savedSetup, currentSetup) {
+  return (
+    JSON.stringify(normalizeWatchSetupForComparison(savedSetup)) ===
+    JSON.stringify(normalizeWatchSetupForComparison(currentSetup))
+  );
+}
+
+function normalizeWatchSetupForComparison(setup = {}) {
+  const contactMethod = setup.contactMethod || 'email';
+  const watchedProgramIds = [...new Set(setup.watchedProgramIds ?? [])].filter(Boolean).sort();
+
+  return {
+    classYear: setup.classYear || '',
+    roleTrack: setup.roleTrack || '',
+    priority: setup.priority || 'all',
+    sendTiming: setup.sendTiming || '',
+    contactMethod,
+    contact:
+      contactMethod === 'phone'
+        ? String(setup.phoneNumber ?? '').trim()
+        : String(setup.email ?? '').trim().toLowerCase(),
+    watchedProgramIds,
+  };
+}
+
+function BetaAlertFeed({ watchedPrograms, suggestedPrograms, hasSavedSetup, hasPreviewFocus }) {
   const feedItems = watchedPrograms.slice(0, 3).map((program) => {
     const readiness = getMonitoringReadiness(program);
-    const signal = getMonitorSignal(program);
 
     return {
       id: program.id,
+      kind: hasSavedSetup ? 'Active' : 'Selected',
       name: program.name,
       organization: program.organization,
-      status: readiness.alertable ? 'Ready for Alerts' : 'Needs Timing Check',
-      message: readiness.alertable
-        ? `${signal.actionLabel}: ${signal.nextAction}`
-        : 'ApplyFirst would hold this until timing is confirmed from an official source.',
+      status: readiness.alertable ? 'Ready' : 'Needs check',
       timing: program.openDate,
     };
   });
+  const suggestedItems = suggestedPrograms.slice(0, 3).map((program) => ({
+    id: program.id,
+    name: program.name,
+    organization: program.organization,
+    status: 'Suggested',
+    timing: program.openDate,
+  }));
 
   return (
-    <section className="beta-alert-feed" aria-label="Beta watch programs">
-      <div className="beta-alert-feed-heading">
-        <span>{hasSavedSetup ? 'Watching Now' : 'Preview'}</span>
-        <strong>{hasSavedSetup ? 'Tracked Programs' : 'Programs in This Plan'}</strong>
-      </div>
-      {feedItems.length ? (
-        <div className="beta-alert-feed-list" role="list">
-          {feedItems.map((item) => (
-            <article key={item.id} role="listitem">
-              <span>{item.status}</span>
-              <strong>{item.name}</strong>
-              <em>{item.organization}</em>
-              <p>{item.message}</p>
-              <small>{item.timing}</small>
-            </article>
-          ))}
+    <section className="beta-alert-feed" aria-label="Selected alert programs">
+      <div className="alert-program-table">
+        <div className="alert-program-table-heading">
+          <span>Watchlist Preview</span>
         </div>
-      ) : (
-        <p className="beta-alert-feed-empty">
-          {hasPreviewFocus
-            ? 'Save programs or choose a narrower focus to generate example alerts.'
-            : 'Choose focus fields to preview example alerts.'}
-        </p>
-      )}
-      <div className="beta-alert-feed-note">
-        <strong>{hasPreviewFocus ? alertStrategy.timingLabel : 'Choose Focus'}</strong>
-        <span>
-          {hasPreviewFocus
-            ? `${needsSourceCheck} matching programs need an official timing check before ApplyFirst would alert you.`
-            : 'Alert previews appear after there is enough focus context.'}
-        </span>
+        <div className="alert-program-groups">
+          <section className="alert-program-section selected" aria-label="Selected programs for alerts">
+            <div className="alert-program-section-heading">
+              <span>Watching</span>
+              <strong>{feedItems.length ? `${feedItems.length} ${feedItems.length === 1 ? 'Program' : 'Programs'}` : 'None Yet'}</strong>
+            </div>
+            {feedItems.length ? (
+              <div className="alert-program-list" role="list">
+                {feedItems.map((item) => (
+                  <article className="alert-program-row selected" key={item.id} role="listitem">
+                    <div>
+                      <strong>{item.name}</strong>
+                      <em>{item.organization}</em>
+                    </div>
+                    <small>{item.timing}</small>
+                    <span className="alert-program-status">{item.status}</span>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p className="beta-alert-feed-empty">
+                {hasPreviewFocus
+                  ? 'Save one program to start your watchlist preview.'
+                  : 'Set focus fields to preview alert-ready matches.'}
+              </p>
+            )}
+          </section>
+          {suggestedItems.length ? (
+            <section className="alert-program-section suggested" aria-label="Suggested programs to save">
+              <div className="alert-program-section-heading">
+                <span>Suggested Matches</span>
+                <strong>{suggestedItems.length} {suggestedItems.length === 1 ? 'Match' : 'Matches'}</strong>
+              </div>
+              <div className="alert-program-list" role="list">
+                {suggestedItems.map((item) => (
+                  <article className="alert-program-row suggested" key={item.id} role="listitem">
+                    <div>
+                      <strong>{item.name}</strong>
+                      <em>{item.organization}</em>
+                    </div>
+                    <small>{item.timing}</small>
+                    <span className="alert-program-status">{item.status}</span>
+                  </article>
+                ))}
+              </div>
+            </section>
+          ) : null}
+        </div>
       </div>
     </section>
   );
@@ -3112,7 +3225,7 @@ function ContributeView({ contributions, opportunities, captureEndpoint = '', on
       <section className="contribute-hero">
         <div>
           <span>Suggest Updates</span>
-          <h1>Suggest a Program or Fix.</h1>
+          <h1 className="page-hero-title">Suggest a Program or Fix.</h1>
           <p>
             Suggest a missing program, flag stale information, or tell us which opportunities would be worth alerts
             later. Every submission is reviewed before it changes the library.
@@ -3240,9 +3353,9 @@ function SubmissionHelper({ state, captureEndpoint }) {
   return null;
 }
 
-function createFeedbackDraft(opportunities) {
+function createFeedbackDraft() {
   return {
-    programId: opportunities[0]?.id ?? '',
+    programId: '',
     issueType: feedbackIssueTypes[0],
     note: '',
   };
@@ -3527,7 +3640,7 @@ function FilterStack({
       <FilterSelect label="Timing" value={timing} onChange={setTiming} options={filterOptions.timing} />
       <FilterSelect label="Status" value={status} onChange={setStatus} options={filterOptions.status} labels={statusLabels} />
       <button className="plain-button" type="button" onClick={resetFilters}>
-        Reset filters
+        Reset Filters
       </button>
     </section>
   );
@@ -3563,6 +3676,7 @@ function OpportunityRecord({ opportunity, selected, saved, onSelect, onSave }) {
   const monitorSignal = getMonitorSignal(opportunity);
   const primaryTrack = tracks[0];
   const isConfirmed = getVerificationState(opportunity) === 'verified';
+  const timingSignal = getRecordTimingSignal(opportunity, monitorSignal);
 
   return (
     <article className={`opportunity-record${selected ? ' selected' : ''}`} role="listitem">
@@ -3584,9 +3698,9 @@ function OpportunityRecord({ opportunity, selected, saved, onSelect, onSave }) {
           <span>{opportunity.classYears.join(', ')}</span>
           <span>{opportunity.timing}</span>
         </div>
+        <p className="record-timing-signal">{timingSignal}</p>
       </button>
       <div className="record-side">
-        <span className={`priority-chip priority-${monitorSignal.priority}`}>{monitorSignal.priorityLabel}</span>
         <div className="record-icons">
           <button
             className={`bookmark-button${saved ? ' saved' : ''}`}
@@ -3630,17 +3744,59 @@ function OpportunityDetail({
   const verificationState = getVerificationState(opportunity);
   const readiness = getMonitoringReadiness(opportunity);
   const sourceUpdatePlan = getSourceUpdatePlan(opportunity);
+  const sourceStatusLabel =
+    verificationState === 'verified'
+      ? 'Source Confirmed'
+      : verificationState === 'watchOnly'
+        ? 'Prep Source'
+        : 'Needs Source Check';
+  const sourceStatusTone =
+    verificationState === 'verified'
+      ? 'verified'
+      : verificationState === 'watchOnly'
+        ? 'watch'
+        : 'review';
+  const programDetails = [
+    { label: 'Host', value: opportunity.organization },
+    { label: 'Program Type', value: opportunity.category },
+    { label: 'Role Area', value: tracks.join(' + ') },
+    { label: 'Eligible Years', value: opportunity.classYears.join(', ') },
+    { label: 'Format / Location', value: getProgramFormatText(opportunity) },
+    { label: 'Length', value: getProgramLengthText(opportunity) },
+    { label: 'Funding / Pay', value: opportunity.funding || 'Not Listed Yet' },
+  ];
+  const timingDetails = [
+    { label: 'Current Status', value: statusLabels[opportunity.status] },
+    { label: 'Opening Window', value: opportunity.openDate },
+    { label: 'Deadline', value: opportunity.deadline },
+    { label: 'Cycle Notes', value: opportunity.timing },
+  ];
+  const sourceDetails = [
+    { label: 'Source Status', value: sourceStatusLabel },
+    { label: 'Last Checked', value: opportunity.lastChecked || 'Needs Confirmation' },
+    { label: 'Beta Alert Status', value: readiness.alertable ? 'Eligible For Reviewed Alerts' : 'Needs Review Before Alerts' },
+  ];
+  const sourceActionLabel =
+    ['open', 'deadlineSoon'].includes(opportunity.status) || monitorSignal.actionLabel === 'Apply Now'
+      ? 'Apply Now'
+      : 'View Official Source';
 
   return (
     <section className="detail-panel">
       <div className="detail-header">
-        <span className={`status-pill status-${opportunity.status}`}>{statusLabels[opportunity.status]}</span>
+        <div className="detail-status-strip">
+          <span className={`status-pill status-${opportunity.status}`}>{statusLabels[opportunity.status]}</span>
+          <span className={`detail-source-state detail-source-state-${sourceStatusTone}`}>
+            {verificationState === 'verified' ? <VerifiedIcon /> : null}
+            {sourceStatusLabel}
+          </span>
+        </div>
         <h2>{opportunity.name}</h2>
         <p>{opportunity.organization}</p>
       </div>
       <div className="detail-actions">
-        <a href={opportunity.url} target="_blank" rel="noreferrer">
-          Official page
+        <a className="detail-primary-link" href={opportunity.url} target="_blank" rel="noreferrer">
+          {sourceActionLabel}
         </a>
         <button
           className={`detail-bookmark${saved ? ' saved' : ''}`}
@@ -3652,85 +3808,43 @@ function OpportunityDetail({
           <BookmarkIcon filled={saved} />
           {saved ? 'Saved' : 'Save'}
         </button>
+        <button className="detail-watch-action" type="button" onClick={onFocusSetup}>
+          Watch This Program
+        </button>
       </div>
       {justSaved ? (
         <section className="save-next-step" aria-label="Saved program next step">
           <div>
             <span>Saved</span>
-            <strong>Next: Set My Focus</strong>
-            <p>ApplyFirst can use your class year, interest, and timing to make the library feel more personal.</p>
+            <strong>Next: Start Watching</strong>
+            <p>Add your focus once so ApplyFirst knows which openings to track for beta alerts.</p>
           </div>
           <button type="button" onClick={onFocusSetup}>
-            Set My Focus
+            Set Focus
           </button>
         </section>
       ) : null}
-      <section className="detail-next-step" aria-label="Recommended Next Step">
-        <span>Recommended Next Step</span>
-        <h3>{monitorSignal.actionLabel}</h3>
-        <p>{monitorSignal.nextAction}</p>
-        <strong>{opportunity.openDate}</strong>
+      <section className="detail-overview-section" aria-label="Program description">
+        <div className="detail-overview-copy">
+          <span>Program Description</span>
+          <p>{getProgramDescription(opportunity)}</p>
+        </div>
+        <DetailFactGrid details={programDetails} />
       </section>
-      <div className="detail-status-row" aria-label="Program status summary">
-        <StatusItem value={monitorSignal.priorityLabel} tone={monitorSignal.priority} />
-        <StatusItem value={monitorSignal.actionLabel} />
-        <StatusItem
-          value={verificationState === 'verified' ? 'Confirmed' : verificationState === 'watchOnly' ? 'Prep Only' : 'Needs Confirmation'}
-          tone={verificationState}
-        />
-      </div>
-      <DetailSection title="Why this matters">{opportunity.why}</DetailSection>
-      <DetailSection title="How to prepare">{opportunity.prep}</DetailSection>
+      <DetailListingSection title="Timing" details={timingDetails} />
+      <section className="detail-listing-section" aria-label="Source status">
+        <div className="detail-listing-heading">
+          <span>Source Check</span>
+          <strong>Official Source</strong>
+        </div>
+        <DetailFactGrid details={sourceDetails} />
+        <p className="detail-listing-note">
+          {getPublicSourceNote(opportunity)}
+        </p>
+      </section>
       <button className="detail-feedback-link" type="button" onClick={onImproveLibrary}>
-        See something missing or stale?
+        Suggest An Update
       </button>
-      <div className="metric-grid">
-        <Metric label="Best for" value={opportunity.classYears.join(', ')} />
-        <Metric label="Track" value={tracks.join(' + ')} />
-        <Metric label="Timing" value={opportunity.timing} />
-        <Metric label="Funding" value={opportunity.funding} />
-      </div>
-      <div className="tracker-fields">
-        <h3>Useful Details</h3>
-        <dl>
-          <div>
-            <dt>Open Date</dt>
-            <dd>{opportunity.openDate}</dd>
-          </div>
-          <div>
-            <dt>Category</dt>
-            <dd>{formatDisplayLabel(opportunity.category)}</dd>
-          </div>
-          <div>
-            <dt>Deadline</dt>
-            <dd>{opportunity.deadline}</dd>
-          </div>
-          <div>
-            <dt>Location</dt>
-            <dd>{opportunity.location}</dd>
-          </div>
-          {showInternalTools ? (
-            <>
-              <div>
-                <dt>Confidence</dt>
-                <dd>{confidenceLabels[opportunity.confidence]}</dd>
-              </div>
-              <div>
-                <dt>Source Coverage</dt>
-                <dd>{monitorSignal.sourceSignal.label}</dd>
-              </div>
-              <div>
-                <dt>Last Checked</dt>
-                <dd>{opportunity.lastChecked || 'Needs Confirmation Pass'}</dd>
-              </div>
-              <div>
-                <dt>Previous URL</dt>
-                <dd>{opportunity.previousUrl || 'Not Tracked Yet'}</dd>
-              </div>
-            </>
-          ) : null}
-        </dl>
-      </div>
       {showInternalTools ? <div className="source-note">
         <h3>Source Note</h3>
         <p>{opportunity.sourceNote}</p>
@@ -3770,13 +3884,429 @@ function OpportunityDetail({
   );
 }
 
-function Metric({ label, value }) {
+function DetailListingSection({ title, details }) {
   return (
-    <span>
-      <strong>{formatDisplayLabel(value)}</strong>
-      {label}
-    </span>
+    <section className="detail-listing-section" aria-label={title}>
+      <div className="detail-listing-heading">
+        <span>{title}</span>
+      </div>
+      <DetailFactGrid details={details} />
+    </section>
   );
+}
+
+function DetailFactGrid({ details }) {
+  return (
+    <dl className="detail-listing-grid">
+      {details.map((detail) => (
+        <div key={detail.label}>
+          <dt>{detail.label}</dt>
+          <dd>{formatDisplayLabel(detail.value)}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function getProgramDescription(opportunity) {
+  return cleanText(opportunity.why) || `${opportunity.name} is tracked because it may be useful for early-career students.`;
+}
+
+function getProgramFormatText(opportunity) {
+  return cleanText(opportunity.location) || 'Not Listed Yet';
+}
+
+function getProgramLengthText(opportunity) {
+  const searchableText = [
+    opportunity.sourceNote,
+    opportunity.why,
+    opportunity.prep,
+    opportunity.openDate,
+    opportunity.deadline,
+    opportunity.location,
+    opportunity.category,
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const exactDuration = searchableText.match(/\b(\d+)\s*[- ]?\s*(week|weeks|day|days|month|months)\b/i);
+
+  if (exactDuration) {
+    const amount = exactDuration[1];
+    const unit = exactDuration[2].toLowerCase();
+    const normalizedUnit = unit.startsWith('week')
+      ? amount === '1'
+        ? 'Week'
+        : 'Weeks'
+      : unit.startsWith('day')
+        ? amount === '1'
+          ? 'Day'
+          : 'Days'
+        : amount === '1'
+          ? 'Month'
+          : 'Months';
+
+    return `${amount} ${normalizedUnit}`;
+  }
+
+  switch (opportunity.category) {
+    case 'Externship / insight series':
+      return 'Short Insight Program; Exact Length Varies';
+    case 'Winternship':
+      return 'Short Winter Program; Exact Length Varies';
+    case 'Training program':
+      return 'Course Length Varies By Pathway';
+    case 'Technical community':
+      return 'Ongoing Community';
+    case 'Scholarship':
+      return 'Award Timeline Varies';
+    case 'Conference funding':
+      return 'Event Or Award Timeline Varies';
+    case 'Special program / resource':
+      return 'Resource Timeline Varies';
+    default:
+      if (opportunity.category === 'Internship' && opportunity.timing !== 'Rolling') {
+        return `${opportunity.timing} Internship; Exact Length Not Listed`;
+      }
+
+      if (opportunity.category === 'Fellowship') {
+        return opportunity.timing === 'Rolling' ? 'Cohort Dependent; Exact Length Not Listed' : `${opportunity.timing} Fellowship; Exact Length Not Listed`;
+      }
+
+      return opportunity.timing === 'Rolling' ? 'Cohort Or Posting Dependent' : 'Not Listed Yet';
+  }
+}
+
+function getPublicSourceNote(opportunity) {
+  let sourceNote = cleanText(opportunity.sourceNote);
+
+  if (!sourceNote) {
+    return 'Open the official page before applying. ApplyFirst uses source checks to decide what can trigger beta alerts.';
+  }
+
+  sourceNote = sourceNote.split(/\bExcerpt:/i)[0].trim();
+
+  return sourceNote
+    .replace(/before sending public alerts/gi, 'before students rely on alerts')
+    .replace(/before alerts/gi, 'before students rely on alerts')
+    .replace(/before sharing/gi, 'before applying')
+    .replace(/Review before students rely on alerts\.?/gi, 'Review the official page before applying.');
+}
+
+function getRecordTimingSignal(opportunity, monitorSignal) {
+  const openDate = formatRecordTimingText(opportunity.openDate);
+  const deadline = formatRecordTimingText(opportunity.deadline);
+
+  if (monitorSignal.alertReadiness === 'deadlineSoon') {
+    return `Deadline - ${deadline || openDate}`;
+  }
+
+  if (monitorSignal.alertReadiness === 'openNow') {
+    return `Open - ${openDate}`;
+  }
+
+  if (monitorSignal.alertReadiness === 'opensSoon') {
+    return `Watch - ${openDate}`;
+  }
+
+  if (monitorSignal.alertReadiness === 'verify') {
+    return 'Verify current-cycle timing';
+  }
+
+  if (monitorSignal.alertReadiness === 'watching') {
+    return `Watch - ${openDate || opportunity.timing}`;
+  }
+
+  return `Prepare for ${opportunity.timing}`;
+}
+
+function formatRecordTimingText(value) {
+  let text = cleanText(value);
+
+  if (!text) {
+    return '';
+  }
+
+  const firstClause = text.split(';')[0]?.trim();
+  if (firstClause) {
+    text = firstClause;
+  }
+
+  if (text.length > 72 && text.includes(' in ')) {
+    text = text.split(' in ')[0].trim();
+  }
+
+  if (text.length > 72 && text.includes(' by ')) {
+    text = text.split(' by ')[0].trim();
+  }
+
+  if (text.length > 82) {
+    text = `${text.slice(0, 79).trim()}...`;
+  }
+
+  return text;
+}
+
+function getOpportunityListingProfile(opportunity, tracks, monitorSignal, readiness) {
+  return {
+    summary: getOpportunityListingSummary(opportunity, tracks, monitorSignal),
+    fitSummary: getOpportunityFitSummary(opportunity, tracks),
+    description: getOpportunityDescription(opportunity, monitorSignal, readiness),
+    eligibilityNote: getEligibilityNote(opportunity, readiness),
+    experienceItems: getProgramExperienceItems(opportunity, tracks),
+    requirementItems: getApplicationRequirementItems(opportunity, tracks),
+    prepNote: getStudentPrepNote(opportunity),
+    watchCadence: getWatchCadenceText(opportunity),
+    sourceWatchSignal: getSourceWatchSignal(opportunity, monitorSignal, readiness),
+  };
+}
+
+function getOpportunityListingSummary(opportunity, tracks, monitorSignal) {
+  const category = formatDisplayLabel(opportunity.category);
+  const trackText = formatTrackList(tracks).toLowerCase();
+  const audience = getSummaryAudienceText(opportunity.classYears);
+  const timing =
+    monitorSignal.alertReadiness === 'openNow'
+      ? 'open or showing an application signal now'
+      : monitorSignal.alertReadiness === 'deadlineSoon'
+        ? 'close enough to review now'
+        : monitorSignal.alertReadiness === 'opensSoon'
+          ? 'worth preparing for before the window opens'
+          : monitorSignal.alertReadiness === 'verify'
+            ? 'worth tracking, but needs current-cycle confirmation'
+            : 'worth keeping on your radar';
+
+  return `${category} for ${audience} interested in ${trackText}; ${timing}.`;
+}
+
+function getOpportunityFitSummary(opportunity, tracks) {
+  return `${getCompactAudienceText(opportunity.classYears)} / ${formatTrackList(tracks)}`;
+}
+
+function getOpportunityDescription(opportunity, monitorSignal, readiness) {
+  const category = formatDisplayLabel(opportunity.category).toLowerCase();
+  const article = /^[aeiou]/i.test(category) ? 'an' : 'a';
+  const audience = formatAudienceText(opportunity.classYears);
+  const openingContext =
+    monitorSignal.alertReadiness === 'openNow'
+      ? 'The timing is the important part: confirm the official page is live before relying on alerts or applying.'
+      : monitorSignal.alertReadiness === 'deadlineSoon'
+        ? 'The timing is the important part: confirm the deadline and decide quickly whether it fits your plan.'
+        : readiness.alertable
+          ? 'ApplyFirst has enough source context to monitor this for reviewed beta alerts.'
+          : 'ApplyFirst is tracking this because the opportunity is useful, but some current-cycle details still need source confirmation.';
+
+  return [
+    `${opportunity.name} is ${article} ${category} from ${opportunity.organization} for ${audience}.`,
+    openingContext,
+  ];
+}
+
+function getCompactAudienceText(classYears) {
+  if (classYears.includes('All class years')) {
+    return 'All Class Years';
+  }
+
+  return classYears.join(' + ');
+}
+
+function getSummaryAudienceText(classYears) {
+  if (classYears.includes('All class years')) {
+    return 'students across class years';
+  }
+
+  if (classYears.length === 1) {
+    return `${classYears[0].toLowerCase()} students`;
+  }
+
+  return `${classYears.slice(0, -1).map((year) => `${year.toLowerCase()} students`).join(', ')} and ${classYears.at(-1).toLowerCase()} students`;
+}
+
+function formatAudienceText(classYears) {
+  if (classYears.includes('All class years')) {
+    return 'students across class years';
+  }
+
+  if (classYears.length === 1) {
+    return `${classYears[0].toLowerCase()} students`;
+  }
+
+  return `${classYears.slice(0, -1).map((year) => year.toLowerCase()).join(', ')} and ${classYears.at(-1).toLowerCase()} students`;
+}
+
+function formatTrackList(tracks) {
+  if (tracks.length <= 1) {
+    return tracks[0] ?? 'Access & Prep';
+  }
+
+  return `${tracks.slice(0, -1).join(', ')} + ${tracks.at(-1)}`;
+}
+
+function getEligibilityNote(opportunity, readiness) {
+  if (readiness.missing.includes('Official verification')) {
+    return 'Confirm current-cycle eligibility on the official page before applying.';
+  }
+
+  if (opportunity.classYears.includes('All class years')) {
+    return 'Eligibility may vary by posting, cohort, major, or location.';
+  }
+
+  return 'Confirm major, enrollment, work authorization, and any cohort-specific requirements on the official page.';
+}
+
+function getProgramExperienceItems(opportunity, tracks) {
+  const categoryItems = getCategoryExperienceItems(opportunity.category);
+  const trackItem = getTrackExperienceItem(tracks[0]);
+
+  return uniqueList([...categoryItems, trackItem]).slice(0, 3);
+}
+
+function getCategoryExperienceItems(category) {
+  switch (category) {
+    case 'Internship':
+      return ['Work on internship-style projects or team assignments.', 'Build a concrete early-career resume signal.'];
+    case 'Externship / insight series':
+      return ['Join short-format company or industry exposure sessions.', 'Use the experience to decide whether the field is worth pursuing.'];
+    case 'Winternship':
+      return ['Use winter break for a structured short program.', 'Get early exposure without committing a full summer.'];
+    case 'Fellowship':
+      return ['Complete mentored project, research, open-source, or community work.', 'Build experience that can substitute for a traditional internship signal.'];
+    case 'Internship-matching fellowship':
+      return ['Receive training, coaching, or partner access around internship placement.', 'Use the program structure to move from prep into applied work.'];
+    case 'Scholarship':
+      return ['Receive funding support and a visible award signal.', 'Join sponsor, mentor, or recipient communities when available.'];
+    case 'Conference funding':
+      return ['Access events, talks, recruiters, research communities, or travel funding.', 'Use the experience to meet people and discover paths that are hard to find from school alone.'];
+    case 'Technical community':
+      return ['Join an ongoing community of peers, mentors, events, and resources.', 'Use the community to find partner programs and hidden deadlines earlier.'];
+    case 'Training program':
+      return ['Complete structured skill-building, interview prep, or project work.', 'Turn practice into portfolio or recruiting readiness.'];
+    default:
+      return ['Explore a career path and build a clearer story for future applications.', 'Use the program as an early signal before larger recruiting cycles.'];
+  }
+}
+
+function getTrackExperienceItem(track) {
+  switch (track) {
+    case 'Software Engineering':
+      return 'Most relevant for students building projects, GitHub proof, technical confidence, or software interview stories.';
+    case 'Product Management':
+      return 'Most relevant for students exploring users, product judgment, prioritization, and cross-functional work.';
+    case 'Quant / Finance':
+      return 'Most relevant for students testing interest in markets, math-heavy problem solving, finance, or trading technology.';
+    default:
+      return 'Most relevant for students who need access, funding, mentorship, community, or structured preparation.';
+  }
+}
+
+function getApplicationRequirementItems(opportunity, tracks) {
+  const items = ['Current resume or student profile.', 'Official-page eligibility check before applying.'];
+
+  if (tracks.includes('Software Engineering')) {
+    items.push('Project, GitHub, portfolio, or technical work sample if requested.');
+  }
+
+  if (tracks.includes('Product Management')) {
+    items.push('Short product, user-problem, or leadership story if requested.');
+  }
+
+  if (tracks.includes('Quant / Finance')) {
+    items.push('Math, finance, markets, or problem-solving interest statement if requested.');
+  }
+
+  if (tracks.includes('Access & Prep')) {
+    items.push('Short goals statement, transcript, recommendation, or proof of enrollment when required.');
+  }
+
+  if (opportunity.confidence === 'needsReview' || opportunity.status === 'verifyManually') {
+    items.push('Current-cycle application page confirmation.');
+  }
+
+  return uniqueList(items).slice(0, 4);
+}
+
+function getStudentPrepNote(opportunity) {
+  return cleanText(opportunity.prep)
+    .replace(/before sharing/gi, 'before applying')
+    .replace(/before sending public alerts/gi, 'before relying on alerts');
+}
+
+function getWatchCadenceText(opportunity) {
+  if (opportunity.timing === 'Rolling') {
+    return 'Rolling or multi-cycle; monitor regularly through the year.';
+  }
+
+  return `Seasonal ${opportunity.timing.toLowerCase()} cycle; monitor in the months before the expected opening.`;
+}
+
+function getSourceWatchSignal(opportunity, monitorSignal, readiness) {
+  if (monitorSignal.alertReadiness === 'openNow') {
+    return 'ApplyFirst watches for application links, open-status language, and deadline changes before sending alerts.';
+  }
+
+  if (monitorSignal.alertReadiness === 'deadlineSoon') {
+    return 'ApplyFirst watches for deadline movement, closing notices, and updated cycle pages.';
+  }
+
+  if (monitorSignal.alertReadiness === 'verify' || !readiness.alertable) {
+    return 'ApplyFirst is still checking whether the official source has a current-cycle page, deadline, or application link.';
+  }
+
+  return 'ApplyFirst watches the official source for opening windows, deadline updates, and application page changes.';
+}
+
+function uniqueList(items) {
+  return Array.from(new Set(items.filter(Boolean)));
+}
+
+function uniqueOpportunitiesById(items) {
+  const seenIds = new Set();
+
+  return items.filter((item) => {
+    if (!item || seenIds.has(item.id)) {
+      return false;
+    }
+
+    seenIds.add(item.id);
+    return true;
+  });
+}
+
+function getStudentSourceStatus(opportunity, verificationState, readiness) {
+  const lastChecked = opportunity.lastChecked ? `Last checked ${opportunity.lastChecked}.` : 'No recent source check is saved yet.';
+
+  if (verificationState === 'verified' && readiness.alertable) {
+    return {
+      tone: 'confirmed',
+      label: 'Source Confirmed',
+      summary: 'Alert Ready',
+      description: `${lastChecked} ApplyFirst has enough official timing context to watch this program for reviewed opening alerts.`,
+    };
+  }
+
+  if (verificationState === 'verified') {
+    return {
+      tone: 'confirmed',
+      label: 'Source Confirmed',
+      summary: 'Good To Compare',
+      description: `${lastChecked} Use this record to compare fit and timing, then open the official page before applying.`,
+    };
+  }
+
+  if (verificationState === 'watchOnly') {
+    return {
+      tone: 'watch',
+      label: 'Prep Source',
+      summary: 'Useful For Planning',
+      description: `${lastChecked} Save it if it fits, but treat opening dates as planning guidance until the next official check.`,
+    };
+  }
+
+  return {
+    tone: 'review',
+    label: 'Needs Source Check',
+    summary: 'Verify Before Relying',
+    description: 'ApplyFirst should confirm the current-cycle official page, opening window, or deadline before students depend on this timing.',
+  };
 }
 
 function SourceUpdatePlan({ plan }) {
@@ -4217,15 +4747,6 @@ function getDisplayHost(value) {
   }
 }
 
-function DetailSection({ title, children }) {
-  return (
-    <section className="detail-section">
-      <h3>{title}</h3>
-      <p>{children}</p>
-    </section>
-  );
-}
-
 function Shortlist({ items, onSelect }) {
   return (
     <section className="shortlist">
@@ -4258,7 +4779,7 @@ function EmptyState({ onReset }) {
       <h3>No Opportunities Match Those Filters.</h3>
       <p>Try a broader class year, category, or status.</p>
       <button type="button" onClick={onReset}>
-        Clear filters
+        Clear Filters
       </button>
     </div>
   );
