@@ -1612,6 +1612,7 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
   const [showAllAlertCandidates, setShowAllAlertCandidates] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [lastRefreshedAt, setLastRefreshedAt] = useState('');
   const [sourceRunDraft, setSourceRunDraft] = useState({
     programIds: '',
   });
@@ -1627,6 +1628,9 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
   const pendingAlertTotal = alertCandidateTotal || alertCandidates.length;
   const visibleAlertCandidates = showAllAlertCandidates ? alertCandidates : alertCandidates.slice(0, 6);
   const hiddenAlertCandidateCount = Math.max(alertCandidates.length - visibleAlertCandidates.length, 0);
+  const reviewEvents = reviewHistory ? buildReviewHistoryEvents(reviewHistory) : [];
+  const reviewNeedsAttention = reviewEvents.filter((event) => event.needsAttention).length;
+  const readinessAttentionTotal = readinessQueue?.needsAttention ?? 0;
 
   const updateSearchDraft = (field, value) => {
     setSearchDraft((currentDraft) => ({
@@ -1678,6 +1682,7 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
       setDiscoveryCandidates(discoveryPayload.candidates ?? []);
       setAlertCandidates(alertPayload.candidates ?? []);
       setAlertCandidateTotal(alertPayload.totalPending ?? alertPayload.candidates?.length ?? 0);
+      setLastRefreshedAt(new Date().toISOString());
       if (!quiet) {
         setActionMessage('Review queues refreshed.');
       }
@@ -1936,6 +1941,7 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
             />
           </label>
           <p>{workerBaseUrl ? `Connected to ${workerBaseUrl}` : 'Set VITE_WATCH_ENDPOINT to enable live review.'}</p>
+          {lastRefreshedAt ? <p>Last refreshed {formatDateTime(lastRefreshedAt)}</p> : null}
           <button type="button" onClick={loadQueues} disabled={!canLoad || loading}>
             {loading ? 'Loading...' : 'Load Queues'}
           </button>
@@ -1952,253 +1958,331 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
         <MaintainerMetric label="Discovery Candidates" value={status?.pendingDiscoveryCandidates ?? discoveryCandidates.length} />
       </section>
 
-      {reviewHistory ? <ReviewHistoryPanel history={reviewHistory} /> : null}
+      <MaintainerWorkflowStrip
+        readinessCount={readinessAttentionTotal}
+        discoveryCount={discoveryCandidates.length}
+        alertCount={pendingAlertTotal}
+        sourceRunCount={sourceRunResult?.checked ?? 0}
+        reviewCount={reviewNeedsAttention}
+      />
 
-      {readinessQueue ? (
-        <MonitoringReadinessQueue
-          queue={readinessQueue}
-          onCheckSource={(programId) => runSourceDryRun([programId], programId)}
-          onFindUrl={(programId) => {
-            updateSearchDraft('programIds', programId);
-            runDiscoverySearch(true, [programId], programId);
-          }}
-          readinessActions={readinessActionByProgramId}
-          loading={loading}
-          canLoad={canLoad}
-        />
-      ) : null}
-
-      <section className="maintainer-panel source-run-panel">
-        <div className="maintainer-panel-heading source-run-heading">
-          <div>
-            <span>Check Existing Source</span>
-            <h2>Test Saved Source Pages</h2>
-          </div>
-          <p>
-            Fetch saved source URLs for the IDs you enter. Use one ID for one program, or paste multiple IDs for a
-            targeted batch.
-          </p>
-        </div>
-        <div className="source-run-form">
-          <label>
-            <span>Program IDs to Test</span>
-            <textarea
-              value={sourceRunDraft.programIds}
-              onChange={(event) => updateSourceRunDraft('programIds', event.target.value)}
-              placeholder="swe-scholarships, virtu-womens-winternship-watch, jpmorgan-career-ed-you-watch"
+      {!status ? (
+        <MaintainerEmptyState canLoad={canLoad} />
+      ) : (
+        <>
+          {readinessQueue ? (
+            <MonitoringReadinessQueue
+              queue={readinessQueue}
+              onCheckSource={(programId) => runSourceDryRun([programId], programId)}
+              onFindUrl={(programId) => {
+                updateSearchDraft('programIds', programId);
+                runDiscoverySearch(true, [programId], programId);
+              }}
+              readinessActions={readinessActionByProgramId}
+              loading={loading}
+              canLoad={canLoad}
             />
-          </label>
-          <button type="button" onClick={() => runSourceDryRun()} disabled={!canLoad || loading}>
-            Test Listed Sources
-          </button>
-        </div>
-        {sourceRunResult ? <SourceRunSummary result={sourceRunResult} /> : null}
-      </section>
+          ) : null}
 
-      <section className="maintainer-review-grid">
-        <section className="maintainer-panel">
-          <div className="maintainer-panel-heading">
-            <div>
-              <span>Discovery Search</span>
-              <h2>Find Updated Source URLs</h2>
-            </div>
-            <p>
-              Search for newer official pages. Add Target Program IDs to search only those programs; leave it blank to
-              search due programs by the limit.
-            </p>
-          </div>
-          <div className="maintainer-search-form">
-            <label>
-              <span>Programs</span>
-              <input
-                type="number"
-                min="1"
-                max="20"
-                value={searchDraft.limit}
-                onChange={(event) => updateSearchDraft('limit', event.target.value)}
-              />
-            </label>
-            <label className="maintainer-wide-field">
-              <span>Target Program IDs</span>
-              <input
-                type="text"
-                value={searchDraft.programIds}
-                onChange={(event) => updateSearchDraft('programIds', event.target.value)}
-                placeholder="Optional: virtu-womens-winternship-watch"
-              />
-            </label>
-            <label>
-              <span>Queries</span>
-              <input
-                type="number"
-                min="1"
-                max="8"
-                value={searchDraft.maxQueriesPerProgram}
-                onChange={(event) => updateSearchDraft('maxQueriesPerProgram', event.target.value)}
-              />
-            </label>
-            <label>
-              <span>Results</span>
-              <input
-                type="number"
-                min="1"
-                max="10"
-                value={searchDraft.maxResultsPerQuery}
-                onChange={(event) => updateSearchDraft('maxResultsPerQuery', event.target.value)}
-              />
-            </label>
-            <label className="maintainer-checkbox">
-              <input
-                type="checkbox"
-                checked={searchDraft.force}
-                onChange={(event) => updateSearchDraft('force', event.target.checked)}
-              />
-              <span>Ignore due schedule for smoke tests</span>
-            </label>
-          </div>
-          <div className="maintainer-actions">
-            <button type="button" onClick={() => runDiscoverySearch(true)} disabled={!canLoad || loading}>
-              Dry Run URL Search
-            </button>
-            <button type="button" onClick={() => runDiscoverySearch(false)} disabled={!canLoad || loading}>
-              Save Candidates
-            </button>
-          </div>
-          {searchResult ? <DiscoverySearchSummary result={searchResult} /> : null}
-        </section>
+          <section className="maintainer-ops-grid">
+            <section className="maintainer-panel source-run-panel maintainer-utility-panel">
+              <div className="maintainer-panel-heading">
+                <div>
+                  <span>Source Checks</span>
+                  <h2>Test Saved Pages</h2>
+                </div>
+                <p>Dry run one or more program IDs before trusting a watched page.</p>
+              </div>
+              <div className="source-run-form">
+                <label>
+                  <span>Program IDs</span>
+                  <textarea
+                    value={sourceRunDraft.programIds}
+                    onChange={(event) => updateSourceRunDraft('programIds', event.target.value)}
+                    placeholder="swe-scholarships, virtu-womens-winternship-watch"
+                  />
+                </label>
+                <button type="button" onClick={() => runSourceDryRun()} disabled={!canLoad || loading}>
+                  Run Dry Check
+                </button>
+              </div>
+              {sourceRunResult ? <SourceRunSummary result={sourceRunResult} /> : null}
+            </section>
 
-        <section className="maintainer-panel">
-          <div className="maintainer-panel-heading">
-            <div>
-              <span>Source URL Review</span>
-              <h2>{discoveryCandidates.length} Candidate{discoveryCandidates.length === 1 ? '' : 's'}</h2>
+            <section className="maintainer-panel maintainer-source-url-panel">
+              <div className="maintainer-panel-heading">
+                <div>
+                  <span>Source URLs</span>
+                  <h2>Find Updated Pages</h2>
+                </div>
+                <p>Search official pages for specific programs, then review saved candidates below.</p>
+              </div>
+              <div className="maintainer-search-form">
+                <label>
+                  <span>Programs</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="20"
+                    value={searchDraft.limit}
+                    onChange={(event) => updateSearchDraft('limit', event.target.value)}
+                  />
+                </label>
+                <label className="maintainer-wide-field">
+                  <span>Target Program IDs</span>
+                  <input
+                    type="text"
+                    value={searchDraft.programIds}
+                    onChange={(event) => updateSearchDraft('programIds', event.target.value)}
+                    placeholder="Optional: virtu-womens-winternship-watch"
+                  />
+                </label>
+                <label>
+                  <span>Queries</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="8"
+                    value={searchDraft.maxQueriesPerProgram}
+                    onChange={(event) => updateSearchDraft('maxQueriesPerProgram', event.target.value)}
+                  />
+                </label>
+                <label>
+                  <span>Results</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    value={searchDraft.maxResultsPerQuery}
+                    onChange={(event) => updateSearchDraft('maxResultsPerQuery', event.target.value)}
+                  />
+                </label>
+                <label className="maintainer-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={searchDraft.force}
+                    onChange={(event) => updateSearchDraft('force', event.target.checked)}
+                  />
+                  <span>Force search</span>
+                </label>
+              </div>
+              <div className="maintainer-actions">
+                <button type="button" onClick={() => runDiscoverySearch(true)} disabled={!canLoad || loading}>
+                  Dry Run Search
+                </button>
+                <button type="button" onClick={() => runDiscoverySearch(false)} disabled={!canLoad || loading}>
+                  Save Candidates
+                </button>
+              </div>
+              {searchResult ? <DiscoverySearchSummary result={searchResult} /> : null}
+
+              <div className="maintainer-subpanel-heading">
+                <div>
+                  <span>Review Candidates</span>
+                  <h2>{discoveryCandidates.length} Candidate{discoveryCandidates.length === 1 ? '' : 's'}</h2>
+                </div>
+                <p>Accept only official or organization-owned pages. Rejected items stay in D1 for audit.</p>
+              </div>
+              <div className="maintainer-card-list">
+                {discoveryCandidates.length ? (
+                  discoveryCandidates.map((candidate) => (
+                    <article className="maintainer-candidate-card" key={candidate.id}>
+                      <div>
+                        <span>{formatDisplayLabel(candidate.confidence)}</span>
+                        <h3>{candidate.programName || candidate.program_id}</h3>
+                        <p>{candidate.title || 'Untitled candidate'}</p>
+                        <div className="candidate-link-row">
+                          <a href={candidate.candidate_url} target="_blank" rel="noreferrer">
+                            Open Candidate Source
+                          </a>
+                          {candidate.currentOfficialUrl ? (
+                            <a href={candidate.currentOfficialUrl} target="_blank" rel="noreferrer">
+                              Current Source
+                            </a>
+                          ) : null}
+                        </div>
+                      </div>
+                      <dl className="candidate-source-compare">
+                        <div>
+                          <dt>Candidate Host</dt>
+                          <dd>{getDisplayHost(candidate.candidate_url)}</dd>
+                        </div>
+                        <div>
+                          <dt>Current Host</dt>
+                          <dd>{getDisplayHost(candidate.currentOfficialUrl)}</dd>
+                        </div>
+                        <div>
+                          <dt>Query</dt>
+                          <dd>{candidate.discovery_query || '-'}</dd>
+                        </div>
+                      </dl>
+                      <p>{candidate.reason || 'Needs maintainer review.'}</p>
+                      {candidate.snippet ? <blockquote>{stripHtml(candidate.snippet)}</blockquote> : null}
+                      <ul className="candidate-review-checklist" aria-label="Review checks before accepting">
+                        <li>Official or organization-owned page</li>
+                        <li>Current-cycle application, deadline, or program page</li>
+                        <li>Program name and student audience match</li>
+                      </ul>
+                      <div className="maintainer-actions">
+                        <button type="button" onClick={() => reviewDiscoveryCandidate(candidate, 'accepted')} disabled={loading}>
+                          Accept & Queue Check
+                        </button>
+                        <button type="button" onClick={() => reviewDiscoveryCandidate(candidate, 'rejected')} disabled={loading}>
+                          Reject URL
+                        </button>
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <p className="maintainer-empty">No pending discovery candidates.</p>
+                )}
+              </div>
+            </section>
+          </section>
+
+          <section className="maintainer-panel">
+            <div className="maintainer-panel-heading">
+              <div>
+                <span>Alert Review</span>
+                <h2>{pendingAlertTotal} Pending Alert{pendingAlertTotal === 1 ? '' : 's'}</h2>
+              </div>
+              <p>Preview recipients first. Send only after the official source and alert copy are trustworthy.</p>
             </div>
-            <p>Accept only official or organization-owned pages. Rejected items stay in D1 for audit.</p>
-          </div>
-          <div className="maintainer-card-list">
-            {discoveryCandidates.length ? (
-              discoveryCandidates.map((candidate) => (
-                <article className="maintainer-candidate-card" key={candidate.id}>
-                  <div>
-                    <span>{formatDisplayLabel(candidate.confidence)}</span>
-                    <h3>{candidate.programName || candidate.program_id}</h3>
-                    <p>{candidate.title || 'Untitled candidate'}</p>
-                    <div className="candidate-link-row">
-                      <a href={candidate.candidate_url} target="_blank" rel="noreferrer">
-                        Open Candidate Source
-                      </a>
-                      {candidate.currentOfficialUrl ? (
-                        <a href={candidate.currentOfficialUrl} target="_blank" rel="noreferrer">
-                          Current Source
-                        </a>
+            {pendingAlertTotal > alertCandidates.length ? (
+              <p className="maintainer-queue-note">
+                Showing the newest {alertCandidates.length} loaded alerts. Use the Worker API for deeper paging when the queue grows.
+              </p>
+            ) : null}
+            <div className="maintainer-card-list maintainer-alert-list">
+              {alertCandidates.length ? (
+                visibleAlertCandidates.map((candidate) => {
+                  const activeAction = alertActionByCandidateId[candidate.id];
+                  const actionResult = alertResultByCandidateId[candidate.id];
+                  const isDryRunning = activeAction === 'dryRun';
+                  const isSending = activeAction === 'send';
+
+                  return (
+                    <article className={`maintainer-candidate-card ${activeAction ? 'is-busy' : ''}`} key={candidate.id}>
+                      <div>
+                        <span>{formatDisplayLabel(candidate.candidateType)}</span>
+                        <h3>{candidate.programName || candidate.program_id}</h3>
+                        <p>{candidate.summary || candidate.title}</p>
+                        {candidate.url ? (
+                          <a href={candidate.url} target="_blank" rel="noreferrer">
+                            Open Official Source
+                          </a>
+                        ) : null}
+                      </div>
+                      <div className="maintainer-actions">
+                        <button className="maintainer-primary-action" type="button" onClick={() => sendAlertCandidate(candidate, true)} disabled={loading || Boolean(activeAction)}>
+                          {isDryRunning ? 'Checking...' : 'Preview Recipients'}
+                        </button>
+                        <button className="maintainer-danger-action" type="button" onClick={() => sendAlertCandidate(candidate, false)} disabled={loading || Boolean(activeAction)}>
+                          {isSending ? 'Sending...' : 'Send This Alert'}
+                        </button>
+                      </div>
+                      {actionResult ? (
+                        <AlertCandidateActionResult
+                          result={actionResult}
+                          onDismiss={() => dismissAlertCandidateResult(candidate.id)}
+                        />
                       ) : null}
-                    </div>
-                  </div>
-                  <dl className="candidate-source-compare">
-                    <div>
-                      <dt>Candidate Host</dt>
-                      <dd>{getDisplayHost(candidate.candidate_url)}</dd>
-                    </div>
-                    <div>
-                      <dt>Current Host</dt>
-                      <dd>{getDisplayHost(candidate.currentOfficialUrl)}</dd>
-                    </div>
-                    <div>
-                      <dt>Query</dt>
-                      <dd>{candidate.discovery_query || '-'}</dd>
-                    </div>
-                  </dl>
-                  <p>{candidate.reason || 'Needs maintainer review.'}</p>
-                  {candidate.snippet ? <blockquote>{stripHtml(candidate.snippet)}</blockquote> : null}
-                  <ul className="candidate-review-checklist" aria-label="Review checks before accepting">
-                    <li>Official or organization-owned page</li>
-                    <li>Current-cycle application, deadline, or program page</li>
-                    <li>Program name and student audience match</li>
-                  </ul>
-                  <div className="maintainer-actions">
-                    <button type="button" onClick={() => reviewDiscoveryCandidate(candidate, 'accepted')} disabled={loading}>
-                      Accept & Queue Check
-                    </button>
-                    <button type="button" onClick={() => reviewDiscoveryCandidate(candidate, 'rejected')} disabled={loading}>
-                      Reject URL
-                    </button>
-                  </div>
-                </article>
-              ))
-            ) : (
-              <p className="maintainer-empty">No pending discovery candidates.</p>
-            )}
-          </div>
-        </section>
-      </section>
+                    </article>
+                  );
+                })
+              ) : (
+                <p className="maintainer-empty">No pending alert candidates.</p>
+              )}
+            </div>
+            {hiddenAlertCandidateCount ? (
+              <button className="maintainer-show-more" type="button" onClick={() => setShowAllAlertCandidates(true)}>
+                Show {hiddenAlertCandidateCount} More Pending Alert{hiddenAlertCandidateCount === 1 ? '' : 's'}
+              </button>
+            ) : showAllAlertCandidates && alertCandidates.length > 6 ? (
+              <button className="maintainer-show-more" type="button" onClick={() => setShowAllAlertCandidates(false)}>
+                Show Fewer Pending Alerts
+              </button>
+            ) : null}
+          </section>
 
-      <section className="maintainer-panel">
-        <div className="maintainer-panel-heading">
+          {reviewHistory ? <ReviewHistoryPanel history={reviewHistory} events={reviewEvents} /> : null}
+        </>
+      )}
+    </section>
+  );
+}
+
+function MaintainerEmptyState({ canLoad }) {
+  const steps = [
+    'Paste the Worker admin token.',
+    'Load queues from the watch worker.',
+    'Review source gaps, URL candidates, alerts, and recent activity.',
+  ];
+
+  return (
+    <section className="maintainer-panel maintainer-empty-state" aria-label="Maintainer start state">
+      <div>
+        <span>Start Here</span>
+        <h2>Load Review Queues.</h2>
+        <p>
+          Maintainer tasks appear after ApplyFirst loads the worker status, readiness queue, URL candidates, pending alerts, and audit history.
+        </p>
+      </div>
+      <ol>
+        {steps.map((step) => (
+          <li key={step}>{step}</li>
+        ))}
+      </ol>
+      <p>{canLoad ? 'Ready to load.' : 'Add the admin token to begin.'}</p>
+    </section>
+  );
+}
+
+function MaintainerWorkflowStrip({ readinessCount, discoveryCount, alertCount, sourceRunCount, reviewCount }) {
+  const steps = [
+    {
+      label: 'Review Queue',
+      value: readinessCount,
+      detail: readinessCount ? 'Fix records that can affect alerts.' : 'No urgent readiness gaps.',
+      tone: readinessCount ? 'attention' : 'calm',
+    },
+    {
+      label: 'Source URLs',
+      value: discoveryCount,
+      detail: discoveryCount ? 'Accept or reject discovered pages.' : 'No pending URL candidates.',
+      tone: discoveryCount ? 'attention' : 'calm',
+    },
+    {
+      label: 'Alert Review',
+      value: alertCount,
+      detail: alertCount ? 'Preview recipients before sending.' : 'No alerts waiting.',
+      tone: alertCount ? 'attention' : 'calm',
+    },
+    {
+      label: 'Source Checks',
+      value: sourceRunCount,
+      detail: sourceRunCount ? 'Latest dry run results are below.' : 'Run targeted checks when needed.',
+      tone: sourceRunCount ? 'active' : 'calm',
+    },
+    {
+      label: 'Audit Trail',
+      value: reviewCount,
+      detail: reviewCount ? 'Recent events need review.' : 'Recent activity is clean.',
+      tone: reviewCount ? 'attention' : 'calm',
+    },
+  ];
+
+  return (
+    <section className="maintainer-workflow-strip" aria-label="Maintainer workflow summary">
+      {steps.map((step) => (
+        <article className={`maintainer-workflow-card ${step.tone}`} key={step.label}>
           <div>
-            <span>Alert Candidate Review</span>
-            <h2>{pendingAlertTotal} Pending Alert{pendingAlertTotal === 1 ? '' : 's'}</h2>
+            <span>{step.label}</span>
+            <strong>{step.value}</strong>
           </div>
-          <p>
-            Actions affect one alert candidate at a time. A dry run previews recipients watching that program; Send
-            emails only those matching recipients.
-          </p>
-        </div>
-        {pendingAlertTotal > alertCandidates.length ? (
-          <p className="maintainer-queue-note">
-            Showing the newest {alertCandidates.length} loaded alerts. Use the Worker API for deeper paging when the queue grows.
-          </p>
-        ) : null}
-        <div className="maintainer-card-list maintainer-alert-list">
-          {alertCandidates.length ? (
-            visibleAlertCandidates.map((candidate) => {
-              const activeAction = alertActionByCandidateId[candidate.id];
-              const actionResult = alertResultByCandidateId[candidate.id];
-              const isDryRunning = activeAction === 'dryRun';
-              const isSending = activeAction === 'send';
-
-              return (
-                <article className={`maintainer-candidate-card ${activeAction ? 'is-busy' : ''}`} key={candidate.id}>
-                  <div>
-                    <span>{formatDisplayLabel(candidate.candidateType)}</span>
-                    <h3>{candidate.programName || candidate.program_id}</h3>
-                    <p>{candidate.summary || candidate.title}</p>
-                    {candidate.url ? (
-                      <a href={candidate.url} target="_blank" rel="noreferrer">
-                        Open Official Source
-                      </a>
-                    ) : null}
-                  </div>
-                  <div className="maintainer-actions">
-                    <button type="button" onClick={() => sendAlertCandidate(candidate, true)} disabled={loading || Boolean(activeAction)}>
-                      {isDryRunning ? 'Checking...' : 'Preview Recipients'}
-                    </button>
-                    <button type="button" onClick={() => sendAlertCandidate(candidate, false)} disabled={loading || Boolean(activeAction)}>
-                      {isSending ? 'Sending...' : 'Send This Alert'}
-                    </button>
-                  </div>
-                  {actionResult ? (
-                    <AlertCandidateActionResult
-                      result={actionResult}
-                      onDismiss={() => dismissAlertCandidateResult(candidate.id)}
-                    />
-                  ) : null}
-                </article>
-              );
-            })
-          ) : (
-            <p className="maintainer-empty">No pending alert candidates.</p>
-          )}
-        </div>
-        {hiddenAlertCandidateCount ? (
-          <button className="maintainer-show-more" type="button" onClick={() => setShowAllAlertCandidates(true)}>
-            Show {hiddenAlertCandidateCount} More Pending Alert{hiddenAlertCandidateCount === 1 ? '' : 's'}
-          </button>
-        ) : showAllAlertCandidates && alertCandidates.length > 6 ? (
-          <button className="maintainer-show-more" type="button" onClick={() => setShowAllAlertCandidates(false)}>
-            Show Fewer Pending Alerts
-          </button>
-        ) : null}
-      </section>
+          <p>{step.detail}</p>
+        </article>
+      ))}
     </section>
   );
 }
@@ -2241,10 +2325,10 @@ function MonitoringReadinessQueue({ queue, onCheckSource, onFindUrl, readinessAc
     <section className="maintainer-panel monitoring-readiness-panel" aria-label="Monitoring readiness queue">
       <div className="maintainer-panel-heading readiness-heading">
         <div>
-          <span>Monitoring Readiness</span>
+          <span>Review Queue</span>
           <h2>{queue.needsAttention ?? 0} Program{queue.needsAttention === 1 ? '' : 's'} Need Attention</h2>
         </div>
-        <p>Use this queue to decide what to fix before students rely on alerts.</p>
+        <p>Fix source, timing, and alert-risk issues before students rely on alerts.</p>
       </div>
       <div className="readiness-groups">
         {groups.map((group) => (
@@ -2347,10 +2431,10 @@ function MaintainerMetric({ label, value }) {
   );
 }
 
-function ReviewHistoryPanel({ history }) {
+function ReviewHistoryPanel({ history, events: providedEvents }) {
   const [activeHistoryFilter, setActiveHistoryFilter] = useState('all');
   const [showExpandedHistory, setShowExpandedHistory] = useState(false);
-  const allEvents = buildReviewHistoryEvents(history);
+  const allEvents = providedEvents ?? buildReviewHistoryEvents(history);
   const attentionCount = allEvents.filter((event) => event.needsAttention).length;
   const latestEvent = allEvents[0];
   const filters = [
