@@ -9,8 +9,8 @@ const args = new Set(process.argv.slice(2));
 const writeOutput = args.has('--write');
 const outputPath = new URL('../cloudflare/d1/watch-seed.generated.sql', import.meta.url);
 const verifiedScheduleOverrides = createVerifiedScheduleOverrides();
-const officialSourceInsertChunkSize = 20;
-const scheduleProfileInsertChunkSize = 5;
+const officialSourceInsertChunkSize = 1;
+const scheduleProfileInsertChunkSize = 1;
 
 const sourceRows = opportunities
   .filter((opportunity) => opportunity.url?.startsWith('https://'))
@@ -454,6 +454,27 @@ function createVerifiedScheduleOverrides() {
     },
   ],
   [
+    'hackny-public-interest-lab',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [10, 11, 12, 1, 2],
+      lastKnownOpenAt: null,
+      activeLeadDays: 150,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 72,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_program_page', 'site:hackny.org/fellows-program "Public Interest Lab" "application"', 'Check the official hackNY page for current application language.'),
+        createDiscoveryQuery('official_deadline', 'site:hackny.org/fellows-program "deadline" "2027"', 'Find the current-cycle deadline if the official page updates.'),
+        createDiscoveryQuery('current_cycle_application', '"hackNY" "Public Interest Lab" "application" "2027"', 'Find current-cycle announcements if the application URL moves.'),
+      ],
+      scheduleNote:
+        'hackNY historically used a rolling fall/winter admission cycle for a summer NYC program. Official page says 2026 relaunch as Public Interest Lab but still has stale prior-cycle dates, so keep alerts in review.',
+    },
+  ],
+  [
     'codepath-career-ready-courses',
     {
       cycleFrequency: 'semester',
@@ -477,7 +498,7 @@ function createVerifiedScheduleOverrides() {
     'new-technologists-academy',
     {
       cycleFrequency: 'annual',
-      expectedOpenMonths: [1, 2, 3, 4],
+      expectedOpenMonths: [1, 2, 3, 4, 10, 11, 12],
       lastKnownOpenAt: '2026-01-01',
       activeLeadDays: 150,
       activeCheckIntervalHours: 24,
@@ -487,30 +508,11 @@ function createVerifiedScheduleOverrides() {
       sourceVolatility: 'moving_cycle_page',
       discoveryQueries: [
         createDiscoveryQuery('official_homepage', 'site:newtechnologists.com "Academy" "Summer 2027"', 'Check whether the Academy page has advanced to the next summer.'),
+        createDiscoveryQuery('official_fellowship', 'site:newtechnologists.com "Fellowship" "January" "September"', 'Confirm Fellowship timing and application language.'),
         createDiscoveryQuery('official_faq', 'site:newtechnologists.com/faq "Academy" "applications"', 'Check FAQ for application and eligibility changes.'),
       ],
       scheduleNote:
-        'Academy is annual and underclassmen-focused. Current page still references Summer 2026, so keep discovery active before winter/spring.',
-    },
-  ],
-  [
-    'new-technologists-fellowship',
-    {
-      cycleFrequency: 'annual',
-      expectedOpenMonths: [10, 11, 12, 1],
-      lastKnownOpenAt: '2026-01-01',
-      activeLeadDays: 120,
-      activeCheckIntervalHours: 24,
-      warmupCheckIntervalHours: 72,
-      dormantCheckIntervalDays: 30,
-      discoveryCheckIntervalHours: 72,
-      sourceVolatility: 'moving_cycle_page',
-      discoveryQueries: [
-        createDiscoveryQuery('official_homepage', 'site:newtechnologists.com "Fellowship" "January" "September"', 'Confirm Fellowship timing and application language.'),
-        createDiscoveryQuery('current_cycle_application', '"New Technologists Fellowship" application 2027', 'Find current-cycle application announcements.'),
-      ],
-      scheduleNote:
-        'Fellowship runs January through September, so monitor in fall/winter for the next cohort.',
+        'The New Technologists has Academy and Fellowship tracks. Monitor winter/spring for Academy updates and fall/winter for Fellowship updates.',
     },
   ],
   [

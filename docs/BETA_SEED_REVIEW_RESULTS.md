@@ -56,21 +56,13 @@ This is a beta-readiness review, not a guarantee that every record is alert-read
 - Keep current app direction: yes.
 - Follow-up: verify pathway-specific close dates before displaying urgent deadline reminders.
 
-### The New Technologists Academy
+### The New Technologists
 
 - Official source: https://newtechnologists.com/
 - Result: beta-ready.
-- Evidence checked: official page describes TNT Academy as a 7-week in-person program for college freshmen and sophomores, with hands-on training, real-world experience, and Summer 2026 language.
+- Evidence checked: official page describes TNT Academy as a 7-week in-person program for college freshmen and sophomores, and TNT Fellowship as a 9-month virtual, part-time professional and technical development experience running January through September.
 - Keep current app direction: yes.
-- Follow-up: exact application deadline is still not visible enough for alert-ready status.
-
-### The New Technologists Fellowship
-
-- Official source: https://newtechnologists.com/
-- Result: beta-ready.
-- Evidence checked: official page describes TNT Fellowship as a 9-month virtual, part-time professional and technical development experience running January through September.
-- Keep current app direction: yes.
-- Follow-up: exact deadline and application cycle need confirmation before alerting.
+- Follow-up: keep Academy and Fellowship as one student-facing entry with track context; exact deadline and application cycle need confirmation before alerting.
 
 ### SEO Tech Developer
 

@@ -162,12 +162,13 @@ npx wrangler d1 execute applyfirst-watch --config wrangler.watch.toml --remote -
 npx wrangler d1 execute applyfirst-watch --config wrangler.watch.toml --remote --file cloudflare/d1/007_beta_access_workspaces.sql
 ```
 
-4. Generate and import official source seed rows:
+4. Sync official source seed rows from `src/opportunities.js`:
 
 ```bash
-npm run watch:seed:d1:write
-npx wrangler d1 execute applyfirst-watch --config wrangler.watch.toml --remote --file cloudflare/d1/watch-seed.generated.sql
+npm run watch:seed:d1:sync
 ```
+
+This regenerates `cloudflare/d1/watch-seed.generated.sql` from the app data, then applies the statements through Wrangler's D1 command API. Use this instead of importing the generated seed with `--file`; the seed is code-derived and should not be hand-patched in D1 except for emergency recovery.
 
 5. Onboard an email sending domain in Cloudflare Email Service:
 

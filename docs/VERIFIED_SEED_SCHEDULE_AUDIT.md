@@ -32,8 +32,7 @@ Programs with exact current-cycle deadlines or rolling applications can be shown
 | MLH Production Engineering Fellowship | https://fellowship.mlh.com/ | Official MLH Fellowship page and application flow list Production Engineering as a selectable track under the rolling MLH Fellowship model. | Rolling cadence with URL discovery because program pages can move. | Good beta monitored seed; alerts should use the shared MLH application model and track-specific context. |
 | Coding it Forward Fellowship | https://codingitforward.com/fellowship | Official page confirms the fellowship model and tracks, but current application dates need cycle verification. | Annual winter discovery. | Useful library record; hold alerts until current application dates are confirmed. |
 | CodePath Career-Ready Courses | https://www.codepath.org/courses | Official course page lists Fall 2026 applications and visible pathway close dates such as August 23. | Term-based checks around spring/summer/fall course windows. | Good beta monitored seed while term deadlines are active. |
-| The New Technologists Academy | https://newtechnologists.com/ | Official page confirms the freshman/sophomore Academy, but still references Summer 2026. | Annual winter/spring discovery for next cycle. | Recommended underclassmen seed; hold alerts until next cycle updates. |
-| The New Technologists Fellowship | https://newtechnologists.com/ | Official page confirms the January-September fellowship, but next-cycle application dates are not explicit. | Annual fall/winter discovery. | Useful prep seed; hold alerts until next-cycle dates are explicit. |
+| The New Technologists | https://newtechnologists.com/ | Official page confirms Academy and Fellowship tracks: Academy is a 7-week in-person freshman/sophomore program, while Fellowship is a January-September virtual part-time experience. | Annual winter/spring discovery for Academy updates and fall/winter discovery for Fellowship updates. | Keep as one student-facing entry with track context; hold alerts until next-cycle dates are explicit. |
 | SEO Tech Developer | https://tech.seo-usa.org/ | Official page confirms a January-March 2026 application timeline and sophomore eligibility. | Annual winter checks. | Verified program; hold alerts until the next application cycle posts. |
 | SEO Tech Developer First-Year Academy | https://tech.seo-usa.org/ | Official page confirms the first-year academy and a prior November 12 opening date. | Annual fall checks. | Recommended underclassmen seed; hold alerts until current close date is explicit. |
 | HeadStart Fellowship | https://www.headstartfellowship.com/fellowship | Official fellowship and FAQ pages confirm Fall 2026 applications, freshman/sophomore eligibility, virtual format, and an Aug 28, 2026 close date. | Semester cadence with daily checks near active deadlines. | Good beta monitored seed while the deadline is live. |
@@ -67,10 +66,11 @@ The first beta audit now covers the original uncertain queue. Remaining follow-u
 - Decide whether NSF REU should remain an umbrella record or expand into specific CS, AI, and security REU site records.
 - Keep canonical watch-only records out of hero/beta-test examples unless their current-cycle pages are live.
 - NASA Internships was removed from the current beta seed because it is a broad internship portal, not a special ApplyFirst program type.
+- Added hackNY Public Interest Lab / Fellows Program as a watch-only fellowship/community record because the official page confirms the program model but still has stale prior-cycle deadline text.
 
 ## 2026-08-22 Verification Pass
 
-- Verification state after this pass: 61 total records, 44 verified, 17 watch-only, and 0 needs confirmation.
+- Verification state after this pass: 61 total records after merging The New Technologists tracks and adding hackNY, 44 verified, 17 watch-only, and 0 needs confirmation.
 - Moved Microsoft Explore, Jane Street FTTP, Jane Street SEE, MLH Production Engineering, Hack.Diversity, Bloomberg NextGen, Bessemer Fellowship Program, and HRT Women in Trading Technology into more accurate source states.
 - Kept Palantir Launch, Two Sigma Freshman SWE, and Google Scholarships as canonical watch-only records because the official pages are the right monitoring targets when current listings become available.
 - Removed IBM Accelerate from the public beta library until a current official Accelerate-specific page is found.

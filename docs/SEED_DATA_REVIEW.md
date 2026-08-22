@@ -39,8 +39,7 @@ Already marked as first verification batch in the project brief:
 - MLH Fellowship.
 - Coding it Forward Fellowship.
 - CodePath Career-Ready Courses.
-- The New Technologists Academy.
-- The New Technologists Fellowship.
+- The New Technologists, covering Academy and Fellowship tracks.
 - SEO Tech Developer.
 - SEO Tech Developer First-Year Academy.
 
@@ -57,6 +56,7 @@ Recently moved out of Needs Confirmation:
 - Jane Street FTTP and SEE: official Jane Street pages confirm the programs, tracks, and student support; alerts should wait for current session pages.
 - MLH Production Engineering Fellowship: official MLH Fellowship page and application flow confirm the track.
 - Hack.Diversity Fellowship: official site confirms the nine-month fellowship model and paid host-company internship outcome; current application timing still needs discovery before alerts.
+- hackNY Public Interest Lab / Fellows Program: official page confirms the NYC summer housing/community model and 2026 relaunch, but still includes prior-cycle deadline language, so keep alerts in review.
 - Bloomberg NextGen Leadership Summit: user-provided Bloomberg Avature link plus campus listings confirm the 2026 event context; use as watch/previous-cycle timing after the deadline.
 - Bessemer Fellowship Program: official page confirms the program is paused/reimagined, so it is a verified watch item, not an active opportunity.
 - HRT Women in Trading Technology: official HRT page confirms January 2026 details and says to check back for January 2027 applications.

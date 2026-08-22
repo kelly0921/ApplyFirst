@@ -63,6 +63,13 @@ const libraryPriorityLabels = {
   recommended: 'Recommended Programs',
   foundation: 'Prep Resources',
 };
+const landingProofSummary = `${opportunities.length}+ Special Programs`;
+const landingSourceCheckedCount = opportunities.filter((opportunity) => getVerificationState(opportunity) === 'verified').length;
+const landingImpactStats = [
+  { value: `${opportunities.length}+`, label: 'Special Programs' },
+  { value: `${landingSourceCheckedCount}`, label: 'Source-Checked' },
+  { value: 'Beta', label: 'Opening Alerts' },
+];
 
 function inferClassYearPreference(value = '') {
   const normalizedValue = value.toLowerCase();
@@ -133,6 +140,24 @@ function getInitialView() {
   }
 }
 
+function getInitialSearchQuery() {
+  try {
+    return new URLSearchParams(window.location.search).get('q')?.trim() ?? '';
+  } catch {
+    return '';
+  }
+}
+
+function getInitialSelectedId() {
+  try {
+    const requestedProgram = new URLSearchParams(window.location.search).get('program')?.trim();
+
+    return opportunities.some((opportunity) => opportunity.id === requestedProgram) ? requestedProgram : opportunities[0].id;
+  } catch {
+    return opportunities[0].id;
+  }
+}
+
 function isReviewToolsRequested() {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -176,12 +201,75 @@ const feedbackIssueTypes = [
 ];
 
 const betaReadyExamples = [
-  'Outreachy',
-  'MLH Fellowship',
-  'Coding it Forward Fellowship',
-  'CodePath Career-Ready Courses',
-  'SEO Tech Developer',
+  'INSIGHT',
+  'Futureforce Tech Launchpad',
+  'Women in Trading Technology',
+  'The New Technologists',
 ];
+
+const hostQualifiedTitleIds = new Set([
+  'palantir-american-tech-fellowship',
+  'jane-street-fttp-watch',
+  'virtu-womens-winternship-watch',
+  'hackny-public-interest-lab',
+  'codepath-career-ready-courses',
+  'forage-virtual-experience',
+  'jane-street-see-watch',
+  'jpmorgan-career-ed-you-watch',
+  'bloomberg-nextgen-leadership-summit',
+  'jane-street-bridge-watch',
+  'jane-street-preview-watch',
+  'jane-street-qtc-watch',
+  'jane-street-wise-watch',
+  'jane-street-amp-watch',
+  'capital-one-tech-summit',
+  'capital-one-product-summit',
+  'capital-one-analyst-early-internship',
+  'develop-for-good-student-projects',
+  'duolingo-thrive-program-watch',
+  'citadel-datathon-watch',
+  'citadel-trading-invitational-watch',
+  'citadel-conference-travel-grant',
+  'break-through-tech-ai-program',
+  'break-through-tech-sprinternship',
+  'two-sigma-freshman-swe-watch',
+  'rewriting-the-code-community',
+  'colorstack-membership',
+]);
+
+function normalizeTitlePart(value = '') {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function getOpportunityDisplayTitle(opportunity) {
+  if (!opportunity) {
+    return '';
+  }
+
+  const title = opportunity.name;
+  const normalizedTitle = normalizeTitlePart(title);
+  const normalizedOrganization = normalizeTitlePart(opportunity.organization);
+
+  if (
+    hostQualifiedTitleIds.has(opportunity.id) &&
+    normalizedOrganization &&
+    !normalizedTitle.includes(normalizedOrganization)
+  ) {
+    return `${opportunity.organization} ${title}`;
+  }
+
+  return title;
+}
+
+function getOpportunityDisplaySubtitle(opportunity) {
+  const title = getOpportunityDisplayTitle(opportunity);
+  const normalizedTitle = normalizeTitlePart(title);
+  const normalizedOrganization = normalizeTitlePart(opportunity.organization);
+
+  return normalizedOrganization && normalizedTitle.includes(normalizedOrganization)
+    ? opportunity.category
+    : opportunity.organization;
+}
 
 async function postJson(endpoint, body) {
   const response = await fetch(endpoint, {
@@ -254,7 +342,7 @@ function App() {
       return '';
     }
   });
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(() => getInitialSearchQuery());
   const [category, setCategory] = useState('all');
   const [roleTrack, setRoleTrack] = useState('all');
   const [priority, setPriority] = useState('all');
@@ -263,7 +351,7 @@ function App() {
   const [timing, setTiming] = useState('all');
   const [status, setStatus] = useState('all');
   const [savedOnly, setSavedOnly] = useState(false);
-  const [selectedId, setSelectedId] = useState(opportunities[0].id);
+  const [selectedId, setSelectedId] = useState(() => getInitialSelectedId());
   const [showInternalTools, setShowInternalTools] = useState(() => isReviewToolsRequested());
   const [maintainerToken, setMaintainerToken] = useState('');
   const [verificationEdits, setVerificationEdits] = useState(() => {
@@ -1173,7 +1261,6 @@ function LandingPage({
   onWaitlistReset,
   onGrantAccess,
 }) {
-  const [showAccess, setShowAccess] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
   const [accessError, setAccessError] = useState('');
 
@@ -1205,13 +1292,23 @@ function LandingPage({
       <main className="landing-main">
         <section className="landing-hero" aria-label="ApplyFirst private beta">
           <div className="landing-copy">
-            <span>Stop Checking Scattered Lists Manually</span>
+            <span>For Early Programs Students Usually Find Too Late</span>
             <h1 className="landing-headline page-hero-title">
               <span className="landing-headline-text headline-highlight">Apply Before The Crowd</span>
             </h1>
             <p>
-              ApplyFirst helps students find high-signal programs, track timing, and prepare before applications open.
+              Save high-signal programs, watch timing, and get reviewed opening alerts before deadlines get crowded.
             </p>
+            <div className="landing-impact-panel" aria-label="ApplyFirst beta impact">
+              <div className="landing-impact-grid">
+                {landingImpactStats.map((stat) => (
+                  <span key={stat.label}>
+                    <strong>{stat.value}</strong>
+                    <em>{stat.label}</em>
+                  </span>
+                ))}
+              </div>
+            </div>
             <div className="landing-actions">
               <a className="button primary" href="#waitlist">
                 Join the Waitlist
@@ -1220,36 +1317,28 @@ function LandingPage({
           </div>
 
           <aside className="landing-panel" aria-label="Private Beta Access">
-            <span>Private Beta</span>
-            <h2>Start With the Beta Library.</h2>
-            <p>Join the waitlist, or enter an invite code to use the current library and alert setup.</p>
-            <div className="beta-panel-points" aria-label="Private Beta Priorities">
-              <span>Curated Library</span>
-              <span>Reviewed Alerts</span>
-              <span>Invite Access</span>
+            <div className="landing-panel-kicker">
+              <span>Private Beta</span>
+              <strong>Invite Only</strong>
             </div>
-            {showAccess ? (
-              <form className="invite-form" onSubmit={submitInviteCode}>
-                <label>
-                  Invite Code
-                  <input
-                    type="text"
-                    value={inviteCode}
-                    onChange={(event) => setInviteCode(event.target.value)}
-                    placeholder="AF-NAME-1234"
-                    autoComplete="off"
-                  />
-                </label>
-                {accessError ? <p className="form-error">{accessError}</p> : null}
-                <button type="submit">Open ApplyFirst</button>
-              </form>
-            ) : (
-              <div className="access-code-callout">
-                <button className="text-button" type="button" onClick={() => setShowAccess(true)}>
-                  Enter Invite Code
-                </button>
-              </div>
-            )}
+            <h2>Enter Invite Code</h2>
+            <form className="invite-form beta-access-form" onSubmit={submitInviteCode}>
+              <label>
+                Invite Code
+                <input
+                  type="text"
+                  value={inviteCode}
+                  onChange={(event) => setInviteCode(event.target.value)}
+                  placeholder="AF-NAME-1234"
+                  autoComplete="off"
+                />
+              </label>
+              {accessError ? <p className="form-error">{accessError}</p> : null}
+              <button type="submit">Open ApplyFirst</button>
+            </form>
+            <a className="panel-waitlist-link" href="#waitlist">
+              Need access? Join the waitlist
+            </a>
           </aside>
         </section>
 
@@ -1278,8 +1367,8 @@ function ProductPreviewSection() {
     <section className="product-preview" aria-label="ApplyFirst product preview">
       <div className="product-preview-heading">
         <span>Product Preview</span>
-        <h2>Built Around Manual Program Tracking.</h2>
-        <p>One view for discovery, timing, saved programs, and source confidence.</p>
+        <h2>From Scattered Links to One Watchlist.</h2>
+        <p>Compare programs, timing, saved targets, and source confidence in one view.</p>
       </div>
       <div className="product-preview-layout">
         <figure className="product-preview-main">
@@ -1326,7 +1415,7 @@ function BetaExampleStrip() {
     <section className="beta-example-strip" aria-label="Trusted beta examples">
       <div>
         <span>Beta Library Examples</span>
-        <p>Source-checked programs students can compare and save.</p>
+        <p>Programs students usually hear about too late.</p>
       </div>
       <div className="beta-example-list">
         {betaReadyExamples.slice(0, 4).map((program) => (
@@ -1340,20 +1429,20 @@ function BetaExampleStrip() {
 function CareerAgencySection() {
   const agencySignals = [
     {
-      title: 'Learn the Work',
-      text: 'Try SWE, product, quant, research, finance tech, fellowships, and technical communities earlier.',
+      title: 'Learn Earlier',
+      text: 'Explore SWE, product, quant, research, and civic tech before recruiting gets crowded.',
     },
     {
-      title: 'Compare Environments',
-      text: 'Notice mentorship, ownership, product depth, company culture, and pace before choosing a path.',
+      title: 'Compare Fit',
+      text: 'See how mentorship, ownership, culture, and pace differ across programs and companies.',
     },
     {
-      title: 'Build Signal',
-      text: 'Turn programs into experience, resume proof, references, peers, and a stronger recruiting story.',
+      title: 'Build Proof',
+      text: 'Turn early programs into projects, resume signal, references, peers, and clearer stories.',
     },
     {
-      title: 'Choose With Agency',
-      text: 'The goal is not only getting picked; it is learning which companies and roles you want to pick.',
+      title: 'Choose Better',
+      text: 'The goal is not only getting picked; it is learning which roles and companies you want.',
     },
   ];
 
@@ -3961,6 +4050,8 @@ function OpportunityRecord({ opportunity, selected, saved, onSelect, onSave }) {
   const primaryTrack = tracks[0];
   const isConfirmed = getVerificationState(opportunity) === 'verified';
   const timingSignal = getRecordTimingSignal(opportunity, monitorSignal);
+  const displayTitle = getOpportunityDisplayTitle(opportunity);
+  const displaySubtitle = getOpportunityDisplaySubtitle(opportunity);
 
   return (
     <article className={`opportunity-record${selected ? ' selected' : ''}`} role="listitem">
@@ -3968,14 +4059,14 @@ function OpportunityRecord({ opportunity, selected, saved, onSelect, onSave }) {
         <div className="record-title">
           <span className={`status-pill status-${opportunity.status}`}>{statusLabels[opportunity.status]}</span>
           <h3>
-            <span>{opportunity.name}</span>
+            <span>{displayTitle}</span>
             {isConfirmed ? (
               <span className="record-confirmed" aria-label="Confirmed by official source" title="Confirmed by official source">
                 <VerifiedIcon />
               </span>
             ) : null}
           </h3>
-          <p>{opportunity.organization}</p>
+          <p>{displaySubtitle}</p>
         </div>
         <div className="record-summary">
           <span>{primaryTrack}</span>
@@ -4058,6 +4149,8 @@ function OpportunityDetail({
     ['open', 'deadlineSoon'].includes(opportunity.status) || monitorSignal.actionLabel === 'Apply Now'
       ? 'Apply Now'
       : 'View Official Source';
+  const displayTitle = getOpportunityDisplayTitle(opportunity);
+  const displaySubtitle = getOpportunityDisplaySubtitle(opportunity);
 
   return (
     <section className="detail-panel">
@@ -4065,8 +4158,8 @@ function OpportunityDetail({
         <div className="detail-status-strip">
           <span className={`status-pill status-${opportunity.status}`}>{statusLabels[opportunity.status]}</span>
         </div>
-        <h2>{opportunity.name}</h2>
-        <p>{opportunity.organization}</p>
+        <h2>{displayTitle}</h2>
+        <p>{displaySubtitle}</p>
       </div>
       <div className="detail-actions">
         <a className="detail-primary-link" href={opportunity.url} target="_blank" rel="noreferrer">

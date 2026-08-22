@@ -38,7 +38,7 @@ After push:
 8. Confirm the entries reach the configured capture destinations.
 9. If `VITE_WATCH_ENDPOINT` is configured, confirm the watch request appears in D1.
 10. Apply `cloudflare/d1/002_automatic_watch_alerts.sql`, `cloudflare/d1/003_seasonal_source_schedules.sql`, `cloudflare/d1/004_discovery_candidates.sql`, `cloudflare/d1/005_discovery_search_runs.sql`, and `cloudflare/d1/006_unsubscribe_safety.sql` before deploying the updated watch Worker.
-11. Run `npm run watch:seed:d1:write`, skim the generated source/schedule rows, and import `cloudflare/d1/watch-seed.generated.sql` so `source_schedule_profiles` exists for every seeded source.
+11. Run `npm run watch:seed:d1:sync` to regenerate the D1 watch seed from `src/opportunities.js` and apply it through command chunks, then confirm `source_schedule_profiles` exists for every seeded source.
 12. Confirm `/watch/status` reports scheduled sources and due sources.
 13. Confirm `/watch/discovery` returns seasonally due URL-discovery items when applicable.
 14. If a search provider secret is configured, dry-run `/watch/discovery/search` with one program and confirm it proposes review candidates instead of sending alerts.

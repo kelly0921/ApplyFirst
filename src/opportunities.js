@@ -769,6 +769,40 @@ export const opportunities = [
     lastChecked: '2026-08-18',
   },
   {
+    id: 'hackny-public-interest-lab',
+    name: 'Public Interest Lab / Fellows Program',
+    organization: 'hackNY',
+    category: 'Fellowship',
+    classYears: ['All class years'],
+    timing: 'Summer',
+    status: 'watching',
+    confidence: 'medium',
+    funding: 'Program fee; limited financial assistance available',
+    location: 'New York City',
+    url: 'https://hackny.org/fellows-program',
+    previousUrl: '',
+    openDate:
+      'Official page says hackNY relaunched its summer program as the Public Interest Lab in 2026; watch fall for the next rolling application cycle',
+    deadline:
+      'Current page still shows prior 2025 application deadlines, so verify the next-cycle deadline before alerting',
+    tags: ['Public interest tech', 'NYC housing', 'Mentorship', 'Tech interns'],
+    description:
+      'hackNY Public Interest Lab, historically the hackNY Fellows Program, is a 10-week New York City summer community for students with paid U.S. tech internships who want subsidized co-living housing, civic-tech speaker events, alumni mentorship, social programming, and a stronger responsible-technology network.',
+    eligibilitySummary:
+      'Undergraduate or graduate students who secure a paid summer tech internship at a U.S. company that allows them to work from New York City; official acceptance is contingent on internship placement and values alignment.',
+    experienceSummary:
+      'Fellows live together in NYU housing, attend after-work speaker events with technology and civic leaders, receive 1:1 alumni mentorship, join weekend activities, and present at demo day.',
+    detailBasis:
+      'Official hackNY page confirms the 2026 relaunch, 10-week NYC housing/community model, internship-contingent eligibility, program fee, mentorship, speaker series, and stale prior-cycle deadline text.',
+    why:
+      'Useful for students who already have a summer tech internship but want a stronger NYC community, mentorship, civic-tech exposure, and support navigating early-career decisions.',
+    prep:
+      'Secure or pursue a paid summer tech internship that can be done from NYC, prepare a values-alignment story around responsible technology, and verify the latest application deadline before applying.',
+    sourceNote:
+      'Official hackNY Fellows Program page says the program relaunched in 2026 as the Public Interest Lab; current page still includes older 2025 deadline language, so keep alerts in review until current-cycle dates are posted.',
+    lastChecked: '2026-08-22',
+  },
+  {
     id: 'codepath-career-ready-courses',
     name: 'Career-Ready Courses',
     organization: 'CodePath',
@@ -833,66 +867,35 @@ export const opportunities = [
   },
   {
     id: 'new-technologists-academy',
-    name: 'The New Technologists Academy',
+    name: 'The New Technologists',
     organization: 'The New Technologists',
     category: 'Fellowship',
-    classYears: ['Freshman', 'Sophomore'],
-    timing: 'Summer',
+    classYears: ['Freshman', 'Sophomore', 'All class years'],
+    timing: 'Rolling',
     status: 'watching',
     confidence: 'medium',
     funding: 'Stipend',
-    location: 'In person',
+    location: 'In person or virtual by track',
     url: 'https://newtechnologists.com/',
     previousUrl: '',
-    openDate: 'Watch winter and spring for the next Academy cycle; official site still lists Summer 2026',
-    deadline: 'Verify exact next-cycle application deadline on official site',
-    tags: ['Underclassmen', 'AI projects', 'Mentorship', 'Nontraditional backgrounds'],
+    openDate:
+      'Academy is summer; Fellowship runs January through September. Watch winter/spring for Academy and fall/winter for Fellowship updates.',
+    deadline: 'Verify exact next-cycle Academy or Fellowship deadline on official site',
+    tags: ['Underclassmen', 'AI projects', 'Mentorship', 'Web development', 'Professional development'],
     description:
-      'The New Technologists Academy is a paid, hands-on program for freshmen and sophomores building technical confidence.',
+      'The New Technologists is a paid career-launching tech program with two tracks: the Academy, a 7-week in-person experience for college freshmen and sophomores, and the Fellowship, a 9-month virtual part-time experience for emerging technologists.',
     eligibilitySummary:
-      'College freshmen and sophomores; exact next-cycle eligibility should be checked when applications reopen.',
+      'Academy targets college freshmen and sophomores; Fellowship targets early-career technologists. Exact next-cycle criteria should be checked when applications reopen.',
     experienceSummary:
-      'Seven-week in-person academy with project work, mentorship, and real-world technical exposure.',
+      'Students build technical confidence through AI or web projects, product lifecycle exposure, React/web development, coding challenges, mentorship, and professional development.',
     detailBasis:
-      'Official site describes the Academy, but the visible cycle still references Summer 2026.',
+      'Official site describes Academy and Fellowship tracks, but visible cycle details still need next-cycle confirmation.',
     why:
-      'A paid 7-week academy explicitly aimed at college freshmen and sophomores who want hands-on tech exposure, mentorship, and real-world project experience.',
+      'A strong early-program signal because it combines paid hands-on technical training, mentorship, professional development, and access for students from nontraditional or underestimated backgrounds.',
     prep:
-      'Prepare a clear story around curiosity, project-building, and why hands-on exposure would help you convert potential into a stronger technical path.',
+      'Prepare a clear story around curiosity, project-building, collaboration, and why hands-on technical exposure would help you convert potential into a stronger tech path.',
     sourceNote:
-      'Official site describes TNT Academy as a 7-week in-person program for college freshmen and sophomores.',
-    lastChecked: '2026-08-18',
-  },
-  {
-    id: 'new-technologists-fellowship',
-    name: 'The New Technologists Fellowship',
-    organization: 'The New Technologists',
-    category: 'Fellowship',
-    classYears: ['All class years'],
-    timing: 'Winter',
-    status: 'watching',
-    confidence: 'medium',
-    funding: 'Varies',
-    location: 'Virtual',
-    url: 'https://newtechnologists.com/',
-    previousUrl: '',
-    openDate: 'Watch fall and winter for the next fellowship cycle; official site says the program runs January through September',
-    deadline: 'Verify exact next-cycle application deadline on official site',
-    tags: ['Early-career', 'Project building', 'Mentorship', 'Professional development'],
-    description:
-      'The New Technologists Fellowship is a longer virtual experience for emerging technologists building projects and professional skills.',
-    eligibilitySummary:
-      'Early-career technologist audience; exact cohort eligibility should be confirmed when applications reopen.',
-    experienceSummary:
-      'Nine-month virtual experience with project building, coding challenges, and professional development.',
-    detailBasis:
-      'Official site describes the fellowship model; next-cycle dates need confirmation.',
-    why:
-      'A longer part-time technical and professional development track that can help emerging technologists build portfolio-worthy work over time.',
-    prep:
-      'Gather project examples and be ready to explain where you want deeper technical confidence, collaboration practice, and mentorship.',
-    sourceNote:
-      'Official site describes the fellowship as a nine-month virtual experience with project building, coding challenges, and professional development.',
+      'Official site describes TNT Academy as a 7-week in-person program for college freshmen and sophomores and TNT Fellowship as a 9-month virtual professional and technical development experience.',
     lastChecked: '2026-08-18',
   },
   {

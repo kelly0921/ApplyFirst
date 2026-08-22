@@ -17,6 +17,8 @@
     "monitor:seed:sql:write": "node scripts/export-monitoring-seed.mjs --sql --write",
     "watch:seed:d1": "node scripts/export-d1-watch-seed.mjs",
     "watch:seed:d1:write": "node scripts/export-d1-watch-seed.mjs --write",
+    "watch:seed:d1:sync": "node scripts/apply-d1-watch-seed.mjs",
+    "watch:seed:d1:sync:dry": "node scripts/apply-d1-watch-seed.mjs --dry-run",
     "watch:worker:dev": "npx wrangler dev --config wrangler.watch.toml",
     "watch:worker:deploy": "npx wrangler deploy --config wrangler.watch.toml",
     "capture:smoke": "node scripts/smoke-capture-endpoints.mjs",

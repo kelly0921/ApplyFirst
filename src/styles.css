@@ -317,7 +317,7 @@ a {
 }
 
 .landing-copy > span,
-.landing-panel > span,
+.landing-panel-kicker span,
 .landing-grid article > span {
   color: var(--brand-accent);
   font-size: 0.78rem;
@@ -344,12 +344,71 @@ a {
 }
 
 .landing-copy p {
-  max-width: 680px;
+  max-width: 640px;
   margin: 0;
   color: var(--muted);
   font-size: clamp(1.02rem, 1.5vw, 1.22rem);
   font-weight: 520;
   line-height: 1.6;
+}
+
+.landing-impact-panel {
+  display: grid;
+  width: min(100%, 620px);
+  margin-top: 20px;
+  border: 1px solid rgba(23, 32, 51, 0.075);
+  border-radius: 16px;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.72), rgba(247, 251, 251, 0.58)),
+    rgba(255, 255, 255, 0.62);
+  box-shadow: 0 10px 22px rgba(45, 54, 74, 0.038);
+  padding: 12px;
+}
+
+.landing-impact-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.landing-impact-grid span {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  border-right: 1px solid rgba(23, 32, 51, 0.065);
+  padding: 2px 10px 2px 10px;
+}
+
+.landing-impact-grid span:last-child {
+  border-right: 0;
+  padding-right: 4px;
+}
+
+.landing-impact-grid span::before {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 0;
+  width: 3px;
+  border-radius: 999px;
+  background: rgba(15, 127, 150, 0.24);
+  content: "";
+}
+
+.landing-impact-grid strong {
+  color: var(--ink);
+  font-size: clamp(1.2rem, 2.1vw, 1.68rem);
+  font-weight: 920;
+  line-height: 1.12;
+}
+
+.landing-impact-grid em {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 760;
+  line-height: 1.2;
 }
 
 .beta-status-note {
@@ -379,21 +438,7 @@ a {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  margin-top: 34px;
-}
-
-.beta-panel-points span {
-  display: inline-flex;
-  min-height: 32px;
-  align-items: center;
-  border: 1px solid rgba(25, 132, 124, 0.16);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.66);
-  color: var(--ink);
-  padding: 6px 11px;
-  font-size: 0.8rem;
-  font-weight: 840;
-  box-shadow: 0 8px 18px rgba(45, 54, 74, 0.05);
+  margin-top: 28px;
 }
 
 .beta-panel-note {
@@ -461,56 +506,55 @@ a {
 
 .landing-panel {
   align-self: center;
+  display: grid;
   max-width: 340px;
-  border: 1px solid rgba(207, 217, 226, 0.88);
+  gap: 14px;
+  border: 1px solid rgba(23, 32, 51, 0.1);
   border-radius: 22px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(248, 250, 252, 0.96)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(248, 252, 252, 0.98)),
     #ffffff;
-  box-shadow: 0 18px 42px rgba(45, 54, 74, 0.1);
-  padding: clamp(20px, 2.4vw, 26px);
+  box-shadow: 0 22px 46px rgba(45, 54, 74, 0.11);
+  padding: clamp(18px, 2.2vw, 24px);
+}
+
+.landing-panel-kicker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.landing-panel-kicker strong {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  border: 1px solid rgba(15, 127, 150, 0.18);
+  border-radius: 999px;
+  background: rgba(232, 250, 250, 0.86);
+  color: var(--green);
+  padding: 5px 10px;
+  font-size: 0.76rem;
+  font-weight: 900;
+  white-space: nowrap;
 }
 
 .landing-panel h2 {
-  margin: 12px 0 12px;
-  font-size: clamp(1.36rem, 2.25vw, 1.76rem);
+  margin: 0;
+  font-size: clamp(1.34rem, 2vw, 1.62rem);
   line-height: 1.12;
-}
-
-.landing-panel p {
-  margin: 0 0 18px;
-  color: var(--muted);
-  font-weight: 520;
-  line-height: 1.55;
-}
-
-.beta-panel-points {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 0 0 22px;
-}
-
-.beta-panel-points span {
-  min-height: 30px;
-  border-color: rgba(15, 127, 150, 0.2);
-  background: rgba(234, 251, 243, 0.82);
-  color: var(--green);
-  box-shadow: none;
-}
-
-.access-code-callout {
-  display: block;
-  border-top: 1px solid var(--line);
-  background: rgba(248, 250, 252, 0.72);
-  margin: 2px -4px -4px;
-  border-radius: 14px;
-  padding: 12px;
 }
 
 .invite-form {
   display: grid;
   gap: 12px;
+}
+
+.beta-access-form {
+  border: 1px solid rgba(15, 127, 150, 0.16);
+  border-radius: 16px;
+  background: rgba(247, 251, 251, 0.78);
+  padding: 12px;
 }
 
 .invite-form label {
@@ -537,12 +581,25 @@ a {
 }
 
 .invite-form button {
-  min-height: 43px;
+  min-height: 48px;
   border: 0;
-  border-radius: 10px;
-  background: var(--brand-accent);
+  border-radius: 12px;
+  background: var(--green);
   color: #ffffff;
   font-weight: 900;
+  box-shadow: 0 14px 24px rgba(15, 127, 150, 0.16);
+}
+
+.panel-waitlist-link {
+  justify-self: center;
+  color: var(--brand-accent);
+  font-size: 0.86rem;
+  font-weight: 880;
+  text-decoration: none;
+}
+
+.panel-waitlist-link:hover {
+  color: var(--ink);
 }
 
 .form-error {
@@ -6341,6 +6398,10 @@ a {
     min-height: auto;
   }
 
+  .landing-panel {
+    max-width: 100%;
+  }
+
   .opportunity-detail-column {
     position: static;
     max-height: none;
@@ -6421,6 +6482,25 @@ a {
   .landing-copy h1 {
     font-size: 1.86rem;
     line-height: 1.02;
+  }
+
+  .landing-copy h1.landing-headline {
+    white-space: normal;
+  }
+
+  .landing-impact-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-impact-grid span {
+    border-right: 0;
+    border-bottom: 1px solid rgba(23, 32, 51, 0.08);
+    padding: 0 0 10px;
+  }
+
+  .landing-impact-grid span:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
   }
 
   .landing-actions {

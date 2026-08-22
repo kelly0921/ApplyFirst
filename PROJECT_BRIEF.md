@@ -139,6 +139,12 @@ Verification rules:
 6. Keep records as `Verify first` when the program is known from trusted lists but the exact current-cycle page is unclear.
 7. Do not send public alerts from records that are missing official-cycle verification.
 
+Public naming rule:
+
+- Lead with the program name when it is distinctive enough to stand alone, such as INSIGHT, Outreachy, Futureforce Tech Launchpad, or The New Technologists.
+- Combine host + program when the name is generic or ambiguous without context, such as Capital One Tech Summit, hackNY Public Interest Lab / Fellows Program, Jane Street Preview, or Break Through Tech AI Program.
+- Avoid repeating the host as a second line when it is already part of the display title; use the opportunity type as the supporting line instead.
+
 First verification batch completed:
 
 - Google Summer of Code.
@@ -146,8 +152,7 @@ First verification batch completed:
 - MLH Fellowship.
 - Coding it Forward Fellowship.
 - CodePath Career-Ready Courses.
-- The New Technologists Academy.
-- The New Technologists Fellowship.
+- The New Technologists, covering Academy and Fellowship tracks in one entry.
 - SEO Tech Developer.
 - SEO Tech Developer First-Year Academy.
 
@@ -159,6 +164,7 @@ Watch-only examples until current-cycle pages are explicit:
 - Two Sigma Freshman Software Engineering.
 - Google Scholarships.
 - Hack.Diversity Fellowship.
+- hackNY Public Interest Lab / Fellows Program.
 
 Removed from public beta until a better official source exists:
 
