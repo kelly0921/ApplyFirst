@@ -4,6 +4,9 @@ const DEFAULT_MONITOR_LIMIT = 12;
 const DEFAULT_DISCOVERY_SEARCH_LIMIT = 5;
 const DEFAULT_DISCOVERY_QUERIES_PER_PROGRAM = 3;
 const DEFAULT_DISCOVERY_RESULTS_PER_QUERY = 5;
+const DEFAULT_SCHEDULED_DISCOVERY_SEARCH_LIMIT = 3;
+const DEFAULT_SCHEDULED_DISCOVERY_QUERIES_PER_PROGRAM = 2;
+const DEFAULT_SCHEDULED_DISCOVERY_RESULTS_PER_QUERY = 3;
 const AUTO_SENDABLE_CONFIDENCES = new Set(['high']);
 const DISCOVERY_SEARCH_PROVIDERS = new Set(['brave', 'tavily']);
 const SOURCE_TRUNCATION_NOTICE = 'ApplyFirst note: source page was truncated at the monitoring byte limit.';
@@ -39,8 +42,38 @@ export default {
         trigger: controller.cron || 'scheduled',
       }),
     );
+
+    if (shouldRunScheduledDiscoverySearch(env)) {
+      ctx.waitUntil(runScheduledDiscoverySearch(env, controller).catch((error) => logScheduledDiscoveryError(error)));
+    }
   },
 };
+
+async function runScheduledDiscoverySearch(env, controller) {
+  return runDiscoverySearch(env, {
+    trigger: 'scheduled_discovery',
+    limit: env.AUTO_DISCOVERY_SEARCH_LIMIT || DEFAULT_SCHEDULED_DISCOVERY_SEARCH_LIMIT,
+    maxQueriesPerProgram:
+      env.AUTO_DISCOVERY_QUERIES_PER_PROGRAM || DEFAULT_SCHEDULED_DISCOVERY_QUERIES_PER_PROGRAM,
+    maxResultsPerQuery:
+      env.AUTO_DISCOVERY_RESULTS_PER_QUERY || DEFAULT_SCHEDULED_DISCOVERY_RESULTS_PER_QUERY,
+    dryRun: env.AUTO_DISCOVERY_SEARCH_DRY_RUN === 'true',
+    scheduledCron: controller?.cron || '',
+  });
+}
+
+function shouldRunScheduledDiscoverySearch(env) {
+  return env.AUTO_DISCOVERY_SEARCH_ENABLED === 'true';
+}
+
+function logScheduledDiscoveryError(error) {
+  console.error(
+    JSON.stringify({
+      event: 'scheduled_discovery_search_failed',
+      error: cleanString(error?.message || String(error), 500),
+    }),
+  );
+}
 
 async function handleRequest(request, env, ctx) {
   const url = new URL(request.url);
@@ -1032,6 +1065,7 @@ async function runDiscoverySearch(env, body = {}) {
   const country = cleanString(body.country || env.DISCOVERY_SEARCH_COUNTRY || 'US', 40);
   const force = Boolean(body.force);
   const dryRun = Boolean(body.dryRun);
+  const trigger = cleanString(body.trigger || 'manual', 40);
   const programIds = getRunProgramIds(body);
   const generatedAt = new Date().toISOString();
   const runId = crypto.randomUUID();
@@ -1061,6 +1095,7 @@ async function runDiscoverySearch(env, body = {}) {
     await recordDiscoverySearchRun(env, {
       id: runId,
       provider,
+      trigger,
       status: 'not_configured',
       searchedPrograms: discoveryItems.length,
       summary: response,
@@ -1187,6 +1222,7 @@ async function runDiscoverySearch(env, body = {}) {
     runId,
     status,
     provider,
+    trigger,
     dryRun,
     force,
     generatedAt,
@@ -1202,6 +1238,7 @@ async function runDiscoverySearch(env, body = {}) {
   await recordDiscoverySearchRun(env, {
     id: runId,
     provider,
+    trigger,
     status,
     searchedPrograms: discoveryItems.length,
     searchedQueries,
@@ -3336,8 +3373,65 @@ async function readTextWithLimit(response, maxBytes) {
   return `${output}${decoder.decode()}`;
 }
 
+function extractSourceStatusSignals(sourceText, referenceDate = new Date()) {
+  const currentYear = referenceDate.getUTCFullYear();
+  const cycleYearSignals = findCycleYearSignals(sourceText);
+  const cycleYears = uniqueStrings(cycleYearSignals.map((signal) => String(signal.year))).map((year) => Number(year));
+  const hasCurrentOrFutureCycleYear = cycleYears.some((year) => year >= currentYear);
+  const hasOnlyPastCycleYears = cycleYears.length > 0 && !hasCurrentOrFutureCycleYear;
+  const hasOpenLanguage =
+    /\b(apply now|applications? (are )?open|now accepting|currently accepting|accepting applications|submit your application|register now|registration (is )?open)\b/i.test(
+      sourceText,
+    );
+  const hasClosedLanguage =
+    /\b(registration (is )?(currently )?closed|applications? (are )?(currently )?closed|application cycle (is )?closed|no longer accepting|deadline has passed|submissions? (are )?closed)\b/i.test(
+      sourceText,
+    );
+  const hasWarmupLanguage =
+    /\b(open soon|coming soon|check back|next cycle|next application cycle|will open|opens on|opens in|interest form|join (our )?(mailing list|waitlist)|get notified)\b/i.test(
+      sourceText,
+    );
+
+  return {
+    cycleYears,
+    cycleYearSignals: cycleYearSignals.slice(0, 6),
+    hasCurrentOrFutureCycleYear,
+    hasOnlyPastCycleYears,
+    hasOpenLanguage,
+    hasClosedLanguage,
+    hasWarmupLanguage,
+  };
+}
+
+function findCycleYearSignals(sourceText) {
+  const matches = [...sourceText.matchAll(/\b20\d{2}\b/g)];
+  const signals = [];
+  const lower = sourceText.toLowerCase();
+  const cycleContextPattern =
+    /\b(apply|application|applications|deadline|deadlines|cohort|cycle|summer|spring|fall|winter|event|events|date|dates|program|fellowship|scholarship|academy|internship|winternship|registration)\b/i;
+
+  for (const match of matches) {
+    const year = Number(match[0]);
+    const start = Math.max(match.index - 100, 0);
+    const end = Math.min(match.index + match[0].length + 100, sourceText.length);
+    const context = lower.slice(start, end).replace(/\s+/g, ' ').trim();
+
+    if (!cycleContextPattern.test(context)) {
+      continue;
+    }
+
+    signals.push({
+      year,
+      context: cleanString(context, 220),
+    });
+  }
+
+  return signals;
+}
+
 function classifySourceText(sourceText, source) {
   const normalized = sourceText.trim().replace(/\s+/g, ' ');
+  const sourceSignals = extractSourceStatusSignals(normalized);
   const openWindow = findDateSignal(normalized, ['open', 'opens', 'applications open', 'apply by', 'will open', 'opens on', 'opens in']);
   const deadline = findDateSignal(
     normalized,
@@ -3378,11 +3472,15 @@ function classifySourceText(sourceText, source) {
   const mentionsEligibility =
     /\b(freshman|first-year|sophomore|underclass|student|eligible|eligibility|class year)\b/i.test(normalized);
   const detectedDate = deadline || openWindow;
-  const staleDateSignal = isStaleDateSignal(detectedDate);
+  const staleDateSignal = isStaleDateSignal(detectedDate) || sourceSignals.hasOnlyPastCycleYears;
   const exactPostingNeeded = isExactPostingNeededSource(source, normalized);
+  const analysisOptions = {
+    sourceSignals,
+  };
 
   if ((saysClosed || saysNotOpenYet) && saysOpen) {
     return buildAnalysis('Conflicting source signals', 'verifyManually', 'needsReview', 'Manual Review', '', source, normalized, deadline || openWindow, {
+      ...analysisOptions,
       sourceState: 'Needs Review',
       sourceAction: 'Open the source manually because the page contains both open and closed language.',
     });
@@ -3390,6 +3488,7 @@ function classifySourceText(sourceText, source) {
 
   if (saysClosed) {
     return buildAnalysis('Registration closed', suggestsNextCycle || saysSoon ? 'expectedSoon' : 'watching', mentionsEligibility ? 'medium' : 'needsReview', 'Monitor Only', '', source, normalized, deadline || openWindow, {
+      ...analysisOptions,
       sourceState: 'Closed',
       sourceAction: 'Keep monitoring the official source; do not send a student opening alert.',
     });
@@ -3397,6 +3496,7 @@ function classifySourceText(sourceText, source) {
 
   if (hasKnownClosedFallback(source, normalized) && !saysOpen && !deadline && !openWindow) {
     return buildAnalysis('Registration closed', 'watching', 'medium', 'Monitor Only', '', source, normalized, deadline || openWindow, {
+      ...analysisOptions,
       sourceState: 'Closed',
       sourceAction: 'Known official page is currently closed; keep watching for reopened registration language.',
     });
@@ -3404,6 +3504,7 @@ function classifySourceText(sourceText, source) {
 
   if (exactPostingNeeded) {
     return buildAnalysis('Exact posting needed', 'verifyManually', 'medium', 'Manual Review', '', source, normalized, deadline || openWindow, {
+      ...analysisOptions,
       sourceState: 'Exact Posting Needed',
       sourceAction: 'Find or accept the specific posting URL before sending alerts to watched students.',
     });
@@ -3411,6 +3512,7 @@ function classifySourceText(sourceText, source) {
 
   if (saysNotOpenYet || saysSoon) {
     return buildAnalysis('Dates updated', 'expectedSoon', mentionsEligibility || openWindow ? 'medium' : 'needsReview', 'Prep Watch', 'prep_window', source, normalized, openWindow || deadline, {
+      ...analysisOptions,
       sourceState: 'Warmup',
       sourceAction: 'Use this for preparation timing, not an opening alert yet.',
     });
@@ -3418,6 +3520,7 @@ function classifySourceText(sourceText, source) {
 
   if (staleDateSignal && (saysOpen || deadline || openWindow)) {
     return buildAnalysis('Old-cycle signal', suggestsNextCycle ? 'expectedSoon' : 'watching', mentionsEligibility ? 'medium' : 'needsReview', saysOpen ? 'Manual Review' : 'Monitor Only', '', source, normalized, detectedDate, {
+      ...analysisOptions,
       sourceState: 'Old Cycle',
       sourceAction: 'Keep monitoring for the next cycle; do not treat this as a fresh opening.',
     });
@@ -3425,6 +3528,7 @@ function classifySourceText(sourceText, source) {
 
   if (saysRolling && saysOpen) {
     return buildAnalysis('Application opened', 'open', mentionsEligibility || deadline ? 'high' : 'medium', 'Alert Candidate', 'opening', source, normalized, deadline, {
+      ...analysisOptions,
       sourceState: 'Open',
       sourceAction: 'Create an alert candidate; auto-send only when the signal is high-confidence and fresh.',
     });
@@ -3432,6 +3536,7 @@ function classifySourceText(sourceText, source) {
 
   if (saysOpen) {
     return buildAnalysis('Application opened', 'open', mentionsEligibility || openWindow || deadline ? 'high' : 'medium', 'Alert Candidate', 'opening', source, normalized, deadline || openWindow, {
+      ...analysisOptions,
       sourceState: 'Open',
       sourceAction: 'Create an alert candidate; auto-send only when the signal is high-confidence and fresh.',
     });
@@ -3439,6 +3544,7 @@ function classifySourceText(sourceText, source) {
 
   if (deadline && !saysClosed) {
     return buildAnalysis('Dates updated', 'deadlineSoon', mentionsEligibility ? 'high' : 'medium', 'Deadline Candidate', 'deadline', source, normalized, deadline, {
+      ...analysisOptions,
       sourceState: 'Deadline',
       sourceAction: 'Review the deadline before sending a reminder or updating the public card.',
     });
@@ -3446,6 +3552,7 @@ function classifySourceText(sourceText, source) {
 
   if (hasInterestForm) {
     return buildAnalysis('Interest form only', 'watching', mentionsEligibility || openWindow ? 'medium' : 'needsReview', 'Monitor Only', '', source, normalized, openWindow, {
+      ...analysisOptions,
       sourceState: 'Monitor',
       sourceAction: 'Keep watching; an interest form is useful but is not an application opening.',
     });
@@ -3453,6 +3560,7 @@ function classifySourceText(sourceText, source) {
 
   if (openWindow || saysRolling) {
     return buildAnalysis('Dates updated', saysRolling ? 'watching' : 'expectedSoon', mentionsEligibility || openWindow ? 'medium' : 'needsReview', 'Prep Watch', 'prep_window', source, normalized, openWindow, {
+      ...analysisOptions,
       sourceState: 'Warmup',
       sourceAction: 'Track this as prep timing until the page confirms applications are open.',
     });
@@ -3460,12 +3568,14 @@ function classifySourceText(sourceText, source) {
 
   if (mentionsEligibility) {
     return buildAnalysis('Eligibility changed', 'verifyManually', 'medium', 'Manual Review', 'eligibility', source, normalized, '', {
+      ...analysisOptions,
       sourceState: 'Needs Review',
       sourceAction: 'Review eligibility changes manually before changing the opportunity record.',
     });
   }
 
   return buildAnalysis('Needs follow-up', 'verifyManually', 'needsReview', 'Manual Review', '', source, normalized, '', {
+    ...analysisOptions,
     sourceState: 'Needs Review',
     sourceAction: 'Open the official source manually because the fetched page did not expose enough timing signal.',
   });
@@ -3486,6 +3596,7 @@ function buildAnalysis(result, suggestedStatus, suggestedConfidence, reviewDecis
     sourceState,
     sourceAction,
     detectedSignal,
+    sourceSignals: options.sourceSignals || null,
     note: `${source.program_name}: ${result}. ${reviewDecision} created from official source monitoring.${signalCopy} Review before sending any student alert. Excerpt: ${excerpt}${sourceText.length > 220 ? '...' : ''}`,
   };
 }

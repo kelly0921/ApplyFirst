@@ -57,6 +57,14 @@ Programs with exact current-cycle deadlines or rolling applications can be shown
 
 High-volatility pages get search-provider discovery during `warmup`, `active`, or `unknown`. Stable community/funding pages get lower-frequency source checks and usually skip URL discovery.
 
+## 2026-08-22 Monitoring Strategy Upgrade
+
+- Keep source checks as the primary monitoring path: official URLs are still checked by cadence and only high-confidence fresh openings can email watched students.
+- Add scheduled discovery search as an opt-in layer with `AUTO_DISCOVERY_SEARCH_ENABLED`. It is disabled by default so deployments do not unexpectedly spend search API calls.
+- Use scheduled discovery only for `moving_cycle_page` records in `warmup`, `active`, or `unknown` phases. This is for programs whose official application page moves each cycle.
+- Treat old-cycle years as stale only when the year appears near application, deadline, cohort, season, event, or program language. Generic footer years should not downgrade a source.
+- Keep uncertain signals in maintainer review. Closed, coming-soon, old-cycle, broad job-board, and exact-posting-needed results should not auto-send alerts.
+
 ## Remaining Audit Questions
 
 The first beta audit now covers the original uncertain queue. Remaining follow-up before broader beta:

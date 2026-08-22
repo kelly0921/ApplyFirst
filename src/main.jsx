@@ -1704,6 +1704,7 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
   const [alertActionByCandidateId, setAlertActionByCandidateId] = useState({});
   const [alertResultByCandidateId, setAlertResultByCandidateId] = useState({});
   const [showAllAlertCandidates, setShowAllAlertCandidates] = useState(false);
+  const [showMaintainerTools, setShowMaintainerTools] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [lastRefreshedAt, setLastRefreshedAt] = useState('');
@@ -2045,25 +2046,19 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
       {errorMessage ? <p className="maintainer-message error">{errorMessage}</p> : null}
       {actionMessage ? <p className="maintainer-message">{actionMessage}</p> : null}
 
-      <section className="maintainer-status-grid" aria-label="Worker status">
-        <MaintainerMetric label="Active Watches" value={status?.activeWatchRequests ?? status?.watchRequests ?? '-'} />
-        <MaintainerMetric label="Unsubscribed" value={status?.unsubscribedWatchRequests ?? '-'} />
-        <MaintainerMetric label="Pending Source Alerts" value={status?.pendingCandidates ?? '-'} />
-        <MaintainerMetric label="Discovery Candidates" value={status?.pendingDiscoveryCandidates ?? discoveryCandidates.length} />
-      </section>
-
-      <MaintainerWorkflowStrip
-        readinessCount={readinessAttentionTotal}
-        discoveryCount={discoveryCandidates.length}
-        alertCount={pendingAlertTotal}
-        sourceRunCount={sourceRunResult?.checked ?? 0}
-        reviewCount={reviewNeedsAttention}
-      />
-
       {!status ? (
         <MaintainerEmptyState canLoad={canLoad} />
       ) : (
         <>
+          <MaintainerReviewSummary
+            status={status}
+            readinessCount={readinessAttentionTotal}
+            discoveryCount={discoveryCandidates.length}
+            alertCount={pendingAlertTotal}
+            reviewCount={reviewNeedsAttention}
+            lastRefreshedAt={lastRefreshedAt}
+          />
+
           {readinessQueue ? (
             <MonitoringReadinessQueue
               queue={readinessQueue}
@@ -2078,160 +2073,118 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
             />
           ) : null}
 
-          <section className="maintainer-ops-grid">
-            <section className="maintainer-panel source-run-panel maintainer-utility-panel">
-              <div className="maintainer-panel-heading">
-                <div>
-                  <span>Source Checks</span>
-                  <h2>Test Saved Pages</h2>
-                </div>
-                <p>Dry run one or more program IDs before trusting a watched page.</p>
-              </div>
-              <div className="source-run-form">
-                <label>
-                  <span>Program IDs</span>
-                  <textarea
-                    value={sourceRunDraft.programIds}
-                    onChange={(event) => updateSourceRunDraft('programIds', event.target.value)}
-                    placeholder="swe-scholarships, virtu-womens-winternship-watch"
-                  />
-                </label>
-                <button type="button" onClick={() => runSourceDryRun()} disabled={!canLoad || loading}>
-                  Run Dry Check
-                </button>
-              </div>
-              {sourceRunResult ? <SourceRunSummary result={sourceRunResult} /> : null}
-            </section>
+          <DiscoveryCandidateReviewPanel
+            candidates={discoveryCandidates}
+            loading={loading}
+            onReviewCandidate={reviewDiscoveryCandidate}
+          />
 
-            <section className="maintainer-panel maintainer-source-url-panel">
-              <div className="maintainer-panel-heading">
-                <div>
-                  <span>Source URLs</span>
-                  <h2>Find Updated Pages</h2>
-                </div>
-                <p>Search official pages for specific programs, then review saved candidates below.</p>
+          <section className="maintainer-panel maintainer-tools-panel">
+            <div className="maintainer-tools-heading">
+              <div>
+                <span>Operator Tools</span>
+                <h2>Run Targeted Checks.</h2>
+                <p>Use these when a record needs a manual source check or URL search.</p>
               </div>
-              <div className="maintainer-search-form">
-                <label>
-                  <span>Programs</span>
-                  <input
-                    type="number"
-                    min="1"
-                    max="20"
-                    value={searchDraft.limit}
-                    onChange={(event) => updateSearchDraft('limit', event.target.value)}
-                  />
-                </label>
-                <label className="maintainer-wide-field">
-                  <span>Target Program IDs</span>
-                  <input
-                    type="text"
-                    value={searchDraft.programIds}
-                    onChange={(event) => updateSearchDraft('programIds', event.target.value)}
-                    placeholder="Optional: virtu-womens-winternship-watch"
-                  />
-                </label>
-                <label>
-                  <span>Queries</span>
-                  <input
-                    type="number"
-                    min="1"
-                    max="8"
-                    value={searchDraft.maxQueriesPerProgram}
-                    onChange={(event) => updateSearchDraft('maxQueriesPerProgram', event.target.value)}
-                  />
-                </label>
-                <label>
-                  <span>Results</span>
-                  <input
-                    type="number"
-                    min="1"
-                    max="10"
-                    value={searchDraft.maxResultsPerQuery}
-                    onChange={(event) => updateSearchDraft('maxResultsPerQuery', event.target.value)}
-                  />
-                </label>
-                <label className="maintainer-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={searchDraft.force}
-                    onChange={(event) => updateSearchDraft('force', event.target.checked)}
-                  />
-                  <span>Force search</span>
-                </label>
-              </div>
-              <div className="maintainer-actions">
-                <button type="button" onClick={() => runDiscoverySearch(true)} disabled={!canLoad || loading}>
-                  Dry Run Search
-                </button>
-                <button type="button" onClick={() => runDiscoverySearch(false)} disabled={!canLoad || loading}>
-                  Save Candidates
-                </button>
-              </div>
-              {searchResult ? <DiscoverySearchSummary result={searchResult} /> : null}
+              <button type="button" onClick={() => setShowMaintainerTools((isVisible) => !isVisible)}>
+                {showMaintainerTools ? 'Hide Tools' : 'Show Tools'}
+              </button>
+            </div>
+            {showMaintainerTools ? (
+              <section className="maintainer-ops-grid">
+                <section className="maintainer-utility-panel">
+                  <div className="maintainer-panel-heading">
+                    <div>
+                      <span>Source Checks</span>
+                      <h2>Test Saved Pages</h2>
+                    </div>
+                    <p>Dry run one or more program IDs before trusting a watched page.</p>
+                  </div>
+                  <div className="source-run-form">
+                    <label>
+                      <span>Program IDs</span>
+                      <textarea
+                        value={sourceRunDraft.programIds}
+                        onChange={(event) => updateSourceRunDraft('programIds', event.target.value)}
+                        placeholder="swe-scholarships, virtu-womens-winternship-watch"
+                      />
+                    </label>
+                    <button type="button" onClick={() => runSourceDryRun()} disabled={!canLoad || loading}>
+                      Run Dry Check
+                    </button>
+                  </div>
+                  {sourceRunResult ? <SourceRunSummary result={sourceRunResult} /> : null}
+                </section>
 
-              <div className="maintainer-subpanel-heading">
-                <div>
-                  <span>Review Candidates</span>
-                  <h2>{discoveryCandidates.length} Candidate{discoveryCandidates.length === 1 ? '' : 's'}</h2>
-                </div>
-                <p>Accept only official or organization-owned pages. Rejected items stay in D1 for audit.</p>
-              </div>
-              <div className="maintainer-card-list">
-                {discoveryCandidates.length ? (
-                  discoveryCandidates.map((candidate) => (
-                    <article className="maintainer-candidate-card" key={candidate.id}>
-                      <div>
-                        <span>{formatDisplayLabel(candidate.confidence)}</span>
-                        <h3>{candidate.programName || candidate.program_id}</h3>
-                        <p>{candidate.title || 'Untitled candidate'}</p>
-                        <div className="candidate-link-row">
-                          <a href={candidate.candidate_url} target="_blank" rel="noreferrer">
-                            Open Candidate Source
-                          </a>
-                          {candidate.currentOfficialUrl ? (
-                            <a href={candidate.currentOfficialUrl} target="_blank" rel="noreferrer">
-                              Current Source
-                            </a>
-                          ) : null}
-                        </div>
-                      </div>
-                      <dl className="candidate-source-compare">
-                        <div>
-                          <dt>Candidate Host</dt>
-                          <dd>{getDisplayHost(candidate.candidate_url)}</dd>
-                        </div>
-                        <div>
-                          <dt>Current Host</dt>
-                          <dd>{getDisplayHost(candidate.currentOfficialUrl)}</dd>
-                        </div>
-                        <div>
-                          <dt>Query</dt>
-                          <dd>{candidate.discovery_query || '-'}</dd>
-                        </div>
-                      </dl>
-                      <p>{candidate.reason || 'Needs maintainer review.'}</p>
-                      {candidate.snippet ? <blockquote>{stripHtml(candidate.snippet)}</blockquote> : null}
-                      <ul className="candidate-review-checklist" aria-label="Review checks before accepting">
-                        <li>Official or organization-owned page</li>
-                        <li>Current-cycle application, deadline, or program page</li>
-                        <li>Program name and student audience match</li>
-                      </ul>
-                      <div className="maintainer-actions">
-                        <button type="button" onClick={() => reviewDiscoveryCandidate(candidate, 'accepted')} disabled={loading}>
-                          Accept & Queue Check
-                        </button>
-                        <button type="button" onClick={() => reviewDiscoveryCandidate(candidate, 'rejected')} disabled={loading}>
-                          Reject URL
-                        </button>
-                      </div>
-                    </article>
-                  ))
-                ) : (
-                  <p className="maintainer-empty">No pending discovery candidates.</p>
-                )}
-              </div>
-            </section>
+                <section className="maintainer-utility-panel">
+                  <div className="maintainer-panel-heading">
+                    <div>
+                      <span>Source URLs</span>
+                      <h2>Find Updated Pages</h2>
+                    </div>
+                    <p>Search official pages for specific programs and save candidates for review.</p>
+                  </div>
+                  <div className="maintainer-search-form">
+                    <label>
+                      <span>Programs</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="20"
+                        value={searchDraft.limit}
+                        onChange={(event) => updateSearchDraft('limit', event.target.value)}
+                      />
+                    </label>
+                    <label className="maintainer-wide-field">
+                      <span>Target Program IDs</span>
+                      <input
+                        type="text"
+                        value={searchDraft.programIds}
+                        onChange={(event) => updateSearchDraft('programIds', event.target.value)}
+                        placeholder="Optional: virtu-womens-winternship-watch"
+                      />
+                    </label>
+                    <label>
+                      <span>Queries</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="8"
+                        value={searchDraft.maxQueriesPerProgram}
+                        onChange={(event) => updateSearchDraft('maxQueriesPerProgram', event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      <span>Results</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="10"
+                        value={searchDraft.maxResultsPerQuery}
+                        onChange={(event) => updateSearchDraft('maxResultsPerQuery', event.target.value)}
+                      />
+                    </label>
+                    <label className="maintainer-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={searchDraft.force}
+                        onChange={(event) => updateSearchDraft('force', event.target.checked)}
+                      />
+                      <span>Force search</span>
+                    </label>
+                  </div>
+                  <div className="maintainer-actions">
+                    <button type="button" onClick={() => runDiscoverySearch(true)} disabled={!canLoad || loading}>
+                      Dry Run Search
+                    </button>
+                    <button type="button" onClick={() => runDiscoverySearch(false)} disabled={!canLoad || loading}>
+                      Save Candidates
+                    </button>
+                  </div>
+                  {searchResult ? <DiscoverySearchSummary result={searchResult} /> : null}
+                </section>
+              </section>
+            ) : null}
           </section>
 
           <section className="maintainer-panel">
@@ -2257,16 +2210,18 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
 
                   return (
                     <article className={`maintainer-candidate-card ${activeAction ? 'is-busy' : ''}`} key={candidate.id}>
-                      <div>
-                        <span>{formatDisplayLabel(candidate.candidateType)}</span>
-                        <h3>{candidate.programName || candidate.program_id}</h3>
-                        <p>{candidate.summary || candidate.title}</p>
+                      <div className="maintainer-card-header">
+                        <div>
+                          <span>{formatDisplayLabel(candidate.candidateType)}</span>
+                          <h3>{candidate.programName || candidate.program_id}</h3>
+                        </div>
                         {candidate.url ? (
                           <a href={candidate.url} target="_blank" rel="noreferrer">
-                            Open Official Source
+                            Official Source
                           </a>
                         ) : null}
                       </div>
+                      <p className="maintainer-card-note">{candidate.summary || candidate.title}</p>
                       <div className="maintainer-actions">
                         <button className="maintainer-primary-action" type="button" onClick={() => sendAlertCandidate(candidate, true)} disabled={loading || Boolean(activeAction)}>
                           {isDryRunning ? 'Checking...' : 'Preview Recipients'}
@@ -2306,6 +2261,151 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
   );
 }
 
+function MaintainerReviewSummary({ status, readinessCount, discoveryCount, alertCount, reviewCount, lastRefreshedAt }) {
+  const actionTotal = readinessCount + discoveryCount + alertCount;
+  const primaryStatus = actionTotal
+    ? `${actionTotal} Action${actionTotal === 1 ? '' : 's'} Need Your Review`
+    : 'No Actions Needed';
+  const primaryDetail = actionTotal
+    ? 'These can affect student-facing alerts. Handle them before trusting or sending signals.'
+    : 'ApplyFirst is still tracking sources, watches, and audit history in the background.';
+  const primaryTasks = [
+    {
+      label: 'Source Readiness',
+      value: readinessCount,
+      status: readinessCount ? 'Needs Action' : 'Tracking Only',
+      action: readinessCount ? 'Check source gaps first' : 'No action needed',
+      detail: readinessCount ? 'Timing, source, or alert-risk issues.' : 'No urgent source gaps.',
+      tone: readinessCount ? 'attention' : 'calm',
+    },
+    {
+      label: 'Candidate URLs',
+      value: discoveryCount,
+      status: discoveryCount ? 'Needs Action' : 'Tracking Only',
+      action: discoveryCount ? 'Accept or reject URLs' : 'No action needed',
+      detail: discoveryCount ? 'Discovered pages waiting for a maintainer decision.' : 'No URLs waiting.',
+      tone: discoveryCount ? 'attention' : 'calm',
+    },
+    {
+      label: 'Alert Queue',
+      value: alertCount,
+      status: alertCount ? 'Needs Action' : 'Tracking Only',
+      action: alertCount ? 'Preview before sending' : 'No action needed',
+      detail: alertCount ? 'Opening signals that may email watched students.' : 'No alerts waiting.',
+      tone: alertCount ? 'attention' : 'calm',
+    },
+  ];
+
+  return (
+    <section className="maintainer-summary-panel" aria-label="Maintainer review summary">
+      <div className="maintainer-summary-heading">
+        <div>
+          <span>Review Cockpit</span>
+          <h2>{primaryStatus}</h2>
+          <p>{primaryDetail}</p>
+        </div>
+        <time dateTime={lastRefreshedAt || undefined}>
+          {lastRefreshedAt ? `Updated ${formatDateTime(lastRefreshedAt)}` : 'Live state pending'}
+        </time>
+      </div>
+      <div className="maintainer-primary-tasks">
+        {primaryTasks.map((task) => (
+          <article className={`maintainer-task-card ${task.tone}`} key={task.label}>
+            <strong>{task.value}</strong>
+            <div>
+              <span>{task.status}</span>
+              <h3>{task.action}</h3>
+              <p><b>{task.label}:</b> {task.detail}</p>
+            </div>
+          </article>
+        ))}
+      </div>
+      <div className="maintainer-tracking-label">
+        <span>Tracking Only</span>
+        <p>These numbers help you understand system health, but they do not require action by themselves.</p>
+      </div>
+      <div className="maintainer-system-row" aria-label="Worker status">
+        <MaintainerMetric label="Active Watches" value={status?.activeWatchRequests ?? status?.watchRequests ?? '-'} />
+        <MaintainerMetric label="Pending Source Alerts" value={status?.pendingCandidates ?? '-'} />
+        <MaintainerMetric label="Audit Items" value={reviewCount} />
+        <MaintainerMetric label="Unsubscribed" value={status?.unsubscribedWatchRequests ?? '-'} />
+      </div>
+    </section>
+  );
+}
+
+function DiscoveryCandidateReviewPanel({ candidates, loading, onReviewCandidate }) {
+  return (
+    <section className="maintainer-panel maintainer-candidate-review-panel">
+      <div className="maintainer-panel-heading">
+        <div>
+          <span>Candidate URLs</span>
+          <h2>{candidates.length} Candidate{candidates.length === 1 ? '' : 's'} Need Review</h2>
+        </div>
+        <p>Accept only official or organization-owned pages. Rejected items stay in D1 for audit.</p>
+      </div>
+      <div className="maintainer-card-list">
+        {candidates.length ? (
+          candidates.map((candidate) => (
+            <article className="maintainer-candidate-card" key={candidate.id}>
+              <div className="maintainer-card-header">
+                <div>
+                  <span>{formatDisplayLabel(candidate.confidence)}</span>
+                  <h3>{candidate.programName || candidate.program_id}</h3>
+                  <p>{candidate.title || 'Untitled candidate'}</p>
+                </div>
+                <div className="candidate-link-row">
+                  <a href={candidate.candidate_url} target="_blank" rel="noreferrer">
+                    Candidate
+                  </a>
+                  {candidate.currentOfficialUrl ? (
+                    <a href={candidate.currentOfficialUrl} target="_blank" rel="noreferrer">
+                      Current
+                    </a>
+                  ) : null}
+                </div>
+              </div>
+              <dl className="candidate-source-compare">
+                <div>
+                  <dt>Candidate Host</dt>
+                  <dd>{getDisplayHost(candidate.candidate_url)}</dd>
+                </div>
+                <div>
+                  <dt>Current Host</dt>
+                  <dd>{getDisplayHost(candidate.currentOfficialUrl)}</dd>
+                </div>
+                <div>
+                  <dt>Query</dt>
+                  <dd>{candidate.discovery_query || '-'}</dd>
+                </div>
+              </dl>
+              <p className="maintainer-card-note">{candidate.reason || 'Needs maintainer review.'}</p>
+              {candidate.snippet ? <blockquote>{stripHtml(candidate.snippet)}</blockquote> : null}
+              <div className="candidate-decision-row">
+                <ul className="candidate-review-checklist" aria-label="Review checks before accepting">
+                  <li>Official owner</li>
+                  <li>Current cycle</li>
+                  <li>Audience matches</li>
+                </ul>
+                <div className="maintainer-actions">
+                  <button type="button" onClick={() => onReviewCandidate(candidate, 'accepted')} disabled={loading}>
+                    Accept & Queue Check
+                  </button>
+                  <button type="button" onClick={() => onReviewCandidate(candidate, 'rejected')} disabled={loading}>
+                    Reject URL
+                  </button>
+                </div>
+              </div>
+            </article>
+          ))
+        ) : (
+          <p className="maintainer-empty">No pending discovery candidates.</p>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function MaintainerEmptyState({ canLoad }) {
   const steps = [
     'Paste the Worker admin token.',
@@ -2328,55 +2428,6 @@ function MaintainerEmptyState({ canLoad }) {
         ))}
       </ol>
       <p>{canLoad ? 'Ready to load.' : 'Add the admin token to begin.'}</p>
-    </section>
-  );
-}
-
-function MaintainerWorkflowStrip({ readinessCount, discoveryCount, alertCount, sourceRunCount, reviewCount }) {
-  const steps = [
-    {
-      label: 'Review Queue',
-      value: readinessCount,
-      detail: readinessCount ? 'Fix records that can affect alerts.' : 'No urgent readiness gaps.',
-      tone: readinessCount ? 'attention' : 'calm',
-    },
-    {
-      label: 'Source URLs',
-      value: discoveryCount,
-      detail: discoveryCount ? 'Accept or reject discovered pages.' : 'No pending URL candidates.',
-      tone: discoveryCount ? 'attention' : 'calm',
-    },
-    {
-      label: 'Alert Review',
-      value: alertCount,
-      detail: alertCount ? 'Preview recipients before sending.' : 'No alerts waiting.',
-      tone: alertCount ? 'attention' : 'calm',
-    },
-    {
-      label: 'Source Checks',
-      value: sourceRunCount,
-      detail: sourceRunCount ? 'Latest dry run results are below.' : 'Run targeted checks when needed.',
-      tone: sourceRunCount ? 'active' : 'calm',
-    },
-    {
-      label: 'Audit Trail',
-      value: reviewCount,
-      detail: reviewCount ? 'Recent events need review.' : 'Recent activity is clean.',
-      tone: reviewCount ? 'attention' : 'calm',
-    },
-  ];
-
-  return (
-    <section className="maintainer-workflow-strip" aria-label="Maintainer workflow summary">
-      {steps.map((step) => (
-        <article className={`maintainer-workflow-card ${step.tone}`} key={step.label}>
-          <div>
-            <span>{step.label}</span>
-            <strong>{step.value}</strong>
-          </div>
-          <p>{step.detail}</p>
-        </article>
-      ))}
     </section>
   );
 }
@@ -2422,9 +2473,9 @@ function MonitoringReadinessQueue({ queue, onCheckSource, onFindUrl, readinessAc
       <div className="maintainer-panel-heading readiness-heading">
         <div>
           <span>Review Queue</span>
-          <h2>{queue.needsAttention ?? 0} Program{queue.needsAttention === 1 ? '' : 's'} Need Attention</h2>
+          <h2>{queue.needsAttention ?? 0} Program{queue.needsAttention === 1 ? '' : 's'} Need Action</h2>
         </div>
-        <p>Fix source, timing, and alert-risk issues before students rely on alerts.</p>
+        <p>Only the action group needs a maintainer decision. The other groups show tracking state.</p>
       </div>
       <div className="readiness-groups">
         {groups.map((group) => (
@@ -2469,37 +2520,39 @@ function ReadinessItemCard({ item, onCheckSource, onFindUrl, activeAction, loadi
 
   return (
     <article className={`readiness-item-card source-state-${getSourceStateTone(item.state)}${hasLocalAction ? ' is-busy' : ''}`}>
-      <div className="readiness-item-main">
+      <div className="readiness-item-header">
         <div>
           <span>{item.state}</span>
           <h3>{item.programName}</h3>
-          <p>{item.action}</p>
         </div>
         <a href={item.url} target="_blank" rel="noreferrer">
           Source
         </a>
       </div>
-      <dl>
-        <div>
-          <dt>Watchers</dt>
-          <dd>{item.activeWatchCount ?? 0}</dd>
+      <p>{item.action}</p>
+      <div className="readiness-item-footer">
+        <dl>
+          <div>
+            <dt>Watchers</dt>
+            <dd>{item.activeWatchCount ?? 0}</dd>
+          </div>
+          <div>
+            <dt>Phase</dt>
+            <dd>{formatDisplayLabel(item.schedulePhase || '-')}</dd>
+          </div>
+          <div>
+            <dt>Next</dt>
+            <dd>{formatDateTime(item.nextCheckAt)}</dd>
+          </div>
+        </dl>
+        <div className="readiness-item-actions">
+          <button type="button" onClick={() => onCheckSource(item.programId)} disabled={!canLoad || loading || hasLocalAction}>
+            {isCheckingSource ? 'Checking...' : 'Check Source'}
+          </button>
+          <button type="button" onClick={() => onFindUrl(item.programId)} disabled={!canLoad || loading || hasLocalAction}>
+            {isFindingUrl ? 'Finding...' : 'Find URL'}
+          </button>
         </div>
-        <div>
-          <dt>Phase</dt>
-          <dd>{formatDisplayLabel(item.schedulePhase || '-')}</dd>
-        </div>
-        <div>
-          <dt>Next Check</dt>
-          <dd>{formatDateTime(item.nextCheckAt)}</dd>
-        </div>
-      </dl>
-      <div className="readiness-item-actions">
-        <button type="button" onClick={() => onCheckSource(item.programId)} disabled={!canLoad || loading || hasLocalAction}>
-          {isCheckingSource ? 'Checking...' : 'Check This Source'}
-        </button>
-        <button type="button" onClick={() => onFindUrl(item.programId)} disabled={!canLoad || loading || hasLocalAction}>
-          {isFindingUrl ? 'Finding...' : 'Find URL for This'}
-        </button>
       </div>
     </article>
   );
@@ -2508,13 +2561,13 @@ function ReadinessItemCard({ item, onCheckSource, onFindUrl, activeAction, loadi
 function getReadinessGroupDescription(key) {
   switch (key) {
     case 'attention':
-      return 'Fix these first: review alerts, accept exact source URLs, or resolve unclear sources.';
+      return 'Needs action: review alerts, accept exact source URLs, or resolve unclear sources.';
     case 'ready':
-      return 'Programs with open or deadline signals that may affect watched students.';
+      return 'Tracking: open or deadline signals worth watching, but not necessarily blocked.';
     case 'closed':
-      return 'Safe to keep watching, but not alert-worthy right now.';
+      return 'Tracking: safe to keep watching, but not alert-worthy right now.';
     default:
-      return 'Healthy monitored records waiting for their useful window.';
+      return 'Tracking: healthy monitored records waiting for their useful window.';
   }
 }
 
