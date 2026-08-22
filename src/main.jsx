@@ -987,7 +987,12 @@ function App() {
                   <input
                     type="search"
                     value={query}
-                    onChange={(event) => setQuery(event.target.value)}
+                    onChange={(event) => {
+                      setQuery(event.target.value);
+                      if (event.target.value.trim()) {
+                        markOnboardingStep('browsed');
+                      }
+                    }}
                     placeholder="Search program, role, timing, or source..."
                   />
                 </label>
@@ -2296,7 +2301,6 @@ function AlertCandidateActionResult({ result, onDismiss }) {
     <section className={`alert-action-result ${result.tone}`} aria-label="Alert action result">
       <div className="alert-action-result-heading">
         <strong>{result.title}</strong>
-        <time dateTime={result.generatedAt}>{formatDateTime(result.generatedAt)}</time>
         <button type="button" onClick={onDismiss} aria-label="Hide alert action result" title="Hide result">
           x
         </button>
@@ -2314,6 +2318,9 @@ function AlertCandidateActionResult({ result, onDismiss }) {
         </ul>
       ) : null}
       {hiddenDeliveryCount ? <p>{hiddenDeliveryCount} more delivery result{hiddenDeliveryCount === 1 ? '' : 's'} hidden.</p> : null}
+      <time className="alert-action-result-time" dateTime={result.generatedAt}>
+        Previewed {formatDateTime(result.generatedAt)}
+      </time>
     </section>
   );
 }
@@ -3535,6 +3542,7 @@ function ContributeView({ contributions, opportunities, captureEndpoint = '', on
           <label>
             <span>Best Fit <span className="preference-required-mark" aria-label="required field">*</span></span>
             <select value={programDraft.track} onChange={(event) => updateProgramDraft('track', event.target.value)} required>
+              <option value="">Choose Best Fit</option>
               <option>Software Engineering</option>
               <option>Product Management</option>
               <option>Design</option>
@@ -3578,6 +3586,7 @@ function ContributeView({ contributions, opportunities, captureEndpoint = '', on
           <label>
             <span>Issue Type <span className="preference-required-mark" aria-label="required field">*</span></span>
             <select value={feedbackDraft.issueType} onChange={(event) => updateFeedbackDraft('issueType', event.target.value)} required>
+              <option value="">Choose Issue Type</option>
               {feedbackIssueTypes.map((issueType) => (
                 <option key={issueType}>{issueType}</option>
               ))}
@@ -3607,7 +3616,7 @@ function createProgramSubmissionDraft() {
   return {
     name: '',
     url: '',
-    track: 'Software Engineering',
+    track: '',
     reason: '',
   };
 }
@@ -3631,7 +3640,7 @@ function SubmissionHelper({ state, captureEndpoint }) {
 function createFeedbackDraft() {
   return {
     programId: '',
-    issueType: feedbackIssueTypes[0],
+    issueType: '',
     note: '',
   };
 }

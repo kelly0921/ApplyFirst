@@ -4083,40 +4083,25 @@ a {
 .alert-action-result-heading {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas:
-    "title close"
-    "title date";
   gap: 3px 8px;
-  align-items: start;
+  align-items: center;
 }
 
 .alert-action-result-heading strong {
-  grid-area: title;
   color: var(--ink);
   font-size: 0.84rem;
   line-height: 1.25;
 }
 
-.alert-action-result-heading time {
-  grid-area: date;
-  justify-self: end;
-  color: var(--quiet);
-  font-size: 0.66rem;
-  font-weight: 850;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
 .alert-action-result-heading button {
-  grid-area: close;
   justify-self: end;
   display: inline-grid;
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
   place-items: center;
-  border: 1px solid rgba(14, 24, 48, 0.1);
-  border-radius: 999px;
-  background: #ffffff;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
   color: var(--quiet);
   font: inherit;
   font-size: 0.74rem;
@@ -4126,7 +4111,7 @@ a {
 }
 
 .alert-action-result-heading button:hover {
-  border-color: rgba(15, 127, 150, 0.24);
+  background: rgba(15, 127, 150, 0.08);
   color: var(--brand-accent);
 }
 
@@ -4187,6 +4172,15 @@ a {
 .alert-action-result li small {
   grid-column: 1 / -1;
   color: var(--rose);
+}
+
+.alert-action-result-time {
+  justify-self: start;
+  color: var(--quiet);
+  font-size: 0.66rem;
+  font-weight: 850;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .candidate-link-row {
