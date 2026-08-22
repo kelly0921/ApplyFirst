@@ -20,8 +20,6 @@ The mark uses a softened Sharp A with a restrained underline, matching the produ
 
 ![ApplyFirst contribution flow](./docs/assets/screenshots/applyfirst-contribute-desktop.png)
 
-![ApplyFirst mobile programs view](./docs/assets/screenshots/applyfirst-programs-mobile.png)
-
 ## Product Direction
 
 ApplyFirst is part of the broader Opportunity Systems product exploration. This app is separate from Kelly's portfolio, so the portfolio can show a case study and screenshots while this app becomes the actual user-facing resource.
