@@ -1,6 +1,6 @@
 # ApplyFirst
 
-A standalone product MVP for helping underclassmen and emerging technical students discover, track, and prepare for high-signal career-launch programs: underclassmen-friendly internships, fellowships, externships, winternships, scholarships, technical communities, and conference funding paths.
+A standalone product MVP for helping underclassmen and emerging technical students discover, track, and prepare for high-signal career-launch programs: early discovery programs, fellowships, externships, winternships, company/nonprofit-sponsored scholarships, technical communities, conference funding paths, and internship alternatives.
 
 For the reusable product narrative, portfolio angle, scope decisions, and future roadmap, see [PROJECT_BRIEF.md](./PROJECT_BRIEF.md).
 
@@ -28,7 +28,7 @@ ApplyFirst is part of the broader Opportunity Systems product exploration. This 
 
 ApplyFirst combines two connected layers:
 
-- **Student Opportunity Library**: the public foundation for curated programs, fellowships, scholarships, grants, technical communities, and conference funding paths.
+- **Student Opportunity Library**: the public foundation for curated programs, fellowships, sponsor-backed scholarships, grants, technical communities, and conference funding paths.
 - **Opportunity Signal Tracker**: the product layer for tracking official-page changes, old vs new URLs, application season patterns, sponsor announcements, confidence scores, and human/community verification.
 
 The library is the front door. The tracker is the moat. The current app starts with the library, student watch requests, and a Cloudflare D1 source-check worker that can send beta opening alerts for high-confidence official-source signals.
@@ -38,8 +38,8 @@ The product belief: ApplyFirst should help students apply earlier and discover w
 The first version focuses on:
 
 - Class-year fit for freshmen, sophomores, and all class years.
-- Role-track fit for software engineering, product management, quant / finance, and Access & Prep programs.
-- Special-program categories inspired by underclassmen opportunity lists.
+- Role-track fit for software engineering, product management, design, quant / finance, and Access & Prep programs.
+- Eight student-facing opportunity types: Discovery Program, Fellowship, Startup / VC Fellowship, Winternship, Scholarship / Funding, Conference / Travel Funding, Community / Prep Program, and Full-Time Alternative.
 - Recommendation, application status, and confirmation labels.
 - Maintainer-only source review and confidence labels.
 - Clear notes on why each opportunity matters and how to prepare.
@@ -47,7 +47,7 @@ The first version focuses on:
 
 This version is a private-beta public prototype with a landing page, endpoint-ready waitlist request, invite-code gate, endpoint-ready beta watch setup, endpoint-ready student update capture, and the full app behind the gate. The app can show the product direction, curated seed set, student My Focus setup, alert readiness model, student submission flow, and a Cloudflare Worker path for checking official source pages, sending high-confidence opening alerts, and holding uncertain changes for review.
 
-Recommendation is computed from the Phase 1 rules: underclassmen-fit programs in high-leverage categories become Recommended; relevant programs can also be Recommended when they are useful enough to review, save, or prepare for early; scholarships, conferences, communities, and resources are treated as Foundation opportunities. Student actions stay separate from these labels: users save programs they care about, while ApplyFirst monitors confirmed sources for future opening signals. Duplicate appearances across older curated lists are useful for verification, but they are not treated as proof that a program is better.
+Recommendation is computed from the Phase 1 rules: underclassmen-fit programs in high-leverage opportunity types become Recommended; relevant programs can also be Recommended when they are useful enough to review, save, or prepare for early; Scholarship / Funding, Conference / Travel Funding, and Community / Prep Program records are treated as Foundation opportunities. Student actions stay separate from these labels: users save programs they care about, while ApplyFirst monitors confirmed sources for future opening signals. Duplicate appearances across older curated lists are useful for verification, but they are not treated as proof that a program is better.
 
 Prototype invite codes for local testing:
 
@@ -55,9 +55,9 @@ Prototype invite codes for local testing:
 - `APPLYFIRST2026`
 - `EARLYACCESS`
 
-These codes are for the current prototype gate only and should be replaced before real private-beta access.
+These generic codes are for local prototype access only. For private beta testers, use unique workspace-style codes such as `AF-KELLY-8X2Q`. A workspace code unlocks the app and, when `VITE_WATCH_ENDPOINT` is configured, restores that student's saved programs, watch-intent list, My Focus preferences, alert setup receipt, waitlist context, and onboarding progress from the watch Worker/D1 backend. This is a lightweight beta identity layer, not secure auth; anyone with the code can restore that beta workspace. Keep full plaintext beta codes in a private registry outside Git; see [Invite Code Workflow](./docs/INVITE_CODE_WORKFLOW.md).
 
-After unlocking the prototype, use the `Landing` button in the app header to clear the local access flag and return to the public landing page.
+After unlocking the prototype, use the `About` button in the app header to clear the local access flag and return to the public landing page.
 
 The waitlist/contact form saves locally by default. Set `VITE_WAITLIST_ENDPOINT` to a JSON-compatible form/backend endpoint to submit waitlist and My Focus contact requests externally; if the endpoint fails, the prototype falls back to local browser storage. Set `VITE_ALERT_ENDPOINT` to capture beta email alert opt-ins, or leave it blank to use the waitlist endpoint. Set `VITE_WATCH_ENDPOINT` to a deployed ApplyFirst watch Worker `/watch` route to save beta watch requests for source monitoring. Student program submissions and feedback save locally by default. Set `VITE_CONTRIBUTION_ENDPOINT` to capture Suggest Updates submissions externally; if the endpoint fails, the prototype falls back to local browser storage. Copy `.env.example` to `.env.local` for local endpoint testing.
 
@@ -76,7 +76,7 @@ Beta-readiness references:
 
 Phase 1 treats curated student repos as discovery inputs, not final truth. The app should save users from checking the same programs across multiple lists by normalizing them into one tracker.
 
-- Primary sources: LuisaE/opportunities and zapplyjobs/underclassmen-internships because they focus on underclassmen-friendly programs, exploratory programs, fellowships, scholarships, and prep resources.
+- Primary sources: LuisaE/opportunities and zapplyjobs/underclassmen-internships because they focus on underclassmen-friendly programs, exploratory programs, fellowships, sponsor-backed scholarships, and prep resources.
 - Secondary source: SimplifyJobs/Summer2026-Internships because it is stronger as a live role-posting feed than as a curated early-program list.
 - Role-specific sources: PM and quant repos are useful, but they should be filterable tracks instead of the default experience for every user.
 - Duplicate signal: if the same program appears across multiple trusted lists, prioritize it for official-source verification and richer tracker notes, not automatic recommendation.
@@ -161,6 +161,7 @@ npx wrangler d1 execute applyfirst-watch --config wrangler.watch.toml --remote -
 npx wrangler d1 execute applyfirst-watch --config wrangler.watch.toml --remote --file cloudflare/d1/004_discovery_candidates.sql
 npx wrangler d1 execute applyfirst-watch --config wrangler.watch.toml --remote --file cloudflare/d1/005_discovery_search_runs.sql
 npx wrangler d1 execute applyfirst-watch --config wrangler.watch.toml --remote --file cloudflare/d1/006_unsubscribe_safety.sql
+npx wrangler d1 execute applyfirst-watch --config wrangler.watch.toml --remote --file cloudflare/d1/007_beta_access_workspaces.sql
 ```
 
 4. Generate and import official source seed rows:
@@ -292,7 +293,7 @@ To save a possible current-cycle URL manually:
 curl -X POST "https://applyfirst-watch.YOUR-SUBDOMAIN.workers.dev/watch/discovery/candidates" \
   -H "Authorization: Bearer YOUR_WATCH_ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
-  -d "{\"programId\":\"nasa-internships\",\"url\":\"https://example.edu/current-cycle\",\"title\":\"Candidate page\",\"source\":\"manual-search\"}"
+  -d "{\"programId\":\"mlh-open-source-fellowship\",\"url\":\"https://example.edu/current-cycle\",\"title\":\"Candidate page\",\"source\":\"manual-search\"}"
 ```
 
 To accept a candidate and queue the source for immediate verification:

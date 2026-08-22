@@ -34,7 +34,6 @@ For each priority record, confirm:
 
 Already marked as first verification batch in the project brief:
 
-- NASA Internships.
 - Google Summer of Code.
 - Outreachy.
 - MLH Fellowship.
@@ -45,15 +44,24 @@ Already marked as first verification batch in the project brief:
 - SEO Tech Developer.
 - SEO Tech Developer First-Year Academy.
 
-Still needs official-cycle verification:
+Current 2026-08-22 verification snapshot:
 
-- Microsoft Explore.
-- Palantir Path.
-- Jane Street early insight programs.
-- Virtu Women's Winternship.
-- HeadStart Fellowship.
-- Hack.Diversity Fellowship.
-- JPMorgan Career.edYOU Academy.
+- 61 total public library records.
+- 44 records are source-confirmed from current official pages.
+- 17 records are useful watch/prep records, but should not trigger automatic alerts until current-cycle timing is clearer.
+- 0 records remain in Needs Confirmation after IBM Accelerate was removed from the public beta library.
+
+Recently moved out of Needs Confirmation:
+
+- Microsoft Explore: official Microsoft overview confirms the first-/second-year, 12-week U.S. Explore model; still watch for exact current-cycle postings.
+- Jane Street FTTP and SEE: official Jane Street pages confirm the programs, tracks, and student support; alerts should wait for current session pages.
+- MLH Production Engineering Fellowship: official MLH Fellowship page and application flow confirm the track.
+- Hack.Diversity Fellowship: official site confirms the nine-month fellowship model and paid host-company internship outcome; current application timing still needs discovery before alerts.
+- Bloomberg NextGen Leadership Summit: user-provided Bloomberg Avature link plus campus listings confirm the 2026 event context; use as watch/previous-cycle timing after the deadline.
+- Bessemer Fellowship Program: official page confirms the program is paused/reimagined, so it is a verified watch item, not an active opportunity.
+- HRT Women in Trading Technology: official HRT page confirms January 2026 details and says to check back for January 2027 applications.
+- Palantir Launch, Two Sigma Freshman SWE, and Google Scholarships: kept as watch-only records because the user identified the canonical official pages where current opportunities should appear when available.
+- IBM Accelerate: removed from the public library until a current official Accelerate-specific page is found.
 
 ## Beta-Ready Rule
 

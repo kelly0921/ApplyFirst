@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 import programsScreenshot from '../docs/assets/screenshots/applyfirst-programs-desktop.png';
@@ -34,9 +34,11 @@ const sourceCheckLogStorageKey = 'applyfirst-source-check-log';
 const waitlistStorageKey = 'applyfirst-waitlist-intent';
 const contributionStorageKey = 'applyfirst-student-contributions';
 const accessStorageKey = 'applyfirst-beta-access';
+const accessCodeStorageKey = 'applyfirst-beta-access-code';
 const onboardingStorageKey = 'applyfirst-onboarding-progress';
 const betaAlertSetupStorageKey = 'applyfirst-beta-alert-setup';
 const inviteCodes = ['APPLYFIRST', 'APPLYFIRST2026', 'EARLYACCESS'];
+const betaWorkspaceInviteCodePattern = /^AF-[A-Z0-9][A-Z0-9-]{4,58}[A-Z0-9]$/;
 const phaseOneTarget = 25;
 const waitlistEndpoint = import.meta.env.VITE_WAITLIST_ENDPOINT ?? '';
 const contributionEndpoint = import.meta.env.VITE_CONTRIBUTION_ENDPOINT ?? '';
@@ -168,13 +170,12 @@ const feedbackIssueTypes = [
   'Program Status Looks Outdated',
   'Missing Program',
   'Should Have Alerts',
-  'Confusing Label or Category',
+  'Confusing Label or Type',
   'Duplicate Program',
   'Other Feedback',
 ];
 
 const betaReadyExamples = [
-  'NASA Internships',
   'Outreachy',
   'MLH Fellowship',
   'Coding it Forward Fellowship',
@@ -196,6 +197,34 @@ async function postJson(endpoint, body) {
   return response;
 }
 
+async function fetchJson(endpoint) {
+  const response = await fetch(endpoint);
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(payload.error || `Endpoint returned HTTP ${response.status}.`);
+  }
+
+  return payload;
+}
+
+function normalizeInviteCode(value) {
+  return String(value ?? '').trim().toUpperCase().replace(/\s+/g, '');
+}
+
+function isWorkspaceInviteCode(value) {
+  return betaWorkspaceInviteCodePattern.test(normalizeInviteCode(value));
+}
+
+function isAcceptedInviteCode(value) {
+  const normalizedCode = normalizeInviteCode(value);
+  return inviteCodes.includes(normalizedCode) || isWorkspaceInviteCode(normalizedCode);
+}
+
+function normalizeStoredIds(value) {
+  return Array.isArray(value) ? [...new Set(value.map((item) => String(item).trim()).filter(Boolean))] : [];
+}
+
 function App() {
   const cleanCaptureMode = isCleanCaptureMode();
   const activeWaitlistEndpoint = cleanCaptureMode ? '' : waitlistEndpoint;
@@ -212,6 +241,17 @@ function App() {
       return window.localStorage.getItem(accessStorageKey) === 'granted';
     } catch {
       return false;
+    }
+  });
+  const [activeAccessCode, setActiveAccessCode] = useState(() => {
+    try {
+      if (cleanCaptureMode) {
+        return '';
+      }
+
+      return normalizeInviteCode(window.localStorage.getItem(accessCodeStorageKey));
+    } catch {
+      return '';
     }
   });
   const [query, setQuery] = useState('');
@@ -336,6 +376,8 @@ function App() {
   });
   const [watchIntentProgramIds, setWatchIntentProgramIds] = useState([]);
   const [lastSavedId, setLastSavedId] = useState(null);
+  const [workspaceSyncState, setWorkspaceSyncState] = useState('idle');
+  const lastWorkspaceSnapshotRef = useRef('');
 
   const opportunityRecords = useMemo(
     () =>
@@ -445,6 +487,31 @@ function App() {
   };
   const onboardingComplete = ['browsed', 'saved', 'focused', 'alerted', 'improved'].every((step) => guideProgress[step]);
   const showFirstSessionGuide = !onboardingProgress.dismissed && !onboardingComplete;
+  const canSyncWorkspace = hasAccess && isWorkspaceInviteCode(activeAccessCode) && Boolean(getWorkerBaseUrl(activeWatchEndpoint));
+
+  const hydrateWorkspaceState = (state = {}) => {
+    setSavedIds(normalizeStoredIds(state.savedIds));
+    setWatchIntentProgramIds(normalizeStoredIds(state.watchIntentProgramIds).slice(0, 10));
+    setAlertPrefs({
+      ...defaultAlertPrefs,
+      ...(state.alertPrefs && typeof state.alertPrefs === 'object' ? state.alertPrefs : {}),
+    });
+    setBetaAlertSetup(state.betaAlertSetup && typeof state.betaAlertSetup === 'object' ? state.betaAlertSetup : null);
+    setWaitlistIntent(state.waitlistIntent && typeof state.waitlistIntent === 'object' ? state.waitlistIntent : null);
+    setOnboardingProgress({
+      ...defaultOnboardingProgress,
+      ...(state.onboardingProgress && typeof state.onboardingProgress === 'object' ? state.onboardingProgress : {}),
+    });
+  };
+
+  const createWorkspaceState = () => ({
+    savedIds,
+    watchIntentProgramIds,
+    alertPrefs,
+    betaAlertSetup,
+    waitlistIntent,
+    onboardingProgress,
+  });
 
   useEffect(() => {
     if (cleanCaptureMode) {
@@ -519,6 +586,89 @@ function App() {
   }, [betaAlertSetup, cleanCaptureMode]);
 
   useEffect(() => {
+    if (cleanCaptureMode) {
+      return;
+    }
+
+    if (!hasAccess || !activeAccessCode) {
+      setWorkspaceSyncState('idle');
+      return;
+    }
+
+    if (!isWorkspaceInviteCode(activeAccessCode) || !activeWatchEndpoint) {
+      setWorkspaceSyncState('local');
+      return;
+    }
+
+    let cancelled = false;
+    setWorkspaceSyncState('loading');
+
+    fetchJson(`${getWorkerBaseUrl(activeWatchEndpoint)}/workspace?code=${encodeURIComponent(activeAccessCode)}`)
+      .then((payload) => {
+        if (cancelled) {
+          return;
+        }
+
+        if (payload.exists) {
+          hydrateWorkspaceState(payload.state);
+        }
+        setWorkspaceSyncState(payload.exists ? 'loaded' : 'new');
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setWorkspaceSyncState('local');
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeAccessCode, activeWatchEndpoint, cleanCaptureMode, hasAccess]);
+
+  useEffect(() => {
+    if (cleanCaptureMode || !canSyncWorkspace || !['loaded', 'new', 'synced', 'syncError'].includes(workspaceSyncState)) {
+      return;
+    }
+
+    const workspaceState = createWorkspaceState();
+    const workspaceSnapshot = JSON.stringify(workspaceState);
+
+    if (workspaceSnapshot === lastWorkspaceSnapshotRef.current && workspaceSyncState === 'synced') {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setWorkspaceSyncState('syncing');
+      postJson(`${getWorkerBaseUrl(activeWatchEndpoint)}/workspace`, {
+        accessCode: activeAccessCode,
+        state: {
+          ...workspaceState,
+          savedAt: new Date().toISOString(),
+        },
+      })
+        .then(() => {
+          lastWorkspaceSnapshotRef.current = workspaceSnapshot;
+          setWorkspaceSyncState('synced');
+        })
+        .catch(() => setWorkspaceSyncState('syncError'));
+    }, 700);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    activeAccessCode,
+    activeWatchEndpoint,
+    alertPrefs,
+    betaAlertSetup,
+    canSyncWorkspace,
+    cleanCaptureMode,
+    onboardingProgress,
+    savedIds,
+    waitlistIntent,
+    watchIntentProgramIds,
+    workspaceSyncState,
+  ]);
+
+  useEffect(() => {
     if (!showInternalTools && activeView === 'maintainer') {
       setActiveView('monitor');
     }
@@ -565,6 +715,11 @@ function App() {
 
   const focusOpportunity = (id) => {
     resetFilters();
+    setSelectedId(id);
+    markOnboardingStep('browsed');
+  };
+
+  const selectOpportunity = (id) => {
     setSelectedId(id);
     markOnboardingStep('browsed');
   };
@@ -709,12 +864,31 @@ function App() {
     return 'savedLocal';
   };
 
-  const grantAccess = () => {
+  const grantAccess = (accessCode = '') => {
+    const normalizedAccessCode = normalizeInviteCode(accessCode);
+    let previousAccessCode = '';
+
     try {
+      previousAccessCode = normalizeInviteCode(window.localStorage.getItem(accessCodeStorageKey));
       window.localStorage.setItem(accessStorageKey, 'granted');
+      if (normalizedAccessCode) {
+        window.localStorage.setItem(accessCodeStorageKey, normalizedAccessCode);
+      } else {
+        window.localStorage.removeItem(accessCodeStorageKey);
+      }
     } catch {
       // Access still works for the current session if local storage is unavailable.
     }
+    lastWorkspaceSnapshotRef.current = '';
+    if (normalizedAccessCode && previousAccessCode !== normalizedAccessCode) {
+      setSavedIds([]);
+      setWatchIntentProgramIds([]);
+      setAlertPrefs({ ...defaultAlertPrefs });
+      setBetaAlertSetup(null);
+      setWaitlistIntent(null);
+      setOnboardingProgress({ ...defaultOnboardingProgress });
+    }
+    setActiveAccessCode(normalizedAccessCode);
     setHasAccess(true);
     setActiveView('monitor');
   };
@@ -722,9 +896,12 @@ function App() {
   const returnToLanding = () => {
     try {
       window.localStorage.removeItem(accessStorageKey);
+      window.localStorage.removeItem(accessCodeStorageKey);
     } catch {
       // Returning to the landing page still works for the current session if local storage is unavailable.
     }
+    lastWorkspaceSnapshotRef.current = '';
+    setActiveAccessCode('');
     setHasAccess(false);
     setActiveView('monitor');
   };
@@ -768,7 +945,7 @@ function App() {
               <div>
                 <span>My Focus</span>
                 <h1 className="page-hero-title">Choose What ApplyFirst Watches.</h1>
-                <p>Set your focus, save a few target programs, and add your contact method so alerts arrive when openings are ready.</p>
+                <p>Set your focus, save targets, and add contact info so alerts arrive when openings are ready.</p>
               </div>
             </section>
             <AlertSetupPanel
@@ -782,6 +959,7 @@ function App() {
               alertStrategy={alertStrategy}
               betaAlertSetup={betaAlertSetup}
               onBetaAlertSetupSave={saveBetaAlertSetup}
+              onAddSuggestedProgram={startAlertsForOpportunity}
               waitlistIntent={waitlistIntent}
               alertEndpoint={activeAlertEndpoint}
               watchEndpoint={activeWatchEndpoint}
@@ -928,7 +1106,7 @@ function App() {
                           opportunity={opportunity}
                           selected={selectedId === opportunity.id}
                           saved={savedIds.includes(opportunity.id)}
-                          onSelect={() => focusOpportunity(opportunity.id)}
+                          onSelect={() => selectOpportunity(opportunity.id)}
                           onSave={() => toggleSaved(opportunity.id)}
                         />
                     ))
@@ -996,15 +1174,15 @@ function LandingPage({
 
   const submitInviteCode = (event) => {
     event.preventDefault();
-    const normalizedCode = inviteCode.trim().toUpperCase();
+    const normalizedCode = normalizeInviteCode(inviteCode);
 
-    if (inviteCodes.includes(normalizedCode)) {
+    if (isAcceptedInviteCode(normalizedCode)) {
       setAccessError('');
-      onGrantAccess();
+      onGrantAccess(isWorkspaceInviteCode(normalizedCode) ? normalizedCode : '');
       return;
     }
 
-    setAccessError('This invite code does not look active yet.');
+    setAccessError('Use a beta code like AF-NAME-1234, or a current prototype access code.');
   };
 
   return (
@@ -1014,7 +1192,7 @@ function LandingPage({
           <ApplyFirstMark />
           <span className="brand-copy">
             <strong>ApplyFirst</strong>
-            <em>Private Beta</em>
+            <em>Find Early. Apply First.</em>
           </span>
         </div>
       </header>
@@ -1041,9 +1219,9 @@ function LandingPage({
             <h2>Start With the Beta Library.</h2>
             <p>Join the waitlist, or enter an invite code to use the current library and alert setup.</p>
             <div className="beta-panel-points" aria-label="Private Beta Priorities">
-              <span>Accuracy First</span>
+              <span>Curated Library</span>
               <span>Reviewed Alerts</span>
-              <span>Invite Only</span>
+              <span>Invite Access</span>
             </div>
             {showAccess ? (
               <form className="invite-form" onSubmit={submitInviteCode}>
@@ -1053,7 +1231,7 @@ function LandingPage({
                     type="text"
                     value={inviteCode}
                     onChange={(event) => setInviteCode(event.target.value)}
-                    placeholder="Enter invite code"
+                    placeholder="AF-NAME-1234"
                     autoComplete="off"
                   />
                 </label>
@@ -1142,11 +1320,11 @@ function BetaExampleStrip() {
   return (
     <section className="beta-example-strip" aria-label="Trusted beta examples">
       <div>
-        <span>Example Programs in the Beta Library</span>
-        <p>Explore programs with enough source context to compare timing, fit, and next steps.</p>
+        <span>Beta Library Examples</span>
+        <p>Source-checked programs students can compare and save.</p>
       </div>
       <div className="beta-example-list">
-        {betaReadyExamples.map((program) => (
+        {betaReadyExamples.slice(0, 4).map((program) => (
           <em key={program}>{program}</em>
         ))}
       </div>
@@ -1341,7 +1519,7 @@ function Header({
         <ApplyFirstMark />
         <span className="brand-copy">
           <strong>ApplyFirst</strong>
-          <em>Track career-launch programs</em>
+          <em>Find Early. Apply First.</em>
         </span>
       </button>
       <nav aria-label="Page links">
@@ -2670,6 +2848,7 @@ function AlertSetupPanel({
   alertStrategy,
   betaAlertSetup,
   onBetaAlertSetupSave,
+  onAddSuggestedProgram,
   waitlistIntent,
   alertEndpoint,
   watchEndpoint,
@@ -2698,7 +2877,7 @@ function AlertSetupPanel({
         <div className="alert-preference-layout">
           <article className={getPreferenceCardClassName(alertPrefs.classYear)}>
             <div className="preference-card-heading">
-              <span>Class Year <span className="preference-required-meta" aria-label="required field">Required</span></span>
+              <span>Class Year <span className="preference-required-mark" aria-label="required field">*</span></span>
             </div>
             <FilterSelect
               label="Class Year"
@@ -2711,7 +2890,7 @@ function AlertSetupPanel({
           </article>
           <article className={getPreferenceCardClassName(alertPrefs.roleTrack)}>
             <div className="preference-card-heading">
-              <span>Role Interest <span className="preference-required-meta" aria-label="required field">Required</span></span>
+              <span>Role Interest <span className="preference-required-mark" aria-label="required field">*</span></span>
             </div>
             <FilterSelect
               label="Role Interest"
@@ -2724,7 +2903,7 @@ function AlertSetupPanel({
           </article>
           <article className={getPreferenceCardClassName(alertPrefs.sendTiming)}>
             <div className="preference-card-heading">
-              <span>Alert Timing <span className="preference-required-meta" aria-label="required field">Required</span></span>
+              <span>Alert Timing <span className="preference-required-mark" aria-label="required field">*</span></span>
             </div>
             <FilterSelect
               label="Timing Preference"
@@ -2746,6 +2925,7 @@ function AlertSetupPanel({
         watchIntentOpportunities={watchIntentOpportunities}
         betaAlertSetup={betaAlertSetup}
         onSave={onBetaAlertSetupSave}
+        onAddSuggestedProgram={onAddSuggestedProgram}
         waitlistIntent={waitlistIntent}
         captureEndpoint={alertEndpoint}
         watchEndpoint={watchEndpoint}
@@ -2762,6 +2942,7 @@ function BetaAlertSystem({
   watchIntentOpportunities = [],
   betaAlertSetup,
   onSave,
+  onAddSuggestedProgram,
   waitlistIntent,
   captureEndpoint = '',
   watchEndpoint = '',
@@ -2883,7 +3064,7 @@ function BetaAlertSystem({
     const hasRemoteEndpoint = Boolean((captureEndpoint && email.trim()) || watchEndpoint);
     const payload = createSetupPayload(hasRemoteEndpoint ? 'Submitting' : 'Saved Locally');
     const prioritySummary =
-      payload.priority === 'all' ? 'All Opportunity Types' : priorityLabels[payload.priority] ?? payload.priority;
+      payload.priority === 'all' ? 'All Recommendations' : priorityLabels[payload.priority] ?? payload.priority;
     const preferenceSummary = `${payload.classYear} / ${payload.roleTrack} / ${prioritySummary} / ${sendTimingLabels[payload.sendTiming] ?? payload.sendTiming}`;
     const watchedProgramNames = payload.watchedPrograms.map((program) => program.name).filter(Boolean);
     const notificationConsentText =
@@ -3057,6 +3238,7 @@ function BetaAlertSystem({
             suggestedPrograms={suggestedMatches}
             hasSavedSetup={Boolean(betaAlertSetup)}
             hasPreviewFocus={hasPreviewFocus}
+            onAddSuggestedProgram={onAddSuggestedProgram}
           />
         </div>
       </section>
@@ -3104,7 +3286,7 @@ function normalizeWatchSetupForComparison(setup = {}) {
   };
 }
 
-function BetaAlertFeed({ watchedPrograms, suggestedPrograms, hasSavedSetup, hasPreviewFocus }) {
+function BetaAlertFeed({ watchedPrograms, suggestedPrograms, hasSavedSetup, hasPreviewFocus, onAddSuggestedProgram }) {
   const feedItems = watchedPrograms.slice(0, 3).map((program) => {
     const readiness = getMonitoringReadiness(program);
 
@@ -3129,12 +3311,12 @@ function BetaAlertFeed({ watchedPrograms, suggestedPrograms, hasSavedSetup, hasP
     <section className="beta-alert-feed" aria-label="Selected alert programs">
       <div className="alert-program-table">
         <div className="alert-program-table-heading">
-          <span>Watchlist Preview</span>
+          <span>Programs to Watch</span>
         </div>
         <div className="alert-program-groups">
           <section className="alert-program-section selected" aria-label="Selected programs for alerts">
             <div className="alert-program-section-heading">
-              <span>Watching</span>
+              <span>Selected</span>
               <strong>{feedItems.length ? `${feedItems.length} ${feedItems.length === 1 ? 'Program' : 'Programs'}` : 'None Yet'}</strong>
             </div>
             {feedItems.length ? (
@@ -3173,6 +3355,14 @@ function BetaAlertFeed({ watchedPrograms, suggestedPrograms, hasSavedSetup, hasP
                     </div>
                     <small>{item.timing}</small>
                     <span className="alert-program-status">{item.status}</span>
+                    <button
+                      className="alert-program-add"
+                      type="button"
+                      onClick={() => onAddSuggestedProgram?.(item.id)}
+                      aria-label={`Add ${item.name} to alerts`}
+                    >
+                      Add
+                    </button>
                   </article>
                 ))}
               </div>
@@ -3227,8 +3417,8 @@ function ContributeView({ contributions, opportunities, captureEndpoint = '', on
           <span>Suggest Updates</span>
           <h1 className="page-hero-title">Suggest a Program or Fix.</h1>
           <p>
-            Suggest a missing program, flag stale information, or tell us which opportunities would be worth alerts
-            later. Every submission is reviewed before it changes the library.
+            <span>Suggest missing programs, flag stale details, or request future alerts.</span>
+            <span>Every submission is reviewed before library changes.</span>
           </p>
         </div>
       </section>
@@ -3240,7 +3430,7 @@ function ContributeView({ contributions, opportunities, captureEndpoint = '', on
             <h2>Add an Opportunity to Track</h2>
           </div>
           <label>
-            <span>Program Name</span>
+            <span>Program Name <span className="preference-required-mark" aria-label="required field">*</span></span>
             <input
               value={programDraft.name}
               onChange={(event) => updateProgramDraft('name', event.target.value)}
@@ -3249,7 +3439,7 @@ function ContributeView({ contributions, opportunities, captureEndpoint = '', on
             />
           </label>
           <label>
-            <span>Official Link</span>
+            <span>Official Link <span className="preference-required-mark" aria-label="required field">*</span></span>
             <input
               type="url"
               value={programDraft.url}
@@ -3259,10 +3449,11 @@ function ContributeView({ contributions, opportunities, captureEndpoint = '', on
             />
           </label>
           <label>
-            <span>Best Fit</span>
-            <select value={programDraft.track} onChange={(event) => updateProgramDraft('track', event.target.value)}>
+            <span>Best Fit <span className="preference-required-mark" aria-label="required field">*</span></span>
+            <select value={programDraft.track} onChange={(event) => updateProgramDraft('track', event.target.value)} required>
               <option>Software Engineering</option>
               <option>Product Management</option>
+              <option>Design</option>
               <option>Quant / Finance</option>
               <option>Access & Prep</option>
               <option>Scholarship / Funding</option>
@@ -3270,7 +3461,7 @@ function ContributeView({ contributions, opportunities, captureEndpoint = '', on
             </select>
           </label>
           <label>
-            <span>Why Should ApplyFirst Watch It?</span>
+            <span>Why Should ApplyFirst Watch It? <span className="preference-required-mark" aria-label="required field">*</span></span>
             <textarea
               value={programDraft.reason}
               onChange={(event) => updateProgramDraft('reason', event.target.value)}
@@ -3301,15 +3492,15 @@ function ContributeView({ contributions, opportunities, captureEndpoint = '', on
             </select>
           </label>
           <label>
-            <span>Issue Type</span>
-            <select value={feedbackDraft.issueType} onChange={(event) => updateFeedbackDraft('issueType', event.target.value)}>
+            <span>Issue Type <span className="preference-required-mark" aria-label="required field">*</span></span>
+            <select value={feedbackDraft.issueType} onChange={(event) => updateFeedbackDraft('issueType', event.target.value)} required>
               {feedbackIssueTypes.map((issueType) => (
                 <option key={issueType}>{issueType}</option>
               ))}
             </select>
           </label>
           <label>
-            <span>What Should Be Fixed?</span>
+            <span>What Should Be Fixed? <span className="preference-required-mark" aria-label="required field">*</span></span>
             <textarea
               value={feedbackDraft.note}
               onChange={(event) => updateFeedbackDraft('note', event.target.value)}
@@ -3391,7 +3582,7 @@ function WaitlistPanel({
         ? 'All Role Tracks'
         : alertPrefs.roleTrack,
     isPreferenceUnset(alertPrefs.priority) || alertPrefs.priority === 'all'
-      ? 'All Opportunity Types'
+      ? 'All Recommendations'
       : priorityLabels[alertPrefs.priority] ?? alertPrefs.priority,
     isPreferenceUnset(alertPrefs.sendTiming) ? 'Timing Not Selected' : sendTimingLabels[alertPrefs.sendTiming],
   ].join(' / ');
@@ -3621,7 +3812,7 @@ function FilterStack({
         options={filterOptions.roleTracks}
       />
       <FilterSelect
-        label="Opportunity Type"
+        label="Recommendation"
         value={priority}
         onChange={setPriority}
         options={Object.keys(libraryPriorityLabels)}
@@ -3636,7 +3827,7 @@ function FilterStack({
           labels={verificationLabels}
         />
       ) : null}
-      <FilterSelect label="Category" value={category} onChange={setCategory} options={filterOptions.categories} />
+      <FilterSelect label="Opportunity Type" value={category} onChange={setCategory} options={filterOptions.categories} />
       <FilterSelect label="Timing" value={timing} onChange={setTiming} options={filterOptions.timing} />
       <FilterSelect label="Status" value={status} onChange={setStatus} options={filterOptions.status} labels={statusLabels} />
       <button className="plain-button" type="button" onClick={resetFilters}>
@@ -3742,7 +3933,6 @@ function OpportunityDetail({
   const tracks = getOpportunityTracks(opportunity);
   const monitorSignal = getMonitorSignal(opportunity);
   const verificationState = getVerificationState(opportunity);
-  const readiness = getMonitoringReadiness(opportunity);
   const sourceUpdatePlan = getSourceUpdatePlan(opportunity);
   const sourceStatusLabel =
     verificationState === 'verified'
@@ -3757,25 +3947,20 @@ function OpportunityDetail({
         ? 'watch'
         : 'review';
   const programDetails = [
-    { label: 'Host', value: opportunity.organization },
-    { label: 'Program Type', value: opportunity.category },
-    { label: 'Role Area', value: tracks.join(' + ') },
-    { label: 'Eligible Years', value: opportunity.classYears.join(', ') },
+    { label: 'Eligibility', value: getEligibilityDetailText(opportunity) },
     { label: 'Format / Location', value: getProgramFormatText(opportunity) },
     { label: 'Length', value: getProgramLengthText(opportunity) },
+    { label: 'Opportunity Type', value: opportunity.category },
     { label: 'Funding / Pay', value: opportunity.funding || 'Not Listed Yet' },
-  ];
+    { label: 'Role Area', value: tracks.join(' + ') },
+  ].filter((detail) => Boolean(detail.value));
   const timingDetails = [
     { label: 'Current Status', value: statusLabels[opportunity.status] },
     { label: 'Opening Window', value: opportunity.openDate },
     { label: 'Deadline', value: opportunity.deadline },
     { label: 'Cycle Notes', value: opportunity.timing },
   ];
-  const sourceDetails = [
-    { label: 'Source Status', value: sourceStatusLabel },
-    { label: 'Last Checked', value: opportunity.lastChecked || 'Needs Confirmation' },
-    { label: 'Beta Alert Status', value: readiness.alertable ? 'Eligible For Reviewed Alerts' : 'Needs Review Before Alerts' },
-  ];
+  const sourceSummary = getStudentSourceSummary(opportunity, verificationState, sourceStatusLabel);
   const sourceActionLabel =
     ['open', 'deadlineSoon'].includes(opportunity.status) || monitorSignal.actionLabel === 'Apply Now'
       ? 'Apply Now'
@@ -3786,10 +3971,6 @@ function OpportunityDetail({
       <div className="detail-header">
         <div className="detail-status-strip">
           <span className={`status-pill status-${opportunity.status}`}>{statusLabels[opportunity.status]}</span>
-          <span className={`detail-source-state detail-source-state-${sourceStatusTone}`}>
-            {verificationState === 'verified' ? <VerifiedIcon /> : null}
-            {sourceStatusLabel}
-          </span>
         </div>
         <h2>{opportunity.name}</h2>
         <p>{opportunity.organization}</p>
@@ -3826,21 +4007,28 @@ function OpportunityDetail({
       ) : null}
       <section className="detail-overview-section" aria-label="Program description">
         <div className="detail-overview-copy">
-          <span>Program Description</span>
-          <p>{getProgramDescription(opportunity)}</p>
+          <span>About The Program</span>
+          {getProgramDescriptionParts(opportunity).map((part) => (
+            <p key={part}>{part}</p>
+          ))}
+          <DetailAboutList items={opportunity.aboutHighlights} />
+        </div>
+        <div className="detail-listing-heading">
+          <span>At A Glance</span>
         </div>
         <DetailFactGrid details={programDetails} />
       </section>
       <DetailListingSection title="Timing" details={timingDetails} />
-      <section className="detail-listing-section" aria-label="Source status">
-        <div className="detail-listing-heading">
-          <span>Source Check</span>
-          <strong>Official Source</strong>
+      <section className={`student-source-summary student-source-summary-${sourceStatusTone}`} aria-label="Source trust">
+        <div>
+          <span>Source</span>
+          <strong>
+            {verificationState === 'verified' ? <VerifiedIcon /> : null}
+            {sourceSummary.title}
+          </strong>
         </div>
-        <DetailFactGrid details={sourceDetails} />
-        <p className="detail-listing-note">
-          {getPublicSourceNote(opportunity)}
-        </p>
+        <p>{sourceSummary.note}</p>
+        <small>{sourceSummary.meta}</small>
       </section>
       <button className="detail-feedback-link" type="button" onClick={onImproveLibrary}>
         Suggest An Update
@@ -3848,6 +4036,7 @@ function OpportunityDetail({
       {showInternalTools ? <div className="source-note">
         <h3>Source Note</h3>
         <p>{opportunity.sourceNote}</p>
+        {opportunity.detailBasis ? <p>Basis: {opportunity.detailBasis}</p> : null}
       </div> : null}
       {showInternalTools ? (
         <section className="internal-tools-stack" aria-label="Internal monitoring tools">
@@ -3899,17 +4088,76 @@ function DetailFactGrid({ details }) {
   return (
     <dl className="detail-listing-grid">
       {details.map((detail) => (
-        <div key={detail.label}>
+        <div className={cleanText(detail.value).length > 76 ? 'wide' : ''} key={detail.label}>
           <dt>{detail.label}</dt>
-          <dd>{formatDisplayLabel(detail.value)}</dd>
+          <dd><FormattedDetailValue value={detail.value} /></dd>
         </div>
       ))}
     </dl>
   );
 }
 
-function getProgramDescription(opportunity) {
-  return cleanText(opportunity.why) || `${opportunity.name} is tracked because it may be useful for early-career students.`;
+function FormattedDetailValue({ value }) {
+  const lines = String(value ?? '').split('\n').map((line) => formatDisplayLabel(cleanText(line))).filter(Boolean);
+
+  if (lines.length <= 1) {
+    return lines[0] ?? '';
+  }
+
+  return (
+    <span className="detail-value-lines">
+      {lines.map((line) => (
+        <span key={line}>{line}</span>
+      ))}
+    </span>
+  );
+}
+
+function DetailAboutList({ items }) {
+  const cleanItems = Array.isArray(items)
+    ? items.map((item) => cleanText(item)).filter(Boolean)
+    : [];
+
+  if (!cleanItems.length) {
+    return null;
+  }
+
+  return (
+    <ul className="detail-about-list">
+      {cleanItems.map((item) => (
+        <li key={item}>{item}</li>
+      ))}
+    </ul>
+  );
+}
+
+function getProgramDescriptionParts(opportunity) {
+  const primaryDescription =
+    cleanText(opportunity.description || opportunity.why) ||
+    `${opportunity.name} is tracked because it may be useful for early-career students.`;
+  const experienceDescription = cleanText(opportunity.experienceSummary);
+
+  return uniqueList([primaryDescription, experienceDescription]);
+}
+
+function getEligibilityDetailText(opportunity) {
+  const classYearText = opportunity.classYears?.join(', ');
+  const eligibilityText = cleanText(opportunity.eligibilitySummary);
+  const normalizedClassYearText = cleanText(classYearText).toLowerCase();
+  const normalizedEligibilityText = eligibilityText.toLowerCase();
+
+  if (
+    eligibilityText &&
+    classYearText &&
+    !normalizedEligibilityText.includes(normalizedClassYearText) &&
+    !normalizedEligibilityText.includes('first- or second-year') &&
+    !normalizedEligibilityText.includes('first-year') &&
+    !normalizedEligibilityText.includes('sophomore')
+  ) {
+    return `${classYearText}. ${eligibilityText}`;
+  }
+
+  return eligibilityText || classYearText || 'Not Listed Yet';
 }
 
 function getProgramFormatText(opportunity) {
@@ -3919,6 +4167,9 @@ function getProgramFormatText(opportunity) {
 function getProgramLengthText(opportunity) {
   const searchableText = [
     opportunity.sourceNote,
+    opportunity.description,
+    opportunity.eligibilitySummary,
+    opportunity.experienceSummary,
     opportunity.why,
     opportunity.prep,
     opportunity.openDate,
@@ -3949,27 +4200,27 @@ function getProgramLengthText(opportunity) {
   }
 
   switch (opportunity.category) {
-    case 'Externship / insight series':
-      return 'Short Insight Program; Exact Length Varies';
+    case 'Discovery Program':
+      return opportunity.timing === 'Rolling'
+        ? 'Discovery Timeline Varies'
+        : `${opportunity.timing} Discovery Program; Exact Length Varies`;
     case 'Winternship':
       return 'Short Winter Program; Exact Length Varies';
-    case 'Training program':
-      return 'Course Length Varies By Pathway';
-    case 'Technical community':
-      return 'Ongoing Community';
-    case 'Scholarship':
-      return 'Award Timeline Varies';
-    case 'Conference funding':
+    case 'Community / Prep Program':
+      return 'Prep Timeline Varies';
+    case 'Scholarship / Funding':
+      return 'Sponsor Award Timeline Varies';
+    case 'Conference / Travel Funding':
       return 'Event Or Award Timeline Varies';
-    case 'Special program / resource':
-      return 'Resource Timeline Varies';
+    case 'Full-Time Alternative':
+      return opportunity.timing === 'Rolling' ? 'Alternative Path Timeline Varies' : `${opportunity.timing} Alternative Path`;
     default:
-      if (opportunity.category === 'Internship' && opportunity.timing !== 'Rolling') {
-        return `${opportunity.timing} Internship; Exact Length Not Listed`;
-      }
-
       if (opportunity.category === 'Fellowship') {
         return opportunity.timing === 'Rolling' ? 'Cohort Dependent; Exact Length Not Listed' : `${opportunity.timing} Fellowship; Exact Length Not Listed`;
+      }
+
+      if (opportunity.category === 'Startup / VC Fellowship') {
+        return opportunity.timing === 'Rolling' ? 'Portfolio Timeline Varies' : `${opportunity.timing} Startup Fellowship; Exact Length Varies`;
       }
 
       return opportunity.timing === 'Rolling' ? 'Cohort Or Posting Dependent' : 'Not Listed Yet';
@@ -3990,6 +4241,33 @@ function getPublicSourceNote(opportunity) {
     .replace(/before alerts/gi, 'before students rely on alerts')
     .replace(/before sharing/gi, 'before applying')
     .replace(/Review before students rely on alerts\.?/gi, 'Review the official page before applying.');
+}
+
+function getStudentSourceSummary(opportunity, verificationState, sourceStatusLabel) {
+  const lastCheckedText = opportunity.lastChecked ? `Last checked ${opportunity.lastChecked}.` : 'Needs a current source check.';
+  const publicNote = getPublicSourceNote(opportunity);
+
+  if (verificationState === 'verified') {
+    return {
+      title: sourceStatusLabel,
+      note: publicNote,
+      meta: lastCheckedText,
+    };
+  }
+
+  if (verificationState === 'watchOnly') {
+    return {
+      title: sourceStatusLabel,
+      note: 'Useful for prep, but ApplyFirst should confirm current-cycle dates before sending opening alerts.',
+      meta: lastCheckedText,
+    };
+  }
+
+  return {
+    title: 'Needs Confirmation',
+    note: 'Check the official page before applying. ApplyFirst will not send beta alerts from this record until the current source is reviewed.',
+    meta: lastCheckedText,
+  };
 }
 
 function getRecordTimingSignal(opportunity, monitorSignal) {
@@ -4162,24 +4440,22 @@ function getProgramExperienceItems(opportunity, tracks) {
 
 function getCategoryExperienceItems(category) {
   switch (category) {
-    case 'Internship':
-      return ['Work on internship-style projects or team assignments.', 'Build a concrete early-career resume signal.'];
-    case 'Externship / insight series':
-      return ['Join short-format company or industry exposure sessions.', 'Use the experience to decide whether the field is worth pursuing.'];
+    case 'Discovery Program':
+      return ['Explore a company, industry, or role before larger recruiting cycles.', 'Use the experience to decide whether the field is worth pursuing.'];
     case 'Winternship':
       return ['Use winter break for a structured short program.', 'Get early exposure without committing a full summer.'];
     case 'Fellowship':
       return ['Complete mentored project, research, open-source, or community work.', 'Build experience that can substitute for a traditional internship signal.'];
-    case 'Internship-matching fellowship':
-      return ['Receive training, coaching, or partner access around internship placement.', 'Use the program structure to move from prep into applied work.'];
-    case 'Scholarship':
-      return ['Receive funding support and a visible award signal.', 'Join sponsor, mentor, or recipient communities when available.'];
-    case 'Conference funding':
+    case 'Startup / VC Fellowship':
+      return ['Apply into a startup, founder, investor, or portfolio-company network.', 'Use the experience to test whether venture-backed company environments fit you.'];
+    case 'Full-Time Alternative':
+      return ['Build career proof through apprenticeship, fellowship, or alternative full-time pipeline work.', 'Use the program to move from skill-building into employment-ready experience.'];
+    case 'Scholarship / Funding':
+      return ['Receive funding support from a company or major nonprofit sponsor.', 'Use the award, mentor access, or sponsor community as an early-career signal.'];
+    case 'Conference / Travel Funding':
       return ['Access events, talks, recruiters, research communities, or travel funding.', 'Use the experience to meet people and discover paths that are hard to find from school alone.'];
-    case 'Technical community':
-      return ['Join an ongoing community of peers, mentors, events, and resources.', 'Use the community to find partner programs and hidden deadlines earlier.'];
-    case 'Training program':
-      return ['Complete structured skill-building, interview prep, or project work.', 'Turn practice into portfolio or recruiting readiness.'];
+    case 'Community / Prep Program':
+      return ['Join structured prep, mentorship, community, course, or resource support.', 'Use the program to build readiness and find hidden deadlines earlier.'];
     default:
       return ['Explore a career path and build a clearer story for future applications.', 'Use the program as an early signal before larger recruiting cycles.'];
   }
@@ -4191,6 +4467,8 @@ function getTrackExperienceItem(track) {
       return 'Most relevant for students building projects, GitHub proof, technical confidence, or software interview stories.';
     case 'Product Management':
       return 'Most relevant for students exploring users, product judgment, prioritization, and cross-functional work.';
+    case 'Design':
+      return 'Most relevant for students building UX research, interface design, portfolio, or product-validation proof.';
     case 'Quant / Finance':
       return 'Most relevant for students testing interest in markets, math-heavy problem solving, finance, or trading technology.';
     default:
@@ -4207,6 +4485,10 @@ function getApplicationRequirementItems(opportunity, tracks) {
 
   if (tracks.includes('Product Management')) {
     items.push('Short product, user-problem, or leadership story if requested.');
+  }
+
+  if (tracks.includes('Design')) {
+    items.push('Portfolio, case study, UX research, or visual/product design sample if requested.');
   }
 
   if (tracks.includes('Quant / Finance')) {
@@ -4706,15 +4988,15 @@ function formatDisplayLabel(value) {
     'Career fairs': 'Career Fairs',
     'Graduate school prep': 'Graduate School Prep',
     'Women in STEM': 'Women in STEM',
-    'Conference funding': 'Conference Funding',
-    'Externship / insight series': 'Externship / Insight Series',
-    'Internship-matching fellowship': 'Internship-Matching Fellowship',
-    'Conference funding': 'Conference Funding',
-    'Technical community': 'Technical Community',
-    'Training program': 'Training Program',
-    'Special program / resource': 'Special Program / Resource',
+    'Discovery Program': 'Discovery Program',
+    'Conference / Travel Funding': 'Conference / Travel Funding',
+    'Startup / VC Fellowship': 'Startup / VC Fellowship',
+    'Full-Time Alternative': 'Full-Time Alternative',
+    'Scholarship / Funding': 'Scholarship / Funding',
+    'Community / Prep Program': 'Community / Prep Program',
     'All class years': 'All Class Years',
-    'Paid internship': 'Paid Internship',
+    'Paid program': 'Paid Program',
+    'Paid placement': 'Paid Placement',
     'Paid fellowship': 'Paid Fellowship',
     'Travel support': 'Travel Support',
     'Host-site dependent': 'Host-Site Dependent',
@@ -4777,7 +5059,7 @@ function EmptyState({ onReset }) {
   return (
     <div className="empty-state">
       <h3>No Opportunities Match Those Filters.</h3>
-      <p>Try a broader class year, category, or status.</p>
+      <p>Try a broader class year, opportunity type, or status.</p>
       <button type="button" onClick={onReset}>
         Clear Filters
       </button>

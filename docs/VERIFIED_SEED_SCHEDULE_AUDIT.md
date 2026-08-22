@@ -1,6 +1,6 @@
 # ApplyFirst Verified Seed And Schedule Audit
 
-Last audited: 2026-08-18
+Last audited: 2026-08-22
 
 ## Purpose
 
@@ -21,15 +21,15 @@ Programs with exact current-cycle deadlines or rolling applications can be shown
 
 | Program | Official Source | Audit Result | Schedule Decision | Alert Position |
 | --- | --- | --- | --- | --- |
-| NASA Internships | https://www.nasa.gov/learning-resources/internship-programs/ | Official page confirms OSTEM and Pathways internship programs plus Spring, Summer, and Fall 2027 deadlines. | Semester cadence around September, February, and May deadlines. | Can be monitored from official source; large pages may still need fetch tuning. |
-| Microsoft Explore | https://careers.microsoft.com/v2/global/en/exploremicrosoft | Official page confirms first- and second-year Explore program framing, but not the current application posting. | Annual fall discovery for current posting URLs. | Keep as recommended, but hold alerts until a current posting is found. |
-| Palantir Path | https://www.palantir.com/careers/students-and-early-talent/ | Official student pages show current early-talent options, but Path was not confirmed as a current official program. | Annual summer/fall discovery across Palantir student and open-position pages. | Needs confirmation before student alerts. |
-| Jane Street FTTP | https://www.janestreet.com/join-jane-street/programs-and-events/fttp/ | Official page confirms the first-year undergraduate program, but current sessions/deadlines vary. | Annual fall/winter discovery. | Recommended prep/watch item; hold alerts until the current session is explicit. |
-| Jane Street SEE | https://www.janestreet.com/join-jane-street/programs-and-events/see/ | Official page confirms the early-exposure program, but current sessions/deadlines vary. | Annual fall/winter discovery. | Recommended prep/watch item; hold alerts until the current session is explicit. |
+| Microsoft Explore | https://careers.microsoft.com/v2/global/en/exploremicrosoft | Official page confirms first- and second-year Explore program framing and the 12-week U.S. model, but not the current application posting. | Annual fall discovery for current posting URLs. | Keep as recommended/watch-only, but hold alerts until a current posting is found. |
+| Palantir Launch | https://www.palantir.com/careers/students/launch/ | User-confirmed canonical Launch page is the right official page to watch for the next Spring Program cycle; current-cycle dates are not explicit. | Annual summer/fall discovery across Palantir Launch and open-position pages. | Watch-only until a current application page or deadline appears. |
+| Jane Street FTTP | https://www.janestreet.com/join-jane-street/programs-and-events/fttp/ | Official page confirms the first-year undergraduate program, trading-and-technology focus, and travel/accommodation/stipend support; current sessions/deadlines vary. | Annual fall/winter discovery. | Recommended prep/watch item; hold alerts until the current session is explicit. |
+| Jane Street SEE | https://www.janestreet.com/join-jane-street/programs-and-events/see/ | Official page confirms the early-exposure program, three tracks, no prior finance requirement, and travel/accommodation/stipend support; current sessions/deadlines vary. | Annual fall/winter discovery. | Recommended prep/watch item; hold alerts until the current session is explicit. |
 | Virtu Women's Winternship | https://job-boards.greenhouse.io/virtu | Official Virtu Greenhouse board lists January 2027 Women's Winternship postings for New York, Dublin, and Singapore; Singapore lists an Oct 30, 2026 deadline. | Annual fall monitoring with URL discovery because location-specific postings can move. | Good beta monitored seed while postings are live; location deadlines should be checked before sending broad alerts. |
 | Google Summer of Code | https://developers.google.com/open-source/gsoc/timeline | Official 2026 timeline confirms contributor applications opened March 16 and closed March 31, 2026. | Annual winter discovery for the next timeline. | Verified program; not a current opening alert until the next cycle posts. |
 | Outreachy | https://www.outreachy.org/docs/applicant/ | Official docs confirm May and December cycles; homepage mentions December 2026 applications in early-to-mid August without a precise public deadline. | Twice-yearly checks around February and August/September. | Keep in discovery/review until exact current deadline is confirmed. |
 | MLH Fellowship | https://fellowship.mlh.com/programs/open-source | Official program page supports rolling cohort applications and a moved URL from the old `.io` domain. | Rolling cadence with URL discovery because program pages can move. | Good beta monitored seed if the page continues to show active application language. |
+| MLH Production Engineering Fellowship | https://fellowship.mlh.com/ | Official MLH Fellowship page and application flow list Production Engineering as a selectable track under the rolling MLH Fellowship model. | Rolling cadence with URL discovery because program pages can move. | Good beta monitored seed; alerts should use the shared MLH application model and track-specific context. |
 | Coding it Forward Fellowship | https://codingitforward.com/fellowship | Official page confirms the fellowship model and tracks, but current application dates need cycle verification. | Annual winter discovery. | Useful library record; hold alerts until current application dates are confirmed. |
 | CodePath Career-Ready Courses | https://www.codepath.org/courses | Official course page lists Fall 2026 applications and visible pathway close dates such as August 23. | Term-based checks around spring/summer/fall course windows. | Good beta monitored seed while term deadlines are active. |
 | The New Technologists Academy | https://newtechnologists.com/ | Official page confirms the freshman/sophomore Academy, but still references Summer 2026. | Annual winter/spring discovery for next cycle. | Recommended underclassmen seed; hold alerts until next cycle updates. |
@@ -37,7 +37,7 @@ Programs with exact current-cycle deadlines or rolling applications can be shown
 | SEO Tech Developer | https://tech.seo-usa.org/ | Official page confirms a January-March 2026 application timeline and sophomore eligibility. | Annual winter checks. | Verified program; hold alerts until the next application cycle posts. |
 | SEO Tech Developer First-Year Academy | https://tech.seo-usa.org/ | Official page confirms the first-year academy and a prior November 12 opening date. | Annual fall checks. | Recommended underclassmen seed; hold alerts until current close date is explicit. |
 | HeadStart Fellowship | https://www.headstartfellowship.com/fellowship | Official fellowship and FAQ pages confirm Fall 2026 applications, freshman/sophomore eligibility, virtual format, and an Aug 28, 2026 close date. | Semester cadence with daily checks near active deadlines. | Good beta monitored seed while the deadline is live. |
-| Hack.Diversity Fellowship | https://www.hackdiversity.com/ | Official site confirms the fellowship model and regional focus, but a current-cycle application page was not found. | Annual fall/winter discovery for the next application page. | Keep as useful library record; do not send opening alerts until current-cycle details are confirmed. |
+| Hack.Diversity Fellowship | https://www.hackdiversity.com/ | Official site confirms the nine-month fellowship model, Boston/New York focus, and paid host-company internship outcome, but a current-cycle application page was not found. | Annual fall/winter discovery for the next application page. | Keep as useful watch-only library record; do not send opening alerts until current-cycle details are confirmed. |
 | Career.edYOU Academy | https://www.jpmorganchase.com/careers/explore-opportunities/programs/career-edyou | Official JPMorganChase page confirms the sophomore program and says registration is currently closed. | Annual fall/winter discovery for reopened location-specific registration. | Verified program, discovery-first; alerts wait for open registration. |
 | ACM-W Research Conference Scholarships | https://women.acm.org/scholarships/ | Official page lists recurring conference-date deadline groups, including an October 15, 2026 group. | Bimonthly deadline cadence. | Good funding seed; alerts should mention the relevant conference-date group. |
 | Rewriting the Code Student Community | https://rewritingthecode.org/ | Official page confirms free community access and recurring student/early-career programming. | Ongoing low-frequency checks. | Foundation resource, not urgent opening-alert target. |
@@ -45,6 +45,9 @@ Programs with exact current-cycle deadlines or rolling applications can be shown
 | NSF REU Computer Science | https://www.nsf.gov/funding/initiatives/reu | Official NSF REU page confirms undergraduate research sites, stipends, and student applications through host sites or NSF ETAP. | Annual winter discovery; monitor umbrella page lightly and search for specific CS/AI REU sites. | Valuable research pathway; alerts should target specific host-site applications, not only the umbrella page. |
 | SWE Scholarships | https://swe.org/scholarships-overview/ | Official SWE overview says the 2026-27 cycle is closed and links to the 2027-2028 interest form; the apply page keeps the typical December-February application openings and January/March closes. | Annual winter scholarship cadence. | Verified funding path; monitor the lighter overview page and use the apply page for timing context. |
 | Grace Hopper Celebration Scholarships | https://ghc.anitab.org/awards-programs/scholarships | Official AnitaB pages show scholarship interest-list/coming-soon language, including Kamala Scholars, but exact current scholarship dates are not posted. | Annual late-summer discovery while GHC funding pages update. | Discovery-first until current application dates are explicit. |
+| Bloomberg NextGen Leadership Summit | https://bloomberg.avature.net/events/EventDetailsPage?jobId=21511&source=LinkedIn&tags=lvalleburgue | User-provided Bloomberg Avature link plus campus listings confirm the August 26-27, 2026 New York event and August 7, 2026 deadline; direct Avature details should still be checked manually. | Annual spring/summer discovery for the next event posting. | Watch-only after the 2026 deadline; do not alert unless Bloomberg posts a fresh application. |
+| Bessemer Fellowship Program | https://www.bvp.com/bessemer-fellows | Official Bessemer page says the Fellowship Program is paused/reimagined and points candidates toward portfolio roles and the Bessemer Analyst Program. | Low-frequency monthly/quarterly check for relaunch language. | Verified watch item, not an active opportunity. |
+| HRT Women in Trading Technology | https://www.hudsonrivertrading.com/student-opportunities/ | Official HRT page confirms January 2026 Women in Trading & Technology details and says applications are closed while January 2027 updates are pending. | Annual late-summer/fall discovery for the next January posting. | Verified watch item; alert only when the January 2027 posting appears. |
 
 ## Schedule Rules
 
@@ -62,6 +65,16 @@ The first beta audit now covers the original uncertain queue. Remaining follow-u
 - Split multi-location postings like Virtu into separate records if students need location-specific alerts.
 - Find authoritative current-cycle application pages for Hack.Diversity and GHC scholarships before automatic alerts.
 - Decide whether NSF REU should remain an umbrella record or expand into specific CS, AI, and security REU site records.
+- Keep canonical watch-only records out of hero/beta-test examples unless their current-cycle pages are live.
+- NASA Internships was removed from the current beta seed because it is a broad internship portal, not a special ApplyFirst program type.
+
+## 2026-08-22 Verification Pass
+
+- Verification state after this pass: 61 total records, 44 verified, 17 watch-only, and 0 needs confirmation.
+- Moved Microsoft Explore, Jane Street FTTP, Jane Street SEE, MLH Production Engineering, Hack.Diversity, Bloomberg NextGen, Bessemer Fellowship Program, and HRT Women in Trading Technology into more accurate source states.
+- Kept Palantir Launch, Two Sigma Freshman SWE, and Google Scholarships as canonical watch-only records because the official pages are the right monitoring targets when current listings become available.
+- Removed IBM Accelerate from the public beta library until a current official Accelerate-specific page is found.
+- Reminder: watch-only records are acceptable for library discovery and saving, but should not trigger automatic opening emails until a current official posting, deadline, or application page is confirmed.
 
 ## 2026-08-18 Live Seed Import Notes
 
@@ -76,7 +89,7 @@ The first beta audit now covers the original uncertain queue. Remaining follow-u
 - Discovery dry run searched 5 due programs with 12 queries, found 12 results, and saved 0 candidates. This is acceptable: no noisy source replacement candidates were added.
 - Large source pages should now be truncated instead of failing the entire source check when they exceed the monitoring byte limit.
 - Old application/date signals should now be treated as old-cycle signals instead of fresh opening alerts.
-- Next live verification should confirm that NASA/SWE no longer fail only because of page size and that SEO/JPMorgan/GHC old-cycle or closed language does not create new alert candidates.
+- Next live verification should confirm that SWE no longer fails only because of page size and that SEO/JPMorgan/GHC old-cycle or closed language does not create new alert candidates.
 
 ## 2026-08-18 Maintainer Dry-Run Mode
 

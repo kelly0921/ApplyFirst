@@ -62,6 +62,15 @@ async function handleRequest(request, env, ctx) {
       return jsonResponse(env, await getWatchStatus(env));
     }
 
+    if (request.method === 'GET' && url.pathname === '/workspace') {
+      return jsonResponse(env, await getBetaWorkspace(env, url));
+    }
+
+    if (request.method === 'POST' && url.pathname === '/workspace') {
+      const body = await readJson(request, {});
+      return jsonResponse(env, await saveBetaWorkspace(env, body));
+    }
+
     if (request.method === 'GET' && url.pathname === '/watch/readiness') {
       await requireAdminToken(request, env);
       return jsonResponse(env, await getReadinessQueue(env));
@@ -143,6 +152,98 @@ async function handleRequest(request, env, ctx) {
       { status },
     );
   }
+}
+
+async function getBetaWorkspace(env, url) {
+  const accessCode = normalizeAccessCode(url.searchParams.get('code'));
+
+  if (!accessCode) {
+    throw httpError(400, 'Invite code is required.');
+  }
+
+  const accessCodeHash = await hashAccessCode(accessCode);
+  const row = await env.DB.prepare(
+    `select id, code_label, state_json, last_seen_at, updated_at, created_at
+     from beta_access_workspaces
+     where access_code_hash = ?
+     limit 1`,
+  )
+    .bind(accessCodeHash)
+    .first();
+
+  if (!row) {
+    return {
+      ok: true,
+      exists: false,
+      state: null,
+    };
+  }
+
+  return {
+    ok: true,
+    exists: true,
+    workspaceId: row.id,
+    codeLabel: row.code_label,
+    state: parseJsonObject(row.state_json),
+    lastSeenAt: row.last_seen_at,
+    updatedAt: row.updated_at,
+    createdAt: row.created_at,
+  };
+}
+
+async function saveBetaWorkspace(env, body) {
+  const accessCode = normalizeAccessCode(body.accessCode || body.code);
+
+  if (!accessCode) {
+    throw httpError(400, 'Invite code is required.');
+  }
+
+  const accessCodeHash = await hashAccessCode(accessCode);
+  const now = new Date().toISOString();
+  const existing = await env.DB.prepare(
+    `select id
+     from beta_access_workspaces
+     where access_code_hash = ?
+     limit 1`,
+  )
+    .bind(accessCodeHash)
+    .first();
+  const stateJson = JSON.stringify(normalizeWorkspaceState(body.state));
+  const codeLabel = createAccessCodeLabel(accessCode);
+  const workspaceId = existing?.id || crypto.randomUUID();
+
+  if (existing?.id) {
+    await env.DB.prepare(
+      `update beta_access_workspaces
+       set code_label = ?,
+           state_json = ?,
+           last_seen_at = ?,
+           updated_at = ?
+       where id = ?`,
+    )
+      .bind(codeLabel, stateJson, now, now, existing.id)
+      .run();
+  } else {
+    await env.DB.prepare(
+      `insert into beta_access_workspaces (
+        id,
+        access_code_hash,
+        code_label,
+        state_json,
+        last_seen_at,
+        updated_at
+      ) values (?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(workspaceId, accessCodeHash, codeLabel, stateJson, now, now)
+      .run();
+  }
+
+  return {
+    ok: true,
+    workspaceId,
+    codeLabel,
+    savedAt: now,
+  };
 }
 
 async function saveWatchRequest(request, env, ctx) {
@@ -3718,6 +3819,78 @@ function parseJsonObject(value) {
   } catch {
     return {};
   }
+}
+
+function normalizeAccessCode(value) {
+  return cleanString(value, 80).toUpperCase().replace(/\s+/g, '');
+}
+
+async function hashAccessCode(value) {
+  return sha256Hex(`applyfirst-beta-workspace:${normalizeAccessCode(value)}`);
+}
+
+function createAccessCodeLabel(value) {
+  const accessCode = normalizeAccessCode(value);
+
+  if (!accessCode) {
+    return '';
+  }
+
+  return `...${accessCode.slice(-4)}`;
+}
+
+function normalizeWorkspaceState(value) {
+  const state = value && typeof value === 'object' ? value : {};
+  const alertPrefs = state.alertPrefs && typeof state.alertPrefs === 'object' ? state.alertPrefs : {};
+  const betaAlertSetup = state.betaAlertSetup && typeof state.betaAlertSetup === 'object' ? state.betaAlertSetup : null;
+  const waitlistIntent = state.waitlistIntent && typeof state.waitlistIntent === 'object' ? state.waitlistIntent : null;
+  const onboardingProgress = state.onboardingProgress && typeof state.onboardingProgress === 'object' ? state.onboardingProgress : {};
+
+  return {
+    savedIds: uniqueStrings(arrayify(state.savedIds)).slice(0, 100),
+    watchIntentProgramIds: uniqueStrings(arrayify(state.watchIntentProgramIds)).slice(0, 100),
+    alertPrefs: {
+      classYear: cleanString(alertPrefs.classYear, 80),
+      roleTrack: cleanString(alertPrefs.roleTrack, 120),
+      priority: cleanString(alertPrefs.priority || 'all', 80),
+      notificationMode: cleanString(alertPrefs.notificationMode || 'waitlist', 80),
+      sendTiming: cleanString(alertPrefs.sendTiming, 80),
+    },
+    betaAlertSetup: betaAlertSetup
+      ? {
+          classYear: cleanString(betaAlertSetup.classYear, 80),
+          roleTrack: cleanString(betaAlertSetup.roleTrack, 120),
+          priority: cleanString(betaAlertSetup.priority || 'all', 80),
+          sendTiming: cleanString(betaAlertSetup.sendTiming, 80),
+          email: cleanString(betaAlertSetup.email, 180).toLowerCase(),
+          phoneNumber: normalizePhone(betaAlertSetup.phoneNumber),
+          contactMethod: cleanString(betaAlertSetup.contactMethod || 'email', 20),
+          captureStatus: cleanString(betaAlertSetup.captureStatus, 120),
+          savedAt: cleanString(betaAlertSetup.savedAt, 80),
+          watchedProgramIds: uniqueStrings(arrayify(betaAlertSetup.watchedProgramIds)).slice(0, 100),
+        }
+      : null,
+    waitlistIntent: waitlistIntent
+      ? {
+          email: cleanString(waitlistIntent.email, 180).toLowerCase(),
+          classYear: cleanString(waitlistIntent.classYear, 120),
+          interest: cleanString(waitlistIntent.interest, 160),
+          school: cleanString(waitlistIntent.school, 160),
+          note: cleanString(waitlistIntent.note, 800),
+          captureStatus: cleanString(waitlistIntent.captureStatus, 120),
+          savedAt: cleanString(waitlistIntent.savedAt, 80),
+        }
+      : null,
+    onboardingProgress: {
+      browsed: Boolean(onboardingProgress.browsed),
+      saved: Boolean(onboardingProgress.saved),
+      focused: Boolean(onboardingProgress.focused),
+      alerted: Boolean(onboardingProgress.alerted),
+      improved: Boolean(onboardingProgress.improved),
+      dismissed: Boolean(onboardingProgress.dismissed),
+    },
+    savedAt: cleanString(state.savedAt, 80) || new Date().toISOString(),
+  };
 }
 
 function buildAlertMessage(env, candidate, recipient) {

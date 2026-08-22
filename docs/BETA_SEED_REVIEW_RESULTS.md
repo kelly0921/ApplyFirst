@@ -12,14 +12,6 @@ This is a beta-readiness review, not a guarantee that every record is alert-read
 
 ## Reviewed Records
 
-### NASA Internships
-
-- Official source: https://intern.nasa.gov/
-- Result: beta-ready and future alert candidate.
-- Evidence checked: NASA lists OSTEM and Pathways internship programs, paid internship language, eligibility details, and Spring/Summer/Fall 2027 application deadlines.
-- Keep current app direction: yes.
-- Follow-up: continue checking NASA STEM Gateway links because individual postings can vary by eligibility and location.
-
 ### Google Summer of Code
 
 - Official source: https://summerofcode.withgoogle.com/
@@ -27,6 +19,10 @@ This is a beta-readiness review, not a guarantee that every record is alert-read
 - Evidence checked: official GSoC site loads and remains the correct program source.
 - Keep current app direction: yes.
 - Follow-up: confirm the visible contributor application dates from the official timeline before treating it as alert-ready.
+
+### Removed After Scope Review
+
+- NASA Internships was reviewed as a credible source, but removed from the current beta library because it is a broad internship portal rather than a fellowship, scholarship, early discovery program, underclassmen pathway, or career-launch alternative.
 
 ### Outreachy
 
@@ -92,19 +88,25 @@ This is a beta-readiness review, not a guarantee that every record is alert-read
 - Keep current app direction: yes for discovery and prep.
 - Follow-up: verify whether the next first-year cycle has updated dates before using this as an opening-reminder example.
 
-## Keep As Needs Confirmation For Now
+## Keep As Watch-Only For Now
 
-These records can stay in the library, but should not be used as examples of confirmed alert readiness until an official current-cycle page is reviewed:
+These records can stay in the library as useful programs to save and monitor, but should not be used as examples of confirmed alert readiness until an official current-cycle page is reviewed:
 
 - Microsoft Explore.
-- Palantir Path.
+- Palantir Launch.
 - Jane Street Focus on Trading and Technology.
 - Jane Street SEE.
 - Virtu Women's Winternship.
 - HeadStart Fellowship.
 - Hack.Diversity Fellowship.
 - JPMorgan Career.edYOU Academy.
+- Two Sigma Freshman Software Engineering.
+- Google Scholarships.
+
+Removed from public beta for now:
+
+- IBM Accelerate, because a current official Accelerate-specific page has not been found.
 
 ## Beta Testing Recommendation
 
-Use the beta-ready records above as the first examples during student tests. If students ask about programs in the Needs Confirmation list, frame them as programs ApplyFirst is watching and verifying, not as confirmed current-cycle opportunities.
+Use the beta-ready records above as the first examples during student tests. If students ask about programs in the watch-only list, frame them as programs ApplyFirst is watching, not as confirmed current-cycle openings.

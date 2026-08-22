@@ -9,6 +9,8 @@ const args = new Set(process.argv.slice(2));
 const writeOutput = args.has('--write');
 const outputPath = new URL('../cloudflare/d1/watch-seed.generated.sql', import.meta.url);
 const verifiedScheduleOverrides = createVerifiedScheduleOverrides();
+const officialSourceInsertChunkSize = 20;
+const scheduleProfileInsertChunkSize = 5;
 
 const sourceRows = opportunities
   .filter((opportunity) => opportunity.url?.startsWith('https://'))
@@ -48,7 +50,36 @@ function createD1SeedSql(rows) {
   return `-- ApplyFirst D1 watch seed.
 -- Generated from src/opportunities.js. Review URLs before importing.
 
-insert into official_sources (
+${createOfficialSourceStatements(rows)}
+
+${createScheduleProfileStatements(rows)}
+
+${createRemovedSourceCleanupStatement(rows)}
+
+update alert_candidates
+set status = 'pending_review',
+    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+where status = 'auto_ready'
+  and official_source_id in (
+    select id
+    from official_sources
+    where seeded_sample = 0
+  );
+`;
+}
+
+function createRemovedSourceCleanupStatement(rows) {
+  const activeSourceIds = rows.map((row) => sqlValue(row.id)).join(', ');
+
+  return `update official_sources
+set enabled = 0,
+    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+where id like '%-official'
+  and id not in (${activeSourceIds});`;
+}
+
+function createOfficialSourceStatements(rows) {
+  return chunkRows(rows, officialSourceInsertChunkSize).map((chunk) => `insert into official_sources (
   id,
   program_id,
   program_name,
@@ -64,7 +95,25 @@ insert into official_sources (
   seeded_sample,
   updated_at
 ) values
-${rows.map((row) => `  (${[
+${chunk.map((row) => createOfficialSourceValueSql(row)).join(',\n')}
+on conflict(id) do update set
+  program_id = excluded.program_id,
+  program_name = excluded.program_name,
+  organization = excluded.organization,
+  url = excluded.url,
+  previous_url = excluded.previous_url,
+  source_type = excluded.source_type,
+  check_cadence = excluded.check_cadence,
+  next_check = excluded.next_check,
+  alert_trigger = excluded.alert_trigger,
+  change_signals_json = excluded.change_signals_json,
+  enabled = excluded.enabled,
+  seeded_sample = excluded.seeded_sample,
+  updated_at = excluded.updated_at;`).join('\n\n');
+}
+
+function createOfficialSourceValueSql(row) {
+  return `  (${[
     sqlValue(row.id),
     sqlValue(row.programId),
     sqlValue(row.programName),
@@ -79,23 +128,11 @@ ${rows.map((row) => `  (${[
     sqlBoolean(row.enabled),
     sqlBoolean(row.seededSample),
     "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
-  ].join(', ')})`).join(',\n')}
-on conflict(id) do update set
-  program_id = excluded.program_id,
-  program_name = excluded.program_name,
-  organization = excluded.organization,
-  url = excluded.url,
-  previous_url = excluded.previous_url,
-  source_type = excluded.source_type,
-  check_cadence = excluded.check_cadence,
-  next_check = excluded.next_check,
-  alert_trigger = excluded.alert_trigger,
-  change_signals_json = excluded.change_signals_json,
-  enabled = excluded.enabled,
-  seeded_sample = excluded.seeded_sample,
-  updated_at = excluded.updated_at;
+  ].join(', ')})`;
+}
 
-insert into source_schedule_profiles (
+function createScheduleProfileStatements(rows) {
+  return chunkRows(rows, scheduleProfileInsertChunkSize).map((chunk) => `insert into source_schedule_profiles (
   official_source_id,
   program_id,
   cycle_frequency,
@@ -114,25 +151,7 @@ insert into source_schedule_profiles (
   schedule_note,
   updated_at
 ) values
-${rows.map((row) => `  (${[
-    sqlValue(row.id),
-    sqlValue(row.programId),
-    sqlValue(row.scheduleProfile.cycleFrequency),
-    sqlValue(JSON.stringify(row.scheduleProfile.expectedOpenMonths)),
-    sqlValue(row.scheduleProfile.lastKnownOpenAt),
-    row.scheduleProfile.activeLeadDays,
-    row.scheduleProfile.activeCheckIntervalHours,
-    row.scheduleProfile.warmupCheckIntervalHours,
-    row.scheduleProfile.dormantCheckIntervalDays,
-    row.scheduleProfile.discoveryCheckIntervalHours,
-    sqlValue(row.scheduleProfile.sourceVolatility),
-    sqlValue(JSON.stringify(row.scheduleProfile.discoveryQueries)),
-    sqlValue('uninitialized'),
-    'null',
-    'null',
-    sqlValue(row.scheduleProfile.scheduleNote),
-    "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
-  ].join(', ')})`).join(',\n')}
+${chunk.map((row) => createScheduleProfileValueSql(row)).join(',\n')}
 on conflict(official_source_id) do update set
   program_id = excluded.program_id,
   cycle_frequency = excluded.cycle_frequency,
@@ -192,18 +211,39 @@ on conflict(official_source_id) do update set
     else source_schedule_profiles.next_discovery_at
   end,
   schedule_note = excluded.schedule_note,
-  updated_at = excluded.updated_at;
+  updated_at = excluded.updated_at;`).join('\n\n');
+}
 
-update alert_candidates
-set status = 'pending_review',
-    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-where status = 'auto_ready'
-  and official_source_id in (
-    select id
-    from official_sources
-    where seeded_sample = 0
-  );
-`;
+function createScheduleProfileValueSql(row) {
+  return `  (${[
+    sqlValue(row.id),
+    sqlValue(row.programId),
+    sqlValue(row.scheduleProfile.cycleFrequency),
+    sqlValue(JSON.stringify(row.scheduleProfile.expectedOpenMonths)),
+    sqlValue(row.scheduleProfile.lastKnownOpenAt),
+    row.scheduleProfile.activeLeadDays,
+    row.scheduleProfile.activeCheckIntervalHours,
+    row.scheduleProfile.warmupCheckIntervalHours,
+    row.scheduleProfile.dormantCheckIntervalDays,
+    row.scheduleProfile.discoveryCheckIntervalHours,
+    sqlValue(row.scheduleProfile.sourceVolatility),
+    sqlValue(JSON.stringify(row.scheduleProfile.discoveryQueries)),
+    sqlValue('uninitialized'),
+    'null',
+    'null',
+    sqlValue(row.scheduleProfile.scheduleNote),
+    "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+  ].join(', ')})`;
+}
+
+function chunkRows(rows, chunkSize) {
+  const chunks = [];
+
+  for (let index = 0; index < rows.length; index += chunkSize) {
+    chunks.push(rows.slice(index, index + chunkSize));
+  }
+
+  return chunks;
 }
 
 function createScheduleProfile(opportunity) {
@@ -292,7 +332,7 @@ function createVerifiedScheduleOverrides() {
     },
   ],
   [
-    'palantir-path-watch',
+    'palantir-launch-spring-program',
     {
       cycleFrequency: 'annual',
       expectedOpenMonths: [7, 8, 9, 10],
@@ -304,32 +344,12 @@ function createVerifiedScheduleOverrides() {
       discoveryCheckIntervalHours: 48,
       sourceVolatility: 'moving_cycle_page',
       discoveryQueries: [
-        createDiscoveryQuery('official_students_page', 'site:palantir.com/careers/students "Palantir Path"', 'Check whether Palantir Path appears on official student pages.'),
-        createDiscoveryQuery('official_open_positions', 'site:palantir.com/careers/open-positions "Palantir Path" internship 2027', 'Search official open positions for a current-cycle Path posting.'),
-        createDiscoveryQuery('related_program_check', 'site:palantir.com/careers/students "Launch" "Meritocracy Fellowship"', 'Track related official early-talent programs when Path is absent.'),
+        createDiscoveryQuery('official_students_page', 'site:palantir.com/careers/students/launch "Palantir Launch"', 'Check whether the official Launch page has current-cycle details.'),
+        createDiscoveryQuery('official_open_positions', 'site:jobs.lever.co/palantir "Palantir Launch" "Spring Program"', 'Search official Lever postings for a current-cycle Launch application.'),
+        createDiscoveryQuery('current_cycle_deadline', '"Palantir Launch" "Spring Program" "deadline" 2027', 'Find current-cycle Launch deadline language.'),
       ],
       scheduleNote:
-        'Path is not confirmed on current official pages. Keep in discovery/review until a current official posting exists.',
-    },
-  ],
-  [
-    'nasa-internships',
-    {
-      cycleFrequency: 'semester',
-      expectedOpenMonths: [8, 9, 2, 5],
-      lastKnownOpenAt: '2026-08-01',
-      activeLeadDays: 120,
-      activeCheckIntervalHours: 24,
-      warmupCheckIntervalHours: 72,
-      dormantCheckIntervalDays: 21,
-      discoveryCheckIntervalHours: 72,
-      sourceVolatility: 'stable',
-      discoveryQueries: [
-        createDiscoveryQuery('official_deadlines', 'site:nasa.gov/learning-resources/internship-programs "Spring 2027 Application Deadline"', 'Confirm NASA OSTEM session deadlines.'),
-        createDiscoveryQuery('gateway_check', 'site:stemgateway.nasa.gov NASA Internship "Spring 2027"', 'Check NASA STEM Gateway if the official landing page redirects application activity.'),
-      ],
-      scheduleNote:
-        'Official NASA page lists Spring, Summer, and Fall 2027 deadlines. Treat as semester cadence with extra attention before each deadline.',
+        'Launch is the confirmed early discovery program. Keep in discovery/review until a current official posting exists.',
     },
   ],
   [
@@ -393,7 +413,7 @@ function createVerifiedScheduleOverrides() {
     },
   ],
   [
-    'mlh-fellowship',
+    'mlh-open-source-fellowship',
     {
       cycleFrequency: 'rolling',
       expectedOpenMonths: [1, 4, 7, 10],
@@ -901,7 +921,7 @@ function buildDiscoveryQueries(opportunity) {
 
   if (opportunity.category?.toLowerCase().includes('conference')) {
     queries.push(
-      createDiscoveryQuery('conference_funding_cycle', `"${opportunity.name}" conference funding ${nextYear}`, 'Conference funding pages often move by event year.'),
+      createDiscoveryQuery('conference_funding_cycle', `"${opportunity.name}" conference travel funding ${nextYear}`, 'Conference / Travel Funding pages often move by event year.'),
     );
   }
 

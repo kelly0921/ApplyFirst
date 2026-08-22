@@ -6,7 +6,7 @@ Use this plan for the first 3-5 student tests. The goal is not to prove the prod
 
 Prioritize students who resemble the primary target user:
 
-- Freshman or sophomore exploring tech, PM, quant / finance, data / AI, fellowships, scholarships, or conference funding.
+- Freshman or sophomore exploring tech, PM, quant / finance, data / AI, fellowships, sponsor-backed scholarships, or conference funding.
 - Actively trying to find career-launch programs before normal internship recruiting gets crowded.
 - Familiar with scattered lists, school links, Discord posts, LinkedIn posts, or GitHub opportunity repos.
 
@@ -31,7 +31,6 @@ Before each test:
 
 Suggested first examples:
 
-- NASA Internships.
 - Outreachy.
 - MLH Fellowship.
 - Coding it Forward Fellowship.

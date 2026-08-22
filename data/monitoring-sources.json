@@ -6,19 +6,13 @@
     "sampleCurrentText": "Microsoft Explore applications are open for Summer 2027. First-year and sophomore students are eligible. Submit your application by October 15, 2026."
   },
   {
-    "id": "nasa-internships",
-    "watchUrl": "https://www.nasa.gov/learning-resources/internship-programs/",
-    "previousText": "NASA internships include spring, summer, and fall sessions. Students can review eligibility and session dates.",
-    "sampleCurrentText": "NASA internships include spring, summer, and fall sessions. Spring 2027 Application Deadline: September 14, 2026. Summer 2027 Application Deadline: February 26, 2027. Fall 2027 Application Deadline: May 21, 2027."
-  },
-  {
     "id": "outreachy",
     "watchUrl": "https://www.outreachy.org/",
     "previousText": "Outreachy internship applications are closed. Please check back for the next application cycle.",
     "sampleCurrentText": "Outreachy runs internships twice a year. December 2026 internship applications are expected in early to mid August. Exact initial application deadline should be verified."
   },
   {
-    "id": "mlh-fellowship",
+    "id": "mlh-open-source-fellowship",
     "watchUrl": "https://fellowship.mlh.com/programs/open-source",
     "previousText": "MLH Fellowship applications are reviewed by cohort. Students can learn about open source tracks and eligibility.",
     "sampleCurrentText": "MLH Fellowship applications are now accepting applications and reviewed on a rolling basis. Students can submit your application by September 20, 2026."

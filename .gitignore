@@ -7,3 +7,7 @@ data/monitoring-seed.generated.json
 data/monitoring-review.generated.json
 supabase/seed.generated.sql
 cloudflare/d1/watch-seed.generated.sql
+docs/private/*
+!docs/private/
+!docs/private/INVITE_CODES.template.csv
+*.private.csv

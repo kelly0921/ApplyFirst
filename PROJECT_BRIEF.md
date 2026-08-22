@@ -22,7 +22,7 @@ For freshmen and sophomores, these programs can be especially valuable because c
 
 The long-term benefit is agency. The more early exposure a student gets, the more they can compare environments, build a network, understand their own values, and make informed choices. Over time, the goal is not only helping companies choose students; it is helping students understand which companies, roles, cultures, and industries they want to choose.
 
-This matters most in fields that are hard to break into, such as quant, finance tech, product, AI, research, and selective fellowship pipelines. Early discovery programs can become a bridge into those spaces before traditional internship recruiting becomes highly competitive.
+This matters most in fields that are hard to break into, such as quant, finance tech, product, AI, research, and selective fellowship pipelines. Discovery programs can become a bridge into those spaces before traditional internship recruiting becomes highly competitive.
 
 ## Target User
 
@@ -31,7 +31,7 @@ The primary user is a first-year or sophomore student trying to break into tech,
 This is modeled after past-Kelly:
 
 - Ambitious, but still learning what programs exist.
-- Building early career momentum through internships, fellowships, insight programs, conferences, scholarships, and prep programs.
+- Building early career momentum through internships, fellowships, insight programs, conferences, company/nonprofit-sponsored scholarships, and prep programs.
 - Willing to prepare, but needs better timing and clearer signals.
 - Does not want another noisy job board.
 
@@ -65,30 +65,33 @@ The wedge:
 
 ApplyFirst should include:
 
-- Underclassmen internships.
-- Exploratory programs.
-- Fellowships.
-- Internship-matching programs.
-- Insight programs.
-- Winternships.
-- Scholarships and conference funding.
-- Career prep programs.
-- Mentorship and technical communities.
-- New grad or recent grad fellowships, rotational programs, apprenticeships, and bridge programs.
+- Discovery Program: early discovery, insight, externship, and special exploratory programs for underclassmen.
+- Fellowship: fellowships, project fellowships, placement fellowships, nonprofit fellowships, and internship alternatives.
+- Startup / VC Fellowship: fellowships that place students into portfolio companies, founder networks, or venture-backed ecosystems.
+- Winternship: short winter-break programs.
+- Scholarship / Funding: company-sponsored or major nonprofit-sponsored scholarships and grants.
+- Conference / Travel Funding: conference scholarships, travel grants, and event access funding.
+- Community / Prep Program: career prep programs, technical communities, mentorship, training, courses, and resource hubs.
+- Full-Time Alternative: new grad, recent grad, apprenticeship, bridge, and full-time alternative pathways.
+
+Detailed distinctions such as externship, training program, placement fellowship, technical community, or special resource should live in tags, descriptions, and source notes rather than as separate public opportunity types.
 
 Role tracks for the current product:
 
 - Software Engineering.
 - Product Management.
+- Design when a program explicitly supports UX, UI, product design, or design-manager paths.
 - Quant / Trading / Finance Tech.
 - Data / AI / ML when tied to early-career programs.
-- Access & Prep, including fellowships, scholarships, conferences, prep programs, and communities.
+- Access & Prep, including fellowships, sponsor-backed scholarships, conferences, prep programs, and communities.
 
 Out of scope for now:
 
 - Generic internships.
+- Broad internship portals and normal role feeds.
 - Normal job postings.
 - Broad job-board replacement.
+- Broad scholarship search across thousands of generic awards.
 - Hardware / robotics and cybersecurity as major tracks, unless stronger source coverage is found later.
 - Fully automated public alerts without human verification.
 
@@ -98,7 +101,7 @@ Curated student repos are discovery inputs, not final truth.
 
 Primary inspiration sources:
 
-- LuisaE/opportunities: broad early-career CS, finance, prep, scholarship, and mentorship programs.
+- LuisaE/opportunities: broad early-career CS, finance, prep, sponsor-backed scholarship, and mentorship programs.
 - zapplyjobs/underclassmen-internships: underclassmen-focused internships, fellowships, externships, winternships, and special programs.
 
 Secondary sources:
@@ -109,6 +112,8 @@ Secondary sources:
 
 Duplicate appearances across trusted lists should become a positive signal. If a program shows up repeatedly, prioritize it for official verification and richer notes.
 
+LuisaE/opportunities should be treated as a key audit checklist, not just inspiration. The repo confirms that ApplyFirst should keep watching early CS programs, internship alternatives, CS exploratory programs, CS fellowships, conference funding, sponsor-backed scholarships, mentorship, research, and finance exploratory programs. It also surfaces missing candidates to evaluate carefully, including LinkedIn First Play, Google ASDI, Uber STAR, Visa Sophomore, NVIDIA Ignite, Oracle first-year SWE, Meta University, JPMorganChase Fellowship, Bank of America freshman technology programs, and similar underclassmen-specific pathways. These should only be promoted into the library after official-source verification and scope review.
+
 ## Manual Verification Workflow
 
 Every public-alert-ready record should pass a manual source check before it is treated as trustworthy.
@@ -116,6 +121,7 @@ Every public-alert-ready record should pass a manual source check before it is t
 Required fields for a verified record:
 
 - Official program URL.
+- Closest available application URL or current-cycle posting URL; use a general overview page only when a direct application page is unavailable, closed, or unstable.
 - Previous URL when useful for page-change tracking.
 - Last checked date.
 - Current opening window or expected opening pattern.
@@ -135,7 +141,6 @@ Verification rules:
 
 First verification batch completed:
 
-- NASA Internships.
 - Google Summer of Code.
 - Outreachy.
 - MLH Fellowship.
@@ -146,15 +151,18 @@ First verification batch completed:
 - SEO Tech Developer.
 - SEO Tech Developer First-Year Academy.
 
-Still needs official-cycle verification:
+Watch-only examples until current-cycle pages are explicit:
 
 - Microsoft Explore.
-- Palantir Path.
+- Palantir Launch.
 - Jane Street early insight programs.
-- Virtu Women's Winternship.
-- HeadStart Fellowship.
+- Two Sigma Freshman Software Engineering.
+- Google Scholarships.
 - Hack.Diversity Fellowship.
-- JPMorgan Career.edYOU Academy.
+
+Removed from public beta until a better official source exists:
+
+- IBM Accelerate.
 
 ## MVP Product Shape
 
@@ -169,7 +177,7 @@ Core Phase 1 features:
 - Class-year filter.
 - Role-track filter.
 - Recommendation filter.
-- Program category filter.
+- Opportunity type filter.
 - Status filter.
 - Opportunity detail panel.
 - Saved shortlist.
@@ -320,7 +328,7 @@ Recommended waitlist fields:
 - Class year.
 - Role tracks.
 - Desired alert timing.
-- Programs or categories the student cares about most.
+- Programs or opportunity types the student cares about most.
 - Optional school, major, or notes.
 
 Current prototype invite codes:
@@ -329,7 +337,7 @@ Current prototype invite codes:
 - `APPLYFIRST2026`
 - `EARLYACCESS`
 
-These are local prototype access codes only. Replace them with real account, invite, or waitlist approval logic before treating ApplyFirst as a live private beta.
+These generic codes are local prototype access codes. Private beta testers can receive unique workspace codes in the `AF-NAME-1234` style. Workspace codes unlock the app and restore a student's saved programs, My Focus preferences, alert setup receipt, waitlist context, and onboarding progress through the Cloudflare watch Worker/D1 backend. This is a lightweight beta identity layer, not secure authentication; anyone with the code can restore that beta workspace. Full plaintext codes stay in a private registry outside Git; the repo only tracks the safe template and workflow in `docs/INVITE_CODE_WORKFLOW.md`.
 
 Next Phase 2 steps:
 
@@ -434,7 +442,7 @@ I also shaped the source strategy by deciding which public opportunity repos sho
 - Class-year filtering for freshman, sophomore, and all-year opportunities.
 - Role-track filtering for software engineering, product management, quant / finance, and Access & Prep programs.
 - Recommendation filtering for Recommended, Watch List, and Foundation programs.
-- Opportunity detail panel with timing, funding, location, confidence, source notes, and preparation guidance.
+- Opportunity detail panel with timing, funding, location, opportunity type, confidence, source notes, and preparation guidance.
 - Application-status labels that distinguish programs to verify, prepare for, or act on.
 - Source-coverage labels that surface programs appearing across trusted lists.
 - Persistent shortlist saved locally in the browser.
@@ -443,9 +451,9 @@ I also shaped the source strategy by deciding which public opportunity repos sho
 
 Recommendation model:
 
-- Recommended: underclassmen-fit opportunities in high-leverage categories such as internships, fellowships, insight programs, winternships, and training programs.
+- Recommended: underclassmen-fit opportunities in high-leverage opportunity types such as Discovery Program, Fellowship, Startup / VC Fellowship, Winternship, and Full-Time Alternative.
 - Watch List: relevant programs worth tracking, but without enough current-cycle urgency or class-year fit to elevate.
-- Foundation: scholarships, conferences, communities, and resources that support career momentum but are not the core application-opening alert target.
+- Foundation: Scholarship / Funding, Conference / Travel Funding, and Community / Prep Program records that support career momentum but are not the core application-opening alert target.
 
 Duplicate appearances across trusted lists are treated as source-coverage and verification cues, not as proof that a program is automatically higher quality.
 
@@ -459,7 +467,7 @@ Stack:
 - CSS.
 - Browser `localStorage` for persistent shortlist state.
 - Cloudflare Pages for the public prototype.
-- Cloudflare Workers and D1 for beta watch-request capture, seasonal source schedules, scheduled source checks, discovery queue surfacing, search-provider candidate discovery, discovery candidate review, and email delivery logs.
+- Cloudflare Workers and D1 for beta watch-request capture, invite-code workspace restore, seasonal source schedules, scheduled source checks, discovery queue surfacing, search-provider candidate discovery, discovery candidate review, and email delivery logs.
 
 Architecture and implementation notes:
 
@@ -468,6 +476,7 @@ Architecture and implementation notes:
 - Adds computed helper functions for role-track classification, recommendation status, application status, source-coverage labeling, and next-action guidance.
 - Uses client-side filtering and search for a fast Phase 1 MVP without backend complexity.
 - Adds a separate watch Worker so beta monitoring can persist source checks, source schedules, and alert delivery logs without overbuilding auth.
+- Adds invite-code workspaces as a beta-stage bridge between browser-only saved state and full accounts.
 - Keeps uncertain outbound notifications behind maintainer review while allowing high-confidence official opening alerts to send automatically.
 - Adds a hidden Maintainer Mode review console for D1-backed discovery candidates, pending alert candidates, email dry runs, and reviewed sends.
 
@@ -566,7 +575,7 @@ This project helped me practice turning scattered information into a product sys
 
 Title: **ApplyFirst**
 
-1-sentence description: A program monitor that helps underclassmen track high-signal internships, fellowships, and career-launch opportunities in one place.
+1-sentence description: A program monitor that helps underclassmen track high-signal early programs, fellowships, funding, and career-launch opportunities in one place.
 
 Tags:
 
