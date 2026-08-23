@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 import programsScreenshot from '../docs/assets/screenshots/applyfirst-programs-desktop.png';
+import programStatusMixScreenshot from '../docs/assets/screenshots/applyfirst-program-status-mix-desktop.png';
 import { createSourceAnalysis, getSourceReviewDecision } from './monitoring';
 import {
   confidenceLabels,
@@ -1371,16 +1372,28 @@ function ProductPreviewSection() {
         <p>Compare programs, timing, saved targets, and source confidence in one view.</p>
       </div>
       <div className="product-preview-layout">
-        <figure className="product-preview-main">
-          <img
-            src={programsScreenshot}
-            alt="ApplyFirst opportunity workspace with program records, saved items, status labels, and a selected program detail panel."
-          />
-          <figcaption>
-            <strong>Program Library</strong>
-            <span>One place to find, filter, and save high-signal student opportunities.</span>
-          </figcaption>
-        </figure>
+        <div className="product-preview-gallery">
+          <figure className="product-preview-main">
+            <img
+              src={programsScreenshot}
+              alt="ApplyFirst Programs page with search, filters, library snapshot, opportunity list, and selected program details."
+            />
+            <figcaption>
+              <strong>Program Library</strong>
+              <span>Search, filter, compare, and save high-signal student opportunities.</span>
+            </figcaption>
+          </figure>
+          <figure className="product-preview-status">
+            <img
+              src={programStatusMixScreenshot}
+              alt="ApplyFirst program rows showing Open Now, Watching, Deadline Soon, and Opening Soon status examples."
+            />
+            <figcaption>
+              <strong>Status Signals</strong>
+              <span>See what is open, what to watch, and what has a deadline approaching.</span>
+            </figcaption>
+          </figure>
+        </div>
         <div className="signal-stack" aria-label="ApplyFirst signal examples">
           <article>
             <span className="signal-icon">01</span>

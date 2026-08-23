@@ -16,6 +16,8 @@ The mark uses a softened Sharp A with a restrained underline, matching the produ
 
 ![ApplyFirst programs dashboard](./docs/assets/screenshots/applyfirst-programs-desktop.png)
 
+![ApplyFirst program status examples](./docs/assets/screenshots/applyfirst-program-status-mix-desktop.png)
+
 ![ApplyFirst preferences setup](./docs/assets/screenshots/applyfirst-preferences-desktop.png)
 
 ![ApplyFirst contribution flow](./docs/assets/screenshots/applyfirst-contribute-desktop.png)
