@@ -1374,7 +1374,7 @@ function ProductPreviewSection() {
         <figure className="product-preview-main">
           <img
             src={programsScreenshot}
-            alt="ApplyFirst program library with search, filters, opportunity records, and a selected program detail panel."
+            alt="ApplyFirst opportunity workspace with program records, saved items, status labels, and a selected program detail panel."
           />
           <figcaption>
             <strong>Program Library</strong>
