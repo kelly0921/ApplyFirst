@@ -74,7 +74,7 @@ export function getOpportunityTracks(opportunity) {
     tracks.add('Design');
   }
 
-  if (signal.match(/quant|trading|finance|fintech|bank|wall street|citadel|jane street|virtu/)) {
+  if (signal.match(/quant|trading|finance|fintech|wall street|investment banking|banking|citadel|jane street|virtu/)) {
     tracks.add('Quant / Finance');
   }
 
@@ -1541,6 +1541,38 @@ export const opportunities = [
     sourceNote:
       'Official Capital One page confirms the 10-week paid McLean program for second-year students and says no related jobs are currently listed.',
     lastChecked: '2026-08-22',
+  },
+  {
+    id: 'bank-of-america-student-leaders',
+    name: 'Student Leaders',
+    organization: 'Bank of America',
+    category: 'Discovery Program',
+    classYears: ['Freshman'],
+    timing: 'Spring',
+    status: 'watching',
+    confidence: 'high',
+    funding: 'Paid program',
+    location: 'Eligible U.S. markets',
+    url: 'https://about.bankofamerica.com/en/making-an-impact/student-leaders',
+    previousUrl: 'https://about.bankofamerica.com/en/making-an-impact/student-leaders-program-faq',
+    openDate: 'Previous-cycle context: 2026 applications opened February 9; watch winter for the next cycle',
+    deadline: 'Previous-cycle context: 2026 application deadline was March 16 at 11:59 p.m. ET; watch for the next deadline',
+    tags: ['Leadership', 'Nonprofit', 'Community impact', 'Access & Prep', 'Paid experience'],
+    description:
+      'Bank of America Student Leaders connects more than 300 community-minded early college students with a paid six-week internship at a local nonprofit organization and a national Leadership Summit. Participants build workforce, leadership, service, and public/private-sector problem-solving experience while working on community needs.',
+    eligibilitySummary:
+      'Official 2026 FAQ targeted students at least 18 years old who earned a high school diploma within the last 24 months, had 12-18 post-secondary credit hours, could work in the U.S. through July 2026 without sponsorship, and lived in an eligible program market.',
+    experienceSummary:
+      'Students work full-time with a nonprofit in June-July, attend a three-day paid-expenses Leadership Summit, connect with peers and Bank of America leaders, and develop career skills around community impact.',
+    detailBasis:
+      'Official Bank of America program and FAQ pages confirm the paid nonprofit placement, Leadership Summit, 2026 application timing, eligibility, and hourly pay details.',
+    why:
+      'A strong early leadership pathway for students who want paid experience, nonprofit exposure, and a sponsor-backed signal before later internship recruiting.',
+    prep:
+      'Prepare community-impact examples, leadership/service stories from the last two years, transcript details, eligible-market availability, and two school-based recommendations.',
+    sourceNote:
+      'Official Bank of America page confirms a paid six-week nonprofit internship and Leadership Summit; official FAQ says 2026 applications opened February 9 and closed March 16, 2026.',
+    lastChecked: '2026-08-23',
   },
   {
     id: 'codepath-futureforce-tech-launchpad',

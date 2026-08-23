@@ -75,6 +75,7 @@ The first beta audit now covers the original uncertain queue. Remaining follow-u
 - Keep canonical watch-only records out of hero/beta-test examples unless their current-cycle pages are live.
 - NASA Internships was removed from the current beta seed because it is a broad internship portal, not a special ApplyFirst program type.
 - Added hackNY Public Interest Lab / Fellows Program as a watch-only fellowship/community record because the official page confirms the program model but still has stale prior-cycle deadline text.
+- Added Bank of America Student Leaders as a watch-only discovery record because the official page confirms the paid nonprofit internship and Leadership Summit model, while the currently visible timing is previous-cycle 2026 context.
 
 ## 2026-08-22 Verification Pass
 
