@@ -59,7 +59,7 @@ These generic codes are for local prototype access only. For private beta tester
 
 After unlocking the prototype, use the `About` button in the app header to clear the local access flag and return to the public landing page.
 
-The waitlist/contact form saves locally by default. Set `VITE_WAITLIST_ENDPOINT` to a JSON-compatible form/backend endpoint to submit waitlist and My Focus contact requests externally; if the endpoint fails, the prototype falls back to local browser storage. Set `VITE_ALERT_ENDPOINT` to capture beta email alert opt-ins, or leave it blank to use the waitlist endpoint. Set `VITE_WATCH_ENDPOINT` to a deployed ApplyFirst watch Worker `/watch` route to save beta watch requests for source monitoring. Student program submissions and feedback save locally by default. Set `VITE_CONTRIBUTION_ENDPOINT` to capture Suggest Updates submissions externally; if the endpoint fails, the prototype falls back to local browser storage. Copy `.env.example` to `.env.local` for local endpoint testing.
+The waitlist/contact form saves locally by default. Set `VITE_WAITLIST_ENDPOINT` to the deployed ApplyFirst capture Worker `/waitlist` route to submit waitlist and My Focus contact requests externally; if the endpoint fails, the prototype falls back to local browser storage. Set `VITE_ALERT_ENDPOINT` to capture beta email alert opt-ins, or leave it blank to use the waitlist endpoint. Set `VITE_WATCH_ENDPOINT` to a deployed ApplyFirst watch Worker `/watch` route to save beta watch requests for source monitoring. Student program submissions and feedback save locally by default. Set `VITE_CONTRIBUTION_ENDPOINT` to the capture Worker `/contribution` route; if the endpoint fails, the prototype falls back to local browser storage. Copy `.env.example` to `.env.local` for local endpoint testing.
 
 Text alerts are implemented in the watch Worker but hidden from students by default. Keep `VITE_TEXT_ALERTS_ENABLED=false` until Twilio is configured and smoke-tested; then set it to `true` in Cloudflare Pages to make the Text option selectable.
 
@@ -147,6 +147,39 @@ To smoke-test beta capture endpoints after setting `VITE_WAITLIST_ENDPOINT` and 
 ```bash
 npm run capture:smoke
 ```
+
+## Cloudflare Capture Worker
+
+The waitlist and Suggest Updates capture slice lives in `workers/applyfirst-capture-worker.js` and uses the existing `applyfirst_beta` D1 database.
+
+Apply the capture schema:
+
+```bash
+npm run capture:d1:migrate
+```
+
+Configure owner notification secrets:
+
+```bash
+npx wrangler secret put OWNER_NOTIFY_EMAIL --config wrangler.capture.toml
+npx wrangler secret put CAPTURE_FROM_EMAIL --config wrangler.capture.toml
+npx wrangler secret put CAPTURE_REPLY_TO --config wrangler.capture.toml
+```
+
+Deploy the Worker:
+
+```bash
+npm run capture:worker:deploy
+```
+
+Use these Cloudflare Pages environment variables:
+
+```text
+VITE_WAITLIST_ENDPOINT=https://applyfirst-capture.kellychenmeiyi.workers.dev/waitlist
+VITE_CONTRIBUTION_ENDPOINT=https://applyfirst-capture.kellychenmeiyi.workers.dev/contribution
+```
+
+After a waitlist submission, check D1 and your owner inbox. If the owner email fails, the request still stays saved in D1.
 
 ## Cloudflare Watch Worker
 

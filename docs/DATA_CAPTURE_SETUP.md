@@ -11,17 +11,17 @@ If an endpoint is blank or unavailable, the app falls back to browser-local stor
 
 ## Recommended Beta Setup
 
-For the first beta, use the fastest durable capture option:
+For the first beta, use the repo-managed Cloudflare capture Worker for waitlist/contact and Suggest Updates submissions:
 
-1. Create one capture destination for waitlist/contact requests.
-2. Create one capture destination for contribution and feedback submissions.
-3. Use either the waitlist destination or a dedicated destination for beta email alert opt-ins.
-4. Deploy the ApplyFirst watch Worker if beta testers should submit real watch requests.
-5. Use endpoints that accept JSON `POST` requests.
-6. Add the endpoint URLs as Cloudflare Pages environment variables.
+1. Apply the capture D1 schema to `applyfirst_beta`.
+2. Deploy `applyfirst-capture` from `wrangler.capture.toml`.
+3. Point `VITE_WAITLIST_ENDPOINT` to `/waitlist`.
+4. Point `VITE_CONTRIBUTION_ENDPOINT` to `/contribution`.
+5. Use either the waitlist endpoint or a dedicated destination for beta email alert opt-ins.
+6. Deploy the ApplyFirst watch Worker if beta testers should submit real watch requests.
 7. Redeploy the site.
 8. Submit one test waitlist entry, one beta watch setup, and one Suggest Updates entry.
-9. Confirm all entries appear in the destination before inviting students.
+9. Confirm all entries appear in D1 before inviting students.
 
 You can also run the repo smoke test after setting endpoint environment variables:
 
@@ -30,6 +30,60 @@ npm run capture:smoke
 ```
 
 The command posts one sample waitlist payload, one beta email alert payload, one contribution payload, and one optional beta watch payload when `VITE_WATCH_ENDPOINT` is set. It exits with an error if any required endpoint is missing, unavailable, or returns a non-2xx status.
+
+## Capture Worker
+
+The capture Worker is stored in this repo:
+
+- Worker source: `workers/applyfirst-capture-worker.js`
+- Worker config: `wrangler.capture.toml`
+- D1 schema: `cloudflare/d1-capture/001_capture_foundation.sql`
+
+Routes:
+
+- `GET /health`
+- `POST /waitlist`
+- `POST /contribution`
+
+The `/waitlist` route stores the request in `waitlist_requests` and, when configured, sends an owner notification email. If the owner notification fails, the waitlist request still succeeds and remains stored in D1.
+
+Apply the schema:
+
+```bash
+npm run capture:d1:migrate
+```
+
+Set Worker secrets:
+
+```bash
+npx wrangler secret put OWNER_NOTIFY_EMAIL --config wrangler.capture.toml
+npx wrangler secret put CAPTURE_FROM_EMAIL --config wrangler.capture.toml
+npx wrangler secret put CAPTURE_REPLY_TO --config wrangler.capture.toml
+```
+
+Use an address on a Cloudflare Email Sending domain for `CAPTURE_FROM_EMAIL`, such as an address on `kellychen.dev`. `CAPTURE_REPLY_TO` can be your owner inbox; student replies are also set to the submitted email when available.
+
+Deploy:
+
+```bash
+npm run capture:worker:deploy
+```
+
+Expected URLs:
+
+```text
+https://applyfirst-capture.kellychenmeiyi.workers.dev/health
+https://applyfirst-capture.kellychenmeiyi.workers.dev/waitlist
+https://applyfirst-capture.kellychenmeiyi.workers.dev/contribution
+```
+
+After deploying, submit one waitlist request from the site and verify:
+
+```bash
+npx wrangler d1 execute applyfirst_beta --remote --command "SELECT id,source,email,class_year,interest,school,created_at FROM waitlist_requests ORDER BY id DESC LIMIT 5;"
+```
+
+You should also receive an owner email with the student's email, class year, interest, school, preference summary, and note.
 
 ## Minimum Fields To Capture
 

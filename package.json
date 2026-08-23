@@ -21,6 +21,9 @@
     "watch:seed:d1:sync:dry": "node scripts/apply-d1-watch-seed.mjs --dry-run",
     "watch:worker:dev": "npx wrangler dev --config wrangler.watch.toml",
     "watch:worker:deploy": "npx wrangler deploy --config wrangler.watch.toml",
+    "capture:worker:dev": "npx wrangler dev --config wrangler.capture.toml",
+    "capture:worker:deploy": "npx wrangler deploy --config wrangler.capture.toml",
+    "capture:d1:migrate": "npx wrangler d1 migrations apply applyfirst_beta --config wrangler.capture.toml --remote",
     "capture:smoke": "node scripts/smoke-capture-endpoints.mjs",
     "preview": "vite preview --host 127.0.0.1"
   },

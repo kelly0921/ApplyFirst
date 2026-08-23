@@ -1,0 +1,21 @@
+name = "applyfirst-capture"
+main = "workers/applyfirst-capture-worker.js"
+compatibility_date = "2026-08-23"
+
+[vars]
+PUBLIC_APP_URL = "https://applyfirst-careers.pages.dev"
+ENABLE_OWNER_WAITLIST_NOTIFICATIONS = "true"
+CAPTURE_FROM_NAME = "ApplyFirst"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "applyfirst_beta"
+database_id = "53721b6a-c480-4abb-b470-e0f9703288b8"
+migrations_dir = "cloudflare/d1-capture"
+
+[[send_email]]
+name = "EMAIL"
+
+[observability]
+enabled = true
+head_sampling_rate = 1

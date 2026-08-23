@@ -20,15 +20,16 @@ Before each test:
 2. Confirm the public `About` page explains the private beta clearly.
 3. Confirm the invite code works and opens the app.
 4. Submit one waitlist/contact request, one beta watch setup, and one Suggest Updates request from the deployed site, then confirm all reach the capture backend.
-5. Turn on Maintainer Mode, open Review, enter the Worker admin token, and load the live queues.
-6. Run one dry-run discovery search and confirm any saved candidates appear as review items.
-7. Dry-run one pending alert candidate if available. Only send a real test email to yourself.
-8. Confirm the real test email includes an unsubscribe link, then open that link and verify the watch request becomes unsubscribed.
-9. Create a fresh watch request after the unsubscribe smoke test if you need another active test recipient.
-10. Turn Maintainer Mode back off before the student session so the tester only sees the student-facing product.
-11. Pick 5-7 manually reviewed programs to mention if the tester asks for examples.
-12. Keep this note ready: students can submit a beta watch setup by email. High-confidence official opening signals can send automatically; uncertain signals stay in review, and every beta email includes an unsubscribe link.
-13. SMS/text alerts are intentionally disabled in the student UI for this beta until Twilio is configured, tested, and enabled with `VITE_TEXT_ALERTS_ENABLED=true`. Revisit this before expanding beyond email alerts.
+5. Confirm the waitlist/contact request also sends an owner notification email to the configured ApplyFirst inbox.
+6. Turn on Maintainer Mode, open Review, enter the Worker admin token, and load the live queues.
+7. Run one dry-run discovery search and confirm any saved candidates appear as review items.
+8. Dry-run one pending alert candidate if available. Only send a real test email to yourself.
+9. Confirm the real test email includes an unsubscribe link, then open that link and verify the watch request becomes unsubscribed.
+10. Create a fresh watch request after the unsubscribe smoke test if you need another active test recipient.
+11. Turn Maintainer Mode back off before the student session so the tester only sees the student-facing product.
+12. Pick 5-7 manually reviewed programs to mention if the tester asks for examples.
+13. Keep this note ready: students can submit a beta watch setup by email. High-confidence official opening signals can send automatically; uncertain signals stay in review, and every beta email includes an unsubscribe link.
+14. SMS/text alerts are intentionally disabled in the student UI for this beta until Twilio is configured, tested, and enabled with `VITE_TEXT_ALERTS_ENABLED=true`. Revisit this before expanding beyond email alerts.
 
 Suggested first examples:
 
