@@ -61,6 +61,8 @@ After unlocking the prototype, use the `About` button in the app header to clear
 
 The waitlist/contact form saves locally by default. Set `VITE_WAITLIST_ENDPOINT` to a JSON-compatible form/backend endpoint to submit waitlist and My Focus contact requests externally; if the endpoint fails, the prototype falls back to local browser storage. Set `VITE_ALERT_ENDPOINT` to capture beta email alert opt-ins, or leave it blank to use the waitlist endpoint. Set `VITE_WATCH_ENDPOINT` to a deployed ApplyFirst watch Worker `/watch` route to save beta watch requests for source monitoring. Student program submissions and feedback save locally by default. Set `VITE_CONTRIBUTION_ENDPOINT` to capture Suggest Updates submissions externally; if the endpoint fails, the prototype falls back to local browser storage. Copy `.env.example` to `.env.local` for local endpoint testing.
 
+Text alerts are implemented in the watch Worker but hidden from students by default. Keep `VITE_TEXT_ALERTS_ENABLED=false` until Twilio is configured and smoke-tested; then set it to `true` in Cloudflare Pages to make the Text option selectable.
+
 Private beta testing should ask students to join the waitlist, unlock the app with an invite code, save one program, submit one program ApplyFirst should watch, and report one stale or confusing record. Until real accounts and moderation exist, submitted programs and feedback should be treated as review candidates rather than public library records.
 
 Beta-readiness references:
@@ -193,10 +195,12 @@ Use a sender such as `alerts@yourdomain.com` for `ALERT_FROM_EMAIL`. Optional Wo
 - `ALERT_REPLY_TO=hello@yourdomain.com`
 - `PUBLIC_APP_URL=https://applyfirst-careers.pages.dev`
 - `WATCH_WORKER_PUBLIC_URL=https://applyfirst-watch.YOUR-SUBDOMAIN.workers.dev`
-- `SMS_WEBHOOK_URL` for a future SMS provider webhook
-- `SMS_WEBHOOK_TOKEN` if that webhook needs a bearer token
+- `SMS_PROVIDER=twilio` to make Twilio the intended SMS provider
+- `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and either `TWILIO_MESSAGING_SERVICE_SID` or `TWILIO_FROM_PHONE` to send text alerts
+- `SMS_WEBHOOK_URL` as an optional custom SMS provider webhook fallback
+- `SMS_WEBHOOK_TOKEN` if the custom webhook needs a bearer token
 - `WATCH_RUN_LIMIT=25` to cap each scheduled run
-- `AUTO_SEND_WATCHED_OPEN_ALERTS=true` to email high-confidence opening transitions automatically
+- `AUTO_SEND_WATCHED_OPEN_ALERTS=true` to send high-confidence opening transitions automatically by the student's selected contact method
 - `AUTO_ALERT_EXISTING_OPEN_ON_WATCH=true` to notify a new watcher when a followed program is already open
 - `DISCOVERY_SEARCH_PROVIDER=brave` or `tavily` for current-cycle URL discovery search
 - `DISCOVERY_SEARCH_COUNTRY=US` for search localization
@@ -212,6 +216,20 @@ npx wrangler secret put TAVILY_API_KEY --config wrangler.watch.toml
 
 Use one provider key at a time. The Worker also accepts `DISCOVERY_SEARCH_API_KEY` as a generic fallback secret.
 
+Optional SMS setup:
+
+```bash
+npx wrangler secret put TWILIO_ACCOUNT_SID --config wrangler.watch.toml
+npx wrangler secret put TWILIO_AUTH_TOKEN --config wrangler.watch.toml
+npx wrangler secret put TWILIO_MESSAGING_SERVICE_SID --config wrangler.watch.toml
+# or, if not using a Messaging Service:
+npx wrangler secret put TWILIO_FROM_PHONE --config wrangler.watch.toml
+```
+
+Text alerts are sent only for watch requests where the student chooses `Text` and provides a phone number. The Worker records SMS delivery attempts in `alert_deliveries` with channel `phone`.
+
+After Twilio is configured and tested, add `VITE_TEXT_ALERTS_ENABLED=true` to the ApplyFirst Pages environment variables and redeploy the site. Until then, the My Focus page marks Text as unavailable so students do not expect SMS delivery.
+
 7. Deploy the watch Worker:
 
 ```bash
@@ -224,7 +242,7 @@ npm run watch:worker:deploy
 https://applyfirst-watch.YOUR-SUBDOMAIN.workers.dev/watch
 ```
 
-The Worker stores beta watch requests, checks only sources that are due, saves page snapshots/source checks, tracks each program's latest alert state, automatically emails watched students when a high-confidence official opening appears, and keeps ambiguous source changes in `pending_review`. Source schedules use cycle frequency, expected opening months, active lead time, dormant cadence, active cadence, and source volatility so ApplyFirst can start checking more often before an expected application season instead of polling every record forever.
+The Worker stores beta watch requests, checks only sources that are due, saves page snapshots/source checks, tracks each program's latest alert state, automatically emails or texts watched students when a high-confidence official opening appears, and keeps ambiguous source changes in `pending_review`. Source schedules use cycle frequency, expected opening months, active lead time, dormant cadence, active cadence, and source volatility so ApplyFirst can start checking more often before an expected application season instead of polling every record forever.
 
 The first audited seed set and its schedule decisions live in [Verified seed schedule audit](./docs/VERIFIED_SEED_SCHEDULE_AUDIT.md). Regenerate and import `cloudflare/d1/watch-seed.generated.sql` after changing audited source URLs, expected months, or alert-safety decisions.
 

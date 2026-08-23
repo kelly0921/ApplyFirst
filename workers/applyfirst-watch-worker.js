@@ -2477,6 +2477,11 @@ async function getWatchStatus(env) {
     pendingDiscoveryCandidates,
     openPrograms,
     alertDeliveries: deliveries,
+    deliveryConfig: {
+      email: Boolean(env.EMAIL && env.ALERT_FROM_EMAIL),
+      sms: hasSmsDeliveryConfig(env),
+      smsProvider: getSmsProvider(env),
+    },
     lastCheckedAt: latestCheck?.latest || null,
   };
 }
@@ -3154,13 +3159,109 @@ async function sendEmailAlert(env, candidate, recipient, destination) {
 }
 
 async function sendPhoneAlert(env, candidate, recipient, destination) {
-  if (!env.SMS_WEBHOOK_URL) {
+  const provider = getSmsProvider(env);
+
+  if ((!provider || provider === 'twilio') && hasTwilioSmsConfig(env)) {
+    return sendTwilioSmsAlert(env, candidate, recipient, destination);
+  }
+
+  if ((!provider || provider === 'webhook') && env.SMS_WEBHOOK_URL) {
+    return sendSmsWebhookAlert(env, candidate, recipient, destination);
+  }
+
+  return {
+    status: 'not_configured',
+    errorMessage:
+      'SMS is not configured. Add Twilio secrets or SMS_WEBHOOK_URL before enabling text alerts.',
+  };
+}
+
+function getSmsProvider(env) {
+  return cleanString(env.SMS_PROVIDER || '', 40).toLowerCase();
+}
+
+function hasSmsDeliveryConfig(env) {
+  const provider = getSmsProvider(env);
+
+  if (provider === 'webhook') {
+    return Boolean(env.SMS_WEBHOOK_URL);
+  }
+
+  if (provider === 'twilio') {
+    return hasTwilioSmsConfig(env);
+  }
+
+  return hasTwilioSmsConfig(env) || Boolean(env.SMS_WEBHOOK_URL);
+}
+
+function hasTwilioSmsConfig(env) {
+  return Boolean(
+    env.TWILIO_ACCOUNT_SID &&
+      env.TWILIO_AUTH_TOKEN &&
+      (env.TWILIO_MESSAGING_SERVICE_SID || env.TWILIO_FROM_PHONE),
+  );
+}
+
+async function sendTwilioSmsAlert(env, candidate, recipient, destination) {
+  const accountSid = cleanString(env.TWILIO_ACCOUNT_SID, 160);
+  const authToken = cleanString(env.TWILIO_AUTH_TOKEN, 240);
+  const messagingServiceSid = cleanString(env.TWILIO_MESSAGING_SERVICE_SID, 160);
+  const fromPhone = normalizePhone(env.TWILIO_FROM_PHONE);
+
+  if (!accountSid || !authToken || (!messagingServiceSid && !fromPhone)) {
     return {
       status: 'not_configured',
-      errorMessage: 'SMS_WEBHOOK_URL is not configured.',
+      errorMessage:
+        'Twilio SMS is not configured. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_MESSAGING_SERVICE_SID or TWILIO_FROM_PHONE.',
     };
   }
 
+  const unsubscribeToken = await getOrCreateUnsubscribeToken(env, recipient);
+  const unsubscribeUrl = buildUnsubscribeUrl(env, { ...recipient, unsubscribeToken });
+  const message = buildSmsMessage(candidate, unsubscribeUrl);
+  const form = new URLSearchParams();
+
+  form.set('To', destination);
+  form.set('Body', message);
+
+  if (messagingServiceSid) {
+    form.set('MessagingServiceSid', messagingServiceSid);
+  } else {
+    form.set('From', fromPhone);
+  }
+
+  try {
+    const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
+      method: 'POST',
+      headers: {
+        authorization: `Basic ${btoa(`${accountSid}:${authToken}`)}`,
+        'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
+      },
+      body: form.toString(),
+    });
+    const responseText = await response.text();
+    const responseBody = parseJsonObject(responseText);
+
+    if (!response.ok) {
+      const twilioMessage = responseBody.message || responseBody.more_info || responseText;
+      throw new Error(
+        `Twilio SMS returned HTTP ${response.status}${twilioMessage ? `: ${cleanString(twilioMessage, 240)}` : ''}.`,
+      );
+    }
+
+    return {
+      status: 'queued',
+      providerMessageId: responseBody.sid || '',
+    };
+  } catch (error) {
+    return {
+      status: 'failed',
+      errorMessage: error.message,
+    };
+  }
+}
+
+async function sendSmsWebhookAlert(env, candidate, recipient, destination) {
   const unsubscribeToken = await getOrCreateUnsubscribeToken(env, recipient);
   const unsubscribeUrl = buildUnsubscribeUrl(env, { ...recipient, unsubscribeToken });
   const message = buildSmsMessage(candidate, unsubscribeUrl);
@@ -3897,7 +3998,22 @@ function numberOrZero(value) {
 }
 
 function normalizePhone(value) {
-  return cleanString(value, 40).replace(/[^\d+]/g, '');
+  const phone = cleanString(value, 40).replace(/[^\d+]/g, '');
+  const digits = phone.replace(/\D/g, '');
+
+  if (phone.startsWith('+')) {
+    return phone;
+  }
+
+  if (digits.length === 10) {
+    return `+1${digits}`;
+  }
+
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return `+${digits}`;
+  }
+
+  return phone;
 }
 
 function normalizeContactMethod(value, email, phone) {
@@ -4094,11 +4210,13 @@ function extractDetectedSignal(summary) {
 function buildSmsMessage(candidate, unsubscribeUrl = '') {
   const programName = candidate.programName || candidate.title || 'Tracked program';
   const sourceUrl = candidate.url || '';
+  const alertCopy = buildStudentAlertCopy(candidate);
 
   return [
-    `ApplyFirst: ${programName} may have an opening signal.`,
-    `Verify details: ${sourceUrl}`,
-    unsubscribeUrl ? `Stop alerts: ${unsubscribeUrl}` : '',
+    `ApplyFirst: ${programName} ${alertCopy.headlineSuffix}.`,
+    `Verify on the official source: ${sourceUrl}`,
+    unsubscribeUrl ? `Manage alerts: ${unsubscribeUrl}` : '',
+    'Reply STOP to opt out.',
   ]
     .filter(Boolean)
     .join(' ');

@@ -368,8 +368,9 @@ The Cloudflare watch Worker adds the first durable monitoring path:
 - `POST /watch/discovery/candidates` saves a possible current-cycle URL for review. Requires `WATCH_ADMIN_TOKEN`.
 - `POST /watch/discovery/candidates/:id/review` accepts or rejects a discovered URL. Accepted candidates can update the official source URL and queue it for immediate verification.
 - `GET /watch/candidates` lists pending review candidates and requires `WATCH_ADMIN_TOKEN`.
-- `POST /watch/candidates/:id/send` sends reviewed email notifications and logs delivery status.
-- Phone/SMS delivery is supported through an optional `SMS_WEBHOOK_URL`, but should not be enabled until consent and provider setup are reviewed.
+- `POST /watch/candidates/:id/send` sends reviewed email or text notifications based on each student's selected contact method and logs delivery status.
+- Phone/SMS delivery is supported through Twilio (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and either `TWILIO_MESSAGING_SERVICE_SID` or `TWILIO_FROM_PHONE`) with `SMS_WEBHOOK_URL` retained as an optional custom provider fallback.
+- The student UI keeps Text disabled unless `VITE_TEXT_ALERTS_ENABLED=true`, so SMS can be implemented in the Worker without promising live text alerts before provider setup is complete.
 - Cron Triggers run every 30 minutes, but source selection is due-based.
 - Source schedules move between `dormant`, `warmup`, `active`, and `unknown` phases based on expected opening months, current status, and watcher demand.
 - Dormant records back off to monthly checks, warmup records check weekly or more often, active watched records check daily, and fetch failures back off instead of retrying every cron tick.
@@ -377,9 +378,9 @@ The Cloudflare watch Worker adds the first durable monitoring path:
 
 The first official seed/schedule audit lives in `docs/VERIFIED_SEED_SCHEDULE_AUDIT.md`. It documents which records are confirmed from official sources, which have current-cycle dates, which are discovery-first, and which expected opening months drive D1 `source_schedule_profiles`.
 
-The Worker can send beta email automatically when an official source has a high-confidence opening signal for a program a student follows. Deadline changes, medium-confidence openings, large-page failures, and ambiguous eligibility changes stay in review.
+The Worker can send beta email or text alerts automatically when an official source has a high-confidence opening signal for a program a student follows. Deadline changes, medium-confidence openings, large-page failures, and ambiguous eligibility changes stay in review.
 
-Student alert emails must be generated from a clean student-facing template. Internal source-check notes, raw page excerpts, classifier labels, and maintainer instructions stay in D1 for review and should not appear in outbound student notifications. Each email includes a tokenized unsubscribe link plus `List-Unsubscribe` and one-click unsubscribe headers; unsubscribed watch requests are excluded before delivery.
+Student alerts must be generated from clean student-facing templates. Internal source-check notes, raw page excerpts, classifier labels, and maintainer instructions stay in D1 for review and should not appear in outbound student notifications. Each email includes a tokenized unsubscribe link plus `List-Unsubscribe` and one-click unsubscribe headers; SMS alerts include a manage-alerts link and `Reply STOP` language. Unsubscribed watch requests are excluded before delivery.
 
 ## Next Implementation Steps
 

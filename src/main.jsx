@@ -45,6 +45,7 @@ const waitlistEndpoint = import.meta.env.VITE_WAITLIST_ENDPOINT ?? '';
 const contributionEndpoint = import.meta.env.VITE_CONTRIBUTION_ENDPOINT ?? '';
 const alertEndpoint = import.meta.env.VITE_ALERT_ENDPOINT ?? waitlistEndpoint;
 const watchEndpoint = import.meta.env.VITE_WATCH_ENDPOINT ?? '';
+const textAlertsEnabled = import.meta.env.VITE_TEXT_ALERTS_ENABLED === 'true';
 const defaultAlertPrefs = {
   classYear: '',
   roleTrack: '',
@@ -3193,10 +3194,12 @@ function BetaAlertSystem({
   captureEndpoint = '',
   watchEndpoint = '',
 }) {
+  const textAlertsAvailable = textAlertsEnabled;
   const [email, setEmail] = useState(waitlistIntent?.email ?? betaAlertSetup?.email ?? '');
   const [phoneNumber, setPhoneNumber] = useState(betaAlertSetup?.phoneNumber ?? '');
   const [contactMethod, setContactMethod] = useState(betaAlertSetup?.contactMethod ?? 'email');
   const [submitState, setSubmitState] = useState('idle');
+  const effectiveContactMethod = textAlertsAvailable ? contactMethod : 'email';
 
   useEffect(() => {
     if (waitlistIntent?.email && !email) {
@@ -3216,7 +3219,7 @@ function BetaAlertSystem({
   const hasPreviewFocus = ![alertPrefs.classYear, alertPrefs.roleTrack].some(isPreferenceUnset);
   const hasEmail = Boolean(email.trim());
   const hasPhone = Boolean(phoneNumber.trim());
-  const hasContact = contactMethod === 'phone' ? hasPhone : hasEmail;
+  const hasContact = effectiveContactMethod === 'phone' ? hasPhone : hasEmail;
   const missingSetupSummary =
     missingSetupFields.length > 1
       ? `${missingSetupFields.slice(0, -1).join(', ')} and ${missingSetupFields.at(-1)}`
@@ -3248,7 +3251,7 @@ function BetaAlertSystem({
   const setupActionMessage = hasIncompleteSetup
     ? `Choose ${missingSetupSummary} first.`
       : !hasContact
-      ? contactMethod === 'phone'
+      ? effectiveContactMethod === 'phone'
         ? 'Add a phone number to receive text alerts.'
         : 'Add an email to receive opening alerts.'
       : !hasWatchedPrograms
@@ -3282,7 +3285,7 @@ function BetaAlertSystem({
     sendTiming: alertPrefs.sendTiming,
     email: email.trim(),
     phoneNumber: phoneNumber.trim(),
-    contactMethod,
+    contactMethod: effectiveContactMethod,
     matchCount: matches.length,
     alertReadyCount: watchedAlertReadyCount,
     savedCount: savedOpportunities.length,
@@ -3314,7 +3317,7 @@ function BetaAlertSystem({
     const preferenceSummary = `${payload.classYear} / ${payload.roleTrack} / ${prioritySummary} / ${sendTimingLabels[payload.sendTiming] ?? payload.sendTiming}`;
     const watchedProgramNames = payload.watchedPrograms.map((program) => program.name).filter(Boolean);
     const notificationConsentText =
-      'I agree to receive ApplyFirst beta opening alerts for programs I choose to watch. I can unsubscribe from any alert email.';
+      'I agree to receive ApplyFirst beta opening alerts by my selected contact method for programs I choose to watch. Message and data rates may apply for text alerts. I can unsubscribe or opt out.';
 
     if (hasRemoteEndpoint) {
       setSubmitState('submitting');
@@ -3411,14 +3414,21 @@ function BetaAlertSystem({
             Email
           </button>
           <button
-            className={contactMethod === 'phone' ? 'active' : ''}
+            className={effectiveContactMethod === 'phone' ? 'active' : 'unavailable'}
             type="button"
-            onClick={() => setContactMethod('phone')}
+            onClick={() => {
+              if (textAlertsAvailable) {
+                setContactMethod('phone');
+              }
+            }}
+            disabled={!textAlertsAvailable}
+            aria-disabled={!textAlertsAvailable}
+            title="Text alerts are not available for this beta yet."
           >
-            Text
+            Text <span>Soon</span>
           </button>
         </div>
-        {contactMethod === 'phone' ? (
+        {effectiveContactMethod === 'phone' ? (
           <label>
             <span>Phone For Text Alerts</span>
             <input
