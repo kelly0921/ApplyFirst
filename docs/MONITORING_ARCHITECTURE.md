@@ -387,7 +387,8 @@ Student alerts must be generated from clean student-facing templates. Internal s
 1. Import the regenerated D1 seed after each verified seed/schedule audit update.
 2. Use the Maintainer Mode review console to smoke-test discovery search, candidate review, alert dry runs, and reviewed sends before each beta round.
 3. Review search-provider ignored reasons and kept-candidate quality, then decide whether JavaScript-heavy or search-hostile programs need a Browser Run fallback workflow.
-4. Add role-based maintainer access before sharing the review console with anyone else.
-5. Add account-level alert preferences and unsubscribe management if students need to manage multiple watch setups from one place.
-6. Add richer review history for search runs, source changes, accepted URLs, rejected URLs, and sent alert decisions.
-7. Decide whether to keep D1 long term or move richer account/review workflows to Supabase.
+4. Return to SMS/text alerts after the first email-only beta: create or upgrade a Twilio account, configure sender registration as needed, smoke-test a real text to yourself, then set `VITE_TEXT_ALERTS_ENABLED=true`.
+5. Add role-based maintainer access before sharing the review console with anyone else.
+6. Add account-level alert preferences and unsubscribe management if students need to manage multiple watch setups from one place.
+7. Add richer review history for search runs, source changes, accepted URLs, rejected URLs, and sent alert decisions.
+8. Decide whether to keep D1 long term or move richer account/review workflows to Supabase.

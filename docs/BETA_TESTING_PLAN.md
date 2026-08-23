@@ -27,7 +27,8 @@ Before each test:
 9. Create a fresh watch request after the unsubscribe smoke test if you need another active test recipient.
 10. Turn Maintainer Mode back off before the student session so the tester only sees the student-facing product.
 11. Pick 5-7 manually reviewed programs to mention if the tester asks for examples.
-12. Keep this note ready: students can submit a beta watch setup by email or text. High-confidence official opening signals can send automatically; uncertain signals stay in review, and every beta email includes an unsubscribe link.
+12. Keep this note ready: students can submit a beta watch setup by email. High-confidence official opening signals can send automatically; uncertain signals stay in review, and every beta email includes an unsubscribe link.
+13. SMS/text alerts are intentionally disabled in the student UI for this beta until Twilio is configured, tested, and enabled with `VITE_TEXT_ALERTS_ENABLED=true`. Revisit this before expanding beyond email alerts.
 
 Suggested first examples:
 
@@ -87,7 +88,8 @@ The beta is working if:
 - My Focus feels useful rather than like arbitrary settings.
 - Students understand the watch plan receipt after submitting beta alerts.
 - Students understand beta watch requests are opt-in, high-confidence openings can email automatically, and uncertain signals stay in review while signal quality is tested.
-- Students understand when ApplyFirst would email or text them.
+- Students understand when ApplyFirst would email them.
+- Students notice Text is marked as unavailable/soon and do not expect SMS until it is explicitly enabled.
 - Students understand they can unsubscribe from beta email alerts.
 - Students understand the current automation is intentionally limited to high-confidence official opening signals.
 - Students can submit feedback without feeling like they are using an internal tool.

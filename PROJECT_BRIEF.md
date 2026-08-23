@@ -489,7 +489,7 @@ Architecture and implementation notes:
 Future technical direction:
 
 - User accounts and saved alert preferences.
-- SMS provider integration beyond the generic webhook path.
+- SMS/text alert launch after Twilio setup, sender verification, and a real delivery smoke test.
 - Richer admin workflow for source verification, current-cycle URL discovery history, role-based access, and record updates.
 
 ### 8. Product Thinking
@@ -513,7 +513,7 @@ Current status: **Private beta prototype with seasonal monitoring foundation**
 
 The standalone MVP is built and functional. It includes the core monitor UI, structured opportunity records, filters, detail views, source-confidence framing, shortlist behavior, program-specific status labels, endpoint-backed beta watch requests, and a Cloudflare Worker/D1 foundation for seasonal source checks.
 
-High-confidence beta email alerts are testable, uncertain signals can now be handled through a hidden Maintainer Mode review console, and beta email alerts include unsubscribe handling. Before positioning ApplyFirst as a broad live alerting resource, the project still needs broader official verification, production deliverability checks, SMS provider setup, account/privacy decisions, and public trust language.
+High-confidence beta email alerts are testable, uncertain signals can now be handled through a hidden Maintainer Mode review console, and beta email alerts include unsubscribe handling. SMS delivery code exists but is disabled in the student UI until Twilio/provider setup is complete. Before positioning ApplyFirst as a broad live alerting resource, the project still needs broader official verification, production deliverability checks, SMS provider setup and smoke testing, account/privacy decisions, and public trust language.
 
 ### 10. What I Learned
 
