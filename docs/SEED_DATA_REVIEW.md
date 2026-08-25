@@ -45,10 +45,10 @@ Already marked as first verification batch in the project brief:
 
 Current 2026-08-22 verification snapshot:
 
-- 61 total public library records.
-- 44 records are source-confirmed from current official pages.
+- 64 total public library records.
+- 47 records are source-confirmed from current official pages.
 - 17 records are useful watch/prep records, but should not trigger automatic alerts until current-cycle timing is clearer.
-- 0 records remain in Needs Confirmation after IBM Accelerate was removed from the public beta library.
+- 0 records remain in Needs Confirmation after IBM Accelerate was removed from the public beta library and BASTA Code2Career plus MLT Career Prep were added from official sources.
 
 Recently moved out of Needs Confirmation:
 
@@ -62,6 +62,8 @@ Recently moved out of Needs Confirmation:
 - HRT Women in Trading Technology: official HRT page confirms January 2026 details and says to check back for January 2027 applications.
 - Palantir Launch, Two Sigma Freshman SWE, and Google Scholarships: kept as watch-only records because the user identified the canonical official pages where current opportunities should appear when available.
 - IBM Accelerate: removed from the public library until a current official Accelerate-specific page is found.
+- BASTA Code2Career: official page confirms Fall 2026 application dates, cohort dates, Google SWE mentorship, platform assessment requirements, and CS graduation-year eligibility.
+- Management Leadership for Tomorrow Career Prep: official page confirms the sophomore-through-senior program model, coaching, employer access, seminars, and Software Engineering/Technology track; user-provided current-cycle deadline and graduation range should be checked against MLT application materials before alerting.
 
 ## Beta-Ready Rule
 

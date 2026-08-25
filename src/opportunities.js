@@ -105,8 +105,10 @@ const repeatedProgramIds = new Set([
   'mlh-production-engineering-fellowship',
   'coding-it-forward-fellowship',
   'new-technologists-academy',
+  'basta-code2career',
   'seo-tech-developer-core',
   'headstart-fellowship-watch',
+  'mlt-career-prep',
   'jane-street-see-watch',
   'jane-street-bridge-watch',
   'jane-street-focus-watch',
@@ -637,8 +639,8 @@ export const opportunities = [
     prep:
       'Prepare a technical project story, GitHub links, and collaboration examples. Track cohort start dates because timing changes by batch.',
     sourceNote:
-      'Official MLH Fellowship site describes a fully remote 12-week internship alternative with stipend and open-source project work.',
-    lastChecked: '2026-08-18',
+      'Official MLH Fellowship site describes a remote 12-week internship alternative with stipend, partner-backed projects, mentorship, Software Engineering, Production Engineering, and Web3 Engineering tracks.',
+    lastChecked: '2026-08-24',
   },
   {
     id: 'mlh-software-engineering-fellowship',
@@ -670,7 +672,7 @@ export const opportunities = [
       'Prepare GitHub/project examples, collaboration stories, and time availability for a 20-hour-per-week remote cohort.',
     sourceNote:
       'Official MLH Software Engineering track page lists Fall 2026 dates, 20 hours per week, and a 12-week remote fellowship model.',
-    lastChecked: '2026-08-22',
+    lastChecked: '2026-08-24',
   },
   {
     id: 'mlh-web3-engineering-fellowship',
@@ -702,7 +704,7 @@ export const opportunities = [
       'Prepare core programming examples, learn basic blockchain vocabulary, and be ready to explain why decentralized systems interest you.',
     sourceNote:
       'Official MLH Web3 Engineering track page lists Fall 2026 dates, 20 hours per week, and blockchain-focused fellowship outcomes.',
-    lastChecked: '2026-08-22',
+    lastChecked: '2026-08-24',
   },
   {
     id: 'mlh-production-engineering-fellowship',
@@ -734,7 +736,7 @@ export const opportunities = [
       'Prepare systems, debugging, Linux, networking, or infrastructure examples and verify the track page before applying.',
     sourceNote:
       'Official MLH Fellowship page and application flow list Production Engineering as a fellowship track; the track uses the same rolling MLH Fellowship application model.',
-    lastChecked: '2026-08-22',
+    lastChecked: '2026-08-24',
   },
   {
     id: 'coding-it-forward-fellowship',
@@ -816,23 +818,87 @@ export const opportunities = [
     url: 'https://www.codepath.org/courses',
     previousUrl: '',
     openDate: 'Fall 2026 applications are open by pathway',
-    deadline: 'Fall 2026 course page lists closing dates such as August 23 by pathway',
+    deadline: 'Fall 2026 pathways close August 30, 2026',
     tags: ['Technical interview prep', 'Applied AI', 'Cybersecurity', 'Web development'],
     description:
-      'CodePath Career-Ready Courses are free technical courses that help students build skills and recruiting readiness.',
+      'CodePath Career-Ready Courses are free 10-week virtual, instructor-led pathways for students building technical depth and recruiting readiness. Fall 2026 options include Applied AI Engineering for AI apps and open-source contributions, Technical Interview Prep for DS&A and mock interviews, Cybersecurity for Blue Team labs and incident response, and Web Development for full-stack applications.',
     eligibilitySummary:
-      'Student course eligibility varies by pathway; applicants should choose the course matching their skill stage.',
+      'Student eligibility, prerequisites, and prework vary by course pathway; applicants should choose the course matching their skill stage.',
     experienceSummary:
-      'Virtual coursework in areas like technical interview prep, applied AI, cybersecurity, and web development.',
+      'Virtual 10-week coursework with instructor-led sessions, pathway-specific projects or labs, and roughly 2-10 hours per week depending on the course.',
     detailBasis:
-      'Current official CodePath courses page lists active Fall 2026 pathways and closing dates by course.',
+      'Current official CodePath courses page lists Fall 2026 Applied AI Engineering, Technical Interview Prep, Cybersecurity, and Web Development pathways with August 30 closing language.',
     why:
       'Structured technical practice, portfolio projects, and recruiting preparation outside standard coursework.',
     prep:
       'Match the pathway to the next bottleneck: interview prep, AI projects, cybersecurity, or web development.',
     sourceNote:
-      'Official CodePath courses page lists no-cost virtual courses, current application links, and visible pathway close dates.',
-    lastChecked: '2026-08-18',
+      'Official CodePath courses page lists no-cost virtual 10-week pathways, current application links, course-specific hours per week, and August 30, 2026 closing language.',
+    lastChecked: '2026-08-24',
+  },
+  {
+    id: 'basta-code2career',
+    name: 'Code2Career',
+    organization: 'BASTA',
+    category: 'Community / Prep Program',
+    classYears: ['All class years'],
+    timing: 'Fall',
+    status: 'deadlineSoon',
+    confidence: 'high',
+    funding: 'Free',
+    location: 'Virtual',
+    url: 'https://www.projectbasta.com/code2career',
+    previousUrl: '',
+    openDate: 'Fall 2026 application window runs August 24-September 11, 2026',
+    deadline: 'Applications close September 11, 2026',
+    tags: ['Technical interview prep', 'Google mentorship', 'Software engineering', 'Career prep'],
+    description:
+      'BASTA Code2Career is a 10-week virtual technical interview and career-prep program for CS students. The Fall 2026 cohort runs October 5-December 11 and includes 1:1 mentorship from a Google Software Engineer, technical assessment practice, employer events, live workshops, and access to a curated jobs and internships board.',
+    eligibilitySummary:
+      'For CS majors at U.S.-based universities graduating between Fall 2026 and Fall 2028 who are on the BASTA platform and complete the required assessment.',
+    experienceSummary:
+      'Virtual 10-week cohort with Google SWE mentorship, online workshops, technical assessment components, employer exposure, and career resources.',
+    detailBasis:
+      'Current official BASTA Code2Career page confirms Fall 2026 open dates, deadline, cohort dates, Google SWE mentorship, platform and assessment requirements, and CS graduation-year eligibility.',
+    why:
+      'Useful for students who need structured technical interview prep, mentorship, and employer exposure before internship or new-grad recruiting.',
+    prep:
+      'Join the BASTA platform, complete the assessment, practice DS&A and coding assessments, and apply before the September 11 deadline.',
+    sourceNote:
+      'Official BASTA Code2Career page confirms Fall 2026 applications are open August 24-September 11, the cohort runs October 5-December 11, and eligible CS majors graduate Fall 2026-Fall 2028.',
+    lastChecked: '2026-08-24',
+  },
+  {
+    id: 'mlt-career-prep',
+    name: 'Career Prep',
+    organization: 'Management Leadership for Tomorrow',
+    category: 'Community / Prep Program',
+    classYears: ['Sophomore'],
+    timing: 'Fall',
+    status: 'expectedSoon',
+    confidence: 'high',
+    funding: 'Free',
+    location: 'Hybrid',
+    url: 'https://mlt.org/career-prep/',
+    previousUrl: '',
+    openDate: 'Watch fall priority deadlines by track',
+    deadline: 'SWE/Technology priority deadline: November 1',
+    tags: ['Career prep', 'Software engineering', 'Technology', 'Mentorship', 'Recruiting support'],
+    description:
+      'Management Leadership for Tomorrow Career Prep is a long-running coaching and recruiting-support program that starts in sophomore year and continues through senior year. The Software Engineering/Technology track focuses on applying computer science principles, building technical leadership, and preparing for software engineering, data, cybersecurity, web, systems, and application-development roles.',
+    eligibilitySummary:
+      'For eligible current sophomores; the user-provided current-cycle note identifies students graduating Fall 2028-Summer 2029 for this round.',
+    experienceSummary:
+      '20+ months of personalized coaching, seminars, interview preparation, job-search guidance, professional network access, employer connections, and recruiting support.',
+    detailBasis:
+      'Official MLT Career Prep page confirms the sophomore-through-senior program model, personalized coaching, job-search guidance, employer access, seminars, and Software Engineering/Technology track. Current-cycle graduation range and November 1 priority deadline should be checked against MLT application materials before alerting.',
+    why:
+      'High-leverage career-prep pathway for sophomores who want coaching, employer access, and structured recruiting support before internships and full-time recruiting intensify.',
+    prep:
+      'Prepare resume, leadership stories, target track rationale, and recruiting goals; verify the current application deadline and eligibility before applying.',
+    sourceNote:
+      'Official MLT Career Prep page confirms sophomore-year start, multi-year coaching, employer access, seminars, and Software Engineering/Technology track; user-provided current-cycle note adds Fall 2028-Summer 2029 eligibility and November 1 SWE/Technology priority deadline pending application-page confirmation.',
+    lastChecked: '2026-08-24',
   },
   {
     id: 'forage-virtual-experience',
@@ -1629,14 +1695,14 @@ export const opportunities = [
     experienceSummary:
       'Students practice product, UX/UI design, frontend/web engineering, AI tooling, stakeholder management, ambiguity, teamwork, and client communication while building portfolio case studies for nonprofits.',
     detailBasis:
-      'Official Develop for Good student page confirms virtual projects, free participation, career development, roles, and Fellows cash grants.',
+      'Official Develop for Good student page confirms Winter 2027 project timeline, remote nonprofit project roles, free participation, career development, and completion grant details.',
     why:
       'Strong internship-alternative for students who need real client/project experience and portfolio proof without waiting for a company offer.',
     prep:
       'Prepare a portfolio or project link for your chosen role, examples of ownership or teamwork, and availability for the 16-week batch.',
     sourceNote:
       'Official Develop for Good page confirms 16-week virtual projects, designer/engineer/manager roles, 5-10 hours per week, September 19, 2026 student deadline, and student cash grants for selected eligible students.',
-    lastChecked: '2026-08-22',
+    lastChecked: '2026-08-24',
   },
   {
     id: 'amazon-future-engineer-scholarship',

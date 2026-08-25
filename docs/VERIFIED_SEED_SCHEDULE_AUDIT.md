@@ -79,7 +79,7 @@ The first beta audit now covers the original uncertain queue. Remaining follow-u
 
 ## 2026-08-22 Verification Pass
 
-- Verification state after this pass: 61 total records after merging The New Technologists tracks and adding hackNY, 44 verified, 17 watch-only, and 0 needs confirmation.
+- Verification state after this pass: 64 total records after merging The New Technologists tracks, adding hackNY, and adding BASTA Code2Career plus MLT Career Prep, 47 verified, 17 watch-only, and 0 needs confirmation.
 - Moved Microsoft Explore, Jane Street FTTP, Jane Street SEE, MLH Production Engineering, Hack.Diversity, Bloomberg NextGen, Bessemer Fellowship Program, and HRT Women in Trading Technology into more accurate source states.
 - Kept Palantir Launch, Two Sigma Freshman SWE, and Google Scholarships as canonical watch-only records because the official pages are the right monitoring targets when current listings become available.
 - Removed IBM Accelerate from the public beta library until a current official Accelerate-specific page is found.
