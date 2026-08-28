@@ -335,11 +335,13 @@ a {
 }
 
 .landing-copy h1.landing-headline {
-  white-space: nowrap;
+  display: grid;
+  gap: 8px;
+  white-space: normal;
 }
 
 .landing-headline-text {
-  display: inline-block;
+  display: block;
   max-width: 100%;
 }
 

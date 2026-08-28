@@ -1296,7 +1296,8 @@ function LandingPage({
           <div className="landing-copy">
             <span>For Openings Students Usually Catch Too Late</span>
             <h1 className="landing-headline page-hero-title">
-              <span className="landing-headline-text headline-highlight">Track Early Programs Before They Open</span>
+              <span className="landing-headline-text">Track Early Programs</span>
+              <span className="landing-headline-text headline-highlight">Before They Open</span>
             </h1>
             <p>
               Save high-signal programs, watch opening windows, and get reviewed alerts before deadlines get crowded.
@@ -1443,12 +1444,12 @@ function BetaExampleStrip() {
 function CareerAgencySection() {
   const agencySignals = [
     {
-      title: 'Early Can Help',
-      text: 'Many programs are built for students before they have traditional internship experience.',
+      title: 'Apply Earlier',
+      text: 'Many programs review as applications arrive or close once spots fill, so timing alerts help students move early.',
     },
     {
-      title: 'Compare Fit',
-      text: 'See how mentorship, ownership, culture, and pace differ across roles and companies.',
+      title: 'Built For Your Stage',
+      text: 'Many programs are designed before students have traditional internship experience.',
     },
     {
       title: 'Build Proof',
