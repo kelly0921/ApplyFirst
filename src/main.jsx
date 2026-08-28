@@ -1294,12 +1294,12 @@ function LandingPage({
       <main className="landing-main">
         <section className="landing-hero" aria-label="ApplyFirst private beta">
           <div className="landing-copy">
-            <span>For Early Programs Students Usually Find Too Late</span>
+            <span>For Openings Students Usually Catch Too Late</span>
             <h1 className="landing-headline page-hero-title">
-              <span className="landing-headline-text headline-highlight">Apply Before The Crowd</span>
+              <span className="landing-headline-text headline-highlight">Track Early Programs Before They Open</span>
             </h1>
             <p>
-              Save high-signal programs, watch timing, and get reviewed opening alerts before deadlines get crowded.
+              Save high-signal programs, watch opening windows, and get reviewed alerts before deadlines get crowded.
             </p>
             <div className="landing-impact-panel" aria-label="ApplyFirst beta impact">
               <div className="landing-impact-grid">
@@ -1428,8 +1428,8 @@ function BetaExampleStrip() {
   return (
     <section className="beta-example-strip" aria-label="Trusted beta examples">
       <div>
-        <span>Beta Library Examples</span>
-        <p>Programs students usually hear about too late.</p>
+        <span>Beyond Internship Boards</span>
+        <p>Discovery programs, fellowships, funding, prep programs, and alternative paths worth tracking early.</p>
       </div>
       <div className="beta-example-list">
         {betaReadyExamples.slice(0, 4).map((program) => (
@@ -1443,20 +1443,20 @@ function BetaExampleStrip() {
 function CareerAgencySection() {
   const agencySignals = [
     {
-      title: 'Learn Earlier',
-      text: 'Explore SWE, product, quant, research, and civic tech before recruiting gets crowded.',
+      title: 'Early Can Help',
+      text: 'Many programs are built for students before they have traditional internship experience.',
     },
     {
       title: 'Compare Fit',
-      text: 'See how mentorship, ownership, culture, and pace differ across programs and companies.',
+      text: 'See how mentorship, ownership, culture, and pace differ across roles and companies.',
     },
     {
       title: 'Build Proof',
-      text: 'Turn early programs into projects, resume signal, references, peers, and clearer stories.',
+      text: 'Turn programs, fellowships, and prep into projects, resume signal, peers, and clearer stories.',
     },
     {
       title: 'Choose Better',
-      text: 'The goal is not only getting picked; it is learning which roles and companies you want.',
+      text: 'Use early exposure to learn what kind of work and environment you actually want.',
     },
   ];
 
