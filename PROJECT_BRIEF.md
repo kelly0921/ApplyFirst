@@ -2,7 +2,7 @@
 
 ## One-Line Positioning
 
-ApplyFirst is an early-career opportunity monitor that helps students discover, track, and act early on high-signal programs beyond generic internships: underclassmen discovery programs, fellowships, funding, prep programs, and nontraditional career paths.
+ApplyFirst is an early-career program monitor that helps underclassmen and emerging technical students discover, prepare for, and apply quickly to high-signal career-launch opportunities.
 
 ## Core Problem
 
@@ -26,12 +26,12 @@ This matters most in fields that are hard to break into, such as quant, finance 
 
 ## Target User
 
-The primary user is a first-year or sophomore student trying to break into tech, product, finance, AI, design, or related career paths before they have much traditional experience.
+The primary user is a first-year or sophomore student trying to break into tech, product, or finance before they have much traditional experience.
 
 This is modeled after past-Kelly:
 
 - Ambitious, but still learning what programs exist.
-- Building early career momentum through discovery programs, fellowships, insight programs, conferences, company/nonprofit-sponsored scholarships, prep programs, and nontraditional career paths.
+- Building early career momentum through internships, fellowships, insight programs, conferences, company/nonprofit-sponsored scholarships, and prep programs.
 - Willing to prepare, but needs better timing and clearer signals.
 - Does not want another noisy job board.
 
