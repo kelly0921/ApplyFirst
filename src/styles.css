@@ -345,6 +345,14 @@ a {
   max-width: 100%;
 }
 
+.landing-headline-accent {
+  display: inline-block;
+  width: fit-content;
+  border-bottom: 0.1em solid rgba(15, 127, 150, 0.28);
+  color: var(--ink);
+  padding-bottom: 0.03em;
+}
+
 .landing-copy p {
   max-width: 640px;
   margin: 0;

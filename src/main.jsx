@@ -1297,7 +1297,7 @@ function LandingPage({
             <span>For Openings Students Usually Catch Too Late</span>
             <h1 className="landing-headline page-hero-title">
               <span className="landing-headline-text">Track Early Programs</span>
-              <span className="landing-headline-text headline-highlight">Before They Open</span>
+              <span className="landing-headline-text landing-headline-accent">Before They Open</span>
             </h1>
             <p>
               Save high-signal programs, watch opening windows, and get reviewed alerts before deadlines get crowded.
