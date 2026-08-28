@@ -1294,12 +1294,14 @@ function LandingPage({
       <main className="landing-main">
         <section className="landing-hero" aria-label="ApplyFirst private beta">
           <div className="landing-copy">
-            <span>For Early Programs Students Usually Find Too Late</span>
+            <span>Early Programs, Fellowships, Funding, and Alternative Paths</span>
             <h1 className="landing-headline page-hero-title">
-              <span className="landing-headline-text headline-highlight">Apply Before The Crowd</span>
+              <span className="landing-headline-text headline-highlight">Find High-Signal Programs Before They Get Crowded.</span>
             </h1>
             <p>
-              Save high-signal programs, watch timing, and get reviewed opening alerts before deadlines get crowded.
+              Track opportunities students often discover too late: underclassmen programs, fellowships, scholarships,
+              prep programs, and nontraditional career paths. Save what fits, watch timing, and act while you are
+              still eligible.
             </p>
             <div className="landing-impact-panel" aria-label="ApplyFirst beta impact">
               <div className="landing-impact-grid">
@@ -1369,8 +1371,8 @@ function ProductPreviewSection() {
     <section className="product-preview" aria-label="ApplyFirst product preview">
       <div className="product-preview-heading">
         <span>Product Preview</span>
-        <h2>From Scattered Links to One Watchlist.</h2>
-        <p>Compare programs, timing, saved targets, and source confidence in one view.</p>
+        <h2>From Scattered Tracking to One Early-Action System.</h2>
+        <p>Compare program context, timing, saved targets, and source confidence in one view.</p>
       </div>
       <div className="product-preview-layout">
         <div className="product-preview-gallery">
@@ -1429,7 +1431,7 @@ function BetaExampleStrip() {
     <section className="beta-example-strip" aria-label="Trusted beta examples">
       <div>
         <span>Beta Library Examples</span>
-        <p>Programs students usually hear about too late.</p>
+        <p>A few paths ApplyFirst is built to track across discovery, prep, fellowships, and funding.</p>
       </div>
       <div className="beta-example-list">
         {betaReadyExamples.slice(0, 4).map((program) => (
@@ -1443,20 +1445,20 @@ function BetaExampleStrip() {
 function CareerAgencySection() {
   const agencySignals = [
     {
-      title: 'Learn Earlier',
-      text: 'Explore SWE, product, quant, research, and civic tech before recruiting gets crowded.',
+      title: 'Built For Your Stage',
+      text: 'Some programs are designed before traditional internship experience, especially for freshmen and sophomores.',
     },
     {
-      title: 'Compare Fit',
-      text: 'See how mentorship, ownership, culture, and pace differ across programs and companies.',
+      title: 'Not Just Internships',
+      text: 'Fellowships, funding, communities, and alternative paths can build career momentum too.',
     },
     {
-      title: 'Build Proof',
-      text: 'Turn early programs into projects, resume signal, references, peers, and clearer stories.',
+      title: 'Timing Matters',
+      text: 'Applications can open quietly, close quickly, or review early when demand gets high.',
     },
     {
       title: 'Choose Better',
-      text: 'The goal is not only getting picked; it is learning which roles and companies you want.',
+      text: 'Early exposure helps students compare roles, companies, mentors, industries, and work styles.',
     },
   ];
 
@@ -1464,7 +1466,7 @@ function CareerAgencySection() {
     <section className="career-agency" aria-label="Why early career programs matter">
       <div className="career-agency-copy">
         <span>Why It Matters</span>
-        <h2>Explore Early. Build Leverage.</h2>
+        <h2>Start Earlier. Choose Better.</h2>
       </div>
       <div className="agency-map" aria-label="Early career program benefits">
         {agencySignals.map((signal) => (
@@ -1508,7 +1510,7 @@ function HowItWorksSection() {
       <div className="how-it-works-copy">
         <span>How It Works</span>
         <h2>Less Checking. Earlier Action.</h2>
-        <p>ApplyFirst turns scattered lists, old spreadsheets, and official pages into one watchlist students can act on earlier.</p>
+        <p>ApplyFirst turns GitHub lists, school links, and official pages into one watchlist students can act on earlier.</p>
       </div>
       <div className="how-it-works-steps">
         {steps.map((step) => (
