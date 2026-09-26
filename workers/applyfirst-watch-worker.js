@@ -2432,6 +2432,7 @@ async function getWatchStatus(env) {
     unsubscribedRequests,
     programs,
     sources,
+    inactiveSources,
     scheduledSources,
     dueSources,
     discoveryDue,
@@ -2446,12 +2447,12 @@ async function getWatchStatus(env) {
     getCount(env, 'watch_requests', "status = 'active' and (unsubscribed_at is null or unsubscribed_at = '')"),
     getCount(env, 'watch_requests', "status = 'unsubscribed' or unsubscribed_at is not null"),
     getCount(env, 'watch_request_programs'),
-    getCount(env, 'official_sources'),
-    getCount(env, 'source_schedule_profiles'),
-    getCount(env, 'source_schedule_profiles', `next_check_at is null or next_check_at = '' or next_check_at <= '${now}'`),
-    getCount(
+    getCount(env, 'official_sources', 'enabled = 1'),
+    getCount(env, 'official_sources', 'enabled = 0'),
+    getEnabledScheduleCount(env),
+    getEnabledScheduleCount(env, `next_check_at is null or next_check_at = '' or next_check_at <= '${now}'`),
+    getEnabledScheduleCount(
       env,
-      'source_schedule_profiles',
       `source_volatility = 'moving_cycle_page' and current_phase in ('warmup', 'active', 'unknown') and (next_discovery_at is null or next_discovery_at = '' or next_discovery_at <= '${now}')`,
     ),
     getCount(env, 'alert_candidates', "status = 'pending_review'"),
@@ -2469,6 +2470,7 @@ async function getWatchStatus(env) {
     unsubscribedWatchRequests: unsubscribedRequests,
     watchedPrograms: programs,
     officialSources: sources,
+    inactiveOfficialSources: inactiveSources,
     scheduledSources,
     dueSources,
     discoveryDue,
@@ -2484,6 +2486,19 @@ async function getWatchStatus(env) {
     },
     lastCheckedAt: latestCheck?.latest || null,
   };
+}
+
+async function getEnabledScheduleCount(env, whereClause = '1 = 1') {
+  const row = await env.DB.prepare(
+    `select count(*) as count
+     from source_schedule_profiles
+     inner join official_sources
+       on official_sources.id = source_schedule_profiles.official_source_id
+     where official_sources.enabled = 1
+       and (${whereClause})`,
+  ).first();
+
+  return Number(row?.count || 0);
 }
 
 async function getReviewHistory(env, url) {
