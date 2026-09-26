@@ -28,6 +28,12 @@ database_name = "applyfirst-watch"
 database_id = "5b13abd5-8970-4403-8cb9-2e5634186cd2"
 migrations_dir = "cloudflare/d1"
 
+[[d1_databases]]
+binding = "CAPTURE_DB"
+database_name = "applyfirst_beta"
+database_id = "53721b6a-c480-4abb-b470-e0f9703288b8"
+migrations_dir = "cloudflare/d1-capture"
+
 [[send_email]]
 name = "EMAIL"
 

@@ -20,8 +20,9 @@ For the first beta, use the repo-managed Cloudflare capture Worker for waitlist/
 5. Use either the waitlist endpoint or a dedicated destination for beta email alert opt-ins.
 6. Deploy the ApplyFirst watch Worker if beta testers should submit real watch requests.
 7. Redeploy the site.
-8. Submit one test waitlist entry, one beta watch setup, and one Suggest Updates entry.
-9. Confirm all entries appear in D1 before inviting students.
+8. Configure Turnstile for `applyfirst-careers.pages.dev`, `localhost`, and `127.0.0.1`.
+9. Submit one test waitlist entry, one beta watch setup, and one Suggest Updates entry.
+10. Confirm all entries appear in D1 before inviting students.
 
 You can also run the repo smoke test after setting endpoint environment variables:
 
@@ -29,7 +30,7 @@ You can also run the repo smoke test after setting endpoint environment variable
 npm run capture:smoke
 ```
 
-The command posts one sample waitlist payload, one beta email alert payload, one contribution payload, and one optional beta watch payload when `VITE_WATCH_ENDPOINT` is set. It exits with an error if any required endpoint is missing, unavailable, or returns a non-2xx status.
+The command posts one sample waitlist payload, one beta email alert payload, one contribution payload, and one optional beta watch payload when `VITE_WATCH_ENDPOINT` is set. Protected capture requests require separate fresh tokens in `TURNSTILE_WAITLIST_TOKEN`, `TURNSTILE_ALERT_TOKEN`, and `TURNSTILE_CONTRIBUTION_TOKEN`. It exits with an error if a required endpoint or token is missing, unavailable, or returns a non-2xx status.
 
 ## Capture Worker
 
@@ -59,6 +60,7 @@ Set Worker secrets:
 npx wrangler secret put OWNER_NOTIFY_EMAIL --config wrangler.capture.toml
 npx wrangler secret put CAPTURE_FROM_EMAIL --config wrangler.capture.toml
 npx wrangler secret put CAPTURE_REPLY_TO --config wrangler.capture.toml
+npx wrangler secret put TURNSTILE_SECRET --config wrangler.capture.toml
 ```
 
 Use an address on a Cloudflare Email Sending domain for `CAPTURE_FROM_EMAIL`, such as an address on `kellychen.dev`. `CAPTURE_REPLY_TO` can be your owner inbox; student replies are also set to the submitted email when available.
@@ -84,6 +86,23 @@ npx wrangler d1 execute applyfirst_beta --remote --command "SELECT id,source,ema
 ```
 
 You should also receive an owner email with the student's email, class year, interest, school, preference summary, and note.
+
+## Turnstile Abuse Protection
+
+Create one managed Turnstile widget with these hostnames:
+
+- `applyfirst-careers.pages.dev`
+- `localhost`
+- `127.0.0.1`
+
+The frontend uses two stable actions:
+
+- `waitlist` for the landing waitlist and beta email-alert setup
+- `contribution` for program suggestions and correction reports
+
+Store the widget secret only in the `applyfirst-capture` Worker as `TURNSTILE_SECRET`. Set `VITE_TURNSTILE_SITE_KEY` in Cloudflare Pages to the public site key. Production uses `TURNSTILE_HOSTNAMES=applyfirst-careers.pages.dev`; do not add localhost to the production Worker allowlist. For local end-to-end development, run the capture Worker locally with a local hostname allowlist and an ignored `.dev.vars` secret.
+
+The Worker fails closed before D1 or email work. It requires a successful Siteverify response, the route's expected action, and the production frontend hostname. Turnstile tokens are single-use, so a fresh widget token is required after every submission attempt.
 
 ## Minimum Fields To Capture
 
@@ -183,6 +202,7 @@ In Cloudflare Pages:
    - `VITE_CONTRIBUTION_ENDPOINT`
    - `VITE_ALERT_ENDPOINT` if using a dedicated beta alert endpoint
    - `VITE_WATCH_ENDPOINT` if using the ApplyFirst watch Worker
+   - `VITE_TURNSTILE_SITE_KEY`
 5. Save.
 6. Redeploy the latest commit.
 
@@ -209,6 +229,7 @@ Before user testing:
 - Beta email alert capture exists through `VITE_ALERT_ENDPOINT` or the waitlist endpoint fallback.
 - Beta watch request capture exists through `VITE_WATCH_ENDPOINT` if source monitoring is part of the test.
 - Cloudflare environment variables are set.
+- Turnstile rejects missing, wrong-action, wrong-hostname, and replayed tokens.
 - Latest commit is deployed.
 - One test waitlist entry appears in the destination.
 - One test beta email alert setup appears in the destination.

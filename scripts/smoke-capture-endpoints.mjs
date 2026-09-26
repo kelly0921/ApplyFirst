@@ -2,6 +2,9 @@ const waitlistEndpoint = process.env.VITE_WAITLIST_ENDPOINT;
 const contributionEndpoint = process.env.VITE_CONTRIBUTION_ENDPOINT;
 const alertEndpoint = process.env.VITE_ALERT_ENDPOINT || waitlistEndpoint;
 const watchEndpoint = process.env.VITE_WATCH_ENDPOINT;
+const waitlistTurnstileToken = process.env.TURNSTILE_WAITLIST_TOKEN;
+const contributionTurnstileToken = process.env.TURNSTILE_CONTRIBUTION_TOKEN;
+const alertTurnstileToken = process.env.TURNSTILE_ALERT_TOKEN;
 
 const samples = [
   {
@@ -18,6 +21,7 @@ const samples = [
       notificationMode: 'Smoke test',
       savedAt: new Date().toISOString(),
       captureStatus: 'Smoke test',
+      turnstileToken: waitlistTurnstileToken,
     },
   },
   {
@@ -31,6 +35,7 @@ const samples = [
       note: 'Smoke test for beta contribution capture.',
       status: 'Smoke test',
       createdAt: new Date().toISOString(),
+      turnstileToken: contributionTurnstileToken,
     },
   },
   {
@@ -47,6 +52,7 @@ const samples = [
       notificationMode: 'Beta Email Alerts',
       savedAt: new Date().toISOString(),
       captureStatus: 'Smoke test',
+      turnstileToken: alertTurnstileToken,
     },
   },
   {
@@ -112,6 +118,15 @@ async function postSample({ label, endpoint, body, optional = false }) {
       ok: false,
       status: 'missing',
       message: `Set ${endpointEnvNames[label]} before running this smoke test.`,
+    };
+  }
+
+  if (label !== 'watch' && !body.turnstileToken) {
+    return {
+      label,
+      ok: false,
+      status: 'missing',
+      message: `Set a fresh TURNSTILE_${label.toUpperCase()}_TOKEN before testing this protected endpoint.`,
     };
   }
 

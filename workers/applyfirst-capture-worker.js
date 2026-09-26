@@ -25,6 +25,7 @@ export default {
 
       if (request.method === 'POST' && url.pathname === '/waitlist') {
         const payload = await readJson(request);
+        await verifyTurnstile(request, env, payload.turnstileToken, 'waitlist');
         const row = await saveWaitlistRequest(env, payload);
         const ownerNotification = await sendOwnerWaitlistNotification(env, row);
 
@@ -37,6 +38,7 @@ export default {
 
       if (request.method === 'POST' && url.pathname === '/contribution') {
         const payload = await readJson(request);
+        await verifyTurnstile(request, env, payload.turnstileToken, 'contribution');
         const row = await saveContributionRequest(env, payload);
 
         return jsonResponse(request, env, {
@@ -98,6 +100,62 @@ async function readJson(request) {
     error.status = 400;
     throw error;
   }
+}
+
+async function verifyTurnstile(request, env, token, expectedAction) {
+  const expectedHostnames = new Set(
+    String(env.TURNSTILE_HOSTNAMES || '')
+      .split(',')
+      .map((hostname) => hostname.trim().toLowerCase())
+      .filter(Boolean),
+  );
+
+  if (
+    !env.TURNSTILE_SECRET ||
+    typeof token !== 'string' ||
+    token.length === 0 ||
+    token.length > 2048 ||
+    expectedHostnames.size === 0
+  ) {
+    throw forbiddenVerificationError();
+  }
+
+  let result;
+
+  try {
+    const verificationResponse = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      signal: AbortSignal.timeout(10_000),
+      body: new URLSearchParams({
+        secret: env.TURNSTILE_SECRET,
+        response: token,
+        remoteip: request.headers.get('CF-Connecting-IP') || '',
+      }),
+    });
+
+    if (!verificationResponse.ok) {
+      throw new Error(`Turnstile siteverify returned HTTP ${verificationResponse.status}.`);
+    }
+
+    result = await verificationResponse.json();
+  } catch {
+    throw forbiddenVerificationError();
+  }
+
+  if (
+    result.success !== true ||
+    result.action !== expectedAction ||
+    !expectedHostnames.has(String(result.hostname || '').toLowerCase())
+  ) {
+    throw forbiddenVerificationError();
+  }
+}
+
+function forbiddenVerificationError() {
+  const error = new Error('Verification failed. Refresh and try again.');
+  error.status = 403;
+  return error;
 }
 
 async function saveWaitlistRequest(env, payload) {

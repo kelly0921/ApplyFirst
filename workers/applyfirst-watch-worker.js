@@ -8,6 +8,28 @@ const DEFAULT_SCHEDULED_DISCOVERY_SEARCH_LIMIT = 3;
 const DEFAULT_SCHEDULED_DISCOVERY_QUERIES_PER_PROGRAM = 2;
 const DEFAULT_SCHEDULED_DISCOVERY_RESULTS_PER_QUERY = 3;
 const AUTO_SENDABLE_CONFIDENCES = new Set(['high']);
+const BETA_WORKSPACE_CODE_PATTERN = /^AF-[A-Z0-9][A-Z0-9-]{4,58}[A-Z0-9]$/;
+const PRODUCT_EVENT_NAMES = new Set([
+  'session_started',
+  'search_used',
+  'program_viewed',
+  'program_saved',
+  'program_unsaved',
+  'watch_started',
+  'focus_saved',
+  'alerts_enabled',
+  'official_source_clicked',
+  'contribution_submitted',
+  'outcome_reported',
+]);
+const PRODUCT_OUTCOMES = new Set(['found_relevant_program', 'applied_earlier', 'not_yet']);
+const ALERT_ENGAGEMENT_ACTIONS = new Set([
+  'source_clicked',
+  'useful',
+  'not_relevant',
+  'already_knew',
+  'inaccurate',
+]);
 const DISCOVERY_SEARCH_PROVIDERS = new Set(['brave', 'tavily']);
 const SOURCE_TRUNCATION_NOTICE = 'ApplyFirst note: source page was truncated at the monitoring byte limit.';
 const JOB_BOARD_HOSTS = new Set([
@@ -95,6 +117,12 @@ async function handleRequest(request, env, ctx) {
       return jsonResponse(env, await getWatchStatus(env));
     }
 
+    if (request.method === 'GET' && url.pathname === '/library/status') {
+      return jsonResponse(env, await getPublicLibraryStatus(env), {
+        headers: { 'cache-control': 'public, max-age=60, s-maxage=300' },
+      });
+    }
+
     if (request.method === 'GET' && url.pathname === '/workspace') {
       return jsonResponse(env, await getBetaWorkspace(env, url));
     }
@@ -102,6 +130,20 @@ async function handleRequest(request, env, ctx) {
     if (request.method === 'POST' && url.pathname === '/workspace') {
       const body = await readJson(request, {});
       return jsonResponse(env, await saveBetaWorkspace(env, body));
+    }
+
+    if (request.method === 'POST' && url.pathname === '/analytics/events') {
+      const body = await readJson(request, {});
+      return jsonResponse(env, await recordProductEvent(env, body), { status: 201 });
+    }
+
+    if (request.method === 'GET' && url.pathname === '/analytics/summary') {
+      await requireAdminToken(request, env);
+      return jsonResponse(env, await getBetaAnalyticsSummary(env));
+    }
+
+    if (request.method === 'GET' && url.pathname === '/watch/engagement') {
+      return handleAlertEngagement(env, url);
     }
 
     if (request.method === 'GET' && url.pathname === '/watch/readiness') {
@@ -277,6 +319,302 @@ async function saveBetaWorkspace(env, body) {
     codeLabel,
     savedAt: now,
   };
+}
+
+async function recordProductEvent(env, body) {
+  const accessCode = normalizeAccessCode(body.accessCode || body.code);
+  const eventName = cleanString(body.eventName || body.event, 80).toLowerCase();
+  const outcome = cleanString(body.outcome, 80).toLowerCase();
+
+  if (!BETA_WORKSPACE_CODE_PATTERN.test(accessCode)) {
+    throw httpError(400, 'A valid beta workspace code is required.');
+  }
+
+  if (!PRODUCT_EVENT_NAMES.has(eventName)) {
+    throw httpError(400, 'Unsupported product event.');
+  }
+
+  if (eventName === 'outcome_reported' && !PRODUCT_OUTCOMES.has(outcome)) {
+    throw httpError(400, 'Choose a supported beta outcome.');
+  }
+
+  const accessCodeHash = await hashAccessCode(accessCode);
+  const workspace = await env.DB.prepare(
+    `select id
+     from beta_access_workspaces
+     where access_code_hash = ?
+     limit 1`,
+  )
+    .bind(accessCodeHash)
+    .first();
+
+  if (!workspace?.id) {
+    throw httpError(409, 'Beta workspace is still initializing. Try again shortly.');
+  }
+
+  const eventId = cleanString(body.eventId, 120) || crypto.randomUUID();
+  const occurredAt = normalizeEventTimestamp(body.occurredAt);
+  const context = normalizeProductEventContext(body.context);
+
+  await env.DB.prepare(
+    `insert or ignore into beta_product_events (
+      id,
+      workspace_id,
+      session_id,
+      event_name,
+      program_id,
+      outcome,
+      context_json,
+      occurred_at
+    ) values (?, ?, ?, ?, ?, ?, ?, ?)`,
+  )
+    .bind(
+      eventId,
+      workspace.id,
+      cleanString(body.sessionId, 120),
+      eventName,
+      cleanString(body.programId, 160),
+      eventName === 'outcome_reported' ? outcome : '',
+      JSON.stringify(context),
+      occurredAt,
+    )
+    .run();
+
+  return {
+    ok: true,
+    eventId,
+    recordedAt: new Date().toISOString(),
+  };
+}
+
+async function getBetaAnalyticsSummary(env) {
+  const now = Date.now();
+  const since7Days = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const since30Days = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const funnelEvents = [
+    'session_started',
+    'program_viewed',
+    'program_saved',
+    'watch_started',
+    'focus_saved',
+    'alerts_enabled',
+    'official_source_clicked',
+    'contribution_submitted',
+  ];
+
+  const [
+    workspaceTotals,
+    funnelResult,
+    activatedResult,
+    returningResult,
+    outcomesResult,
+    topProgramsResult,
+    alertEngagementResult,
+    waitlistTotals,
+  ] = await Promise.all([
+    env.DB.prepare(
+      `select
+        count(*) as total,
+        count(case when last_seen_at >= ? then 1 end) as active7Days,
+        count(case when last_seen_at >= ? then 1 end) as active30Days
+       from beta_access_workspaces`,
+    )
+      .bind(since7Days, since30Days)
+      .first(),
+    env.DB.prepare(
+      `select event_name as eventName,
+        count(distinct workspace_id) as participants,
+        count(*) as events
+       from beta_product_events
+       where created_at >= ?
+         and event_name in (${funnelEvents.map(() => '?').join(', ')})
+       group by event_name`,
+    )
+      .bind(since30Days, ...funnelEvents)
+      .all(),
+    env.DB.prepare(
+      `select count(*) as count
+       from (
+         select workspace_id
+         from beta_product_events
+         where created_at >= ?
+           and event_name in ('program_saved', 'focus_saved', 'alerts_enabled')
+         group by workspace_id
+         having count(distinct event_name) = 3
+       )`,
+    )
+      .bind(since30Days)
+      .first(),
+    env.DB.prepare(
+      `select count(*) as count
+       from (
+         select workspace_id
+         from beta_product_events
+         where created_at >= ?
+         group by workspace_id
+         having count(distinct substr(created_at, 1, 10)) >= 2
+       )`,
+    )
+      .bind(since30Days)
+      .first(),
+    env.DB.prepare(
+      `select outcome,
+        count(distinct workspace_id) as participants,
+        count(*) as responses
+       from beta_product_events
+       where event_name = 'outcome_reported'
+         and created_at >= ?
+       group by outcome`,
+    )
+      .bind(since30Days)
+      .all(),
+    env.DB.prepare(
+      `select program_id as programId,
+        count(case when event_name = 'program_viewed' then 1 end) as views,
+        count(case when event_name = 'program_saved' then 1 end) as saves,
+        count(case when event_name = 'official_source_clicked' then 1 end) as sourceClicks
+       from beta_product_events
+       where created_at >= ?
+         and program_id is not null
+         and program_id != ''
+         and event_name in ('program_viewed', 'program_saved', 'official_source_clicked')
+       group by program_id
+       order by saves desc, sourceClicks desc, views desc
+       limit 8`,
+    )
+      .bind(since30Days)
+      .all(),
+    env.DB.prepare(
+      `select action,
+        count(distinct watch_request_id) as participants,
+        count(*) as events
+       from alert_engagement_events
+       where created_at >= ?
+       group by action`,
+    )
+      .bind(since30Days)
+      .all(),
+    getCaptureWaitlistTotals(env),
+  ]);
+
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    periodDays: 30,
+    workspaces: {
+      total: Number(workspaceTotals?.total || 0),
+      active7Days: Number(workspaceTotals?.active7Days || 0),
+      active30Days: Number(workspaceTotals?.active30Days || 0),
+      activated30Days: Number(activatedResult?.count || 0),
+      returning30Days: Number(returningResult?.count || 0),
+    },
+    waitlist: waitlistTotals,
+    funnel: normalizeCountRows(funnelResult.results, 'eventName'),
+    outcomes: normalizeCountRows(outcomesResult.results, 'outcome'),
+    alertEngagement: normalizeCountRows(alertEngagementResult.results, 'action'),
+    topPrograms: (topProgramsResult.results || []).map((row) => ({
+      programId: row.programId,
+      views: Number(row.views || 0),
+      saves: Number(row.saves || 0),
+      sourceClicks: Number(row.sourceClicks || 0),
+    })),
+  };
+}
+
+async function getCaptureWaitlistTotals(env) {
+  if (!env.CAPTURE_DB) {
+    return { total: null, uniqueEmails: null, available: false };
+  }
+
+  try {
+    const row = await env.CAPTURE_DB.prepare(
+      `select
+        count(*) as total,
+        count(distinct lower(email)) as uniqueEmails
+       from waitlist_requests
+       where email is not null
+         and trim(email) != ''`,
+    ).first();
+
+    return {
+      total: Number(row?.total || 0),
+      uniqueEmails: Number(row?.uniqueEmails || 0),
+      available: true,
+    };
+  } catch (error) {
+    console.error(JSON.stringify({ event: 'capture_waitlist_metrics_failed', error: error.message }));
+    return { total: null, uniqueEmails: null, available: false };
+  }
+}
+
+async function handleAlertEngagement(env, url) {
+  const requestId = cleanString(url.searchParams.get('requestId'), 120);
+  const candidateId = cleanString(url.searchParams.get('candidateId'), 120);
+  const token = cleanString(url.searchParams.get('token'), 180);
+  const action = cleanString(url.searchParams.get('action'), 80).toLowerCase();
+
+  if (!requestId || !candidateId || !token || !ALERT_ENGAGEMENT_ACTIONS.has(action)) {
+    return new Response(buildAlertEngagementPage(env, 'Feedback Link Expired', 'This alert feedback link is incomplete or no longer valid.'), {
+      status: 400,
+      headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
+    });
+  }
+
+  const row = await env.DB.prepare(
+    `select
+      watch_requests.unsubscribe_token as unsubscribeToken,
+      alert_candidates.id as candidateId,
+      official_sources.url as sourceUrl,
+      official_sources.program_name as programName
+     from watch_requests
+     inner join alert_candidates on alert_candidates.id = ?
+     left join official_sources on official_sources.id = alert_candidates.official_source_id
+     where watch_requests.id = ?
+     limit 1`,
+  )
+    .bind(candidateId, requestId)
+    .first();
+
+  if (!row || !timingSafeEqual(token, row.unsubscribeToken)) {
+    return new Response(buildAlertEngagementPage(env, 'Feedback Link Expired', 'This alert feedback link is incomplete or no longer valid.'), {
+      status: 403,
+      headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
+    });
+  }
+
+  await env.DB.prepare(
+    `insert into alert_engagement_events (
+      id,
+      alert_candidate_id,
+      watch_request_id,
+      action
+    ) values (?, ?, ?, ?)`,
+  )
+    .bind(crypto.randomUUID(), candidateId, requestId, action)
+    .run();
+
+  if (action === 'source_clicked') {
+    return new Response(null, {
+      status: 302,
+      headers: {
+        location: row.sourceUrl || publicAppUrl(env),
+        'cache-control': 'no-store',
+        'referrer-policy': 'no-referrer',
+      },
+    });
+  }
+
+  return new Response(
+    buildAlertEngagementPage(
+      env,
+      'Thanks For The Feedback',
+      `Your response for ${row.programName || 'this opportunity'} was recorded. It will help improve future ApplyFirst alerts.`,
+    ),
+    {
+      status: 200,
+      headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
+    },
+  );
 }
 
 async function saveWatchRequest(request, env, ctx) {
@@ -2488,6 +2826,38 @@ async function getWatchStatus(env) {
   };
 }
 
+async function getPublicLibraryStatus(env) {
+  const rows = await env.DB.prepare(
+    `select
+      official_sources.program_id as programId,
+      program_alert_states.status,
+      program_alert_states.confidence,
+      coalesce(program_alert_states.last_checked_at, official_sources.last_checked_at) as lastCheckedAt,
+      program_alert_states.updated_at as updatedAt
+    from official_sources
+    inner join program_alert_states
+      on program_alert_states.program_id = official_sources.program_id
+    where official_sources.enabled = 1
+      and program_alert_states.confidence = 'high'
+      and program_alert_states.status in ('open', 'deadline', 'opening_soon')
+      and lower(coalesce(program_alert_states.review_decision, '')) != 'manual review'
+    order by official_sources.program_id asc`,
+  ).all();
+  const programs = (rows.results || []).map((row) => ({
+    programId: cleanString(row.programId, 160),
+    status: cleanString(row.status, 40),
+    confidence: 'high',
+    lastCheckedAt: cleanString(row.lastCheckedAt, 40),
+    updatedAt: cleanString(row.updatedAt, 40),
+  }));
+
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    programs,
+  };
+}
+
 async function getEnabledScheduleCount(env, whereClause = '1 = 1') {
   const row = await env.DB.prepare(
     `select count(*) as count
@@ -3438,6 +3808,36 @@ function renderUnsubscribePage(result) {
 </html>`;
 }
 
+function buildAlertEngagementPage(env, title, message) {
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>${escapeHtml(title)} | ApplyFirst</title>
+    <style>
+      body{margin:0;background:#f6f8fb;color:#17212f;font-family:Inter,Arial,sans-serif}
+      main{min-height:100vh;display:grid;place-items:center;padding:24px}
+      section{max-width:560px;background:#fff;border:1px solid #dce5ee;border-radius:16px;padding:28px;box-shadow:0 18px 42px rgba(23,33,47,.08)}
+      span{display:inline-flex;margin-bottom:14px;color:#0f7f96;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+      h1{margin:0 0 10px;font-size:30px;line-height:1.15}
+      p{margin:0;color:#425066;line-height:1.6}
+      a{display:inline-flex;margin-top:22px;color:#0f7f96;font-weight:800;text-decoration:none}
+    </style>
+  </head>
+  <body>
+    <main>
+      <section>
+        <span>ApplyFirst Beta</span>
+        <h1>${escapeHtml(title)}</h1>
+        <p>${escapeHtml(message)}</p>
+        <a href="${escapeHtml(publicAppUrl(env))}">Return To ApplyFirst</a>
+      </section>
+    </main>
+  </body>
+</html>`;
+}
+
 async function getCount(env, tableName, whereClause = '') {
   const row = await env.DB.prepare(`select count(*) as count from ${tableName} ${whereClause ? `where ${whereClause}` : ''}`).first();
   return Number(row?.count || 0);
@@ -4101,12 +4501,51 @@ function createAccessCodeLabel(value) {
   return `...${accessCode.slice(-4)}`;
 }
 
+function normalizeEventTimestamp(value) {
+  const timestamp = cleanString(value, 80);
+  const parsed = Date.parse(timestamp);
+
+  if (!timestamp || !Number.isFinite(parsed)) {
+    return new Date().toISOString();
+  }
+
+  const now = Date.now();
+  const bounded = Math.min(Math.max(parsed, now - 7 * 24 * 60 * 60 * 1000), now + 5 * 60 * 1000);
+  return new Date(bounded).toISOString();
+}
+
+function normalizeProductEventContext(value) {
+  const context = value && typeof value === 'object' ? value : {};
+
+  return {
+    view: cleanString(context.view, 40),
+    source: cleanString(context.source, 80),
+    status: cleanString(context.status, 60),
+    resultCount: normalizeMetricNumber(context.resultCount),
+    queryLength: normalizeMetricNumber(context.queryLength),
+  };
+}
+
+function normalizeMetricNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.max(0, Math.min(Math.round(number), 10_000)) : null;
+}
+
+function normalizeCountRows(rows, key) {
+  return (rows || []).map((row) => ({
+    [key]: cleanString(row[key], 120),
+    participants: Number(row.participants || 0),
+    events: Number(row.events || row.responses || 0),
+  }));
+}
+
 function normalizeWorkspaceState(value) {
   const state = value && typeof value === 'object' ? value : {};
   const alertPrefs = state.alertPrefs && typeof state.alertPrefs === 'object' ? state.alertPrefs : {};
   const betaAlertSetup = state.betaAlertSetup && typeof state.betaAlertSetup === 'object' ? state.betaAlertSetup : null;
   const waitlistIntent = state.waitlistIntent && typeof state.waitlistIntent === 'object' ? state.waitlistIntent : null;
   const onboardingProgress = state.onboardingProgress && typeof state.onboardingProgress === 'object' ? state.onboardingProgress : {};
+  const betaOutcome = state.betaOutcome && typeof state.betaOutcome === 'object' ? state.betaOutcome : null;
 
   return {
     savedIds: uniqueStrings(arrayify(state.savedIds)).slice(0, 100),
@@ -4151,6 +4590,12 @@ function normalizeWorkspaceState(value) {
       improved: Boolean(onboardingProgress.improved),
       dismissed: Boolean(onboardingProgress.dismissed),
     },
+    betaOutcome: betaOutcome && PRODUCT_OUTCOMES.has(cleanString(betaOutcome.outcome, 80))
+      ? {
+          outcome: cleanString(betaOutcome.outcome, 80),
+          updatedAt: cleanString(betaOutcome.updatedAt, 80),
+        }
+      : null,
     savedAt: cleanString(state.savedAt, 80) || new Date().toISOString(),
   };
 }
@@ -4159,6 +4604,13 @@ function buildAlertMessage(env, candidate, recipient) {
   const programName = candidate.programName || candidate.title || 'Tracked Program';
   const sourceUrl = candidate.url || publicAppUrl(env);
   const unsubscribeUrl = buildUnsubscribeUrl(env, recipient);
+  const trackedSourceUrl = buildAlertEngagementUrl(env, candidate, recipient, 'source_clicked') || sourceUrl;
+  const feedbackUrls = {
+    useful: buildAlertEngagementUrl(env, candidate, recipient, 'useful'),
+    notRelevant: buildAlertEngagementUrl(env, candidate, recipient, 'not_relevant'),
+    alreadyKnew: buildAlertEngagementUrl(env, candidate, recipient, 'already_knew'),
+    inaccurate: buildAlertEngagementUrl(env, candidate, recipient, 'inaccurate'),
+  };
   const alertCopy = buildStudentAlertCopy(candidate);
   const subject = alertCopy.subject;
   const text = [
@@ -4167,11 +4619,17 @@ function buildAlertMessage(env, candidate, recipient) {
     alertCopy.summary,
     '',
     'What to do next:',
-    `1. Open the official source: ${sourceUrl}`,
+    `1. Open the official source: ${trackedSourceUrl}`,
     '2. Confirm eligibility, deadline, and required materials.',
     '3. Apply early if this program fits your goals.',
     '',
     `Beta note: ${alertCopy.betaNote}`,
+    '',
+    'Was this alert useful?',
+    feedbackUrls.useful ? `Useful: ${feedbackUrls.useful}` : '',
+    feedbackUrls.notRelevant ? `Not relevant: ${feedbackUrls.notRelevant}` : '',
+    feedbackUrls.alreadyKnew ? `Already knew: ${feedbackUrls.alreadyKnew}` : '',
+    feedbackUrls.inaccurate ? `Information looks wrong: ${feedbackUrls.inaccurate}` : '',
     '',
     'Why you received this:',
     'You asked ApplyFirst to watch this program for opening signals.',
@@ -4193,9 +4651,22 @@ function buildAlertMessage(env, candidate, recipient) {
             </ol>
           </div>
           <p style="margin:0 0 20px">
-            <a href="${escapeHtml(sourceUrl)}" style="display:inline-block;background:#17212f;color:#ffffff;text-decoration:none;border-radius:999px;padding:11px 18px;font-size:14px;font-weight:800">Check Official Source</a>
+            <a href="${escapeHtml(trackedSourceUrl)}" style="display:inline-block;background:#17212f;color:#ffffff;text-decoration:none;border-radius:999px;padding:11px 18px;font-size:14px;font-weight:800">Check Official Source</a>
           </p>
           <p style="margin:0 0 14px;color:#5b6472;font-size:13px"><strong style="color:#17212f">Beta note:</strong> ${escapeHtml(alertCopy.betaNote)}</p>
+          ${feedbackUrls.useful ? `
+          <div style="margin:0 0 18px;padding-top:16px;border-top:1px solid #e5e7eb">
+            <p style="margin:0 0 9px;color:#17212f;font-size:13px;font-weight:800">Was this alert useful?</p>
+            <p style="margin:0;color:#5b6472;font-size:12px;line-height:1.8">
+              <a href="${escapeHtml(feedbackUrls.useful)}" style="color:#0f7f96">Useful</a>
+              &nbsp;·&nbsp;
+              <a href="${escapeHtml(feedbackUrls.notRelevant)}" style="color:#0f7f96">Not relevant</a>
+              &nbsp;·&nbsp;
+              <a href="${escapeHtml(feedbackUrls.alreadyKnew)}" style="color:#0f7f96">Already knew</a>
+              &nbsp;·&nbsp;
+              <a href="${escapeHtml(feedbackUrls.inaccurate)}" style="color:#0f7f96">Information looks wrong</a>
+            </p>
+          </div>` : ''}
           <p style="margin:0;color:#6b7280;font-size:12px">You are receiving this because you asked ApplyFirst to watch this program. <a href="${escapeHtml(unsubscribeUrl)}" style="color:#2563eb">Unsubscribe from this watch setup</a>.</p>
         </div>
       </div>
@@ -4308,6 +4779,23 @@ function buildUnsubscribeUrl(env, recipient) {
   }
 
   return `${baseUrl}?requestId=${encodeURIComponent(recipient.id)}`;
+}
+
+function buildAlertEngagementUrl(env, candidate, recipient, action) {
+  const token = cleanString(recipient.unsubscribeToken, 180);
+  const requestId = cleanString(recipient.id, 120);
+  const candidateId = cleanString(candidate.id, 120);
+
+  if (!token || !requestId || !candidateId || !ALERT_ENGAGEMENT_ACTIONS.has(action)) {
+    return '';
+  }
+
+  const url = new URL(`${watchWorkerUrl(env)}/watch/engagement`);
+  url.searchParams.set('requestId', requestId);
+  url.searchParams.set('candidateId', candidateId);
+  url.searchParams.set('token', token);
+  url.searchParams.set('action', action);
+  return url.toString();
 }
 
 function publicAppUrl(env) {

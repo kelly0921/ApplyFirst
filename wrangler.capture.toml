@@ -6,6 +6,8 @@ compatibility_date = "2026-08-23"
 PUBLIC_APP_URL = "https://applyfirst-careers.pages.dev"
 ENABLE_OWNER_WAITLIST_NOTIFICATIONS = "true"
 CAPTURE_FROM_NAME = "ApplyFirst"
+TURNSTILE_HOSTNAMES = "applyfirst-careers.pages.dev"
+CORS_ORIGIN = "https://applyfirst-careers.pages.dev"
 
 [[d1_databases]]
 binding = "DB"

@@ -220,6 +220,34 @@ Audit log for automatic and reviewed student notifications.
 - `sent_at`
 - `created_at`
 
+### beta_product_events
+
+Privacy-conscious first-party beta events tied to a hashed workspace identity.
+
+- `id`
+- `workspace_id`
+- `session_id`
+- `event_name`
+- `program_id`
+- `outcome`
+- `context_json`
+- `occurred_at`
+- `created_at`
+
+Only allowlisted high-signal actions are accepted. Search text and plaintext invite codes are not stored.
+
+### alert_engagement_events
+
+Student actions from an opening-alert email.
+
+- `id`
+- `alert_candidate_id`
+- `watch_request_id`
+- `action`
+- `created_at`
+
+Supported actions are official-source click, useful, not relevant, already knew, and inaccurate.
+
 ### saved_programs
 
 Future account-backed version of the current local saved list.
@@ -358,6 +386,10 @@ The Cloudflare watch Worker adds the first durable monitoring path:
 
 - `POST /watch` saves a student's My Focus watch request and program context in D1.
 - `GET /watch/status` returns safe aggregate counts for smoke checks.
+- `GET /library/status` returns a cached, read-only feed of fresh high-confidence `open`, `deadline`, and `opening_soon` states. The public app refreshes this feed on load, every five minutes, and when a student returns to the tab. It never exposes source notes, candidate details, internal review decisions, or low-confidence crawler output.
+- `POST /analytics/events` records allowlisted beta-workspace actions and student-reported outcomes. It requires an existing workspace code, stores only its hash-backed workspace ID, and never stores search text.
+- `GET /analytics/summary` returns the 30-day beta funnel, activation, return use, outcomes, alert feedback, popular programs, and waitlist counts for the maintainer console. Requires `WATCH_ADMIN_TOKEN`.
+- `GET /watch/engagement` records tracked official-source clicks and one-tap usefulness feedback from alert emails.
 - `GET /watch/unsubscribe?token=...` and `POST /watch/unsubscribe?token=...` unsubscribe a beta watch setup. Legacy `requestId` links are still supported for older test emails.
 - `GET /watch/readiness` returns the maintainer readiness queue grouped by source attention state. Requires `WATCH_ADMIN_TOKEN`.
 - `GET /watch/history` returns recent discovery search runs, reviewed URL decisions, source checks, and masked alert-delivery attempts for maintainer audit review. Requires `WATCH_ADMIN_TOKEN`.
@@ -384,11 +416,12 @@ Student alerts must be generated from clean student-facing templates. Internal s
 
 ## Next Implementation Steps
 
-1. Import the regenerated D1 seed after each verified seed/schedule audit update.
+1. Apply the metrics migration, deploy the watch Worker, and smoke-test the beta funnel before inviting the first 12 students.
 2. Use the Maintainer Mode review console to smoke-test discovery search, candidate review, alert dry runs, and reviewed sends before each beta round.
-3. Review search-provider ignored reasons and kept-candidate quality, then decide whether JavaScript-heavy or search-hostile programs need a Browser Run fallback workflow.
-4. Return to SMS/text alerts after the first email-only beta: create or upgrade a Twilio account, configure sender registration as needed, smoke-test a real text to yourself, then set `VITE_TEXT_ALERTS_ENABLED=true`.
-5. Add role-based maintainer access before sharing the review console with anyone else.
-6. Add account-level alert preferences and unsubscribe management if students need to manage multiple watch setups from one place.
-7. Add richer review history for search runs, source changes, accepted URLs, rejected URLs, and sent alert decisions.
-8. Decide whether to keep D1 long term or move richer account/review workflows to Supabase.
+3. Review the `Beta Progress` funnel after one week, fix repeated failures, and expand in controlled waitlist batches only when the stability gates pass.
+4. Import the regenerated D1 seed after each verified seed/schedule audit update.
+5. Review search-provider ignored reasons and kept-candidate quality, then decide whether JavaScript-heavy or search-hostile programs need a Browser Run fallback workflow.
+6. Return to SMS/text alerts after the first email-only beta: create or upgrade a Twilio account, configure sender registration as needed, smoke-test a real text to yourself, then set `VITE_TEXT_ALERTS_ENABLED=true`.
+7. Add role-based maintainer access before sharing the review console with anyone else.
+8. Add account-level alert preferences and unsubscribe management if students need to manage multiple watch setups from one place.
+9. Decide whether to keep D1 long term or move richer account/review workflows to Supabase.

@@ -1,6 +1,65 @@
 # ApplyFirst Beta Testing Plan
 
-Use this plan for the first 3-5 student tests. The goal is not to prove the product is finished; the goal is to learn whether students understand the value, trust the library, know how to set alerts, and know what they would want ApplyFirst to watch.
+Use this plan to expand the beta without paying for infrastructure before the product proves its value. The primary outcome is whether students discover a relevant opportunity and apply earlier. Saving programs, setting a focus, and enabling alerts are supporting behaviors, not the end result.
+
+## Rollout Plan
+
+Start with the 12 confirmed Recruiting Season Accelerator students. Give each student a unique workspace code so their saved programs, focus, alert setup, and outcome check-in follow that code across browsers.
+
+Hold the first cohort for one stable week before inviting more waitlist users. Stability means:
+
+- No unresolved access, save-sync, alert-signup, or unsubscribe failures.
+- No incorrect automatic opening emails.
+- Monitoring backlog stays near zero and scheduled checks continue running.
+- At least 8 of 12 students open a workspace.
+- At least 5 students save a relevant program or start watching one.
+
+If those conditions hold, invite 5-8 additional waitlist users. After that, expand in batches of 15-25. Do not invite the entire waitlist at once; each batch should be large enough to reveal patterns while still making individual failures easy to investigate.
+
+Pause expansion when a student-facing failure repeats, an inaccurate alert is sent, source checks fall materially behind, or fewer than one-third of invited students complete any meaningful action.
+
+## What To Measure
+
+The north-star outcome is the number of students who report either `Found A Relevant Program` or `Applied Earlier`.
+
+Use these supporting measures to diagnose where the product helps or loses students:
+
+- Reach: unique waitlist emails, invited workspaces, and workspaces opened.
+- Discovery: students who view a program, save a program, or visit an official source.
+- Activation: students who save a program, set My Focus, and enable alerts.
+- Retention: students who return on at least two different days within 30 days.
+- Alert value: official-source clicks plus `Useful`, `Not Relevant`, `Already Knew`, and `Information Looks Wrong` feedback.
+- Coverage quality: monitored sources due, failed source checks, pending candidates, incorrect alerts, and alert delivery failures.
+- Student outcomes: `Found A Relevant Program`, `Applied Earlier`, or `Not Yet` from the My Focus check-in.
+
+Do not optimize for raw page views or waitlist size alone. A smaller cohort that discovers and acts on relevant programs is more valuable than a large inactive list.
+
+## Beta Success Thresholds
+
+Use these as directional launch gates, not permanent targets:
+
+- Access rate: at least 70% of invited students open their workspace.
+- Discovery rate: at least 50% of opened workspaces view an opportunity and at least 35% save or watch one.
+- Activation rate: at least 30% of opened workspaces save a program, set My Focus, and enable alerts.
+- Return rate: at least 25% of opened workspaces return on another day.
+- Outcome rate: at least 25% of opened workspaces report finding a relevant program or applying earlier.
+- Trust: no false automatic opening alerts in the first cohort; any inaccurate alert feedback is reviewed before the next batch.
+
+The Maintainer Mode `Beta Progress` panel reports these first-party metrics for the last 30 days. Analytics are tied to hashed beta workspaces, not plaintext invite codes. Search terms are not stored. Program IDs, high-signal actions, alert feedback, and explicit outcome responses are stored so the funnel can be evaluated without adding a paid analytics vendor.
+
+## Cost Guardrails
+
+The product should be able to invite more students without adding a paid analytics stack or increasing source checks linearly with every user.
+
+- Use the existing Worker and D1 databases for product events and summaries.
+- Keep email as the only enabled alert channel during the first beta; SMS remains unavailable until its cost and compliance work are justified by demand.
+- Monitor each official source once per scheduled cadence, then fan a confirmed signal out to interested students. Do not fetch the same source separately for every watcher.
+- Run Brave discovery only for seasonally due sources and cap programs, queries, and results per run.
+- Expand in cohorts so operational review volume grows predictably.
+- Review Workers requests, D1 rows read/written, email delivery volume, and search-provider usage weekly.
+- Add a paid service only after a measured bottleneck appears; do not buy capacity in anticipation of one.
+
+At the current beta size, infrastructure should remain inside Cloudflare's free allowances. Recheck the official [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/) and [D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/) pages before a broad public launch because platform limits can change.
 
 ## Tester Profile
 

@@ -1,6 +1,6 @@
 # ApplyFirst
 
-A standalone product MVP for helping underclassmen and emerging technical students discover, track, and prepare for high-signal career-launch programs: early discovery programs, fellowships, externships, winternships, company/nonprofit-sponsored scholarships, technical communities, conference funding paths, and internship alternatives.
+A standalone product MVP for helping underclassmen and emerging technical students discover and apply earlier to high-signal career-launch programs: early discovery programs, fellowships, externships, winternships, company/nonprofit-sponsored scholarships, technical communities, conference funding paths, and internship alternatives.
 
 For the reusable product narrative, portfolio angle, scope decisions, and future roadmap, see [PROJECT_BRIEF.md](./PROJECT_BRIEF.md).
 
@@ -42,10 +42,10 @@ The first version focuses on:
 - Eight student-facing opportunity types: Discovery Program, Fellowship, Startup / VC Fellowship, Winternship, Scholarship / Funding, Conference / Travel Funding, Community / Prep Program, and Full-Time Alternative.
 - Recommendation, application status, and confirmation labels.
 - Maintainer-only source review and confidence labels.
-- Clear notes on why each opportunity matters and how to prepare.
+- Clear eligibility, timing, program context, and official-source links so students can decide what to pursue.
 - A future path toward an Opportunity Signal Tracker.
 
-This version is a private-beta public prototype with a landing page, endpoint-ready waitlist request, invite-code gate, endpoint-ready beta watch setup, endpoint-ready student update capture, and the full app behind the gate. The app can show the product direction, curated seed set, student My Focus setup, alert readiness model, student submission flow, and a Cloudflare Worker path for checking official source pages, sending high-confidence opening alerts, and holding uncertain changes for review.
+This version is a private-beta public prototype with a landing page, Turnstile-protected waitlist and student update capture, an invite-code gate, beta watch setup, and the full app behind the gate. The app can show the product direction, curated seed set, student My Focus setup, alert readiness model, student submission flow, and a Cloudflare Worker path for checking official source pages, sending high-confidence opening alerts, and holding uncertain changes for review. First-party beta metrics measure discovery, activation, return use, alert usefulness, and whether students report finding a relevant program or applying earlier.
 
 Recommendation is computed from the Phase 1 rules: underclassmen-fit programs in high-leverage opportunity types become Recommended; relevant programs can also be Recommended when they are useful enough to review, save, or prepare for early; Scholarship / Funding, Conference / Travel Funding, and Community / Prep Program records are treated as Foundation opportunities. Student actions stay separate from these labels: users save programs they care about, while ApplyFirst monitors confirmed sources for future opening signals. Duplicate appearances across older curated lists are useful for verification, but they are not treated as proof that a program is better.
 
@@ -59,7 +59,7 @@ These generic codes are for local prototype access only. For private beta tester
 
 After unlocking the prototype, use the `About` button in the app header to clear the local access flag and return to the public landing page.
 
-The waitlist/contact form saves locally by default. Set `VITE_WAITLIST_ENDPOINT` to the deployed ApplyFirst capture Worker `/waitlist` route to submit waitlist and My Focus contact requests externally; if the endpoint fails, the prototype falls back to local browser storage. Set `VITE_ALERT_ENDPOINT` to capture beta email alert opt-ins, or leave it blank to use the waitlist endpoint. Set `VITE_WATCH_ENDPOINT` to a deployed ApplyFirst watch Worker `/watch` route to save beta watch requests for source monitoring. Student program submissions and feedback save locally by default. Set `VITE_CONTRIBUTION_ENDPOINT` to the capture Worker `/contribution` route; if the endpoint fails, the prototype falls back to local browser storage. Copy `.env.example` to `.env.local` for local endpoint testing.
+The waitlist/contact form saves locally by default. Set `VITE_WAITLIST_ENDPOINT` to the deployed ApplyFirst capture Worker `/waitlist` route to submit waitlist and My Focus contact requests externally; if the endpoint fails, the prototype falls back to local browser storage. Set `VITE_ALERT_ENDPOINT` to capture beta email alert opt-ins, or leave it blank to use the waitlist endpoint. Set `VITE_WATCH_ENDPOINT` to a deployed ApplyFirst watch Worker `/watch` route to save beta watch requests for source monitoring. Student program submissions and feedback save locally by default. Set `VITE_CONTRIBUTION_ENDPOINT` to the capture Worker `/contribution` route. Remote capture also requires `VITE_TURNSTILE_SITE_KEY`; the Worker validates every token's action and frontend hostname before writing to D1. Copy `.env.example` to `.env.local` for local endpoint testing.
 
 Text alerts are implemented in the watch Worker but hidden from students by default. Keep `VITE_TEXT_ALERTS_ENABLED=false` until Twilio is configured and smoke-tested; then set it to `true` in Cloudflare Pages to make the Text option selectable.
 
@@ -164,6 +164,7 @@ Configure owner notification secrets:
 npx wrangler secret put OWNER_NOTIFY_EMAIL --config wrangler.capture.toml
 npx wrangler secret put CAPTURE_FROM_EMAIL --config wrangler.capture.toml
 npx wrangler secret put CAPTURE_REPLY_TO --config wrangler.capture.toml
+npx wrangler secret put TURNSTILE_SECRET --config wrangler.capture.toml
 ```
 
 Deploy the Worker:
@@ -177,6 +178,7 @@ Use these Cloudflare Pages environment variables:
 ```text
 VITE_WAITLIST_ENDPOINT=https://applyfirst-capture.kellychenmeiyi.workers.dev/waitlist
 VITE_CONTRIBUTION_ENDPOINT=https://applyfirst-capture.kellychenmeiyi.workers.dev/contribution
+VITE_TURNSTILE_SITE_KEY=YOUR_PUBLIC_SITE_KEY
 ```
 
 After a waitlist submission, check D1 and your owner inbox. If the owner email fails, the request still stays saved in D1.
@@ -190,14 +192,10 @@ The beta watching slice lives in a separate Worker so the static site deployment
 3. Apply the schema:
 
 ```bash
-npx wrangler d1 execute applyfirst-watch --config wrangler.watch.toml --remote --file cloudflare/d1/001_watch_foundation.sql
-npx wrangler d1 execute applyfirst-watch --config wrangler.watch.toml --remote --file cloudflare/d1/002_automatic_watch_alerts.sql
-npx wrangler d1 execute applyfirst-watch --config wrangler.watch.toml --remote --file cloudflare/d1/003_seasonal_source_schedules.sql
-npx wrangler d1 execute applyfirst-watch --config wrangler.watch.toml --remote --file cloudflare/d1/004_discovery_candidates.sql
-npx wrangler d1 execute applyfirst-watch --config wrangler.watch.toml --remote --file cloudflare/d1/005_discovery_search_runs.sql
-npx wrangler d1 execute applyfirst-watch --config wrangler.watch.toml --remote --file cloudflare/d1/006_unsubscribe_safety.sql
-npx wrangler d1 execute applyfirst-watch --config wrangler.watch.toml --remote --file cloudflare/d1/007_beta_access_workspaces.sql
+npm run watch:d1:migrate
 ```
+
+This applies the versioned watch migrations, including beta workspace storage, first-party product events, and alert engagement feedback. The watch Worker also binds the existing `applyfirst_beta` database as `CAPTURE_DB` so the admin-only beta summary can report waitlist totals without copying that data.
 
 4. Sync official source seed rows from `src/opportunities.js`:
 
@@ -276,6 +274,14 @@ https://applyfirst-watch.YOUR-SUBDOMAIN.workers.dev/watch
 ```
 
 The Worker stores beta watch requests, checks only sources that are due, saves page snapshots/source checks, tracks each program's latest alert state, automatically emails or texts watched students when a high-confidence official opening appears, and keeps ambiguous source changes in `pending_review`. Source schedules use cycle frequency, expected opening months, active lead time, dormant cadence, active cadence, and source volatility so ApplyFirst can start checking more often before an expected application season instead of polling every record forever.
+
+The same Worker accepts allowlisted beta product events at `/analytics/events`, records one-tap alert feedback at `/watch/engagement`, and exposes an admin-only 30-day summary at `/analytics/summary`. Maintainer Mode displays that summary in `Beta Progress`. It does not store plaintext invite codes or student search text.
+
+Before deployment, run the analytics contract test:
+
+```bash
+npm run watch:analytics:test
+```
 
 The first audited seed set and its schedule decisions live in [Verified seed schedule audit](./docs/VERIFIED_SEED_SCHEDULE_AUDIT.md). Regenerate and import `cloudflare/d1/watch-seed.generated.sql` after changing audited source URLs, expected months, or alert-safety decisions.
 

@@ -2,7 +2,7 @@
 
 ## One-Line Positioning
 
-ApplyFirst is an early-career program monitor that helps underclassmen and emerging technical students discover, prepare for, and apply quickly to high-signal career-launch opportunities.
+ApplyFirst is an early-career program monitor that helps underclassmen and emerging technical students discover relevant career-launch opportunities and apply earlier.
 
 ## Core Problem
 
@@ -12,9 +12,9 @@ For underclassmen especially, timing matters. Many programs review applications 
 
 ## Product Belief
 
-ApplyFirst is important for two connected reasons: students need to find opportunities early, and they need more chances to learn what kind of work and company environment actually fits them.
+ApplyFirst is important for two connected reasons: students need to discover relevant opportunities before recruiting gets crowded, and they need more chances to learn what kind of work and company environment actually fits them.
 
-The first reason is timing. Early application often changes outcomes. If a student knows when a high-signal program is likely to open, they can prepare their resume, portfolio, essays, referrals, and application materials before the window gets crowded. This is why monitoring, opening signals, and alerts matter.
+The first reason is timing. Early application often changes outcomes. If a student knows when a high-signal program is likely to open, they can act before the window gets crowded. Preparation can support that action, but ApplyFirst's main job is discovery, trustworthy timing signals, and earlier application.
 
 The second reason is career discovery. Early-career programs do more than add a line to a resume. They help students learn technical and professional skills, build confidence, meet peers and mentors, and understand how different companies actually operate.
 

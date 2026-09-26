@@ -38,6 +38,8 @@ const accessStorageKey = 'applyfirst-beta-access';
 const accessCodeStorageKey = 'applyfirst-beta-access-code';
 const onboardingStorageKey = 'applyfirst-onboarding-progress';
 const betaAlertSetupStorageKey = 'applyfirst-beta-alert-setup';
+const betaOutcomeStorageKey = 'applyfirst-beta-outcome';
+const analyticsSessionStorageKey = 'applyfirst-analytics-session';
 const inviteCodes = ['APPLYFIRST', 'APPLYFIRST2026', 'EARLYACCESS'];
 const betaWorkspaceInviteCodePattern = /^AF-[A-Z0-9][A-Z0-9-]{4,58}[A-Z0-9]$/;
 const phaseOneTarget = 25;
@@ -45,6 +47,7 @@ const waitlistEndpoint = import.meta.env.VITE_WAITLIST_ENDPOINT ?? '';
 const contributionEndpoint = import.meta.env.VITE_CONTRIBUTION_ENDPOINT ?? '';
 const alertEndpoint = import.meta.env.VITE_ALERT_ENDPOINT ?? waitlistEndpoint;
 const watchEndpoint = import.meta.env.VITE_WATCH_ENDPOINT ?? '';
+const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY ?? '';
 const textAlertsEnabled = import.meta.env.VITE_TEXT_ALERTS_ENABLED === 'true';
 const defaultAlertPrefs = {
   classYear: '',
@@ -64,6 +67,23 @@ const defaultOnboardingProgress = {
 const libraryPriorityLabels = {
   recommended: 'Recommended Programs',
   foundation: 'Prep Resources',
+};
+const librarySortOptions = [
+  { value: 'actSoon', label: 'Act Soon' },
+  { value: 'recentlyVerified', label: 'Recently Verified' },
+  { value: 'alphabetical', label: 'A-Z' },
+];
+const opportunityStatusSortOrder = {
+  deadlineSoon: 0,
+  open: 1,
+  expectedSoon: 2,
+  watching: 3,
+  verifyManually: 4,
+};
+const publicMonitorStatusMap = {
+  open: 'open',
+  deadline: 'deadlineSoon',
+  opening_soon: 'expectedSoon',
 };
 const landingProofSummary = `${opportunities.length}+ Special Programs`;
 const landingSourceCheckedCount = opportunities.filter((opportunity) => getVerificationState(opportunity) === 'verified').length;
@@ -298,6 +318,158 @@ async function fetchJson(endpoint) {
   return payload;
 }
 
+function getAnalyticsSessionId() {
+  try {
+    const existing = window.sessionStorage.getItem(analyticsSessionStorageKey);
+
+    if (existing) {
+      return existing;
+    }
+
+    const sessionId = crypto.randomUUID();
+    window.sessionStorage.setItem(analyticsSessionStorageKey, sessionId);
+    return sessionId;
+  } catch {
+    return crypto.randomUUID();
+  }
+}
+
+function sendProductEvent(workerBaseUrl, accessCode, sessionId, eventName, details = {}) {
+  if (!workerBaseUrl || !isWorkspaceInviteCode(accessCode)) {
+    return Promise.resolve();
+  }
+
+  return postJson(`${workerBaseUrl}/analytics/events`, {
+    accessCode,
+    sessionId,
+    eventId: crypto.randomUUID(),
+    eventName,
+    occurredAt: new Date().toISOString(),
+    programId: details.programId || '',
+    outcome: details.outcome || '',
+    context: details.context || {},
+  }).catch(() => {
+    // Product analytics should never interrupt the student workflow.
+  });
+}
+
+let turnstileScriptPromise;
+
+function loadTurnstileScript() {
+  if (typeof window === 'undefined') {
+    return Promise.reject(new Error('Turnstile requires a browser.'));
+  }
+
+  if (window.turnstile) {
+    return Promise.resolve(window.turnstile);
+  }
+
+  if (!turnstileScriptPromise) {
+    turnstileScriptPromise = new Promise((resolve, reject) => {
+      const existingScript = document.querySelector('script[data-applyfirst-turnstile]');
+      const script = existingScript ?? document.createElement('script');
+
+      script.addEventListener('load', () => {
+        if (window.turnstile) {
+          resolve(window.turnstile);
+        } else {
+          reject(new Error('Turnstile did not initialize.'));
+        }
+      }, { once: true });
+      script.addEventListener('error', () => reject(new Error('Turnstile could not load.')), { once: true });
+
+      if (!existingScript) {
+        script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+        script.async = true;
+        script.defer = true;
+        script.dataset.applyfirstTurnstile = 'true';
+        document.head.appendChild(script);
+      }
+    });
+  }
+
+  return turnstileScriptPromise;
+}
+
+function TurnstileVerification({ action, onTokenChange, resetKey = 0 }) {
+  const containerRef = useRef(null);
+  const widgetIdRef = useRef(null);
+  const callbackRef = useRef(onTokenChange);
+  const [loadState, setLoadState] = useState(turnstileSiteKey ? 'loading' : 'missing');
+
+  useEffect(() => {
+    callbackRef.current = onTokenChange;
+  }, [onTokenChange]);
+
+  useEffect(() => {
+    if (!turnstileSiteKey || !containerRef.current) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    loadTurnstileScript()
+      .then((turnstile) => {
+        if (cancelled || !containerRef.current) {
+          return;
+        }
+
+        widgetIdRef.current = turnstile.render(containerRef.current, {
+          sitekey: turnstileSiteKey,
+          action,
+          theme: 'light',
+          size: 'flexible',
+          callback: (token) => {
+            setLoadState('ready');
+            callbackRef.current(token);
+          },
+          'expired-callback': () => {
+            setLoadState('expired');
+            callbackRef.current('');
+          },
+          'error-callback': () => {
+            setLoadState('error');
+            callbackRef.current('');
+          },
+        });
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLoadState('error');
+          callbackRef.current('');
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      if (widgetIdRef.current !== null && window.turnstile) {
+        window.turnstile.remove(widgetIdRef.current);
+      }
+      widgetIdRef.current = null;
+    };
+  }, [action]);
+
+  useEffect(() => {
+    if (resetKey > 0 && widgetIdRef.current !== null && window.turnstile) {
+      window.turnstile.reset(widgetIdRef.current);
+      setLoadState('loading');
+      callbackRef.current('');
+    }
+  }, [resetKey]);
+
+  if (!turnstileSiteKey) {
+    return <p className="form-helper form-error">Verification is unavailable. Please try again later.</p>;
+  }
+
+  return (
+    <div className="turnstile-verification" aria-live="polite">
+      <div ref={containerRef} className="turnstile-widget" />
+      {loadState === 'error' ? <p className="form-helper form-error">Verification could not load. Refresh and try again.</p> : null}
+      {loadState === 'expired' ? <p className="form-helper">Verification expired. Please complete it again.</p> : null}
+    </div>
+  );
+}
+
 function normalizeInviteCode(value) {
   return String(value ?? '').trim().toUpperCase().replace(/\s+/g, '');
 }
@@ -313,6 +485,96 @@ function isAcceptedInviteCode(value) {
 
 function normalizeStoredIds(value) {
   return Array.isArray(value) ? [...new Set(value.map((item) => String(item).trim()).filter(Boolean))] : [];
+}
+
+function getSortableDate(value = '') {
+  const normalized = String(value).replace(/(\d)(st|nd|rd|th)\b/gi, '$1');
+  const isoMatch = normalized.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/);
+  const monthMatch = normalized.match(
+    /\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2}(?:,)?\s+20\d{2}\b/i,
+  );
+  const parsed = Date.parse(isoMatch?.[0] ?? monthMatch?.[0] ?? '');
+
+  return Number.isNaN(parsed) ? Number.POSITIVE_INFINITY : parsed;
+}
+
+function compareOpportunityNames(a, b) {
+  return a.name.localeCompare(b.name);
+}
+
+function compareOpportunityDates(a, b, direction = 'asc') {
+  const first = getSortableDate(a);
+  const second = getSortableDate(b);
+
+  if (first === second) {
+    return 0;
+  }
+
+  if (!Number.isFinite(first)) {
+    return 1;
+  }
+
+  if (!Number.isFinite(second)) {
+    return -1;
+  }
+
+  return direction === 'desc' ? second - first : first - second;
+}
+
+function compareOpportunities(a, b, sortMode) {
+  if (sortMode === 'alphabetical') {
+    return compareOpportunityNames(a, b);
+  }
+
+  if (sortMode === 'recentlyVerified') {
+    const checkedDifference = compareOpportunityDates(a.lastChecked, b.lastChecked, 'desc');
+
+    if (checkedDifference !== 0) {
+      return checkedDifference;
+    }
+
+    const verificationDifference =
+      Number(getVerificationState(b) === 'verified') - Number(getVerificationState(a) === 'verified');
+    return verificationDifference || compareOpportunityNames(a, b);
+  }
+
+  const statusDifference =
+    (opportunityStatusSortOrder[a.status] ?? Number.MAX_SAFE_INTEGER) -
+    (opportunityStatusSortOrder[b.status] ?? Number.MAX_SAFE_INTEGER);
+
+  if (statusDifference !== 0) {
+    return statusDifference;
+  }
+
+  const verificationDifference =
+    Number(getVerificationState(b) === 'verified') - Number(getVerificationState(a) === 'verified');
+
+  if (verificationDifference !== 0) {
+    return verificationDifference;
+  }
+
+  const timingDifference = compareOpportunityDates(a.deadline || a.openDate, b.deadline || b.openDate);
+
+  return timingDifference || compareOpportunityNames(a, b);
+}
+
+function getLiveOpportunityUpdate(opportunity, liveStatus) {
+  const status = publicMonitorStatusMap[liveStatus?.status];
+  const checkedDate = String(liveStatus?.lastCheckedAt ?? '').slice(0, 10);
+
+  if (!status || liveStatus?.confidence !== 'high') {
+    return null;
+  }
+
+  if (opportunity.lastChecked && checkedDate && checkedDate < opportunity.lastChecked) {
+    return null;
+  }
+
+  return {
+    status,
+    confidence: 'high',
+    ...(checkedDate ? { lastChecked: checkedDate } : {}),
+  };
 }
 
 function App() {
@@ -353,6 +615,8 @@ function App() {
   const [timing, setTiming] = useState('all');
   const [status, setStatus] = useState('all');
   const [savedOnly, setSavedOnly] = useState(false);
+  const [sortMode, setSortMode] = useState('actSoon');
+  const [liveProgramStatuses, setLiveProgramStatuses] = useState({});
   const [selectedId, setSelectedId] = useState(() => getInitialSelectedId());
   const [showInternalTools, setShowInternalTools] = useState(() => isReviewToolsRequested());
   const [maintainerToken, setMaintainerToken] = useState('');
@@ -464,20 +728,86 @@ function App() {
       return null;
     }
   });
+  const [betaOutcome, setBetaOutcome] = useState(() => {
+    try {
+      if (cleanCaptureMode) {
+        return null;
+      }
+
+      return JSON.parse(window.localStorage.getItem(betaOutcomeStorageKey)) ?? null;
+    } catch {
+      return null;
+    }
+  });
   const [watchIntentProgramIds, setWatchIntentProgramIds] = useState([]);
   const [lastSavedId, setLastSavedId] = useState(null);
   const [workspaceSyncState, setWorkspaceSyncState] = useState('idle');
   const lastWorkspaceSnapshotRef = useRef('');
+  const analyticsSessionIdRef = useRef(cleanCaptureMode ? '' : getAnalyticsSessionId());
+  const analyticsSessionTrackedRef = useRef(false);
+  const viewedProgramIdsRef = useRef(new Set());
+  const lastTrackedSearchRef = useRef('');
 
   const opportunityRecords = useMemo(
     () =>
-      opportunities.map((opportunity) => ({
-        ...opportunity,
-        ...(verificationEdits[opportunity.id] ?? {}),
-        hasLocalVerificationEdit: Boolean(verificationEdits[opportunity.id]),
-      })),
-    [verificationEdits],
+      opportunities.map((opportunity) => {
+        const liveUpdate = getLiveOpportunityUpdate(opportunity, liveProgramStatuses[opportunity.id]);
+
+        return {
+          ...opportunity,
+          ...(liveUpdate ?? {}),
+          ...(verificationEdits[opportunity.id] ?? {}),
+          hasLocalVerificationEdit: Boolean(verificationEdits[opportunity.id]),
+        };
+      }),
+    [liveProgramStatuses, verificationEdits],
   );
+
+  useEffect(() => {
+    const workerBaseUrl = getWorkerBaseUrl(activeWatchEndpoint);
+
+    if (!workerBaseUrl || cleanCaptureMode) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const refreshLibraryStatus = () => {
+      fetchJson(`${workerBaseUrl}/library/status`)
+        .then((payload) => {
+          if (cancelled || !Array.isArray(payload.programs)) {
+            return;
+          }
+
+          setLiveProgramStatuses(
+            Object.fromEntries(
+              payload.programs
+                .filter((program) => program?.programId)
+                .map((program) => [program.programId, program]),
+            ),
+          );
+        })
+        .catch(() => {
+          // Keep the curated library available when the live status feed is temporarily unavailable.
+        });
+    };
+
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') {
+        refreshLibraryStatus();
+      }
+    };
+
+    refreshLibraryStatus();
+    const refreshTimer = window.setInterval(refreshLibraryStatus, 5 * 60 * 1000);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(refreshTimer);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [activeWatchEndpoint, cleanCaptureMode]);
 
   const verificationQueueItems = useMemo(
     () =>
@@ -532,7 +862,12 @@ function App() {
     });
   }, [category, classYear, opportunityRecords, priority, query, roleTrack, savedIds, savedOnly, showInternalTools, status, timing, verification]);
 
-  const selectedOpportunity = filtered.find((item) => item.id === selectedId) ?? filtered[0] ?? null;
+  const sortedFiltered = useMemo(
+    () => [...filtered].sort((a, b) => compareOpportunities(a, b, sortMode)),
+    [filtered, sortMode],
+  );
+
+  const selectedOpportunity = sortedFiltered.find((item) => item.id === selectedId) ?? sortedFiltered[0] ?? null;
   const savedOpportunities = opportunityRecords.filter((item) => savedIds.includes(item.id));
   const watchIntentOpportunities = opportunityRecords.filter((item) => watchIntentProgramIds.includes(item.id));
   const alertPreviewMatches = useMemo(
@@ -578,6 +913,14 @@ function App() {
   const onboardingComplete = ['browsed', 'saved', 'focused', 'alerted', 'improved'].every((step) => guideProgress[step]);
   const showFirstSessionGuide = !onboardingProgress.dismissed && !onboardingComplete;
   const canSyncWorkspace = hasAccess && isWorkspaceInviteCode(activeAccessCode) && Boolean(getWorkerBaseUrl(activeWatchEndpoint));
+  const trackProductEvent = (eventName, details = {}) =>
+    sendProductEvent(
+      getWorkerBaseUrl(activeWatchEndpoint),
+      activeAccessCode,
+      analyticsSessionIdRef.current,
+      eventName,
+      details,
+    );
 
   const hydrateWorkspaceState = (state = {}) => {
     setSavedIds(normalizeStoredIds(state.savedIds));
@@ -592,6 +935,7 @@ function App() {
       ...defaultOnboardingProgress,
       ...(state.onboardingProgress && typeof state.onboardingProgress === 'object' ? state.onboardingProgress : {}),
     });
+    setBetaOutcome(state.betaOutcome && typeof state.betaOutcome === 'object' ? state.betaOutcome : null);
   };
 
   const createWorkspaceState = () => ({
@@ -601,6 +945,7 @@ function App() {
     betaAlertSetup,
     waitlistIntent,
     onboardingProgress,
+    betaOutcome,
   });
 
   useEffect(() => {
@@ -680,6 +1025,18 @@ function App() {
       return;
     }
 
+    if (betaOutcome) {
+      window.localStorage.setItem(betaOutcomeStorageKey, JSON.stringify(betaOutcome));
+    } else {
+      window.localStorage.removeItem(betaOutcomeStorageKey);
+    }
+  }, [betaOutcome, cleanCaptureMode]);
+
+  useEffect(() => {
+    if (cleanCaptureMode) {
+      return;
+    }
+
     if (!hasAccess || !activeAccessCode) {
       setWorkspaceSyncState('idle');
       return;
@@ -749,6 +1106,7 @@ function App() {
     activeWatchEndpoint,
     alertPrefs,
     betaAlertSetup,
+    betaOutcome,
     canSyncWorkspace,
     cleanCaptureMode,
     onboardingProgress,
@@ -763,6 +1121,49 @@ function App() {
       setActiveView('monitor');
     }
   }, [activeView, showInternalTools]);
+
+  useEffect(() => {
+    if (
+      cleanCaptureMode ||
+      analyticsSessionTrackedRef.current ||
+      !canSyncWorkspace ||
+      !['loaded', 'synced'].includes(workspaceSyncState)
+    ) {
+      return;
+    }
+
+    analyticsSessionTrackedRef.current = true;
+    trackProductEvent('session_started', {
+      context: { view: activeView, source: 'beta_workspace' },
+    });
+  }, [activeView, canSyncWorkspace, cleanCaptureMode, workspaceSyncState]);
+
+  useEffect(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+
+    if (
+      cleanCaptureMode ||
+      !canSyncWorkspace ||
+      !['loaded', 'synced'].includes(workspaceSyncState) ||
+      normalizedQuery.length < 2 ||
+      normalizedQuery === lastTrackedSearchRef.current
+    ) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      lastTrackedSearchRef.current = normalizedQuery;
+      trackProductEvent('search_used', {
+        context: {
+          view: 'programs',
+          queryLength: normalizedQuery.length,
+          resultCount: filtered.length,
+        },
+      });
+    }, 900);
+
+    return () => window.clearTimeout(timer);
+  }, [canSyncWorkspace, cleanCaptureMode, filtered.length, query, workspaceSyncState]);
 
   const markOnboardingStep = (step) => {
     setOnboardingProgress((currentProgress) =>
@@ -789,6 +1190,25 @@ function App() {
     });
     markOnboardingStep('focused');
     markOnboardingStep('alerted');
+    trackProductEvent('focus_saved', {
+      context: { view: 'my_focus', source: 'alert_setup' },
+    });
+    trackProductEvent('alerts_enabled', {
+      context: { view: 'my_focus', source: setup.contactMethod || 'email' },
+    });
+  };
+
+  const saveBetaOutcome = (outcome) => {
+    const nextOutcome = {
+      outcome,
+      updatedAt: new Date().toISOString(),
+    };
+
+    setBetaOutcome(nextOutcome);
+    trackProductEvent('outcome_reported', {
+      outcome,
+      context: { view: 'my_focus', source: 'beta_check_in' },
+    });
   };
 
   const resetFilters = () => {
@@ -801,6 +1221,7 @@ function App() {
     setTiming('all');
     setStatus('all');
     setSavedOnly(false);
+    setSortMode('actSoon');
   };
 
   const focusOpportunity = (id) => {
@@ -812,6 +1233,14 @@ function App() {
   const selectOpportunity = (id) => {
     setSelectedId(id);
     markOnboardingStep('browsed');
+
+    if (!viewedProgramIdsRef.current.has(id)) {
+      viewedProgramIdsRef.current.add(id);
+      trackProductEvent('program_viewed', {
+        programId: id,
+        context: { view: 'programs', source: 'library_list' },
+      });
+    }
   };
 
   const toggleSaved = (id) => {
@@ -829,10 +1258,16 @@ function App() {
     if (alreadySaved) {
       setWatchIntentProgramIds((currentIds) => currentIds.filter((programId) => programId !== id));
     }
+
+    trackProductEvent(alreadySaved ? 'program_unsaved' : 'program_saved', {
+      programId: id,
+      context: { view: 'programs', source: 'bookmark' },
+    });
   };
 
   const startAlertsForOpportunity = (id) => {
     const opportunity = opportunityRecords.find((item) => item.id === id);
+    const alreadySaved = savedIds.includes(id);
 
     if (!opportunity) {
       setActiveView('alerts');
@@ -858,6 +1293,16 @@ function App() {
         roleTrack: isPreferenceUnset(currentPrefs.roleTrack) ? tracks[0] : currentPrefs.roleTrack,
         sendTiming: isPreferenceUnset(currentPrefs.sendTiming) ? 'openOnly' : currentPrefs.sendTiming,
       };
+    });
+    if (!alreadySaved) {
+      trackProductEvent('program_saved', {
+        programId: id,
+        context: { view: 'programs', source: 'watch_program' },
+      });
+    }
+    trackProductEvent('watch_started', {
+      programId: id,
+      context: { view: 'programs', source: 'watch_program' },
     });
     setActiveView('alerts');
     window.setTimeout(() => {
@@ -911,7 +1356,7 @@ function App() {
     setAlertPrefs(defaultAlertPrefs);
   };
 
-  const addStudentContribution = async (type, draft) => {
+  const addStudentContribution = async (type, draft, verification = {}) => {
     const contribution = {
       ...draft,
       id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -921,6 +1366,10 @@ function App() {
     };
 
     if (activeContributionEndpoint) {
+      if (!verification.turnstileToken) {
+        return 'verificationRequired';
+      }
+
       try {
         const response = await fetch(activeContributionEndpoint, {
           method: 'POST',
@@ -928,6 +1377,7 @@ function App() {
           body: JSON.stringify({
             source: 'applyfirst-contribution',
             ...contribution,
+            turnstileToken: verification.turnstileToken,
           }),
         });
 
@@ -939,6 +1389,10 @@ function App() {
           [{ ...contribution, status: 'Submitted for Review' }, ...currentContributions].slice(0, 12),
         );
         markOnboardingStep('improved');
+        trackProductEvent('contribution_submitted', {
+          programId: cleanText(contribution.programId || ''),
+          context: { view: 'suggest_updates', source: type },
+        });
         return 'submitted';
       } catch {
         setStudentContributions((currentContributions) =>
@@ -970,6 +1424,9 @@ function App() {
       // Access still works for the current session if local storage is unavailable.
     }
     lastWorkspaceSnapshotRef.current = '';
+    analyticsSessionTrackedRef.current = false;
+    viewedProgramIdsRef.current = new Set();
+    lastTrackedSearchRef.current = '';
     if (normalizedAccessCode && previousAccessCode !== normalizedAccessCode) {
       setSavedIds([]);
       setWatchIntentProgramIds([]);
@@ -977,6 +1434,7 @@ function App() {
       setBetaAlertSetup(null);
       setWaitlistIntent(null);
       setOnboardingProgress({ ...defaultOnboardingProgress });
+      setBetaOutcome(null);
     }
     setActiveAccessCode(normalizedAccessCode);
     setHasAccess(true);
@@ -991,6 +1449,9 @@ function App() {
       // Returning to the landing page still works for the current session if local storage is unavailable.
     }
     lastWorkspaceSnapshotRef.current = '';
+    analyticsSessionTrackedRef.current = false;
+    viewedProgramIdsRef.current = new Set();
+    lastTrackedSearchRef.current = '';
     setActiveAccessCode('');
     setHasAccess(false);
     setActiveView('monitor');
@@ -1054,6 +1515,9 @@ function App() {
               alertEndpoint={activeAlertEndpoint}
               watchEndpoint={activeWatchEndpoint}
             />
+            {savedIds.length || betaAlertSetup ? (
+              <BetaOutcomeCheckIn outcome={betaOutcome?.outcome || ''} onChange={saveBetaOutcome} />
+            ) : null}
           </section>
         ) : activeView === 'contribute' ? (
           <ContributeView
@@ -1106,7 +1570,7 @@ function App() {
                     <dd>Saved By You</dd>
                   </div>
                   <div>
-                    <dt>{alertableCount}</dt>
+                    <dt>{verifiedCount}</dt>
                     <dd>Source Confirmed</dd>
                   </div>
                 </dl>
@@ -1168,6 +1632,14 @@ function App() {
                     <strong>{filtered.length} {filtered.length === 1 ? 'program' : 'programs'}</strong>
                   </div>
                   <div className="board-toolbar-actions">
+                    <label className="library-sort-control">
+                      <span className="sr-only">Sort Programs</span>
+                      <select value={sortMode} onChange={(event) => setSortMode(event.target.value)}>
+                        {librarySortOptions.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                    </label>
                     <div className="result-view-switch" aria-label="Program list view">
                       <button
                         className={!savedOnly ? 'active' : ''}
@@ -1194,8 +1666,8 @@ function App() {
                   </div>
                 </div>
                 <div className="record-table" role="list">
-                  {filtered.length ? (
-                    filtered.map((opportunity) => (
+                  {sortedFiltered.length ? (
+                    sortedFiltered.map((opportunity) => (
                         <OpportunityRecord
                           key={opportunity.id}
                           opportunity={opportunity}
@@ -1220,6 +1692,18 @@ function App() {
                     selectedOpportunity && selectedOpportunity.id === lastSavedId && savedIds.includes(selectedOpportunity.id),
                   )}
                   onFocusSetup={() => selectedOpportunity && startAlertsForOpportunity(selectedOpportunity.id)}
+                  onOfficialSourceClick={() => {
+                    if (selectedOpportunity) {
+                      trackProductEvent('official_source_clicked', {
+                        programId: selectedOpportunity.id,
+                        context: {
+                          view: 'programs',
+                          source: selectedOpportunity.status === 'open' ? 'apply_now' : 'official_source',
+                          status: selectedOpportunity.status,
+                        },
+                      });
+                    }
+                  }}
                   onImproveLibrary={() => setActiveView('contribute')}
                   onVerificationSave={saveVerificationEdit}
                   onVerificationReset={resetVerificationEdit}
@@ -1712,6 +2196,7 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
   const [discoveryCandidates, setDiscoveryCandidates] = useState([]);
   const [alertCandidates, setAlertCandidates] = useState([]);
   const [alertCandidateTotal, setAlertCandidateTotal] = useState(0);
+  const [betaMetrics, setBetaMetrics] = useState(null);
   const [searchResult, setSearchResult] = useState(null);
   const [sourceRunResult, setSourceRunResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -1778,12 +2263,13 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
     }
 
     try {
-      const [statusPayload, readinessPayload, historyPayload, discoveryPayload, alertPayload] = await Promise.all([
+      const [statusPayload, readinessPayload, historyPayload, discoveryPayload, alertPayload, metricsPayload] = await Promise.all([
         callAdminEndpoint('/watch/status'),
         callAdminEndpoint('/watch/readiness'),
         callAdminEndpoint('/watch/history'),
         callAdminEndpoint('/watch/discovery/candidates?status=pending_review'),
         callAdminEndpoint('/watch/candidates'),
+        callAdminEndpoint('/analytics/summary'),
       ]);
 
       setStatus(statusPayload);
@@ -1792,6 +2278,7 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
       setDiscoveryCandidates(discoveryPayload.candidates ?? []);
       setAlertCandidates(alertPayload.candidates ?? []);
       setAlertCandidateTotal(alertPayload.totalPending ?? alertPayload.candidates?.length ?? 0);
+      setBetaMetrics(metricsPayload);
       setLastRefreshedAt(new Date().toISOString());
       if (!quiet) {
         setActionMessage('Review queues refreshed.');
@@ -2074,6 +2561,8 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
             lastRefreshedAt={lastRefreshedAt}
           />
 
+          {betaMetrics ? <BetaMetricsPanel metrics={betaMetrics} /> : null}
+
           {readinessQueue ? (
             <MonitoringReadinessQueue
               queue={readinessQueue}
@@ -2272,6 +2761,102 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
           {reviewHistory ? <ReviewHistoryPanel history={reviewHistory} events={reviewEvents} /> : null}
         </>
       )}
+    </section>
+  );
+}
+
+function BetaMetricsPanel({ metrics }) {
+  const funnel = Object.fromEntries((metrics.funnel ?? []).map((item) => [item.eventName, item.participants]));
+  const outcomes = Object.fromEntries((metrics.outcomes ?? []).map((item) => [item.outcome, item.participants]));
+  const engagement = Object.fromEntries(
+    (metrics.alertEngagement ?? []).map((item) => [item.action, item.participants]),
+  );
+  const meaningfulOutcomes = (outcomes.found_relevant_program ?? 0) + (outcomes.applied_earlier ?? 0);
+  const funnelRows = [
+    ['Opened A Beta Workspace', funnel.session_started ?? 0],
+    ['Viewed A Program', funnel.program_viewed ?? 0],
+    ['Saved A Program', funnel.program_saved ?? 0],
+    ['Started Watching', funnel.watch_started ?? 0],
+    ['Enabled Alerts', funnel.alerts_enabled ?? 0],
+    ['Visited An Official Source', funnel.official_source_clicked ?? 0],
+  ];
+
+  return (
+    <section className="maintainer-panel beta-metrics-panel" aria-label="Beta product metrics">
+      <div className="maintainer-panel-heading">
+        <div>
+          <span>Beta Progress</span>
+          <h2>Are Students Discovering And Applying Earlier?</h2>
+        </div>
+        <p>Workspace-level activity from the last {metrics.periodDays ?? 30} days.</p>
+      </div>
+      <dl className="beta-metrics-summary">
+        <div>
+          <dt>{metrics.waitlist?.uniqueEmails ?? '-'}</dt>
+          <dd>Unique Waitlist</dd>
+        </div>
+        <div>
+          <dt>{metrics.workspaces?.total ?? 0}</dt>
+          <dd>Workspaces Seen</dd>
+        </div>
+        <div>
+          <dt>{metrics.workspaces?.activated30Days ?? 0}</dt>
+          <dd>Core Setup Complete</dd>
+        </div>
+        <div>
+          <dt>{meaningfulOutcomes}</dt>
+          <dd>Useful Outcomes</dd>
+        </div>
+      </dl>
+      <details className="beta-metrics-details">
+        <summary>View Funnel And Feedback</summary>
+        <div className="beta-metrics-detail-grid">
+          <section>
+            <h3>Student Funnel</h3>
+            <dl>
+              {funnelRows.map(([label, value]) => (
+                <div key={label}>
+                  <dt>{label}</dt>
+                  <dd>{value}</dd>
+                </div>
+              ))}
+              <div>
+                <dt>Returned On Multiple Days</dt>
+                <dd>{metrics.workspaces?.returning30Days ?? 0}</dd>
+              </div>
+            </dl>
+          </section>
+          <section>
+            <h3>Reported Outcomes</h3>
+            <dl>
+              <div><dt>Found A Relevant Program</dt><dd>{outcomes.found_relevant_program ?? 0}</dd></div>
+              <div><dt>Applied Earlier</dt><dd>{outcomes.applied_earlier ?? 0}</dd></div>
+              <div><dt>Not Yet</dt><dd>{outcomes.not_yet ?? 0}</dd></div>
+            </dl>
+            <h3>Alert Feedback</h3>
+            <dl>
+              <div><dt>Opened Official Source</dt><dd>{engagement.source_clicked ?? 0}</dd></div>
+              <div><dt>Useful</dt><dd>{engagement.useful ?? 0}</dd></div>
+              <div><dt>Not Relevant</dt><dd>{engagement.not_relevant ?? 0}</dd></div>
+              <div><dt>Already Knew</dt><dd>{engagement.already_knew ?? 0}</dd></div>
+              <div><dt>Information Looks Wrong</dt><dd>{engagement.inaccurate ?? 0}</dd></div>
+            </dl>
+          </section>
+        </div>
+        {metrics.topPrograms?.length ? (
+          <section className="beta-top-programs">
+            <h3>Programs Drawing Action</h3>
+            <div className="beta-top-programs-list">
+              {metrics.topPrograms.slice(0, 6).map((program) => (
+                <div key={program.programId}>
+                  <strong>{formatDisplayLabel(program.programId)}</strong>
+                  <span>{program.saves} saved · {program.sourceClicks} source visits · {program.views} views</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+      </details>
     </section>
   );
 }
@@ -3200,6 +3785,8 @@ function BetaAlertSystem({
   const [phoneNumber, setPhoneNumber] = useState(betaAlertSetup?.phoneNumber ?? '');
   const [contactMethod, setContactMethod] = useState(betaAlertSetup?.contactMethod ?? 'email');
   const [submitState, setSubmitState] = useState('idle');
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
   const effectiveContactMethod = textAlertsAvailable ? contactMethod : 'email';
 
   useEffect(() => {
@@ -3249,6 +3836,7 @@ function BetaAlertSystem({
   const hasUnsavedWatchSetupChanges =
     Boolean(betaAlertSetup) && !watchSetupMatches(betaAlertSetup, currentWatchSetup);
   const isSavedWatchSetupCurrent = Boolean(betaAlertSetup) && !hasUnsavedWatchSetupChanges;
+  const needsTurnstile = Boolean(captureEndpoint && email.trim() && !turnstileToken);
   const setupActionMessage = hasIncompleteSetup
     ? `Choose ${missingSetupSummary} first.`
       : !hasContact
@@ -3257,6 +3845,8 @@ function BetaAlertSystem({
         : 'Add an email to receive opening alerts.'
       : !hasWatchedPrograms
         ? 'Save a program or set My Focus from a listing first.'
+      : needsTurnstile
+        ? 'Complete the verification before starting alerts.'
       : isSavedWatchSetupCurrent
         ? ''
         : betaAlertSetup
@@ -3276,7 +3866,7 @@ function BetaAlertSystem({
       ? 'is-dirty'
       : '';
   const setupButtonDisabled =
-    hasIncompleteSetup || !hasContact || !hasWatchedPrograms || submitState === 'submitting' || isSavedWatchSetupCurrent;
+    hasIncompleteSetup || !hasContact || !hasWatchedPrograms || needsTurnstile || submitState === 'submitting' || isSavedWatchSetupCurrent;
   const shouldShowSetupStatus = setupButtonDisabled && !isSavedWatchSetupCurrent;
 
   const createSetupPayload = (captureStatus) => ({
@@ -3321,6 +3911,11 @@ function BetaAlertSystem({
       'I agree to receive ApplyFirst beta opening alerts by my selected contact method for programs I choose to watch. Message and data rates may apply for text alerts. I can unsubscribe or opt out.';
 
     if (hasRemoteEndpoint) {
+      if (captureEndpoint && payload.email && !turnstileToken) {
+        setSubmitState('verificationRequired');
+        return;
+      }
+
       setSubmitState('submitting');
       try {
         const requests = [];
@@ -3337,6 +3932,7 @@ function BetaAlertSystem({
               preferenceSummary,
               notificationMode: 'Beta Email Alerts',
               savedAt: new Date().toISOString(),
+              turnstileToken,
             }),
           );
         }
@@ -3371,10 +3967,12 @@ function BetaAlertSystem({
         }
 
         await Promise.all(requests);
+        setTurnstileResetKey((current) => current + 1);
         onSave(createSetupPayload(watchEndpoint ? 'Opening Alerts Submitted' : 'Email Alerts Submitted'));
         setSubmitState('submitted');
         return;
       } catch {
+        setTurnstileResetKey((current) => current + 1);
         onSave(createSetupPayload('Saved Locally After Endpoint Issue'));
         setSubmitState('localFallback');
         return;
@@ -3459,6 +4057,9 @@ function BetaAlertSystem({
         >
           {setupButtonLabel}
         </button>
+        {captureEndpoint && email.trim() ? (
+          <TurnstileVerification action="waitlist" onTokenChange={setTurnstileToken} resetKey={turnstileResetKey} />
+        ) : null}
       </div>
 
       {betaAlertSetup ? <WatchSetupReceipt setup={betaAlertSetup} /> : null}
@@ -3631,11 +4232,47 @@ function BetaAlertFeed({ watchedPrograms, suggestedPrograms, hasSavedSetup, hasP
   );
 }
 
+function BetaOutcomeCheckIn({ outcome, onChange }) {
+  const options = [
+    { value: 'found_relevant_program', label: 'Found A Relevant Program' },
+    { value: 'applied_earlier', label: 'Applied Earlier' },
+    { value: 'not_yet', label: 'Not Yet' },
+  ];
+
+  return (
+    <section className="beta-outcome-check-in" aria-label="ApplyFirst beta progress check-in">
+      <div>
+        <span>Beta Check-In</span>
+        <h2>What Has ApplyFirst Helped You Do?</h2>
+        <p>One answer helps us improve discovery and opening alerts.</p>
+      </div>
+      <div className="beta-outcome-options" role="group" aria-label="Choose your current ApplyFirst outcome">
+        {options.map((option) => (
+          <button
+            className={outcome === option.value ? 'active' : ''}
+            type="button"
+            key={option.value}
+            onClick={() => onChange(option.value)}
+            aria-pressed={outcome === option.value}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+      {outcome ? <small>Saved. You can update this as your recruiting season changes.</small> : null}
+    </section>
+  );
+}
+
 function ContributeView({ contributions, opportunities, captureEndpoint = '', onSubmit }) {
   const [programDraft, setProgramDraft] = useState(() => createProgramSubmissionDraft());
   const [feedbackDraft, setFeedbackDraft] = useState(() => createFeedbackDraft(opportunities));
   const [programSubmitState, setProgramSubmitState] = useState('idle');
   const [feedbackSubmitState, setFeedbackSubmitState] = useState('idle');
+  const [programTurnstileToken, setProgramTurnstileToken] = useState('');
+  const [feedbackTurnstileToken, setFeedbackTurnstileToken] = useState('');
+  const [programTurnstileResetKey, setProgramTurnstileResetKey] = useState(0);
+  const [feedbackTurnstileResetKey, setFeedbackTurnstileResetKey] = useState(0);
 
   const updateProgramDraft = (field, value) => {
     setProgramDraft((currentDraft) => ({
@@ -3653,17 +4290,27 @@ function ContributeView({ contributions, opportunities, captureEndpoint = '', on
 
   const submitProgram = async (event) => {
     event.preventDefault();
+    if (captureEndpoint && !programTurnstileToken) {
+      setProgramSubmitState('verificationRequired');
+      return;
+    }
     setProgramSubmitState('submitting');
-    const result = await onSubmit('program', programDraft);
+    const result = await onSubmit('program', programDraft, { turnstileToken: programTurnstileToken });
     setProgramSubmitState(result);
+    setProgramTurnstileResetKey((current) => current + 1);
     setProgramDraft(createProgramSubmissionDraft());
   };
 
   const submitFeedback = async (event) => {
     event.preventDefault();
+    if (captureEndpoint && !feedbackTurnstileToken) {
+      setFeedbackSubmitState('verificationRequired');
+      return;
+    }
     setFeedbackSubmitState('submitting');
-    const result = await onSubmit('feedback', feedbackDraft);
+    const result = await onSubmit('feedback', feedbackDraft, { turnstileToken: feedbackTurnstileToken });
     setFeedbackSubmitState(result);
+    setFeedbackTurnstileResetKey((current) => current + 1);
     setFeedbackDraft(createFeedbackDraft(opportunities));
   };
 
@@ -3727,7 +4374,14 @@ function ContributeView({ contributions, opportunities, captureEndpoint = '', on
               required
             />
           </label>
-          <button type="submit" disabled={programSubmitState === 'submitting'}>
+          {captureEndpoint ? (
+            <TurnstileVerification
+              action="contribution"
+              onTokenChange={setProgramTurnstileToken}
+              resetKey={programTurnstileResetKey}
+            />
+          ) : null}
+          <button type="submit" disabled={programSubmitState === 'submitting' || (captureEndpoint && !programTurnstileToken)}>
             {programSubmitState === 'submitting' ? 'Saving...' : 'Save Submission'}
           </button>
           <SubmissionHelper state={programSubmitState} captureEndpoint={captureEndpoint} />
@@ -3767,7 +4421,14 @@ function ContributeView({ contributions, opportunities, captureEndpoint = '', on
               required
             />
           </label>
-          <button type="submit" disabled={feedbackSubmitState === 'submitting'}>
+          {captureEndpoint ? (
+            <TurnstileVerification
+              action="contribution"
+              onTokenChange={setFeedbackTurnstileToken}
+              resetKey={feedbackTurnstileResetKey}
+            />
+          ) : null}
+          <button type="submit" disabled={feedbackSubmitState === 'submitting' || (captureEndpoint && !feedbackTurnstileToken)}>
             {feedbackSubmitState === 'submitting' ? 'Saving...' : 'Save Feedback'}
           </button>
           <SubmissionHelper state={feedbackSubmitState} captureEndpoint={captureEndpoint} />
@@ -3796,6 +4457,10 @@ function SubmissionHelper({ state, captureEndpoint }) {
     return <p className="form-helper">Saved here for now. We may ask you to submit again later.</p>;
   }
 
+  if (state === 'verificationRequired') {
+    return <p className="form-helper form-error">Complete the verification before submitting.</p>;
+  }
+
   if (!captureEndpoint) {
     return <p className="form-helper">Saved in this browser for now.</p>;
   }
@@ -3822,6 +4487,8 @@ function WaitlistPanel({
 }) {
   const [draft, setDraft] = useState(() => createWaitlistDraft(alertPrefs));
   const [submitState, setSubmitState] = useState('idle');
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
   const isLandingContext = context === 'landing';
   const isSetupContext = !isLandingContext;
 
@@ -3860,6 +4527,11 @@ function WaitlistPanel({
     };
 
     if (captureEndpoint) {
+      if (!turnstileToken) {
+        setSubmitState('verificationRequired');
+        return;
+      }
+
       setSubmitState('submitting');
       try {
         const response = await fetch(captureEndpoint, {
@@ -3868,6 +4540,7 @@ function WaitlistPanel({
           body: JSON.stringify({
             source: 'applyfirst-waitlist',
             ...payload,
+            turnstileToken,
           }),
         });
 
@@ -3879,9 +4552,11 @@ function WaitlistPanel({
           ...payload,
           captureStatus: 'Submitted to Waitlist Endpoint',
         });
+        setTurnstileResetKey((current) => current + 1);
         setSubmitState('submitted');
         return;
       } catch {
+        setTurnstileResetKey((current) => current + 1);
         onSave({
           ...payload,
           captureStatus: 'Saved Locally After Endpoint Issue',
@@ -3978,11 +4653,17 @@ function WaitlistPanel({
               placeholder={isLandingContext ? '' : 'Example: freshman SWE discovery programs, conference funding, PM fellowships...'}
             />
           </label>
-          <button type="submit" disabled={submitState === 'submitting'}>
+          {captureEndpoint ? (
+            <TurnstileVerification action="waitlist" onTokenChange={setTurnstileToken} resetKey={turnstileResetKey} />
+          ) : null}
+          <button type="submit" disabled={submitState === 'submitting' || (captureEndpoint && !turnstileToken)}>
             {submitState === 'submitting' ? 'Saving...' : isLandingContext ? 'Join Waitlist' : 'Save Contact Preference'}
           </button>
           {submitState === 'localFallback' ? (
             <p className="form-helper">Saved here for now. We may ask you to submit again later.</p>
+          ) : null}
+          {submitState === 'verificationRequired' ? (
+            <p className="form-helper form-error">Complete the verification before joining.</p>
           ) : null}
           {!captureEndpoint ? (
             <p className="form-helper">
@@ -4175,6 +4856,7 @@ function OpportunityDetail({
   onSave,
   justSaved,
   onFocusSetup,
+  onOfficialSourceClick,
   onImproveLibrary,
   onVerificationSave,
   onVerificationReset,
@@ -4245,6 +4927,7 @@ function OpportunityDetail({
           href={opportunity.applicationUrl || opportunity.url}
           target="_blank"
           rel="noreferrer"
+          onClick={onOfficialSourceClick}
         >
           {sourceActionLabel}
         </a>
