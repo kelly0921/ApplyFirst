@@ -156,6 +156,21 @@ First verification batch completed:
 - SEO Tech Developer.
 - SEO Tech Developer First-Year Academy.
 
+Current-cycle discovery expansion verified September 26, 2026:
+
+- Goldman Sachs Emerging Leaders Series, including the Dallas Engineering track.
+- HRT Women in Trading & Technology for January 2027.
+- HRT Inside and Explore interest routes.
+- Susquehanna Quantitative Trading & Strategy and Trading System Engineer Discovery Programs.
+- Akuna Capital 2027 Trading Sneak Peek interest route.
+- Discover Citadel for April 2027.
+- Jane Street IN FOCUS corrected to a May 2027 watch item rather than an open application.
+
+Additional watch-only programs added from stable official pages:
+
+- Goldman Sachs Possibilities Series.
+- IMC Launchpad.
+
 Watch-only examples until current-cycle pages are explicit:
 
 - Microsoft Explore.

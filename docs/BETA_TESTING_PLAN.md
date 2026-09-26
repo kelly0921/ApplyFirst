@@ -33,6 +33,10 @@ Before each test:
 
 Suggested first examples:
 
+- Goldman Sachs Emerging Leaders Series.
+- HRT Women in Trading & Technology.
+- Susquehanna Quantitative Trading & Strategy Discovery Program.
+- Discover Citadel.
 - Outreachy.
 - MLH Fellowship.
 - Coding it Forward Fellowship.

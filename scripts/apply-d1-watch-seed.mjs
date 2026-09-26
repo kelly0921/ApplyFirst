@@ -8,6 +8,7 @@ const dryRun = args.has('--dry-run');
 const maxAttempts = Number.parseInt(getArgValue('--attempts') ?? '3', 10);
 const retryDelayMs = Number.parseInt(getArgValue('--retry-delay-ms') ?? '2500', 10);
 const seedPath = new URL('../cloudflare/d1/watch-seed.generated.sql', import.meta.url);
+const seedFilePath = fileURLToPath(seedPath);
 const projectRoot = fileURLToPath(new URL('..', import.meta.url));
 const wranglerBinary = process.execPath;
 const wranglerArgs = [
@@ -21,9 +22,17 @@ const wranglerArgs = [
 ];
 
 if (!skipGenerate) {
-  runCommand(process.execPath, ['scripts/export-d1-watch-seed.mjs', '--write'], {
+  const generationResult = runCommand(process.execPath, ['scripts/export-d1-watch-seed.mjs', '--write'], {
     label: 'Generating D1 seed from src/opportunities.js',
   });
+
+  if (!generationResult.ok) {
+    throw new Error(
+      generationResult.error
+        ? `Generating D1 seed failed: ${generationResult.error.message}`
+        : `Generating D1 seed failed with exit code ${generationResult.status}`,
+    );
+  }
 }
 
 const sql = stripSqlLineComments(await readFile(seedPath, 'utf8'));
@@ -35,18 +44,16 @@ if (!statements.length) {
 
 console.log(`${dryRun ? 'Would apply' : 'Applying'} ${statements.length} D1 seed statements.`);
 
-for (const [index, statement] of statements.entries()) {
-  const label = `${dryRun ? 'Previewing' : 'Running'} ${index + 1}/${statements.length}`;
-  console.log(label);
-
-  if (dryRun) {
-    continue;
-  }
-
-  runCommandWithRetries(wranglerBinary, [...wranglerArgs, '--command', `${statement};`], { label });
+if (dryRun) {
+  console.log('Dry run complete.');
+} else {
+  runCommandWithRetries(
+    wranglerBinary,
+    [...wranglerArgs, '--file', seedFilePath, '--yes'],
+    { label: `Applying ${statements.length} statements in one idempotent import` },
+  );
+  console.log('D1 watch seed synced from code.');
 }
-
-console.log(dryRun ? 'Dry run complete.' : 'D1 watch seed synced from code.');
 
 function splitSqlStatements(sqlText) {
   const statements = [];

@@ -9,6 +9,8 @@ const args = new Set(process.argv.slice(2));
 const writeOutput = args.has('--write');
 const outputPath = new URL('../cloudflare/d1/watch-seed.generated.sql', import.meta.url);
 const verifiedScheduleOverrides = createVerifiedScheduleOverrides();
+// Keep each SQLite statement comfortably below D1's statement-size limit while
+// avoiding one network request per row during remote sync.
 const officialSourceInsertChunkSize = 1;
 const scheduleProfileInsertChunkSize = 1;
 
@@ -23,8 +25,8 @@ const sourceRows = opportunities
       programId: opportunity.id,
       programName: opportunity.name,
       organization: opportunity.organization,
-      url: opportunity.url,
-      previousUrl: opportunity.previousUrl || null,
+      url: opportunity.monitorUrl || opportunity.url,
+      previousUrl: opportunity.previousUrl || (opportunity.monitorUrl ? opportunity.url : null),
       sourceType: 'official_program_page',
       checkCadence: plan.checkCadence,
       nextCheck: plan.nextCheck,
@@ -75,7 +77,8 @@ function createRemovedSourceCleanupStatement(rows) {
 set enabled = 0,
     updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 where id like '%-official'
-  and id not in (${activeSourceIds});`;
+  and id not in (${activeSourceIds})
+  and enabled != 0;`;
 }
 
 function createOfficialSourceStatements(rows) {
@@ -109,7 +112,19 @@ on conflict(id) do update set
   change_signals_json = excluded.change_signals_json,
   enabled = excluded.enabled,
   seeded_sample = excluded.seeded_sample,
-  updated_at = excluded.updated_at;`).join('\n\n');
+  updated_at = excluded.updated_at
+where official_sources.program_id is not excluded.program_id
+  or official_sources.program_name is not excluded.program_name
+  or official_sources.organization is not excluded.organization
+  or official_sources.url is not excluded.url
+  or official_sources.previous_url is not excluded.previous_url
+  or official_sources.source_type is not excluded.source_type
+  or official_sources.check_cadence is not excluded.check_cadence
+  or official_sources.next_check is not excluded.next_check
+  or official_sources.alert_trigger is not excluded.alert_trigger
+  or official_sources.change_signals_json is not excluded.change_signals_json
+  or official_sources.enabled is not excluded.enabled
+  or official_sources.seeded_sample is not excluded.seeded_sample;`).join('\n\n');
 }
 
 function createOfficialSourceValueSql(row) {
@@ -211,7 +226,19 @@ on conflict(official_source_id) do update set
     else source_schedule_profiles.next_discovery_at
   end,
   schedule_note = excluded.schedule_note,
-  updated_at = excluded.updated_at;`).join('\n\n');
+  updated_at = excluded.updated_at
+where source_schedule_profiles.program_id is not excluded.program_id
+  or source_schedule_profiles.cycle_frequency is not excluded.cycle_frequency
+  or source_schedule_profiles.expected_open_months_json is not excluded.expected_open_months_json
+  or source_schedule_profiles.last_known_open_at is not excluded.last_known_open_at
+  or source_schedule_profiles.active_lead_days is not excluded.active_lead_days
+  or source_schedule_profiles.active_check_interval_hours is not excluded.active_check_interval_hours
+  or source_schedule_profiles.warmup_check_interval_hours is not excluded.warmup_check_interval_hours
+  or source_schedule_profiles.dormant_check_interval_days is not excluded.dormant_check_interval_days
+  or source_schedule_profiles.discovery_check_interval_hours is not excluded.discovery_check_interval_hours
+  or source_schedule_profiles.source_volatility is not excluded.source_volatility
+  or source_schedule_profiles.discovery_queries_json is not excluded.discovery_queries_json
+  or source_schedule_profiles.schedule_note is not excluded.schedule_note;`).join('\n\n');
 }
 
 function createScheduleProfileValueSql(row) {
@@ -370,6 +397,226 @@ function createVerifiedScheduleOverrides() {
       ],
       scheduleNote:
         'Official FTTP page confirms the program, but sessions/deadlines vary. Search before and during fall/winter recruiting.',
+    },
+  ],
+  [
+    'goldman-sachs-emerging-leaders-series',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [8, 9, 10],
+      lastKnownOpenAt: '2026-09-26',
+      activeLeadDays: 120,
+      activeCheckIntervalHours: 12,
+      warmupCheckIntervalHours: 48,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 24,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_program_page', 'site:goldmansachs.com/careers/students/programs-and-internships/americas/emerging-leaders-series "October 4"', 'Confirm current Emerging Leaders timing and eligibility.'),
+        createDiscoveryQuery('current_cycle_application', 'site:recruiting360.avature.net "Emerging Leaders Series" "Goldman Sachs"', 'Find or confirm the current application route.'),
+      ],
+      scheduleNote:
+        'Current official cycle is open through October 4, 2026. Check frequently through the deadline and return to seasonal discovery afterward.',
+    },
+  ],
+  [
+    'goldman-sachs-possibilities-series',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [10, 11, 12, 1],
+      lastKnownOpenAt: null,
+      activeLeadDays: 120,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 48,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_program_page', 'site:goldmansachs.com/careers/students/programs-and-internships/americas/possibilities-series "Possibilities Series"', 'Check the official first-year program page for a new cycle.'),
+        createDiscoveryQuery('current_cycle_application', 'site:recruiting360.avature.net "Possibilities Series" "Goldman Sachs" 2027', 'Find a future current-cycle application route.'),
+      ],
+      scheduleNote:
+        'The Spring 2026 page is closed. Begin discovery in fall and keep alerts in review until a new first-year cycle is explicit.',
+    },
+  ],
+  [
+    'hrt-women-trading-technology',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [9, 10],
+      lastKnownOpenAt: '2026-09-26',
+      activeLeadDays: 120,
+      activeCheckIntervalHours: 12,
+      warmupCheckIntervalHours: 48,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 24,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_job_page', 'site:hudsonrivertrading.com/hrt-job "WiTTI" "Winter 2027"', 'Find and verify the direct current-cycle posting.'),
+        createDiscoveryQuery('official_announcement', 'site:linkedin.com/company/hudson-river-trading "WiTTI" "October 16, 2026"', 'Confirm the deadline announced by HRT.'),
+      ],
+      scheduleNote:
+        'Winter 2027 applications are open through October 16, 2026. Keep the source active through the deadline.',
+    },
+  ],
+  [
+    'hrt-inside-hrt',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [1, 2, 3],
+      lastKnownOpenAt: null,
+      activeLeadDays: 120,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 48,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_students_page', 'site:hudsonrivertrading.com/student-opportunities "Inside HRT"', 'Check the official student page for the next Inside HRT application.'),
+        createDiscoveryQuery('current_cycle_application', 'site:hudsonrivertrading.com/hrt-job "Inside HRT" 2027', 'Find a direct 2027 application posting.'),
+      ],
+      scheduleNote:
+        'Official spring program and interest route are live, but a current application deadline is not posted. Start discovery before winter.',
+    },
+  ],
+  [
+    'hrt-explore-hrt-us',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [1, 2, 3],
+      lastKnownOpenAt: null,
+      activeLeadDays: 120,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 48,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_students_page', 'site:hudsonrivertrading.com/student-opportunities "Explore HRT" "New York"', 'Check the official student page for the U.S. Explore HRT route.'),
+        createDiscoveryQuery('current_cycle_application', 'site:hudsonrivertrading.com/hrt-job "Explore HRT" 2027', 'Find a direct 2027 U.S. application posting.'),
+      ],
+      scheduleNote:
+        'Track the New York edition for the U.S. beta. Keep international editions as context, not separate public records.',
+    },
+  ],
+  [
+    'imc-launchpad-us',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [1, 2, 3, 4],
+      lastKnownOpenAt: null,
+      activeLeadDays: 120,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 48,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_program_page', 'site:imc.com/us/careers/students-graduates/programs/launchpad "Launchpad"', 'Check the stable U.S. Launchpad page for a refreshed cycle.'),
+        createDiscoveryQuery('current_cycle_application', 'site:imc.com/us/careers "Launchpad" "2027" Chicago', 'Find a current Chicago application or announcement.'),
+      ],
+      scheduleNote:
+        'The official U.S. program page confirms the model but still references a prior cohort. Treat it as watch-only until a new application appears.',
+    },
+  ],
+  [
+    'sig-quant-trading-strategy-discovery-2027',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [8, 9, 10, 11],
+      lastKnownOpenAt: '2026-09-26',
+      activeLeadDays: 120,
+      activeCheckIntervalHours: 12,
+      warmupCheckIntervalHours: 48,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 24,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_job_page', 'site:careers.sig.com/jobs/11148 "November 16, 2026"', 'Confirm the current program deadline and status.'),
+        createDiscoveryQuery('replacement_posting', 'site:careers.sig.com "Quantitative Trading" "Discovery Program 2027"', 'Find a replacement URL if the posting moves.'),
+      ],
+      scheduleNote:
+        'Current 2027 application is open through November 16, 2026. Keep active until the posting closes.',
+    },
+  ],
+  [
+    'sig-trading-system-engineer-discovery-2027',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [8, 9, 10, 11],
+      lastKnownOpenAt: '2026-09-26',
+      activeLeadDays: 120,
+      activeCheckIntervalHours: 12,
+      warmupCheckIntervalHours: 48,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 24,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_job_page', 'site:careers.sig.com/predictions/jobs/11491 "November 16, 2026"', 'Confirm the current engineering discovery deadline and status.'),
+        createDiscoveryQuery('replacement_posting', 'site:careers.sig.com "Trading System Engineer" "Discovery Program 2027"', 'Find a replacement URL if the posting moves.'),
+      ],
+      scheduleNote:
+        'Current 2027 application is open through November 16, 2026. Keep active until the posting closes.',
+    },
+  ],
+  [
+    'akuna-trading-sneak-peek-2027',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [8, 9, 10, 11],
+      lastKnownOpenAt: '2026-09-26',
+      activeLeadDays: 120,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 48,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_interest_page', 'site:akunacapital.com/careers/job/7986086 "2027 Trading Sneak Peek Weeks"', 'Confirm the expression-of-interest route remains live.'),
+        createDiscoveryQuery('current_cycle_application', 'site:akunacapital.com/careers "Sneak Peek Week" "2027" trading', 'Find the individual week applications when they launch.'),
+      ],
+      scheduleNote:
+        'The 2027 expression-of-interest route is open. Monitor for individual Sneak Peek Week postings and deadlines.',
+    },
+  ],
+  [
+    'jane-street-in-focus-watch',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [1, 2, 3, 4, 5],
+      lastKnownOpenAt: null,
+      activeLeadDays: 150,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 48,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_program_page', 'site:janestreet.com/join-jane-street/programs-and-events/in-focus "May 2027"', 'Confirm the May 2027 move and reopening language.'),
+        createDiscoveryQuery('current_cycle_application', 'site:janestreet.com "IN FOCUS" "applications" "May 2027"', 'Find the reopened application or session page.'),
+      ],
+      scheduleNote:
+        'Official page says the program is moving to May 2027 and applications will reopen later. Do not treat the generic program-index label as an open application.',
+    },
+  ],
+  [
+    'citadel-discover-watch',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [9, 10, 11, 12, 1, 2, 3],
+      lastKnownOpenAt: '2026-09-26',
+      activeLeadDays: 180,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 48,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_program_page', 'site:citadel.com/careers/programs-and-events/discover-citadel "March 5, 2027"', 'Confirm current U.S. program timing and eligibility.'),
+        createDiscoveryQuery('official_application', 'site:citadel.com/careers/programs-and-events/discover-citadel/apply "Early April 2027"', 'Confirm the direct application remains open.'),
+      ],
+      scheduleNote:
+        'Current U.S. application is open for the early-April 2027 New York event and closes March 5, 2027.',
     },
   ],
   [

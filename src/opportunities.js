@@ -171,19 +171,32 @@ export function getVerificationState(opportunity) {
   return 'watchOnly';
 }
 
+function hasActionableTimingValue(value) {
+  if (!value) {
+    return false;
+  }
+
+  const nonActionablePatterns = [
+    /\bwatch\b/i,
+    /\bverify\b/i,
+    /\bvar(?:y|ies)\b/i,
+    /\bclosed\b/i,
+    /\bnot (?:yet )?(?:been )?(?:posted|listed|available|live)\b/i,
+    /\bno .*\bdeadline\b/i,
+    /\bwill reopen\b/i,
+    /\binterest route\b/i,
+    /\bunknown\b/i,
+  ];
+
+  return !nonActionablePatterns.some((pattern) => pattern.test(value));
+}
+
 export function getMonitoringReadiness(opportunity) {
   const missing = [];
   const hasOfficialUrl = opportunity.url?.startsWith('https://');
   const hasCheckedDate = Boolean(opportunity.lastChecked);
-  const hasActionableWindow =
-    opportunity.openDate &&
-    !opportunity.openDate.toLowerCase().includes('watch') &&
-    !opportunity.openDate.toLowerCase().includes('verify');
-  const hasDeadline =
-    opportunity.deadline &&
-    !opportunity.deadline.toLowerCase().includes('watch') &&
-    !opportunity.deadline.toLowerCase().includes('verify') &&
-    !opportunity.deadline.toLowerCase().includes('varies');
+  const hasActionableWindow = hasActionableTimingValue(opportunity.openDate);
+  const hasDeadline = hasActionableTimingValue(opportunity.deadline);
   const verificationState = getVerificationState(opportunity);
   const monitorSignal = getMonitorSignal(opportunity);
   const hasCurrentCycleTiming = Boolean(hasActionableWindow || hasDeadline);
@@ -228,10 +241,7 @@ export function getVerificationPriority(opportunity) {
   const tracks = getOpportunityTracks(opportunity);
   const underclassmenFit =
     opportunity.classYears.includes('Freshman') || opportunity.classYears.includes('Sophomore');
-  const hasCurrentTiming =
-    opportunity.openDate &&
-    !opportunity.openDate.toLowerCase().includes('watch') &&
-    !opportunity.openDate.toLowerCase().includes('verify');
+  const hasCurrentTiming = hasActionableTimingValue(opportunity.openDate);
   const sourceSignal = getSourceSignal(opportunity);
   let score = 0;
 
@@ -281,11 +291,7 @@ export function getVerificationPriority(opportunity) {
 export function getSourceUpdatePlan(opportunity) {
   const readiness = getMonitoringReadiness(opportunity);
   const monitorSignal = getMonitorSignal(opportunity);
-  const hasSpecificTiming =
-    opportunity.openDate &&
-    !opportunity.openDate.toLowerCase().includes('watch') &&
-    !opportunity.openDate.toLowerCase().includes('verify') &&
-    !opportunity.openDate.toLowerCase().includes('varies');
+  const hasSpecificTiming = hasActionableTimingValue(opportunity.openDate);
   const needsOfficialCycleCheck = readiness.missing.includes('Official verification');
   const needsTimingCheck = readiness.missing.includes('Current cycle timing');
   const checkCadence =
@@ -810,31 +816,31 @@ export const opportunities = [
     organization: 'CodePath',
     category: 'Community / Prep Program',
     classYears: ['All class years'],
-    timing: 'Fall',
-    status: 'deadlineSoon',
+    timing: 'Spring',
+    status: 'open',
     confidence: 'high',
     funding: 'Free',
     location: 'Virtual',
     url: 'https://www.codepath.org/courses',
     previousUrl: '',
-    openDate: 'Fall 2026 applications are open by pathway',
-    deadline: 'Fall 2026 pathways close August 30, 2026',
+    openDate: 'Spring course applications are open',
+    deadline: 'Apply while the current Spring application remains active; an exact close date is not listed',
     tags: ['Technical interview prep', 'Applied AI', 'Cybersecurity', 'Web development'],
     description:
-      'CodePath Career-Ready Courses are free 10-week virtual, instructor-led pathways for students building technical depth and recruiting readiness. Fall 2026 options include Applied AI Engineering for AI apps and open-source contributions, Technical Interview Prep for DS&A and mock interviews, Cybersecurity for Blue Team labs and incident response, and Web Development for full-stack applications.',
+      'CodePath Career-Ready Courses are free 10-week virtual, instructor-led pathways for students building technical depth and recruiting readiness. Current Spring options include Applied AI Engineering for AI apps and open-source contributions, Technical Interview Prep for DS&A and mock interviews, Cybersecurity for Blue Team labs and incident response, and Web Development for full-stack applications.',
     eligibilitySummary:
       'Student eligibility, prerequisites, and prework vary by course pathway; applicants should choose the course matching their skill stage.',
     experienceSummary:
       'Virtual 10-week coursework with instructor-led sessions, pathway-specific projects or labs, and roughly 2-10 hours per week depending on the course.',
     detailBasis:
-      'Current official CodePath courses page lists Fall 2026 Applied AI Engineering, Technical Interview Prep, Cybersecurity, and Web Development pathways with August 30 closing language.',
+      'The current official CodePath courses page lists Spring applications and active Apply Now links for Applied AI Engineering, Technical Interview Prep, Cybersecurity, and Web Development.',
     why:
       'Structured technical practice, portfolio projects, and recruiting preparation outside standard coursework.',
     prep:
       'Match the pathway to the next bottleneck: interview prep, AI projects, cybersecurity, or web development.',
     sourceNote:
-      'Official CodePath courses page lists no-cost virtual 10-week pathways, current application links, course-specific hours per week, and August 30, 2026 closing language.',
-    lastChecked: '2026-08-24',
+      'Official CodePath courses page currently lists no-cost virtual 10-week pathways, Spring waitlist language, active application links, and course-specific hours per week.',
+    lastChecked: '2026-09-26',
   },
   {
     id: 'basta-code2career',
@@ -843,30 +849,30 @@ export const opportunities = [
     category: 'Community / Prep Program',
     classYears: ['All class years'],
     timing: 'Fall',
-    status: 'deadlineSoon',
+    status: 'expectedSoon',
     confidence: 'high',
     funding: 'Free',
     location: 'Virtual',
     url: 'https://www.projectbasta.com/code2career',
     previousUrl: '',
-    openDate: 'Fall 2026 application window runs August 24-September 11, 2026',
-    deadline: 'Applications close September 11, 2026',
+    openDate: 'Spring 2027 applications are expected to open as early as January 2027',
+    deadline: 'Next application deadline has not been posted',
     tags: ['Technical interview prep', 'Google mentorship', 'Software engineering', 'Career prep'],
     description:
-      'BASTA Code2Career is a 10-week virtual technical interview and career-prep program for CS students. The Fall 2026 cohort runs October 5-December 11 and includes 1:1 mentorship from a Google Software Engineer, technical assessment practice, employer events, live workshops, and access to a curated jobs and internships board.',
+      'BASTA Code2Career is a 10-week virtual technical interview and career-prep program for CS students. The upcoming Spring 2027 cohort is expected to run from March through May and includes 1:1 mentorship from a Google Software Engineer, technical assessment practice, employer events, live workshops, and access to a curated jobs and internships board.',
     eligibilitySummary:
-      'For CS majors at U.S.-based universities graduating between Fall 2026 and Fall 2028 who are on the BASTA platform and complete the required assessment.',
+      'For CS majors at U.S.-based universities graduating between Spring 2027 and Spring 2029 who are on the BASTA platform and complete the required assessment.',
     experienceSummary:
       'Virtual 10-week cohort with Google SWE mentorship, online workshops, technical assessment components, employer exposure, and career resources.',
     detailBasis:
-      'Current official BASTA Code2Career page confirms Fall 2026 open dates, deadline, cohort dates, Google SWE mentorship, platform and assessment requirements, and CS graduation-year eligibility.',
+      'Current official BASTA Code2Career page says the Fall 2026 application is closed and Spring 2027 applications are expected to open as early as January.',
     why:
       'Useful for students who need structured technical interview prep, mentorship, and employer exposure before internship or new-grad recruiting.',
     prep:
-      'Join the BASTA platform, complete the assessment, practice DS&A and coding assessments, and apply before the September 11 deadline.',
+      'Join the BASTA platform, complete the assessment, practice DS&A and coding assessments, and prepare for the Spring 2027 application window.',
     sourceNote:
-      'Official BASTA Code2Career page confirms Fall 2026 applications are open August 24-September 11, the cohort runs October 5-December 11, and eligible CS majors graduate Fall 2026-Fall 2028.',
-    lastChecked: '2026-08-24',
+      'Official BASTA Code2Career page confirms the Fall 2026 application is closed, the Spring 2027 cohort runs March-May, and applications are expected to open as early as January 2027.',
+    lastChecked: '2026-09-26',
   },
   {
     id: 'mlt-career-prep',
@@ -1035,14 +1041,14 @@ export const opportunities = [
     category: 'Fellowship',
     classYears: ['Freshman', 'Sophomore'],
     timing: 'Fall',
-    status: 'deadlineSoon',
+    status: 'watching',
     confidence: 'high',
     funding: 'Free',
     location: 'Virtual',
     url: 'https://www.headstartfellowship.com/fellowship',
     previousUrl: '',
-    openDate: 'Fall 2026 applications are open',
-    deadline: 'Fall 2026 applications close Aug 28, 2026 at 11:59 p.m. ET',
+    openDate: 'Fall 2026 applications closed August 28, 2026',
+    deadline: 'Next cohort deadline has not been posted',
     tags: ['Mentorship', 'Career prep', 'Underclassmen', 'Virtual'],
     description:
       'HeadStart Fellowship is a virtual underclassmen fellowship focused on mentorship, career preparation, and early recruiting confidence.',
@@ -1051,14 +1057,14 @@ export const opportunities = [
     experienceSummary:
       'Virtual mentorship and education-style programming for students preparing for technical opportunities.',
     detailBasis:
-      'Current official HeadStart pages list Fall 2026 applications and deadline.',
+      'The official HeadStart page still lists the Fall 2026 cycle and its August 28 deadline, which has passed.',
     why:
       'A mentorship and education-style fellowship that appears frequently in underclassmen opportunity lists as an early career preparation path.',
     prep:
-      'Confirm the current cycle, then prepare a short interest statement and a resume that shows technical curiosity even if your experience is early.',
+      'Join the reminder list and prepare a short interest statement plus a resume that shows technical curiosity before the next cohort opens.',
     sourceNote:
-      'Official HeadStart Fellowship pages confirm Fall 2026 applications, freshman/sophomore eligibility, a virtual format, and the Aug 28, 2026 close date.',
-    lastChecked: '2026-08-18',
+      'Official HeadStart Fellowship page still displays the Fall 2026 application and its August 28 close date; treat it as previous-cycle context until a new cohort is posted.',
+    lastChecked: '2026-09-26',
   },
   {
     id: 'hack-diversity-fellowship-watch',
@@ -1294,31 +1300,31 @@ export const opportunities = [
     organization: 'Jane Street',
     category: 'Discovery Program',
     classYears: ['All class years'],
-    timing: 'Rolling',
-    status: 'open',
+    timing: 'Spring',
+    status: 'watching',
     confidence: 'high',
-    funding: 'Varies',
-    location: 'Multi-day program',
+    funding: 'Travel, housing, meals, and daily expenses',
+    location: 'Location-specific sessions',
     url: 'https://www.janestreet.com/join-jane-street/programs-and-events/in-focus/',
     previousUrl: '',
-    openDate: 'Jane Street programs page currently lists IN FOCUS as accepting applications',
-    deadline: 'Verify exact current-cycle deadline on the official page',
+    openDate: 'Applications will reopen later for the May 2027 program',
+    deadline: 'Next application deadline has not been posted',
     tags: ['Trading', 'Software engineering', 'Strategy and product', 'STEM access'],
     description:
-      'IN FOCUS is a multi-day Jane Street program where undergraduates and graduate students explore trading, software development, and strategy/product teams.',
+      'IN FOCUS is a multi-day Jane Street program where students learn how the firm approaches trading, software engineering, and strategy and product work. Trading participants study probability, market structure, arbitrage, and mock trading; software engineering participants use OCaml and build components of an electronic trading simulation; strategy and product participants work through cross-functional case studies.',
     eligibilitySummary:
-      'Undergraduate and graduate students who have experienced barriers to advanced STEM educational access; exact cycle criteria vary.',
+      'Current undergraduate students who have experienced barriers to advanced STEM educational access; the official page describes a broad range of qualifying personal, financial, educational, and community circumstances.',
     experienceSummary:
-      'Students explore Jane Street’s trading, software development, and strategy/product work through interactive programming.',
+      'A few days of classes, games, technical exercises, and team-specific activities across trading, software engineering, or strategy and product.',
     detailBasis:
-      'Official Jane Street programs page lists IN FOCUS as accepting applications.',
+      'The current official IN FOCUS page says program dates are moving to May 2027 and applications will reopen later.',
     why:
       'Useful for students comparing quant trading, software engineering, and strategy/product paths in one program.',
     prep:
-      'Prepare examples of technical curiosity and choose which Jane Street track you want to understand best.',
+      'Choose the track that best matches your interests, prepare examples of technical curiosity, and sign up for Jane Street session notifications.',
     sourceNote:
-      'Official Jane Street programs page lists IN FOCUS as accepting applications for students exploring trading, software development, and strategy/product teams.',
-    lastChecked: '2026-08-22',
+      'Official Jane Street page confirms the three tracks, covered travel/housing/meals, and the move to May 2027; it explicitly says applications will reopen later.',
+    lastChecked: '2026-09-26',
   },
   {
     id: 'jane-street-insight-watch',
@@ -1359,14 +1365,14 @@ export const opportunities = [
     category: 'Fellowship',
     classYears: ['Freshman', 'Sophomore'],
     timing: 'Summer',
-    status: 'deadlineSoon',
-    confidence: 'high',
+    status: 'watching',
+    confidence: 'medium',
     funding: 'Scholarship',
     location: 'New York, NY',
     url: 'https://www.janestreet.com/join-jane-street/programs-and-events/jsip/',
     previousUrl: '',
-    openDate: 'JSIP 2026 applications are listed with a February 8, 2026 deadline',
-    deadline: 'Sunday, February 8, 2026 at 11:59 p.m. EST',
+    openDate: 'The 2026 cycle has ended; monitor Jane Street for the next JSIP announcement',
+    deadline: 'Next application deadline has not been posted',
     tags: ['Software engineering', 'OCaml', 'Underclassmen', 'STEM access'],
     description:
       'JSIP is a multi-week summer immersion program where first- and second-year students build software engineering skills, learn OCaml and functional programming, and complete structured projects.',
@@ -1375,14 +1381,14 @@ export const opportunities = [
     experienceSummary:
       'Fellows learn from full-time Jane Street software engineers, study CS fundamentals and OCaml, build larger SWE projects, and receive a scholarship plus covered housing/travel/meals.',
     detailBasis:
-      'Official JSIP page lists 2026 deadline, NYC dates, costs covered, and a $12,500 scholarship.',
+      'The former JSIP URL now redirects to Jane Street’s general programs page, where JSIP is not currently listed as accepting applications.',
     why:
       'One of the strongest underclassmen technical programs for students interested in functional programming, finance technology, and rigorous software engineering.',
     prep:
       'Prepare programming coursework evidence, project examples, and a clear explanation of barriers to CS access and technical curiosity.',
     sourceNote:
-      'Official JSIP page confirms first/second-year eligibility, mid-June to mid-August NYC program timing, covered costs, and a $12,500 scholarship.',
-    lastChecked: '2026-08-22',
+      'Previous-cycle official material confirmed first/second-year eligibility, a multi-week NYC program, covered costs, and a scholarship. The current Jane Street programs page does not list an active JSIP application.',
+    lastChecked: '2026-09-26',
   },
   {
     id: 'jane-street-preview-watch',
@@ -1679,14 +1685,14 @@ export const opportunities = [
     category: 'Fellowship',
     classYears: ['All class years'],
     timing: 'Winter',
-    status: 'deadlineSoon',
+    status: 'watching',
     confidence: 'high',
     funding: 'Free; student grants available',
     location: 'Virtual',
     url: 'https://www.developforgood.org/for-students',
     previousUrl: '',
-    openDate: 'Winter 2027 batch begins with orientation October 25-31, 2026',
-    deadline: 'Student volunteer application deadline: September 19, 2026',
+    openDate: 'Winter 2027 applications closed September 19, 2026; the batch begins October 25-31',
+    deadline: 'Next student volunteer application deadline has not been posted',
     tags: ['Civic tech', 'Software engineering', 'Product Management', 'Design', 'Nonprofit'],
     description:
       'Develop for Good places technology students on 16-week virtual nonprofit projects where designers, engineers, product managers, and technical/design managers build real products for social-impact clients. The Winter 2027 batch runs from late October 2026 through February 2027 with 5-10 hours per week expected.',
@@ -1695,14 +1701,14 @@ export const opportunities = [
     experienceSummary:
       'Students practice product, UX/UI design, frontend/web engineering, AI tooling, stakeholder management, ambiguity, teamwork, and client communication while building portfolio case studies for nonprofits.',
     detailBasis:
-      'Official Develop for Good student page confirms Winter 2027 project timeline, remote nonprofit project roles, free participation, career development, and completion grant details.',
+      'The official Develop for Good student page confirms the Winter 2027 timeline and shows that its September 19 student application deadline has passed.',
     why:
       'Strong internship-alternative for students who need real client/project experience and portfolio proof without waiting for a company offer.',
     prep:
-      'Prepare a portfolio or project link for your chosen role, examples of ownership or teamwork, and availability for the 16-week batch.',
+      'Prepare a portfolio or project link for your chosen role, examples of ownership or teamwork, and monitor for the next 16-week batch.',
     sourceNote:
-      'Official Develop for Good page confirms 16-week virtual projects, designer/engineer/manager roles, 5-10 hours per week, September 19, 2026 student deadline, and student cash grants for selected eligible students.',
-    lastChecked: '2026-08-24',
+      'Official Develop for Good page confirms 16-week virtual projects, designer/engineer/manager roles, 5-10 hours per week, the passed September 19, 2026 deadline, and student cash grants for selected eligible students.',
+    lastChecked: '2026-09-26',
   },
   {
     id: 'amazon-future-engineer-scholarship',
@@ -1769,36 +1775,103 @@ export const opportunities = [
     lastChecked: '2026-08-22',
   },
   {
+    id: 'goldman-sachs-emerging-leaders-series',
+    name: 'Emerging Leaders Series',
+    organization: 'Goldman Sachs',
+    category: 'Discovery Program',
+    classYears: ['Sophomore'],
+    timing: 'Fall',
+    status: 'deadlineSoon',
+    confidence: 'high',
+    funding: 'Not listed',
+    location: 'New York, Dallas, or Salt Lake City',
+    url: 'https://www.goldmansachs.com/careers/students/programs-and-internships/americas/emerging-leaders-series',
+    applicationUrl: 'https://recruiting360.avature.net/candidates/Projectdetailinvitations?projectId=26455',
+    previousUrl: '',
+    openDate: 'Applications are open for programs running from Fall 2026 through Spring 2027',
+    deadline: 'October 4, 2026 at 11:59 PM ET',
+    tags: ['Engineering', 'Finance', 'Investment banking', 'Second-year students'],
+    description:
+      'Goldman Sachs Emerging Leaders Series is an immersive program for second-year undergraduate and master’s students. Participants receive business-specific training, recruiting and interview preparation, networking, and access to senior leaders across finance, operations, risk, research, and engineering tracks.',
+    eligibilitySummary:
+      'Undergraduate and master’s students graduating between December 2028 and June 2029.',
+    experienceSummary:
+      'Track-specific programming in New York, Salt Lake City, or Dallas; the Dallas track is focused on engineering.',
+    detailBasis:
+      'The current official Goldman Sachs page confirms open applications, the October 4 deadline, graduation window, locations, and business tracks.',
+    why:
+      'A current second-year discovery program with a dedicated engineering path and direct exposure to future Goldman Sachs internship recruiting.',
+    prep:
+      'Choose the business track that matches your interests and apply before the October 4 deadline with a current resume and concise interest story.',
+    sourceNote:
+      'Official Goldman Sachs page says applications close October 4, 2026 at 11:59 PM ET and lists Engineering as the Dallas track.',
+    lastChecked: '2026-09-26',
+  },
+  {
+    id: 'goldman-sachs-possibilities-series',
+    name: 'Possibilities Series',
+    organization: 'Goldman Sachs',
+    category: 'Discovery Program',
+    classYears: ['Freshman'],
+    timing: 'Spring',
+    status: 'watching',
+    confidence: 'high',
+    funding: 'Not listed',
+    location: 'Confirmed after acceptance',
+    url: 'https://www.goldmansachs.com/careers/students/programs-and-internships/americas/possibilities-series',
+    previousUrl: '',
+    openDate: 'Spring 2026 applications are closed; watch for the next first-year cycle',
+    deadline: 'Next application deadline has not been posted',
+    tags: ['Finance', 'First-year students', 'Professional development', 'Networking'],
+    description:
+      'Goldman Sachs Possibilities Series is a first-year undergraduate program introducing students to financial services through interactive workshops, professional skill development, networking, and exposure to people across the firm.',
+    eligibilitySummary:
+      'The latest official cycle was for first-year undergraduates at U.S. colleges and universities graduating between December 2028 and May 2029.',
+    experienceSummary:
+      'A spring discovery experience focused on industry exposure, network-building, and foundational career skills.',
+    detailBasis:
+      'The official Goldman Sachs page confirms the first-year audience and Spring 2026 model, but the latest application cycle is closed.',
+    why:
+      'A useful first-year finance discovery path to monitor before students are expected to have traditional internship experience.',
+    prep:
+      'Use the closed cycle to understand eligibility and prepare a resume before the next application window appears.',
+    sourceNote:
+      'Official Goldman Sachs page confirms the program and first-year eligibility but marks the Spring 2026 application as closed.',
+    lastChecked: '2026-09-26',
+  },
+  {
     id: 'citadel-discover-watch',
     name: 'Discover Citadel',
     organization: 'Citadel',
     category: 'Discovery Program',
     classYears: ['Freshman', 'Sophomore'],
-    timing: 'Winter',
-    status: 'watching',
+    timing: 'Spring',
+    status: 'open',
     confidence: 'high',
-    funding: 'Varies',
-    location: 'New York, London, Hong Kong, or Singapore',
-    url: 'https://www.citadel.com/careers/programs-and-events/',
+    funding: 'Travel, hotel, and meals',
+    location: 'New York City',
+    url: 'https://www.citadel.com/careers/programs-and-events/discover-citadel/',
+    applicationUrl: 'https://www.citadel.com/careers/programs-and-events/discover-citadel/apply/',
+    monitorUrl: 'https://www.citadel.com/careers/programs-and-events/discover-citadel/apply/',
     previousUrl: '',
-    openDate: 'Watch fall and winter for upcoming Discover sessions',
-    deadline: 'Exact session deadlines vary',
+    openDate: 'Applications are open for the U.S. event in early April 2027',
+    deadline: 'March 5, 2027',
     tags: ['Quant', 'Finance', 'Trading', 'Underclassmen'],
     description:
-      'Discover Citadel is an invitation-only two-day program for first- and second-year undergraduates to learn about Citadel and Citadel Securities.',
+      'Discover Citadel is a two-day New York program where first- and second-year students explore Citadel and Citadel Securities through team sessions, networking, intellectual competitions, mock interviews, and exposure to quantitative research, software engineering, and trading.',
     eligibilitySummary:
-      'First- and second-year undergraduates per official Citadel programs page.',
+      'Students at universities in the U.S. or Canada graduating between December 2028 and June 2030; applicants must be at least 18 and submit a resume with GPA.',
     experienceSummary:
-      'Students get early firm exposure, meet teams, and learn about investing, trading, technology, and global markets.',
+      'Two in-person days in New York with travel, two hotel nights, ground transportation, and meals provided under the official program terms.',
     detailBasis:
-      'Official Citadel programs page lists Discover Citadel and its first/second-year undergraduate audience.',
+      'The current official program and application pages list the April 2027 event, March 5 deadline, eligibility, and covered program benefits.',
     why:
       'A high-signal quant/finance discovery program for underclassmen before internship recruiting gets intense.',
     prep:
-      'Prepare math, CS, finance curiosity stories and watch for location-specific application windows.',
+      'Prepare a resume with GPA, relevant academic or technical work links, and a clear preference across software engineering, quantitative research, or trading.',
     sourceNote:
-      'Official Citadel programs page describes Discover Citadel as an invitation-only two-day event for first- and second-year undergraduates.',
-    lastChecked: '2026-08-22',
+      'Official Citadel application page confirms the U.S. event is in New York in early April 2027 and applications close March 5, 2027.',
+    lastChecked: '2026-09-26',
   },
   {
     id: 'citadel-datathon-watch',
@@ -2090,35 +2163,231 @@ export const opportunities = [
   },
   {
     id: 'hrt-women-trading-technology',
-    name: 'Women in Trading Technology',
+    name: 'Women in Trading & Technology (WiTTI)',
     organization: 'Hudson River Trading',
     category: 'Winternship',
     classYears: ['Freshman', 'Sophomore'],
     timing: 'Winter',
-    status: 'watching',
+    status: 'deadlineSoon',
     confidence: 'high',
     funding: 'Paid program',
     location: 'New York City',
     url: 'https://www.hudsonrivertrading.com/student-opportunities/',
+    applicationUrl: 'https://www.hudsonrivertrading.com/hrt-job/women-in-trading-and-technology-internship-witti-winter-2027/',
+    monitorUrl: 'https://www.hudsonrivertrading.com/hrt-job/women-in-trading-and-technology-internship-witti-winter-2027/',
     previousUrl: '',
-    openDate: 'January 2026 applications are closed; watch for January 2027 applications',
-    deadline: 'Applications for January 2026 are closed; next deadline not posted',
+    openDate: 'Applications are open for the January 2027 program',
+    deadline: 'October 16, 2026',
     tags: ['Trading', 'Quant', 'Women in tech', 'Finance'],
     description:
-      'HRT Women in Trading Technology is a short January winternship that introduces second-year students from underrepresented backgrounds to automated trading, quantitative research, and software engineering at HRT.',
+      'HRT Women in Trading & Technology is a 2-4 week January program introducing students to automated trading, software engineering, and algorithm development. Participants complete independent Python and C++ projects, attend technical talks and seminars, and learn how quantitative researchers and engineers work together at HRT.',
     eligibilitySummary:
-      'Official HRT page describes the January 2026 program for second-year students from underrepresented backgrounds in tech and finance; check back for January 2027 applications.',
+      'Full-time undergraduates in a technical or quantitative discipline graduating between Fall 2028 and Summer 2030; HRT describes the program as designed for students without extensive quantitative-trading experience.',
     experienceSummary:
-      'Students spend 2-4 weeks in New York City learning technical facets of algorithmic trading, joining tech talks, and completing hands-on programming projects in Python and C++.',
+      'In-person in New York beginning January 4, 2027, with a flexible two-, three-, or four-week duration based on the student’s winter break.',
     detailBasis:
-      'Official HRT student opportunities page confirms the January 2026 Women in Trading & Technology program and says applications are closed until January 2027 updates.',
+      'The official HRT student page and current Winter 2027 posting confirm the program format, technical content, location, and application status; HRT’s official announcement supplies the October 16 deadline and graduation window.',
     why:
       'High-signal quant/finance discovery path for underclassmen, especially students exploring trading technology early.',
     prep:
-      'Watch HRT student opportunities, prepare probability/math/programming examples, and verify the current cycle before applying.',
+      'Apply before October 16 and prepare programming, probability, quantitative problem-solving, and technical-curiosity examples.',
     sourceNote:
-      'Official HRT student opportunities page says Women in Trading & Technology is a 2-4 week January program in New York City for second-year students from underrepresented backgrounds; January 2026 applications are closed and January 2027 updates are pending.',
-    lastChecked: '2026-08-22',
+      'Official HRT sources confirm January 2027 applications are open for students graduating Fall 2028-Summer 2030 and close October 16, 2026.',
+    lastChecked: '2026-09-26',
+  },
+  {
+    id: 'hrt-inside-hrt',
+    name: 'Inside HRT',
+    organization: 'Hudson River Trading',
+    category: 'Discovery Program',
+    classYears: ['Freshman', 'Sophomore'],
+    timing: 'Spring',
+    status: 'watching',
+    confidence: 'medium',
+    funding: 'Not listed',
+    location: 'New York City',
+    url: 'https://www.hudsonrivertrading.com/student-opportunities/',
+    previousUrl: '',
+    openDate: 'The official program page is live; no active application is currently available',
+    deadline: 'Next application deadline has not been posted',
+    tags: ['Software engineering', 'Quant', 'STEM', 'First-year students', 'Second-year students'],
+    description:
+      'Inside HRT is a three-day spring program for first- and second-year students exploring quantitative finance. Students join hands-on workshops, technical talks, and networking sessions with HRT employees while learning how computer science, mathematics, and other STEM disciplines connect to automated trading.',
+    eligibilitySummary:
+      'First- and second-year students pursuing computer science, mathematics, or another STEM-related degree.',
+    experienceSummary:
+      'Three in-person days in New York City with workshops, tech talks, and direct exposure to HRT teams.',
+    detailBasis:
+      'The current official HRT student-opportunities page confirms the program, audience, spring timing, and New York location, but its Inside HRT destination does not currently resolve to an active application.',
+    why:
+      'A compact underclassman introduction to quantitative finance before students need extensive finance or internship experience.',
+    prep:
+      'Prepare a current resume and examples from STEM coursework or projects while ApplyFirst watches for the next active application.',
+    sourceNote:
+      'Official HRT page lists Inside HRT as a three-day NYC spring program for first- and second-year STEM students, but its current destination returns no active application.',
+    lastChecked: '2026-09-26',
+  },
+  {
+    id: 'hrt-explore-hrt-us',
+    name: 'Explore HRT',
+    organization: 'Hudson River Trading',
+    category: 'Discovery Program',
+    classYears: ['All class years'],
+    timing: 'Spring',
+    status: 'watching',
+    confidence: 'medium',
+    funding: 'Not listed',
+    location: 'New York City (U.S. track)',
+    url: 'https://www.hudsonrivertrading.com/student-opportunities/',
+    previousUrl: '',
+    openDate: 'The official program page is live; no active U.S. application is currently available',
+    deadline: 'Next application deadline has not been posted',
+    tags: ['Quantitative trading', 'Software engineering', 'Mentorship', '2028 graduates'],
+    description:
+      'Explore HRT is a multi-day spring program for students interested in quantitative trading careers. The U.S. track gives students a closer look at HRT’s global trading infrastructure through technical talks, one-to-one mentorship, and conversations with the teams who build and operate its systems.',
+    eligibilitySummary:
+      'The current official page lists the program for 2028 graduates; location-specific eligibility should be confirmed when applications open.',
+    experienceSummary:
+      'Multi-day early-talent programming with technical talks, mentorship, and exposure to HRT’s trading systems and people.',
+    detailBasis:
+      'The current official HRT page lists New York, London, and Singapore editions; ApplyFirst tracks the New York edition, but the current destination does not expose an active U.S. application.',
+    why:
+      'A role-exploration path for students who want to understand quantitative trading infrastructure before choosing a later internship track.',
+    prep:
+      'Prepare examples of quantitative or technical curiosity while ApplyFirst watches for a location-specific U.S. application.',
+    sourceNote:
+      'Official HRT page confirms Explore HRT as a spring early-talent program with a New York edition for 2028 graduates, but no active U.S. application is currently listed.',
+    lastChecked: '2026-09-26',
+  },
+  {
+    id: 'imc-launchpad-us',
+    name: 'Launchpad',
+    organization: 'IMC Trading',
+    category: 'Discovery Program',
+    classYears: ['Sophomore'],
+    timing: 'Spring',
+    status: 'watching',
+    confidence: 'medium',
+    funding: 'Not listed',
+    location: 'Chicago, IL',
+    url: 'https://www.imc.com/us/careers/students-graduates/programs/launchpad',
+    previousUrl: '',
+    openDate: 'The official program page remains live; the next U.S. application cycle is not posted',
+    deadline: 'Next application deadline has not been posted',
+    tags: ['Software engineering', 'Quantitative trading', 'Second-year students', 'Trading simulations'],
+    description:
+      'IMC Launchpad is a two-day Chicago discovery program for second-year students interested in software engineering or quantitative trading. Participants join technical workshops, trading simulations, office sessions, and conversations with IMC engineers and traders, with strong participants positioned for later internship recruiting.',
+    eligibilitySummary:
+      'Second-year university students with quantitative, engineering, computer science, mathematics, or related backgrounds.',
+    experienceSummary:
+      'Two in-person days in Chicago covering trading, technology, technical practice, internship pathways, and networking.',
+    detailBasis:
+      'The official U.S. Launchpad page confirms the program model and target audience but still references a prior cycle, so the next application remains watch-only.',
+    why:
+      'A high-signal bridge into both software engineering and quantitative trading for students early in college.',
+    prep:
+      'Prepare programming or quantitative problem-solving examples and monitor the official page for the next Chicago application.',
+    sourceNote:
+      'Official IMC U.S. page confirms Launchpad is a two-day Chicago program for second-year students; current-cycle application dates are not yet explicit.',
+    lastChecked: '2026-09-26',
+  },
+  {
+    id: 'sig-quant-trading-strategy-discovery-2027',
+    name: 'Quantitative Trading & Strategy Discovery Program',
+    organization: 'Susquehanna',
+    category: 'Discovery Program',
+    classYears: ['Sophomore'],
+    timing: 'Rolling',
+    status: 'open',
+    confidence: 'high',
+    funding: 'Not listed',
+    location: 'New York City',
+    url: 'https://careers.sig.com/jobs/11148',
+    previousUrl: '',
+    openDate: 'Applications are open for the 2027 discovery program',
+    deadline: 'November 16, 2026',
+    tags: ['Quantitative trading', 'Strategy development', 'Software engineering', 'C++'],
+    description:
+      'Susquehanna’s multi-day Quantitative Trading and Quantitative Strategy Development Discovery Program introduces students to quantitative development, trading, signal creation, low-latency execution, and the C++ systems behind systematic markets. The invitation-only event includes interactive sessions, assessment-based challenges, and interviews connected to Summer 2028 internship opportunities.',
+    eligibilitySummary:
+      'Students planning to graduate in Winter 2028 or Spring 2029 with interest in mathematics, computer science, engineering, physics, statistics, finance, or economics.',
+    experienceSummary:
+      'A multi-day, in-person New York event combining technical learning, trading and strategy exposure, challenges, and interviews.',
+    detailBasis:
+      'The current official Susquehanna posting confirms the 2027 program, target graduation dates, content, and November 16 application deadline.',
+    why:
+      'A direct early pathway into quantitative trading and low-latency software work before Summer 2028 recruiting.',
+    prep:
+      'Submit a resume before November 16 and prepare probability, market, programming, and quantitative problem-solving examples.',
+    sourceNote:
+      'Official Susquehanna posting says applications close November 16, 2026 and describes a pathway to Summer 2028 internships.',
+    lastChecked: '2026-09-26',
+  },
+  {
+    id: 'sig-trading-system-engineer-discovery-2027',
+    name: 'Trading System Engineer Discovery Program',
+    organization: 'Susquehanna',
+    category: 'Discovery Program',
+    classYears: ['Sophomore'],
+    timing: 'Rolling',
+    status: 'open',
+    confidence: 'high',
+    funding: 'Not listed',
+    location: 'Bala Cynwyd, PA',
+    url: 'https://careers.sig.com/predictions/jobs/11491?lang=en-us',
+    previousUrl: '',
+    openDate: 'Applications are open for the 2027 discovery program',
+    deadline: 'November 16, 2026',
+    tags: ['C++', 'Software engineering', 'Low-latency systems', 'Trading infrastructure'],
+    description:
+      'Susquehanna’s multi-day Trading System Engineer Discovery Program shows students how C++ engineers build low-latency trading systems and complex strategies. Participants join interactive technical sessions, assessment-based challenges, and interviews that can lead toward Summer 2028 internship opportunities.',
+    eligibilitySummary:
+      'Students planning to graduate in Winter 2028 or Spring 2029 with backgrounds in computer science, computer engineering, physics, mathematics, or statistics.',
+    experienceSummary:
+      'An in-person event near Philadelphia focused on C++ engineering, trading systems, technical challenges, and internship-pathway interviews.',
+    detailBasis:
+      'The current official Susquehanna posting confirms the 2027 event, graduation window, technical focus, and November 16 deadline.',
+    why:
+      'A rare early program specifically focused on systems engineering rather than general software internship recruiting.',
+    prep:
+      'Submit a resume before November 16 and prepare C++ fundamentals, systems thinking, and technical problem-solving examples.',
+    sourceNote:
+      'Official Susquehanna posting says applications close November 16, 2026 and connects the event to Summer 2028 internships.',
+    lastChecked: '2026-09-26',
+  },
+  {
+    id: 'akuna-trading-sneak-peek-2027',
+    name: 'Trading Sneak Peek Weeks',
+    organization: 'Akuna Capital',
+    category: 'Discovery Program',
+    classYears: ['All class years'],
+    timing: 'Rolling',
+    status: 'watching',
+    confidence: 'high',
+    funding: 'Transportation and accommodation',
+    location: 'Chicago, IL',
+    url: 'https://akunacapital.com/careers/job/7986086/expression-of-interest-2027-trading-sneak-peek-weeks/?gh_jid=7986086',
+    applicationUrl: 'https://akunacapital.com/careers/job/7986086/expression-of-interest-2027-trading-sneak-peek-weeks/?gh_jid=7986086',
+    actionLabel: 'Register Interest',
+    previousUrl: 'https://akunacapital.com/work-with-us/internships/',
+    openDate: 'The 2027 expression-of-interest form is open; individual week applications are not yet live',
+    deadline: 'Individual Sneak Peek Week deadlines have not been posted',
+    tags: ['Trading', 'Options', 'Quant', 'Micro-internship', 'Game theory'],
+    description:
+      'Akuna Capital’s 2027 Trading Sneak Peek Weeks are one-week Chicago micro-internships that introduce students to options, risk management, game theory, and quantitative decision-making. Participants learn from trader trainers, practice with trading games and simulations, shadow trading desks, and attend AkunaU lectures and networking sessions.',
+    eligibilitySummary:
+      'Students graduating between December 2027 and August 2028 in engineering, economics, statistics, mathematics, computer science, actuarial science, or a related field, with U.S. work authorization.',
+    experienceSummary:
+      'One in-person week in Chicago; Akuna lists transportation and accommodation as program perks.',
+    detailBasis:
+      'The current official Akuna posting collects interest for multiple 2027 Sneak Peek Weeks and says candidates will be notified when individual roles go live.',
+    why:
+      'A short, hands-on alternative to a traditional internship for students evaluating whether options trading fits them.',
+    prep:
+      'Register interest, then prepare examples of quantitative reasoning, interest in markets, and collaborative problem solving before individual applications open.',
+    sourceNote:
+      'Official Akuna page confirms the 2027 interest route, graduation window, Chicago format, and covered transportation and accommodation; it is not yet an individual program application.',
+    lastChecked: '2026-09-26',
   },
   {
     id: 'deshaw-fellowships-watch',

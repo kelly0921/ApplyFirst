@@ -4223,9 +4223,10 @@ function OpportunityDetail({
   ];
   const sourceSummary = getStudentSourceSummary(opportunity, verificationState, sourceStatusLabel);
   const sourceActionLabel =
-    ['open', 'deadlineSoon'].includes(opportunity.status) || monitorSignal.actionLabel === 'Apply Now'
+    opportunity.actionLabel ||
+    (['open', 'deadlineSoon'].includes(opportunity.status) || monitorSignal.actionLabel === 'Apply Now'
       ? 'Apply Now'
-      : 'View Official Source';
+      : 'View Official Source');
   const displayTitle = getOpportunityDisplayTitle(opportunity);
   const displaySubtitle = getOpportunityDisplaySubtitle(opportunity);
 
@@ -4239,7 +4240,12 @@ function OpportunityDetail({
         <p>{displaySubtitle}</p>
       </div>
       <div className="detail-actions">
-        <a className="detail-primary-link" href={opportunity.url} target="_blank" rel="noreferrer">
+        <a
+          className="detail-primary-link"
+          href={opportunity.applicationUrl || opportunity.url}
+          target="_blank"
+          rel="noreferrer"
+        >
           {sourceActionLabel}
         </a>
         <button

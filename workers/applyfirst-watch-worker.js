@@ -3547,7 +3547,7 @@ function classifySourceText(sourceText, source) {
     /\b(when|once|if|before|until)\s+applications?\s+(are\s+)?open\b/i.test(normalized) ||
     /\b(first|be first)\s+to\s+know\s+when\s+applications?\s+(are\s+)?open\b/i.test(normalized);
   const saysOpen =
-    /\b(apply now|applications? (are )?open|now accepting|currently accepting|accepting applications|submit your application|register now|registration (is )?open|registration has opened|registrations? (are )?open)\b/i.test(
+    /\b(apply now|applications? (are )?open|applications? will close|now accepting|currently accepting|accepting applications|submit your application|register now|registration (is )?open|registration has opened|registrations? (are )?open)\b/i.test(
       normalized,
     ) &&
     !saysNotOpenYet &&
@@ -3560,7 +3560,11 @@ function classifySourceText(sourceText, source) {
     normalized,
   );
   const hasInterestForm =
-    /\b(interest form|join (our )?(mailing list|waitlist)|notify me|get notified|sign up for updates|stay informed)\b/i.test(
+    /\b(expression of interest|register your interest|express interest|interest form|list of interested candidates|join (our )?(mailing list|waitlist)|notify me|get notified|notified as soon as (the )?(role|roles|application|applications) (go|goes) live|sign up for updates|stay informed)\b/i.test(
+      normalized,
+    );
+  const saysReopenLater =
+    /\b(applications? (will )?re-?open (at a later date|later)|applications? reopen later|sign up to be notified about upcoming sessions)\b/i.test(
       normalized,
     );
   const saysRolling =
@@ -3611,7 +3615,31 @@ function classifySourceText(sourceText, source) {
     });
   }
 
-  if (saysNotOpenYet || saysSoon) {
+  if (hasInterestForm) {
+    return buildAnalysis('Interest form only', 'watching', mentionsEligibility || openWindow ? 'medium' : 'needsReview', 'Monitor Only', '', source, normalized, openWindow, {
+      ...analysisOptions,
+      sourceState: 'Monitor',
+      sourceAction: 'Keep watching; an interest form is useful but is not an application opening.',
+    });
+  }
+
+  if (saysReopenLater) {
+    return buildAnalysis('Applications will reopen later', 'watching', mentionsEligibility ? 'medium' : 'needsReview', 'Monitor Only', '', source, normalized, deadline || openWindow, {
+      ...analysisOptions,
+      sourceState: 'Monitor',
+      sourceAction: 'Keep watching for the announced reopening; do not send an opening alert yet.',
+    });
+  }
+
+  if (sourceSignals.hasOnlyPastCycleYears && !saysOpen && !deadline && !openWindow) {
+    return buildAnalysis('Old-cycle signal', 'watching', mentionsEligibility ? 'medium' : 'needsReview', 'Monitor Only', '', source, normalized, '', {
+      ...analysisOptions,
+      sourceState: 'Old Cycle',
+      sourceAction: 'The program page is useful context, but keep watching for a current application cycle.',
+    });
+  }
+
+  if ((saysNotOpenYet || saysSoon) && !/\bapplications? will close\b/i.test(normalized)) {
     return buildAnalysis('Dates updated', 'expectedSoon', mentionsEligibility || openWindow ? 'medium' : 'needsReview', 'Prep Watch', 'prep_window', source, normalized, openWindow || deadline, {
       ...analysisOptions,
       sourceState: 'Warmup',
@@ -3648,14 +3676,6 @@ function classifySourceText(sourceText, source) {
       ...analysisOptions,
       sourceState: 'Deadline',
       sourceAction: 'Review the deadline before sending a reminder or updating the public card.',
-    });
-  }
-
-  if (hasInterestForm) {
-    return buildAnalysis('Interest form only', 'watching', mentionsEligibility || openWindow ? 'medium' : 'needsReview', 'Monitor Only', '', source, normalized, openWindow, {
-      ...analysisOptions,
-      sourceState: 'Monitor',
-      sourceAction: 'Keep watching; an interest form is useful but is not an application opening.',
     });
   }
 
@@ -4357,3 +4377,5 @@ function jsonResponse(env, body, init = {}) {
     },
   });
 }
+
+export { classifySourceText };
