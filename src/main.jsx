@@ -416,6 +416,14 @@ function loadTurnstileScript() {
 }
 
 function getTurnstileErrorMessage(errorCode) {
+  if (errorCode === '110600' || errorCode === '110620') {
+    return 'Verification timed out. Try again when you are ready to submit.';
+  }
+
+  if (errorCode === '110200') {
+    return 'Verification only works on the main ApplyFirst site. Open applyfirst-careers.pages.dev and try again.';
+  }
+
   if (errorCode.startsWith('2005')) {
     return 'Verification was blocked by this browser. Try again or check your content-blocking settings.';
   }
@@ -424,7 +432,7 @@ function getTurnstileErrorMessage(errorCode) {
     return 'The security check was interrupted. Try again or open ApplyFirst in another browser.';
   }
 
-  if (errorCode.startsWith('110') || errorCode.startsWith('400')) {
+  if (['110100', '110110', '400020', '400021', '400070'].includes(errorCode)) {
     return 'Verification is temporarily unavailable. Please try again later.';
   }
 
@@ -4710,7 +4718,7 @@ function WaitlistPanel({
               placeholder={isLandingContext ? '' : 'Example: freshman SWE discovery programs, conference funding, PM fellowships...'}
             />
           </label>
-          {captureEndpoint ? (
+          {captureEndpoint && (!isLandingContext || draft.email.trim()) ? (
             <TurnstileVerification action="waitlist" onTokenChange={setTurnstileToken} resetKey={turnstileResetKey} />
           ) : null}
           <button type="submit" disabled={submitState === 'submitting' || (captureEndpoint && !turnstileToken)}>
