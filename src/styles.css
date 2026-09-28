@@ -2609,6 +2609,35 @@ a {
   color: #a33a4e;
 }
 
+.turnstile-recovery {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 11px;
+  border: 1px solid #e9c4ca;
+  background: #fff8f9;
+}
+
+.turnstile-retry-button {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 6px 11px;
+  border: 1px solid #caa2aa;
+  border-radius: 6px;
+  background: #fff;
+  color: #7f2939;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.turnstile-retry-button:hover {
+  border-color: #a33a4e;
+  background: #fff1f3;
+}
+
 .waitlist-panel {
   display: grid;
   grid-template-columns: minmax(240px, 0.72fr) minmax(360px, 1fr);

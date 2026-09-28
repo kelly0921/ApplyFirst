@@ -354,6 +354,9 @@ function sendProductEvent(workerBaseUrl, accessCode, sessionId, eventName, detai
 }
 
 let turnstileScriptPromise;
+const turnstileScriptSelector = 'script[data-applyfirst-turnstile]';
+const turnstileReadyCallback = '__applyFirstTurnstileReady';
+const turnstileLoadTimeoutMs = 15_000;
 
 function loadTurnstileScript() {
   if (typeof window === 'undefined') {
@@ -366,29 +369,66 @@ function loadTurnstileScript() {
 
   if (!turnstileScriptPromise) {
     turnstileScriptPromise = new Promise((resolve, reject) => {
-      const existingScript = document.querySelector('script[data-applyfirst-turnstile]');
-      const script = existingScript ?? document.createElement('script');
+      const existingScript = document.querySelector(turnstileScriptSelector);
+      existingScript?.remove();
 
-      script.addEventListener('load', () => {
-        if (window.turnstile) {
-          resolve(window.turnstile);
-        } else {
-          reject(new Error('Turnstile did not initialize.'));
+      const script = document.createElement('script');
+      let settled = false;
+
+      const cleanup = () => {
+        window.clearTimeout(timeoutId);
+        delete window[turnstileReadyCallback];
+      };
+      const fail = (message) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        script.remove();
+        turnstileScriptPromise = undefined;
+        reject(new Error(message));
+      };
+      const timeoutId = window.setTimeout(() => {
+        fail('Turnstile took too long to initialize.');
+      }, turnstileLoadTimeoutMs);
+
+      window[turnstileReadyCallback] = () => {
+        if (settled) return;
+        if (!window.turnstile) {
+          fail('Turnstile did not initialize.');
+          return;
         }
-      }, { once: true });
-      script.addEventListener('error', () => reject(new Error('Turnstile could not load.')), { once: true });
 
-      if (!existingScript) {
-        script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-        script.async = true;
-        script.defer = true;
-        script.dataset.applyfirstTurnstile = 'true';
-        document.head.appendChild(script);
-      }
+        settled = true;
+        cleanup();
+        resolve(window.turnstile);
+      };
+
+      script.src = `https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=${turnstileReadyCallback}`;
+      script.async = true;
+      script.defer = true;
+      script.dataset.applyfirstTurnstile = 'true';
+      script.addEventListener('error', () => fail('Turnstile could not load.'), { once: true });
+      document.head.appendChild(script);
     });
   }
 
   return turnstileScriptPromise;
+}
+
+function getTurnstileErrorMessage(errorCode) {
+  if (errorCode.startsWith('2005')) {
+    return 'Verification was blocked by this browser. Try again or check your content-blocking settings.';
+  }
+
+  if (errorCode.startsWith('300') || errorCode.startsWith('600')) {
+    return 'The security check was interrupted. Try again or open ApplyFirst in another browser.';
+  }
+
+  if (errorCode.startsWith('110') || errorCode.startsWith('400')) {
+    return 'Verification is temporarily unavailable. Please try again later.';
+  }
+
+  return 'Verification could not load. Check your connection and try again.';
 }
 
 function TurnstileVerification({ action, onTokenChange, resetKey = 0 }) {
@@ -396,6 +436,8 @@ function TurnstileVerification({ action, onTokenChange, resetKey = 0 }) {
   const widgetIdRef = useRef(null);
   const callbackRef = useRef(onTokenChange);
   const [loadState, setLoadState] = useState(turnstileSiteKey ? 'loading' : 'missing');
+  const [retryAttempt, setRetryAttempt] = useState(0);
+  const [errorCode, setErrorCode] = useState('');
 
   useEffect(() => {
     callbackRef.current = onTokenChange;
@@ -407,6 +449,9 @@ function TurnstileVerification({ action, onTokenChange, resetKey = 0 }) {
     }
 
     let cancelled = false;
+    setLoadState('loading');
+    setErrorCode('');
+    callbackRef.current('');
 
     loadTurnstileScript()
       .then((turnstile) => {
@@ -419,17 +464,22 @@ function TurnstileVerification({ action, onTokenChange, resetKey = 0 }) {
           action,
           theme: 'light',
           size: 'flexible',
+          retry: 'auto',
+          'retry-interval': 5000,
           callback: (token) => {
             setLoadState('ready');
+            setErrorCode('');
             callbackRef.current(token);
           },
           'expired-callback': () => {
             setLoadState('expired');
             callbackRef.current('');
           },
-          'error-callback': () => {
+          'error-callback': (code) => {
             setLoadState('error');
+            setErrorCode(String(code || ''));
             callbackRef.current('');
+            return true;
           },
         });
       })
@@ -447,7 +497,7 @@ function TurnstileVerification({ action, onTokenChange, resetKey = 0 }) {
       }
       widgetIdRef.current = null;
     };
-  }, [action]);
+  }, [action, retryAttempt]);
 
   useEffect(() => {
     if (resetKey > 0 && widgetIdRef.current !== null && window.turnstile) {
@@ -464,7 +514,14 @@ function TurnstileVerification({ action, onTokenChange, resetKey = 0 }) {
   return (
     <div className="turnstile-verification" aria-live="polite">
       <div ref={containerRef} className="turnstile-widget" />
-      {loadState === 'error' ? <p className="form-helper form-error">Verification could not load. Refresh and try again.</p> : null}
+      {loadState === 'error' ? (
+        <div className="turnstile-recovery" data-error-code={errorCode || undefined}>
+          <p className="form-helper form-error">{getTurnstileErrorMessage(errorCode)}</p>
+          <button className="turnstile-retry-button" type="button" onClick={() => setRetryAttempt((attempt) => attempt + 1)}>
+            Try Again
+          </button>
+        </div>
+      ) : null}
       {loadState === 'expired' ? <p className="form-helper">Verification expired. Please complete it again.</p> : null}
     </div>
   );
