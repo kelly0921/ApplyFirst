@@ -2633,6 +2633,10 @@ async function getSourcesForMonitoring(env, { limit, now, force, programIds = []
       source_schedule_profiles.next_check_at,
       source_schedule_profiles.next_discovery_at,
       source_schedule_profiles.schedule_note,
+      source_schedule_profiles.curated_status,
+      source_schedule_profiles.curated_status_reviewed_at,
+      source_schedule_profiles.curated_open_date,
+      source_schedule_profiles.curated_deadline,
       coalesce(watched.active_watch_count, 0) as active_watch_count
     from official_sources
     left join source_schedule_profiles
@@ -5815,6 +5819,11 @@ function findCycleYearSignals(sourceText) {
 }
 
 function classifySourceText(sourceText, source, referenceDate = new Date()) {
+  const pageAnalysis = classifySourcePageText(sourceText, source, referenceDate);
+  return reconcileWithCuratedSourceStatus(pageAnalysis, sourceText, source, referenceDate);
+}
+
+function classifySourcePageText(sourceText, source, referenceDate = new Date()) {
   const normalized = sourceText.trim().replace(/\s+/g, ' ');
   const sourceSignals = extractSourceStatusSignals(normalized);
   const openWindow = findDateSignal(
@@ -5999,6 +6008,145 @@ function classifySourceText(sourceText, source, referenceDate = new Date()) {
     sourceState: 'Needs Review',
     sourceAction: 'Open the official source manually because the fetched page did not expose enough timing signal.',
   });
+}
+
+function reconcileWithCuratedSourceStatus(analysis, sourceText, source, referenceDate) {
+  const curatedStatus = cleanString(source.curated_status, 40);
+  const reviewedAt = Date.parse(cleanString(source.curated_status_reviewed_at, 40));
+
+  if (!curatedStatus || !Number.isFinite(reviewedAt)) {
+    return analysis;
+  }
+
+  const normalized = sourceText.trim().replace(/\s+/g, ' ');
+  const curatedDeadline = cleanString(source.curated_deadline, 240);
+  const curatedSignal = findDateSignal(curatedDeadline, [], false, referenceDate);
+  const curatedDeadlinePassed = isDateBeforeReference(curatedSignal, referenceDate);
+  const curatedDeadlineDate = parseDateSignal(curatedSignal, referenceDate);
+  const reviewAgeMs = referenceDate.getTime() - reviewedAt;
+  const reviewIsFresh = reviewAgeMs <= 45 * 24 * 60 * 60 * 1000;
+  const reviewCoversActiveDeadline = Boolean(
+    curatedDeadlineDate && curatedDeadlineDate.getTime() >= startOfUtcDay(referenceDate).getTime(),
+  );
+
+  if (!reviewIsFresh && !reviewCoversActiveDeadline) {
+    return analysis;
+  }
+
+  const explicitClosedResult = [
+    'Registration closed',
+    'Deadline passed',
+    'Applications will reopen later',
+    'Interest form only',
+  ].includes(analysis.result);
+
+  if (curatedStatus === 'open') {
+    if (explicitClosedResult || curatedDeadlinePassed) {
+      return analysis;
+    }
+
+    return buildAnalysis(
+      'Application opened',
+      'open',
+      'high',
+      'Alert Candidate',
+      'opening',
+      source,
+      normalized,
+      curatedSignal || analysis.detectedSignal,
+      {
+        sourceSignals: analysis.sourceSignals,
+        sourceState: 'Open',
+        sourceAction: 'Use the recent official-page audit while continuing to monitor for a closing signal.',
+      },
+    );
+  }
+
+  if (curatedStatus === 'deadline') {
+    if (explicitClosedResult || curatedDeadlinePassed) {
+      return analysis;
+    }
+
+    return buildAnalysis(
+      'Dates updated',
+      'deadlineSoon',
+      'high',
+      'Deadline Candidate',
+      'deadline',
+      source,
+      normalized,
+      curatedSignal || analysis.detectedSignal,
+      {
+        sourceSignals: analysis.sourceSignals,
+        sourceState: 'Deadline',
+        sourceAction: 'Use the audited deadline and continue checking the official source for closure or replacement dates.',
+      },
+    );
+  }
+
+  if (curatedStatus === 'opening_soon') {
+    if (analysis.reviewDecision === 'Alert Candidate' && analysis.suggestedConfidence === 'high') {
+      return analysis;
+    }
+
+    if (explicitClosedResult && analysis.suggestedStatus !== 'expectedSoon') {
+      return analysis;
+    }
+
+    return buildAnalysis(
+      'Dates updated',
+      'expectedSoon',
+      'high',
+      'Prep Watch',
+      'prep_window',
+      source,
+      normalized,
+      curatedSignal || analysis.detectedSignal,
+      {
+        sourceSignals: analysis.sourceSignals,
+        sourceState: 'Warmup',
+        sourceAction: 'Keep checking during the audited opening window; do not alert until the source clearly opens.',
+      },
+    );
+  }
+
+  if (curatedStatus === 'watching' && ['Alert Candidate', 'Deadline Candidate'].includes(analysis.reviewDecision)) {
+    return buildAnalysis(
+      'Source conflicts with recent audit',
+      'verifyManually',
+      'needsReview',
+      'Manual Review',
+      '',
+      source,
+      normalized,
+      analysis.detectedSignal,
+      {
+        sourceSignals: analysis.sourceSignals,
+        sourceState: 'Needs Review',
+        sourceAction: 'Review the apparent opening manually because a recent official-page audit marked this cycle closed or watch-only.',
+      },
+    );
+  }
+
+  if (curatedStatus === 'needs_review') {
+    return buildAnalysis(
+      'Curated review required',
+      'verifyManually',
+      'needsReview',
+      'Manual Review',
+      '',
+      source,
+      normalized,
+      analysis.detectedSignal,
+      {
+        sourceSignals: analysis.sourceSignals,
+        sourceState: 'Needs Review',
+        sourceAction: 'Keep this source in review until a maintainer confirms one unambiguous current-cycle application.',
+      },
+    );
+  }
+
+  return analysis;
 }
 
 function buildAnalysis(result, suggestedStatus, suggestedConfidence, reviewDecision, candidateType, source, sourceText, detectedSignal, options = {}) {

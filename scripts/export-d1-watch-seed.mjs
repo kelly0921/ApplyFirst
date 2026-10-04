@@ -164,6 +164,10 @@ function createScheduleProfileStatements(rows) {
   next_check_at,
   next_discovery_at,
   schedule_note,
+  curated_status,
+  curated_status_reviewed_at,
+  curated_open_date,
+  curated_deadline,
   updated_at
 ) values
 ${chunk.map((row) => createScheduleProfileValueSql(row)).join(',\n')}
@@ -226,6 +230,10 @@ on conflict(official_source_id) do update set
     else source_schedule_profiles.next_discovery_at
   end,
   schedule_note = excluded.schedule_note,
+  curated_status = excluded.curated_status,
+  curated_status_reviewed_at = excluded.curated_status_reviewed_at,
+  curated_open_date = excluded.curated_open_date,
+  curated_deadline = excluded.curated_deadline,
   updated_at = excluded.updated_at
 where source_schedule_profiles.program_id is not excluded.program_id
   or source_schedule_profiles.cycle_frequency is not excluded.cycle_frequency
@@ -238,7 +246,11 @@ where source_schedule_profiles.program_id is not excluded.program_id
   or source_schedule_profiles.discovery_check_interval_hours is not excluded.discovery_check_interval_hours
   or source_schedule_profiles.source_volatility is not excluded.source_volatility
   or source_schedule_profiles.discovery_queries_json is not excluded.discovery_queries_json
-  or source_schedule_profiles.schedule_note is not excluded.schedule_note;`).join('\n\n');
+  or source_schedule_profiles.schedule_note is not excluded.schedule_note
+  or source_schedule_profiles.curated_status is not excluded.curated_status
+  or source_schedule_profiles.curated_status_reviewed_at is not excluded.curated_status_reviewed_at
+  or source_schedule_profiles.curated_open_date is not excluded.curated_open_date
+  or source_schedule_profiles.curated_deadline is not excluded.curated_deadline;`).join('\n\n');
 }
 
 function createScheduleProfileValueSql(row) {
@@ -259,6 +271,10 @@ function createScheduleProfileValueSql(row) {
     'null',
     'null',
     sqlValue(row.scheduleProfile.scheduleNote),
+    sqlValue(row.scheduleProfile.curatedStatus),
+    sqlValue(row.scheduleProfile.curatedStatusReviewedAt),
+    sqlValue(row.scheduleProfile.curatedOpenDate),
+    sqlValue(row.scheduleProfile.curatedDeadline),
     "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
   ].join(', ')})`;
 }
@@ -315,9 +331,23 @@ function createScheduleProfile(opportunity) {
     sourceVolatility,
     discoveryQueries,
     scheduleNote: `${cycleFrequency} cadence; ${monthCopy}; ${sourceVolatility} source.`,
+    curatedStatus: opportunity.statusReviewedAt ? mapCuratedStatus(opportunity.status) : null,
+    curatedStatusReviewedAt: opportunity.statusReviewedAt || null,
+    curatedOpenDate: opportunity.statusReviewedAt ? opportunity.openDate || null : null,
+    curatedDeadline: opportunity.statusReviewedAt ? opportunity.deadline || null : null,
   };
 
   return applyVerifiedScheduleOverride(opportunity, inferredProfile);
+}
+
+function mapCuratedStatus(status) {
+  return {
+    open: 'open',
+    deadlineSoon: 'deadline',
+    expectedSoon: 'opening_soon',
+    watching: 'watching',
+    verifyManually: 'needs_review',
+  }[status] || null;
 }
 
 function applyVerifiedScheduleOverride(opportunity, inferredProfile) {
@@ -512,11 +542,11 @@ function createVerifiedScheduleOverrides() {
       discoveryCheckIntervalHours: 24,
       sourceVolatility: 'moving_cycle_page',
       discoveryQueries: [
-        createDiscoveryQuery('official_program_page', 'site:goldmansachs.com/careers/students/programs-and-internships/americas/emerging-leaders-series "October 4"', 'Confirm current Emerging Leaders timing and eligibility.'),
-        createDiscoveryQuery('current_cycle_application', 'site:recruiting360.avature.net "Emerging Leaders Series" "Goldman Sachs"', 'Find or confirm the current application route.'),
+        createDiscoveryQuery('official_program_page', 'site:goldmansachs.com/careers/students/programs-and-internships/americas/emerging-leaders-series "October 4"', 'Check whether Goldman has closed or updated the Emerging Leaders page.'),
+        createDiscoveryQuery('current_cycle_application', 'site:recruiting360.avature.net "Emerging Leaders Series" "Goldman Sachs"', 'Find a replacement official application route if Goldman republishes one.'),
       ],
       scheduleNote:
-        'Current official cycle is open through October 4, 2026. Check frequently through the deadline and return to seasonal discovery afterward.',
+        'Keep the official October 4, 2026 deadline visible even though the Avature application route is unavailable. After the deadline passes, return to monitoring for a future cycle or replacement application.',
     },
   ],
   [
@@ -834,11 +864,11 @@ function createVerifiedScheduleOverrides() {
       discoveryCheckIntervalHours: 72,
       sourceVolatility: 'moving_cycle_page',
       discoveryQueries: [
-        createDiscoveryQuery('official_courses_page', 'site:codepath.org/courses "Fall 2026" "Closing"', 'Verify current term course close dates.'),
-        createDiscoveryQuery('application_portal', 'site:applications.codepath.org CodePath "Fall 2026"', 'Find application portal pages when official links move.'),
+        createDiscoveryQuery('official_courses_page', 'site:codepath.org/courses "Spring 2027" "Apply"', 'Verify whether CodePath has published a dated Spring 2027 application window.'),
+        createDiscoveryQuery('application_portal', 'site:applications.codepath.org CodePath "Spring 2027"', 'Find a current-cycle application portal when official links move.'),
       ],
       scheduleNote:
-        'CodePath runs term-based courses. Fall 2026 pathway deadlines are visible, so check more often before term closes.',
+        'CodePath runs term-based courses. The official page currently exposes waitlist or generic course links without one defensible current-cycle deadline, so keep alerts in review until a dated application is found.',
     },
   ],
   [

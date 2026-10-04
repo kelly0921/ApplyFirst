@@ -399,7 +399,7 @@ export const opportunities = [
     category: 'Discovery Program',
     classYears: ['Freshman', 'Sophomore'],
     timing: 'Summer',
-    status: 'watching',
+    status: 'deadlineSoon',
     confidence: 'medium',
     funding: 'Paid program',
     location: 'Varies by posting',
@@ -819,14 +819,14 @@ export const opportunities = [
     category: 'Community / Prep Program',
     classYears: ['All class years'],
     timing: 'Spring',
-    status: 'open',
+    status: 'watching',
     confidence: 'high',
     funding: 'Free',
     location: 'Virtual',
     url: 'https://www.codepath.org/courses',
     previousUrl: '',
-    openDate: 'Spring course applications are open',
-    deadline: 'Apply while the current Spring application remains active; an exact close date is not listed',
+    openDate: 'The official courses page includes Spring waitlist language and course links, but a current-cycle application window is not confirmed',
+    deadline: 'No current-cycle course deadline is confirmed',
     tags: ['Technical interview prep', 'Applied AI', 'Cybersecurity', 'Web development'],
     description:
       'CodePath Career-Ready Courses are free 10-week virtual, instructor-led pathways for students building technical depth and recruiting readiness. Current Spring options include Applied AI Engineering for AI apps and open-source contributions, Technical Interview Prep for DS&A and mock interviews, Cybersecurity for Blue Team labs and incident response, and Web Development for full-stack applications.',
@@ -835,14 +835,15 @@ export const opportunities = [
     experienceSummary:
       'Virtual 10-week coursework with instructor-led sessions, pathway-specific projects or labs, and roughly 2-10 hours per week depending on the course.',
     detailBasis:
-      'The current official CodePath courses page lists Spring applications and active Apply Now links for Applied AI Engineering, Technical Interview Prep, Cybersecurity, and Web Development.',
+      'The official CodePath courses page describes Applied AI Engineering, Technical Interview Prep, Cybersecurity, and Web Development, but the current fetched page does not identify one unambiguous active application cycle.',
     why:
       'Structured technical practice, portfolio projects, and recruiting preparation outside standard coursework.',
     prep:
       'Match the pathway to the next bottleneck: interview prep, AI projects, cybersecurity, or web development.',
     sourceNote:
-      'Official CodePath courses page currently lists no-cost virtual 10-week pathways, Spring waitlist language, active application links, and course-specific hours per week.',
-    lastChecked: '2026-09-26',
+      'Official CodePath courses page lists no-cost virtual 10-week pathways and Spring waitlist language. Keep this watch-only until a dated current-cycle application or deadline is confirmed.',
+    lastChecked: '2026-10-04',
+    statusReviewedAt: '2026-10-04T14:40:33.036Z',
   },
   {
     id: 'basta-code2career',
@@ -1437,8 +1438,8 @@ export const opportunities = [
     category: 'Discovery Program',
     classYears: ['All class years'],
     timing: 'Rolling',
-    status: 'verifyManually',
-    confidence: 'needsReview',
+    status: 'watching',
+    confidence: 'high',
     funding: 'Varies',
     location: 'Multi-day program',
     url: 'https://www.janestreet.com/join-jane-street/programs-and-events/qtc/',
@@ -1793,14 +1794,13 @@ export const opportunities = [
     category: 'Discovery Program',
     classYears: ['Sophomore'],
     timing: 'Fall',
-    status: 'deadlineSoon',
-    confidence: 'high',
+    status: 'verifyManually',
+    confidence: 'needsReview',
     funding: 'Not listed',
     location: 'New York, Dallas, or Salt Lake City',
     url: 'https://www.goldmansachs.com/careers/students/programs-and-internships/americas/emerging-leaders-series',
-    applicationUrl: 'https://recruiting360.avature.net/candidates/Projectdetailinvitations?projectId=26455',
     previousUrl: '',
-    openDate: 'Applications are open for programs running from Fall 2026 through Spring 2027',
+    openDate: 'Goldman Sachs still labels the 2026 program open, although its direct application route is unavailable',
     deadline: 'October 4, 2026 at 11:59 PM ET',
     tags: ['Engineering', 'Finance', 'Investment banking', 'Second-year students'],
     description:
@@ -1810,14 +1810,15 @@ export const opportunities = [
     experienceSummary:
       'Track-specific programming in New York, Salt Lake City, or Dallas; the Dallas track is focused on engineering.',
     detailBasis:
-      'The current official Goldman Sachs page confirms open applications, the October 4 deadline, graduation window, locations, and business tracks.',
+      'The Goldman Sachs program page still shows its October 4 deadline, graduation window, locations, and business tracks, but its Apply Now destination is unavailable and no alternate official application was found.',
     why:
       'A current second-year discovery program with a dedicated engineering path and direct exposure to future Goldman Sachs internship recruiting.',
     prep:
-      'Choose the business track that matches your interests and apply before the October 4 deadline with a current resume and concise interest story.',
+      'Review the official program page before the October 4 deadline; the separate application route may no longer be accessible.',
     sourceNote:
-      'Official Goldman Sachs page says applications close October 4, 2026 at 11:59 PM ET and lists Engineering as the Dallas track.',
-    lastChecked: '2026-09-26',
+      'The official Goldman Sachs page still says applications close October 4, 2026 at 11:59 PM ET, but its linked Avature application route is unavailable. ApplyFirst links to the working program page and returns this record to monitoring after the deadline.',
+    lastChecked: '2026-10-04',
+    statusReviewedAt: '2026-10-04T16:04:48.100Z',
   },
   {
     id: 'goldman-sachs-possibilities-series',

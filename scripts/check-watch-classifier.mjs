@@ -51,12 +51,101 @@ const cases = [
     text: 'Applications are open to students graduating December 2028 through June 2029 and close October 4, 2026 at 11:59 PM ET.',
     expected: ['Application opened', 'open', 'Alert Candidate'],
   },
+  {
+    name: 'recent open audit preserves MLT when the fetched page only exposes timing copy',
+    source: source('mlt-career-prep', 'https://mlt.smapply.org/prog/careerprep2029_application/', {
+      curated_status: 'open',
+      curated_status_reviewed_at: '2026-10-04T14:40:33.036Z',
+      curated_open_date: 'Career Prep 2029 applications opened June 8, 2026',
+      curated_deadline: 'SWE/Technology priority: November 1, 2026; final deadline: January 15, 2027',
+    }),
+    text: 'Career Prep 2029. SWE and Technology priority deadline November 1, 2026. Final deadline January 15, 2027. College sophomores are eligible.',
+    expected: ['Application opened', 'open', 'Alert Candidate'],
+    detectedSignal: 'November 1, 2026',
+  },
+  {
+    name: 'recent open audit preserves KP when the fetched page is sparse',
+    source: source('kleiner-perkins-fellows', 'https://jobs.ashbyhq.com/kleinerperkinsfellows/ae095fcc-c38e-4c41-814d-b562f05fa776', {
+      curated_status: 'open',
+      curated_status_reviewed_at: '2026-10-04T14:40:33.036Z',
+      curated_open_date: '2027 Engineering Fellow applications are open and reviewed on a rolling basis',
+      curated_deadline: 'January 31, 2027 at 11:59 PM PT',
+    }),
+    text: 'Kleiner Perkins Engineering Fellows. Build with a portfolio company in the San Francisco Bay Area.',
+    expected: ['Application opened', 'open', 'Alert Candidate'],
+    detectedSignal: 'January 31, 2027',
+  },
+  {
+    name: 'recent deadline audit preserves NRF urgency when the umbrella page is generic',
+    source: source('nrf-foundation-scholarships', 'https://nrffoundation.org/campus/scholarships', {
+      curated_status: 'deadline',
+      curated_status_reviewed_at: '2026-10-04T14:40:33.036Z',
+      curated_open_date: 'Five NRF Foundation tuition and travel scholarship paths are currently open',
+      curated_deadline: 'October 13, October 20, or October 30, 2026, depending on the scholarship',
+    }),
+    text: 'NRF Foundation scholarships support undergraduate students interested in retail careers, technology, leadership, and conference experiences.',
+    expected: ['Dates updated', 'deadlineSoon', 'Deadline Candidate'],
+    detectedSignal: 'October 13',
+  },
+  {
+    name: 'recent closed audit blocks a stale Develop for Good apply CTA',
+    source: source('develop-for-good-student-projects', 'https://www.developforgood.org/for-students', {
+      curated_status: 'watching',
+      curated_status_reviewed_at: '2026-10-04T14:40:33.036Z',
+      curated_open_date: 'Winter 2027 applications closed September 19, 2026; the batch begins October 25-31',
+      curated_deadline: 'Next student volunteer application deadline has not been posted',
+    }),
+    text: 'Apply today. Student application deadline September 19, 2026. The Winter 2027 program runs October 25, 2026 through February 20, 2027. University students are eligible.',
+    expected: ['Source conflicts with recent audit', 'verifyManually', 'Manual Review'],
+  },
+  {
+    name: 'ambiguous curated source remains in review despite an apparent apply CTA',
+    source: source('eight-vc-fellowship', 'https://www.8vc.com/fellowships', {
+      curated_status: 'needs_review',
+      curated_status_reviewed_at: '2026-10-04T14:40:33.036Z',
+      curated_open_date: 'Official page contains conflicting open and closed labels',
+      curated_deadline: 'Confirm the current engineering fellowship cycle before applying',
+    }),
+    text: 'Applications are open. Apply now to the 8VC Fellowship. Applications are closed for the prior track.',
+    expected: ['Curated review required', 'verifyManually', 'Manual Review'],
+  },
+  {
+    name: 'explicit closure overrides a recent open audit',
+    source: source('sample-open-program', 'https://example.com/program', {
+      curated_status: 'open',
+      curated_status_reviewed_at: '2026-10-04T14:40:33.036Z',
+      curated_deadline: 'January 31, 2027',
+    }),
+    text: 'Applications are closed. Sign up to hear about the next cycle for eligible undergraduate students.',
+    expected: ['Registration closed', 'expectedSoon', 'Monitor Only'],
+  },
+  {
+    name: 'expired audit without a future deadline cannot suppress a new opening',
+    source: source('sample-reopened-program', 'https://example.com/reopened', {
+      curated_status: 'watching',
+      curated_status_reviewed_at: '2026-07-01T12:00:00.000Z',
+      curated_deadline: 'Next deadline has not been posted',
+    }),
+    text: 'Applications are open now for eligible undergraduate students. Apply by December 1, 2026.',
+    expected: ['Application opened', 'open', 'Alert Candidate'],
+  },
+  {
+    name: 'deadline audit returns to monitoring after its deadline passes',
+    source: source('goldman-sachs-emerging-leaders-series', 'https://www.goldmansachs.com/careers/students/programs-and-internships/americas/emerging-leaders-series', {
+      curated_status: 'deadline',
+      curated_status_reviewed_at: '2026-10-04T16:04:48.100Z',
+      curated_deadline: 'October 4, 2026 at 11:59 PM ET',
+    }),
+    text: 'Applications are open now and will close on Sunday, October 4, 2026 at 11:59 PM ET. Undergraduate students are eligible.',
+    referenceDate: new Date('2026-10-05T04:01:00.000Z'),
+    expected: ['Deadline passed', 'watching', 'Monitor Only'],
+  },
 ];
 
 const referenceDate = new Date('2026-10-04T16:00:00.000Z');
 
 for (const fixture of cases) {
-  const result = classifySourceText(fixture.text, fixture.source, referenceDate);
+  const result = classifySourceText(fixture.text, fixture.source, fixture.referenceDate || referenceDate);
   const actual = [result.result, result.suggestedStatus, result.reviewDecision];
   assert.deepEqual(actual, fixture.expected, fixture.name);
   if (fixture.detectedSignal) {
@@ -65,11 +154,12 @@ for (const fixture of cases) {
   console.log(`PASS ${fixture.name}`);
 }
 
-function source(programId, url) {
+function source(programId, url, overrides = {}) {
   return {
     id: `${programId}-official`,
     program_id: programId,
     program_name: programId,
     url,
+    ...overrides,
   };
 }

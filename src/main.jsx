@@ -176,9 +176,9 @@ function getInitialSelectedId() {
   try {
     const requestedProgram = new URLSearchParams(window.location.search).get('program')?.trim();
 
-    return opportunities.some((opportunity) => opportunity.id === requestedProgram) ? requestedProgram : opportunities[0].id;
+    return opportunities.some((opportunity) => opportunity.id === requestedProgram) ? requestedProgram : '';
   } catch {
-    return opportunities[0].id;
+    return '';
   }
 }
 
@@ -2135,7 +2135,7 @@ function App() {
                         <OpportunityRecord
                           key={opportunity.id}
                           opportunity={opportunity}
-                          selected={selectedId === opportunity.id}
+                          selected={selectedOpportunity?.id === opportunity.id}
                           saved={savedIds.includes(opportunity.id)}
                           progress={getProgramBoardState(
                             programEvidence[opportunity.id],
