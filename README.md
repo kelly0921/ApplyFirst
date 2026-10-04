@@ -55,7 +55,7 @@ Prototype invite codes for local testing:
 - `APPLYFIRST2026`
 - `EARLYACCESS`
 
-These generic codes are for local prototype access only. For private beta testers, use unique workspace-style codes such as `AF-KELLY-8X2Q`. A workspace code unlocks the app and, when `VITE_WATCH_ENDPOINT` is configured, restores that student's saved programs, watch-intent list, My Focus preferences, alert setup receipt, waitlist context, and onboarding progress from the watch Worker/D1 backend. This is a lightweight beta identity layer, not secure auth; anyone with the code can restore that beta workspace. Keep full plaintext beta codes in a private registry outside Git; see [Invite Code Workflow](./docs/INVITE_CODE_WORKFLOW.md).
+These generic codes are for local prototype access only. For private beta testers, use unique workspace-style codes such as `AF-KELLY-8X2Q`. A workspace code unlocks the app and, when `VITE_WATCH_ENDPOINT` is configured, restores that student's saved programs, independent watch preferences, application-attempt history, My Focus preferences, alert setup receipt, waitlist context, and onboarding progress from the watch Worker/D1 backend. This is a lightweight beta identity layer, not secure auth; anyone with the code can restore that beta workspace. Keep full plaintext beta codes in a private registry outside Git; see [Invite Code Workflow](./docs/INVITE_CODE_WORKFLOW.md).
 
 After unlocking the prototype, use the `About` button in the app header to clear the local access flag and return to the public landing page.
 
@@ -195,7 +195,7 @@ The beta watching slice lives in a separate Worker so the static site deployment
 npm run watch:d1:migrate
 ```
 
-This applies the versioned watch migrations, including beta workspace storage, first-party product events, and alert engagement feedback. The watch Worker also binds the existing `applyfirst_beta` database as `CAPTURE_DB` so the admin-only beta summary can report waitlist totals without copying that data.
+This applies the versioned watch migrations, including beta workspace storage, first-party product events, alert engagement feedback, privacy-safe invite counts, explicit relevance, append-only application attempts, application outcomes, and independent program watch state. The watch Worker also binds the existing `applyfirst_beta` database as `CAPTURE_DB` so the admin-only beta summary can report waitlist totals without copying that data.
 
 4. Sync official source seed rows from `src/opportunities.js`:
 
@@ -203,7 +203,7 @@ This applies the versioned watch migrations, including beta workspace storage, f
 npm run watch:seed:d1:sync
 ```
 
-This regenerates `cloudflare/d1/watch-seed.generated.sql` from the app data, then applies the statements through Wrangler's D1 command API. Use this instead of importing the generated seed with `--file`; the seed is code-derived and should not be hand-patched in D1 except for emergency recovery.
+This regenerates `cloudflare/seeds/watch-seed.generated.sql` from the app data, then applies the statements through Wrangler's D1 command API. The seed intentionally lives outside the D1 migrations directory. Use the sync command instead of importing the generated seed with `--file`; the seed is code-derived and should not be hand-patched in D1 except for emergency recovery.
 
 5. Onboard an email sending domain in Cloudflare Email Service:
 
@@ -275,15 +275,16 @@ https://applyfirst-watch.YOUR-SUBDOMAIN.workers.dev/watch
 
 The Worker stores beta watch requests, checks only sources that are due, saves page snapshots/source checks, tracks each program's latest alert state, automatically emails or texts watched students when a high-confidence official opening appears, and keeps ambiguous source changes in `pending_review`. Source schedules use cycle frequency, expected opening months, active lead time, dormant cadence, active cadence, and source volatility so ApplyFirst can start checking more often before an expected application season instead of polling every record forever.
 
-The same Worker accepts allowlisted beta product events at `/analytics/events`, records one-tap alert feedback at `/watch/engagement`, and exposes an admin-only 30-day summary at `/analytics/summary`. Maintainer Mode displays that summary in `Beta Progress`. It does not store plaintext invite codes or student search text.
+The same Worker accepts allowlisted beta product events at `/analytics/events`, stores structured relevance at `/analytics/program-evidence`, keeps repeat application attempts at `/analytics/application-attempts`, stores explicit watch preferences at `/analytics/program-watches`, records one-tap alert feedback at `/watch/engagement`, and exposes an admin-only 30-day summary at `/analytics/summary`. Admin-only audit and operations routes capture known-opening checks, accuracy samples, corrections, and lightweight human-time estimates. The admin-only `/analytics/invitations/sync` route accepts hash-only records generated from the ignored private invite registry, giving the review board accurate invited/opened counts without storing names, emails, or plaintext codes. Maintainer Mode prioritizes Student Value, Independent Usability, Trust/Reliability, and Operational Burden above engagement diagnostics. The participant endpoint remains paginated and masked. ApplyFirst does not store plaintext invite codes, student identities, student search text, resumes, application answers, or private application notes in product analytics. Exact definitions live in [Beta metric definitions](./docs/BETA_METRIC_DEFINITIONS.md).
 
 Before deployment, run the analytics contract test:
 
 ```bash
 npm run watch:analytics:test
+npm run watch:invites:sync:dry
 ```
 
-The first audited seed set and its schedule decisions live in [Verified seed schedule audit](./docs/VERIFIED_SEED_SCHEDULE_AUDIT.md). Regenerate and import `cloudflare/d1/watch-seed.generated.sql` after changing audited source URLs, expected months, or alert-safety decisions.
+The first audited seed set and its schedule decisions live in [Verified seed schedule audit](./docs/VERIFIED_SEED_SCHEDULE_AUDIT.md). Regenerate and sync `cloudflare/seeds/watch-seed.generated.sql` after changing audited source URLs, expected months, or alert-safety decisions.
 
 Manual source runs respect the due schedule by default. Use `force` for smoke tests:
 

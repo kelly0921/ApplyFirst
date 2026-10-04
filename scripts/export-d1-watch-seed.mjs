@@ -7,7 +7,7 @@ import {
 
 const args = new Set(process.argv.slice(2));
 const writeOutput = args.has('--write');
-const outputPath = new URL('../cloudflare/d1/watch-seed.generated.sql', import.meta.url);
+const outputPath = new URL('../cloudflare/seeds/watch-seed.generated.sql', import.meta.url);
 const verifiedScheduleOverrides = createVerifiedScheduleOverrides();
 // Keep each SQLite statement comfortably below D1's statement-size limit while
 // avoiding one network request per row during remote sync.
@@ -43,7 +43,7 @@ const sql = createD1SeedSql(sourceRows);
 if (writeOutput) {
   await mkdir(new URL('../cloudflare/d1/', import.meta.url), { recursive: true });
   await writeFile(outputPath, sql);
-  console.log(`Wrote ${sourceRows.length} official source rows to cloudflare/d1/watch-seed.generated.sql`);
+  console.log(`Wrote ${sourceRows.length} official source rows to cloudflare/seeds/watch-seed.generated.sql`);
 } else {
   console.log(sql);
 }

@@ -117,4 +117,4 @@ The first beta audit now covers the original uncertain queue. Remaining follow-u
 4. Capture exact current-cycle dates if visible.
 5. If dates are missing but cadence is known, mark the record as verified but discovery-first.
 6. If the official page moved, update `url` and keep the old page in `previousUrl`.
-7. Regenerate `cloudflare/d1/watch-seed.generated.sql` and import it into D1 after review.
+7. Regenerate `cloudflare/seeds/watch-seed.generated.sql` and sync it into D1 after review.

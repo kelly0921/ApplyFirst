@@ -236,6 +236,94 @@ Privacy-conscious first-party beta events tied to a hashed workspace identity.
 
 Only allowlisted high-signal actions are accepted. Search text and plaintext invite codes are not stored.
 
+`beta_access_workspaces.tester_segment` stores a maintainer-assigned cohort label (`unknown`, `rsa_assisted`, `independent_waitlist`, or `other`). It supports cohort comparisons without adding student identity. The label describes the testing cohort, not the assistance used for any specific decision.
+
+### beta_program_evidence
+
+One durable student-program decision record per hashed workspace and program.
+
+- `workspace_id`
+- `program_id`
+- `relevance`
+- `relevance_source` (`explicit` or `inferred_applied`)
+- `relevance_updated_at`
+- `prior_awareness`
+- `eligibility_unclear_reason`
+- `first_relevant_at`
+- `action_state`
+- `action_at`
+- `support_level`
+- `attribution`
+- `friction_category`
+- `class_year`
+- `role_track`
+- `opportunity_category`
+
+The current product writes relevance, prior awareness, and the allowlisted eligibility-unclear reason here. Legacy action/support fields remain for migration compatibility, but new application and watch behavior is stored in the dedicated tables below. The table does not store free-form student text.
+
+### beta_application_attempts
+
+Append-only student application history. An ordinary Mark Applied action is idempotent for one workspace, program, and cycle; Add Another Application is the explicit same-cycle repeat path.
+
+> **Relevance is a judgment. Applying is an event. Watching is an ongoing preference.** A non-selection does not end the student-program relationship, and the product does not assume a selective recurring program should only be attempted once.
+
+- `workspace_id`
+- `program_id`
+- `applied_at`
+- `cycle_label` (optional)
+- `idempotency_key` (ordinary attempts only)
+- `creation_mode` (`ordinary`, `explicit_additional`, or `legacy_migration`)
+- `outcome`
+- `outcome_updated_at`
+- `source`
+
+Outcomes are allowlisted. No resume, essay, application answer, or private note is accepted.
+
+Cycle labels are conservative: use an explicit program cycle such as `Summer 2027` only when the program data identifies it, otherwise use only the application year. A program can explicitly mark its cycle mapping unknown so the attempt remains unspecified rather than gaining false precision. Migration `013` collapses repeated historical `submitted` events within the same workspace/program/year, while retaining events from distinct years as defensible separate attempts. Ambiguous timestamps collapse into one unspecified legacy attempt.
+
+### beta_program_watches
+
+One explicit current watch preference per workspace and program.
+
+- `workspace_id`
+- `program_id`
+- `is_watching`
+- `started_at`
+- `stopped_at`
+- `updated_at`
+
+This table controls alert eligibility. Saved bookmarks, relevance answers, and application attempts do not implicitly stop watching.
+
+Migration `013` creates a program watch only from legacy rows whose reason explicitly meant a program-level watch (`Selected for alerts`, `Watched by student`, or `Explicit program watch`). Broad My Focus matches and Saved-by-student links are not reinterpreted as personal watches.
+
+### monitoring_audits
+
+Maintainer-entered evidence for known openings, information-accuracy samples, and corrections.
+
+- `program_id`
+- `audit_type`
+- `event_at`
+- `verified_deadline_at`
+- `detected`
+- `detected_at`
+- `alert_candidate_id`
+- `status_correct`
+- `deadline_correct`
+- `eligibility_correct`
+- `url_correct`
+- `freshness_correct`
+- `alert_correct`
+- `evidence_url`
+- `evidence_note`
+- `reported_at`
+- `resolved_at`
+
+Known-opening coverage is explicitly sample-based. ApplyFirst does not pretend to know the complete universe of missed openings.
+
+### operational_time_entries
+
+Lightweight maintainer estimates for `monitoring_review`, `data_correction`, and `user_support`. Each record stores a date, minutes, and optional short note. This is enough to compare student/watch volume with human burden without building a time-tracking product.
+
 ### alert_engagement_events
 
 Student actions from an opening-alert email.
@@ -388,7 +476,19 @@ The Cloudflare watch Worker adds the first durable monitoring path:
 - `GET /watch/status` returns safe aggregate counts for smoke checks.
 - `GET /library/status` returns a cached, read-only feed of fresh high-confidence `open`, `deadline`, and `opening_soon` states. The public app refreshes this feed on load, every five minutes, and when a student returns to the tab. It never exposes source notes, candidate details, internal review decisions, or low-confidence crawler output.
 - `POST /analytics/events` records allowlisted beta-workspace actions and student-reported outcomes. It requires an existing workspace code, stores only its hash-backed workspace ID, and never stores search text.
-- `GET /analytics/summary` returns the 30-day beta funnel, activation, return use, outcomes, alert feedback, popular programs, and waitlist counts for the maintainer console. Requires `WATCH_ADMIN_TOKEN`.
+- `GET /analytics/program-evidence?code=...` returns the current workspace's own program decisions.
+- `POST /analytics/program-evidence` upserts allowlisted relevance, prior awareness, eligibility-unclear reason, and non-sensitive segment fields for one workspace/program pair.
+- `GET /analytics/application-attempts?code=...` returns that workspace's private application-attempt history.
+- `POST /analytics/application-attempts` creates an idempotent ordinary attempt or an explicitly requested additional attempt. It infers current-cycle relevance only when no explicit relevance answer exists and never changes Saved or Watching.
+- `POST /analytics/application-attempts/:id/outcome` updates the allowlisted outcome for one attempt owned by the workspace.
+- `GET /analytics/program-watches?code=...` returns the workspace's current watch preferences.
+- `POST /analytics/program-watches` starts or stops one program watch without changing Saved, relevance, or application history.
+- `GET /analytics/summary` returns the 30-day value hierarchy, independent-use evidence, monitoring reliability, operational burden, diagnostics, program insights, alert feedback, and waitlist segments. Requires `WATCH_ADMIN_TOKEN`.
+- `GET /analytics/participants` returns masked workspace-level activity plus eligible activation, relevant programs, new discoveries, external actions, support context, and Relevant-Window Return eligibility. It never returns plaintext invite codes or student identities and requires `WATCH_ADMIN_TOKEN`.
+- `POST /analytics/participants/segment` lets the maintainer classify a masked workspace as RSA-assisted, independent/waitlist, other, or unknown. It requires `WATCH_ADMIN_TOKEN`; cohort membership remains separate from outcome-level support.
+- `POST /analytics/invitations/sync` accepts only locally generated SHA-256 invite hashes, masked labels, send status, segment, and invite date. It powers accurate invited/opened cohort counts without moving the private identity registry into analytics and requires `WATCH_ADMIN_TOKEN`.
+- `POST /analytics/monitoring-audits` records a known-opening, information-accuracy, or correction audit. Requires `WATCH_ADMIN_TOKEN`.
+- `POST /analytics/operations` records a small manual estimate of monitoring, correction, or support time. Requires `WATCH_ADMIN_TOKEN`.
 - `GET /watch/engagement` records tracked official-source clicks and one-tap usefulness feedback from alert emails.
 - `GET /watch/unsubscribe?token=...` and `POST /watch/unsubscribe?token=...` unsubscribe a beta watch setup. Legacy `requestId` links are still supported for older test emails.
 - `GET /watch/readiness` returns the maintainer readiness queue grouped by source attention state. Requires `WATCH_ADMIN_TOKEN`.
@@ -416,9 +516,9 @@ Student alerts must be generated from clean student-facing templates. Internal s
 
 ## Next Implementation Steps
 
-1. Apply the metrics migration, deploy the watch Worker, and smoke-test the beta funnel before inviting the first 12 students.
+1. Apply migrations through `013`, deploy the watch Worker, sync the hash-only invite registry, and smoke-test relevance, repeat application history, application outcomes, independent watch state, manual audits, operations entries, and the beta summary before inviting the next cohort.
 2. Use the Maintainer Mode review console to smoke-test discovery search, candidate review, alert dry runs, and reviewed sends before each beta round.
-3. Review the `Beta Progress` funnel after one week, fix repeated failures, and expand in controlled waitlist batches only when the stability gates pass.
+3. Review Student Value, Independent Usability, Trust, and Operational Burden after one week. Expand only when the evidence and stability gates pass.
 4. Import the regenerated D1 seed after each verified seed/schedule audit update.
 5. Review search-provider ignored reasons and kept-candidate quality, then decide whether JavaScript-heavy or search-hostile programs need a Browser Run fallback workflow.
 6. Return to SMS/text alerts after the first email-only beta: create or upgrade a Twilio account, configure sender registration as needed, smoke-test a real text to yourself, then set `VITE_TEXT_ALERTS_ENABLED=true`.

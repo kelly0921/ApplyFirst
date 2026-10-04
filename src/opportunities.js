@@ -1,6 +1,6 @@
 export const statusLabels = {
   open: 'Open Now',
-  watching: 'Watching',
+  watching: 'Monitoring',
   expectedSoon: 'Opening Soon',
   deadlineSoon: 'Deadline Soon',
   verifyManually: 'Needs Confirmation',

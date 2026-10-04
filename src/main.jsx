@@ -222,6 +222,39 @@ const feedbackIssueTypes = [
   'Other Feedback',
 ];
 
+const programRelevanceOptions = [
+  { value: 'this_cycle', label: 'Yes, this cycle' },
+  { value: 'future_cycle', label: 'Yes, a future cycle' },
+  { value: 'not_a_fit', label: 'Not a fit' },
+  { value: 'not_eligible', label: 'Not eligible' },
+  { value: 'eligibility_unclear', label: "Not sure if I'm eligible" },
+];
+
+const eligibilityUnclearOptions = [
+  { value: 'class_year', label: 'Graduation Year or Class Year' },
+  { value: 'major_or_field', label: 'Major or Field' },
+  { value: 'location', label: 'Location' },
+  { value: 'work_authorization', label: 'Work Authorization' },
+  { value: 'experience_requirements', label: 'Experience Requirements' },
+  { value: 'other', label: 'Other' },
+];
+
+const applicationOutcomeOptions = [
+  { value: 'pending', label: 'Still waiting' },
+  { value: 'accepted', label: 'Accepted' },
+  { value: 'not_selected', label: 'Not selected' },
+  { value: 'withdrew', label: 'Withdrew' },
+  { value: 'did_not_complete', label: 'Did not complete' },
+  { value: 'prefer_not_to_say', label: 'Prefer not to say' },
+];
+
+const testerSegmentOptions = [
+  { value: 'unknown', label: 'Not Classified' },
+  { value: 'rsa_assisted', label: 'RSA-Assisted' },
+  { value: 'independent_waitlist', label: 'Independent / Waitlist' },
+  { value: 'other', label: 'Other Beta Group' },
+];
+
 const betaReadyExamples = [
   'INSIGHT',
   'Futureforce Tech Launchpad',
@@ -552,6 +585,21 @@ function normalizeStoredIds(value) {
   return Array.isArray(value) ? [...new Set(value.map((item) => String(item).trim()).filter(Boolean))] : [];
 }
 
+function normalizeCycleLabel(value) {
+  return cleanText(value).toLowerCase();
+}
+
+function getApplicationCycleLabel(opportunity, appliedAt) {
+  if (opportunity?.applicationCycleUnspecified === true) return '';
+
+  const explicitCycle = cleanText(opportunity?.applicationCycleLabel);
+
+  if (explicitCycle) return explicitCycle;
+
+  const date = new Date(appliedAt);
+  return Number.isNaN(date.getTime()) ? '' : String(date.getUTCFullYear());
+}
+
 function getSortableDate(value = '') {
   const normalized = String(value).replace(/(\d)(st|nd|rd|th)\b/gi, '$1');
   const isoMatch = normalized.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/);
@@ -679,7 +727,7 @@ function App() {
   const [classYear, setClassYear] = useState('all');
   const [timing, setTiming] = useState('all');
   const [status, setStatus] = useState('all');
-  const [savedOnly, setSavedOnly] = useState(false);
+  const [libraryScope, setLibraryScope] = useState('all');
   const [sortMode, setSortMode] = useState('actSoon');
   const [liveProgramStatuses, setLiveProgramStatuses] = useState({});
   const [selectedId, setSelectedId] = useState(() => getInitialSelectedId());
@@ -804,6 +852,12 @@ function App() {
       return null;
     }
   });
+  const [programEvidence, setProgramEvidence] = useState({});
+  const [programEvidenceState, setProgramEvidenceState] = useState('idle');
+  const [applicationAttempts, setApplicationAttempts] = useState([]);
+  const [applicationAttemptsState, setApplicationAttemptsState] = useState('idle');
+  const [applicationMutationState, setApplicationMutationState] = useState({});
+  const [programWatchState, setProgramWatchState] = useState('idle');
   const [watchIntentProgramIds, setWatchIntentProgramIds] = useState([]);
   const [lastSavedId, setLastSavedId] = useState(null);
   const [workspaceSyncState, setWorkspaceSyncState] = useState('idle');
@@ -812,6 +866,9 @@ function App() {
   const analyticsSessionTrackedRef = useRef(false);
   const viewedProgramIdsRef = useRef(new Set());
   const lastTrackedSearchRef = useRef('');
+  const applicationAttemptInFlightRef = useRef(new Set());
+  const ordinaryApplicationAttemptKeysRef = useRef(new Set());
+  const applicationAttemptInteractionAtRef = useRef(new Map());
 
   const opportunityRecords = useMemo(
     () =>
@@ -887,6 +944,23 @@ function App() {
     [opportunityRecords],
   );
 
+  const applicationAttemptsByProgram = useMemo(
+    () => applicationAttempts.reduce((grouped, attempt) => ({
+      ...grouped,
+      [attempt.programId]: [...(grouped[attempt.programId] ?? []), attempt],
+    }), {}),
+    [applicationAttempts],
+  );
+  const activeSavedIdSet = useMemo(() => new Set(savedIds), [savedIds]);
+  const historyProgramIdSet = useMemo(
+    () => new Set(applicationAttempts.map((attempt) => attempt.programId)),
+    [applicationAttempts],
+  );
+  const activeWatchIntentIdSet = useMemo(
+    () => new Set(watchIntentProgramIds),
+    [watchIntentProgramIds],
+  );
+
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
@@ -912,7 +986,9 @@ function App() {
 
       return (
         (!normalizedQuery || searchText.includes(normalizedQuery)) &&
-        (!savedOnly || savedIds.includes(opportunity.id)) &&
+        (libraryScope === 'all' ||
+          (libraryScope === 'saved' && activeSavedIdSet.has(opportunity.id)) ||
+          (libraryScope === 'history' && historyProgramIdSet.has(opportunity.id))) &&
         (roleTrack === 'all' || getOpportunityTracks(opportunity).includes(roleTrack)) &&
         (priority === 'all' ||
           (priority === 'recommended'
@@ -925,7 +1001,7 @@ function App() {
         (status === 'all' || opportunity.status === status)
       );
     });
-  }, [category, classYear, opportunityRecords, priority, query, roleTrack, savedIds, savedOnly, showInternalTools, status, timing, verification]);
+  }, [activeSavedIdSet, category, classYear, historyProgramIdSet, libraryScope, opportunityRecords, priority, query, roleTrack, showInternalTools, status, timing, verification]);
 
   const sortedFiltered = useMemo(
     () => [...filtered].sort((a, b) => compareOpportunities(a, b, sortMode)),
@@ -933,8 +1009,9 @@ function App() {
   );
 
   const selectedOpportunity = sortedFiltered.find((item) => item.id === selectedId) ?? sortedFiltered[0] ?? null;
-  const savedOpportunities = opportunityRecords.filter((item) => savedIds.includes(item.id));
-  const watchIntentOpportunities = opportunityRecords.filter((item) => watchIntentProgramIds.includes(item.id));
+  const activeSavedIds = [...activeSavedIdSet];
+  const savedOpportunities = opportunityRecords.filter((item) => activeSavedIdSet.has(item.id));
+  const watchIntentOpportunities = opportunityRecords.filter((item) => activeWatchIntentIdSet.has(item.id));
   const alertPreviewMatches = useMemo(
     () =>
       opportunityRecords.filter((opportunity) => {
@@ -1138,6 +1215,105 @@ function App() {
   }, [activeAccessCode, activeWatchEndpoint, cleanCaptureMode, hasAccess]);
 
   useEffect(() => {
+    if (
+      cleanCaptureMode ||
+      !canSyncWorkspace ||
+      !['loaded', 'synced'].includes(workspaceSyncState) ||
+      programEvidenceState !== 'idle'
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    setProgramEvidenceState('loading');
+    fetchJson(
+      `${getWorkerBaseUrl(activeWatchEndpoint)}/analytics/program-evidence?code=${encodeURIComponent(activeAccessCode)}`,
+    )
+      .then((payload) => {
+        if (cancelled) return;
+        setProgramEvidence(
+          Object.fromEntries((payload.evidence ?? []).map((item) => [item.programId, item])),
+        );
+        setProgramEvidenceState('loaded');
+      })
+      .catch(() => {
+        if (!cancelled) setProgramEvidenceState('unavailable');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeAccessCode, activeWatchEndpoint, canSyncWorkspace, cleanCaptureMode, programEvidenceState, workspaceSyncState]);
+
+  useEffect(() => {
+    if (
+      cleanCaptureMode ||
+      !canSyncWorkspace ||
+      !['loaded', 'synced'].includes(workspaceSyncState) ||
+      applicationAttemptsState !== 'idle'
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    setApplicationAttemptsState('loading');
+    fetchJson(
+      `${getWorkerBaseUrl(activeWatchEndpoint)}/analytics/application-attempts?code=${encodeURIComponent(activeAccessCode)}`,
+    )
+      .then((payload) => {
+        if (cancelled) return;
+        setApplicationAttempts(Array.isArray(payload.attempts) ? payload.attempts : []);
+        setApplicationAttemptsState('loaded');
+      })
+      .catch(() => {
+        if (!cancelled) setApplicationAttemptsState('unavailable');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeAccessCode,
+    activeWatchEndpoint,
+    applicationAttemptsState,
+    canSyncWorkspace,
+    cleanCaptureMode,
+    workspaceSyncState,
+  ]);
+
+  useEffect(() => {
+    if (
+      cleanCaptureMode ||
+      !canSyncWorkspace ||
+      !['loaded', 'synced'].includes(workspaceSyncState) ||
+      programWatchState !== 'idle'
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    setProgramWatchState('loading');
+    fetchJson(
+      `${getWorkerBaseUrl(activeWatchEndpoint)}/analytics/program-watches?code=${encodeURIComponent(activeAccessCode)}`,
+    )
+      .then((payload) => {
+        if (cancelled) return;
+        const watches = Array.isArray(payload.watches) ? payload.watches : [];
+        if (watches.length) {
+          setWatchIntentProgramIds(watches.filter((watch) => watch.isWatching).map((watch) => watch.programId).slice(0, 50));
+        }
+        setProgramWatchState('loaded');
+      })
+      .catch(() => {
+        if (!cancelled) setProgramWatchState('unavailable');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeAccessCode, activeWatchEndpoint, canSyncWorkspace, cleanCaptureMode, programWatchState, workspaceSyncState]);
+
+  useEffect(() => {
     if (cleanCaptureMode || !canSyncWorkspace || !['loaded', 'new', 'synced', 'syncError'].includes(workspaceSyncState)) {
       return;
     }
@@ -1276,6 +1452,58 @@ function App() {
     });
   };
 
+  const saveProgramEvidenceForOpportunity = async (programId, updates) => {
+    const opportunity = opportunityRecords.find((item) => item.id === programId);
+    const nextEvidence = {
+      ...(programEvidence[programId] ?? {}),
+      ...updates,
+      programId,
+      updatedAt: new Date().toISOString(),
+      relevanceSource: updates.relevance ? 'explicit' : programEvidence[programId]?.relevanceSource,
+      relevanceUpdatedAt: updates.relevance ? new Date().toISOString() : programEvidence[programId]?.relevanceUpdatedAt,
+      saveState: 'saving',
+    };
+
+    setProgramEvidence((current) => ({ ...current, [programId]: nextEvidence }));
+
+    if (!canSyncWorkspace || !opportunity) {
+      setProgramEvidence((current) => ({
+        ...current,
+        [programId]: { ...nextEvidence, saveState: 'local' },
+      }));
+      return true;
+    }
+
+    try {
+      await postJson(`${getWorkerBaseUrl(activeWatchEndpoint)}/analytics/program-evidence`, {
+        accessCode: activeAccessCode,
+        programId,
+        relevance: nextEvidence.relevance,
+        priorAwareness: nextEvidence.priorAwareness,
+        eligibilityUnclearReason: nextEvidence.eligibilityUnclearReason,
+        classYear: alertPrefs.classYear,
+        roleTrack: alertPrefs.roleTrack,
+        opportunityCategory: opportunity.category,
+      });
+      setProgramEvidence((current) => ({
+        ...current,
+        [programId]: {
+          ...nextEvidence,
+          relevanceSource: nextEvidence.relevance ? 'explicit' : nextEvidence.relevanceSource,
+          relevanceUpdatedAt: nextEvidence.relevance ? new Date().toISOString() : nextEvidence.relevanceUpdatedAt,
+          saveState: 'saved',
+        },
+      }));
+      return true;
+    } catch {
+      setProgramEvidence((current) => ({
+        ...current,
+        [programId]: { ...nextEvidence, saveState: 'error' },
+      }));
+      return false;
+    }
+  };
+
   const resetFilters = () => {
     setQuery('');
     setRoleTrack('all');
@@ -1285,7 +1513,7 @@ function App() {
     setClassYear('all');
     setTiming('all');
     setStatus('all');
-    setSavedOnly(false);
+    setLibraryScope('all');
     setSortMode('actSoon');
   };
 
@@ -1296,6 +1524,7 @@ function App() {
   };
 
   const selectOpportunity = (id) => {
+    setLastSavedId(null);
     setSelectedId(id);
     markOnboardingStep('browsed');
 
@@ -1320,19 +1549,53 @@ function App() {
       return currentlySaved ? currentIds.filter((savedId) => savedId !== id) : [...currentIds, id];
     });
 
-    if (alreadySaved) {
-      setWatchIntentProgramIds((currentIds) => currentIds.filter((programId) => programId !== id));
-    }
-
     trackProductEvent(alreadySaved ? 'program_unsaved' : 'program_saved', {
       programId: id,
       context: { view: 'programs', source: 'bookmark' },
     });
   };
 
+  const setOpportunityWatching = async (id, watching) => {
+    const opportunity = opportunityRecords.find((item) => item.id === id);
+    const previousIds = watchIntentProgramIds;
+
+    setWatchIntentProgramIds((currentIds) => (
+      watching
+        ? [id, ...currentIds.filter((programId) => programId !== id)].slice(0, 50)
+        : currentIds.filter((programId) => programId !== id)
+    ));
+    setProgramWatchState('saving');
+
+    if (canSyncWorkspace && opportunity) {
+      try {
+        await postJson(`${getWorkerBaseUrl(activeWatchEndpoint)}/analytics/program-watches`, {
+          accessCode: activeAccessCode,
+          programId: id,
+          programName: opportunity.name,
+          organization: opportunity.organization,
+          officialUrl: opportunity.applicationUrl || opportunity.url,
+          readiness: getMonitoringReadiness(opportunity).label,
+          watching,
+        });
+        setProgramWatchState('saved');
+      } catch {
+        setWatchIntentProgramIds(previousIds);
+        setProgramWatchState('error');
+        return false;
+      }
+    } else {
+      setProgramWatchState('local');
+    }
+
+    trackProductEvent(watching ? 'watch_started' : 'watch_stopped', {
+      programId: id,
+      context: { view: 'programs', source: 'program_detail' },
+    });
+    return true;
+  };
+
   const startAlertsForOpportunity = (id) => {
     const opportunity = opportunityRecords.find((item) => item.id === id);
-    const alreadySaved = savedIds.includes(id);
 
     if (!opportunity) {
       setActiveView('alerts');
@@ -1340,13 +1603,10 @@ function App() {
     }
 
     setSelectedId(id);
-    setLastSavedId(id);
     markOnboardingStep('browsed');
-    markOnboardingStep('saved');
     markOnboardingStep('focused');
 
-    setSavedIds((currentIds) => (currentIds.includes(id) ? currentIds : [...currentIds, id]));
-    setWatchIntentProgramIds((currentIds) => [id, ...currentIds.filter((programId) => programId !== id)].slice(0, 10));
+    setOpportunityWatching(id, true);
     setAlertPrefs((currentPrefs) => {
       const tracks = getOpportunityTracks(opportunity);
 
@@ -1359,20 +1619,129 @@ function App() {
         sendTiming: isPreferenceUnset(currentPrefs.sendTiming) ? 'openOnly' : currentPrefs.sendTiming,
       };
     });
-    if (!alreadySaved) {
-      trackProductEvent('program_saved', {
-        programId: id,
-        context: { view: 'programs', source: 'watch_program' },
-      });
-    }
-    trackProductEvent('watch_started', {
-      programId: id,
-      context: { view: 'programs', source: 'watch_program' },
-    });
     setActiveView('alerts');
     window.setTimeout(() => {
       document.getElementById('watch-plan')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 0);
+  };
+
+  const markOpportunityApplied = async (id, { allowDuplicate = false } = {}) => {
+    const interactionAt = Date.now();
+    const previousInteractionAt = applicationAttemptInteractionAtRef.current.get(id) ?? 0;
+    if (interactionAt - previousInteractionAt < 1_000) return false;
+    if (applicationAttemptInFlightRef.current.has(id)) return false;
+    applicationAttemptInteractionAtRef.current.set(id, interactionAt);
+
+    const now = new Date().toISOString();
+    const opportunity = opportunityRecords.find((item) => item.id === id);
+    const cycleLabel = getApplicationCycleLabel(opportunity, now);
+    const ordinaryAttemptKey = `${id}:${normalizeCycleLabel(cycleLabel) || 'unspecified'}`;
+    const existingAttempt = !allowDuplicate
+      ? applicationAttempts.find((attempt) => (
+        attempt.programId === id && normalizeCycleLabel(attempt.cycleLabel) === normalizeCycleLabel(cycleLabel)
+      ))
+      : null;
+
+    if (!allowDuplicate && (existingAttempt || ordinaryApplicationAttemptKeysRef.current.has(ordinaryAttemptKey))) {
+      return true;
+    }
+
+    applicationAttemptInFlightRef.current.add(id);
+    if (!allowDuplicate) ordinaryApplicationAttemptKeysRef.current.add(ordinaryAttemptKey);
+    setApplicationMutationState((current) => ({ ...current, [id]: 'saving' }));
+
+    try {
+      let created = true;
+      let attempt = {
+        id: crypto.randomUUID(),
+        programId: id,
+        appliedAt: now,
+        cycleLabel,
+        outcome: 'pending',
+        outcomeUpdatedAt: null,
+        source: allowDuplicate ? 'local_additional' : 'local',
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      if (canSyncWorkspace) {
+        const response = await postJson(
+          `${getWorkerBaseUrl(activeWatchEndpoint)}/analytics/application-attempts`,
+          {
+            accessCode: activeAccessCode,
+            programId: id,
+            appliedAt: now,
+            cycleLabel,
+            cycleUnspecified: !cycleLabel,
+            outcome: 'pending',
+            allowDuplicate,
+          },
+        );
+        attempt = response.attempt;
+        created = response.created !== false;
+      }
+
+      setApplicationAttempts((current) => (
+        current.some((item) => item.id === attempt.id) ? current : [attempt, ...current]
+      ));
+      setProgramEvidence((current) => {
+        const existing = current[id] ?? {};
+        if (existing.relevanceSource === 'explicit') return current;
+        return {
+          ...current,
+          [id]: {
+            ...existing,
+            programId: id,
+            relevance: 'this_cycle',
+            relevanceSource: 'inferred_applied',
+            relevanceUpdatedAt: now,
+            updatedAt: now,
+          },
+        };
+      });
+      setApplicationMutationState((current) => ({ ...current, [id]: 'saved' }));
+      if (created) {
+        trackProductEvent('application_recorded', {
+          programId: id,
+          context: { view: 'programs', source: allowDuplicate ? 'add_another_application' : 'mark_applied' },
+        });
+      }
+      return true;
+    } catch {
+      if (!allowDuplicate) ordinaryApplicationAttemptKeysRef.current.delete(ordinaryAttemptKey);
+      setApplicationMutationState((current) => ({ ...current, [id]: 'error' }));
+      return false;
+    } finally {
+      applicationAttemptInFlightRef.current.delete(id);
+    }
+  };
+
+  const updateApplicationOutcome = async (attemptId, programId, outcome) => {
+    setApplicationMutationState((current) => ({ ...current, [attemptId]: 'saving' }));
+
+    try {
+      if (canSyncWorkspace) {
+        await postJson(
+          `${getWorkerBaseUrl(activeWatchEndpoint)}/analytics/application-attempts/${encodeURIComponent(attemptId)}/outcome`,
+          { accessCode: activeAccessCode, outcome },
+        );
+      }
+      const now = new Date().toISOString();
+      setApplicationAttempts((current) => current.map((attempt) => (
+        attempt.id === attemptId
+          ? { ...attempt, outcome, outcomeUpdatedAt: outcome === 'pending' ? null : now, updatedAt: now }
+          : attempt
+      )));
+      setApplicationMutationState((current) => ({ ...current, [attemptId]: 'saved' }));
+      trackProductEvent('application_outcome_updated', {
+        programId,
+        context: { view: 'programs', source: outcome },
+      });
+      return true;
+    } catch {
+      setApplicationMutationState((current) => ({ ...current, [attemptId]: 'error' }));
+      return false;
+    }
   };
 
   const saveVerificationEdit = (id, updates) => {
@@ -1500,6 +1869,12 @@ function App() {
       setWaitlistIntent(null);
       setOnboardingProgress({ ...defaultOnboardingProgress });
       setBetaOutcome(null);
+      setProgramEvidence({});
+      setProgramEvidenceState('idle');
+      setApplicationAttempts([]);
+      setApplicationAttemptsState('idle');
+      setApplicationMutationState({});
+      setProgramWatchState('idle');
     }
     setActiveAccessCode(normalizedAccessCode);
     setHasAccess(true);
@@ -1579,10 +1954,8 @@ function App() {
               waitlistIntent={waitlistIntent}
               alertEndpoint={activeAlertEndpoint}
               watchEndpoint={activeWatchEndpoint}
+              accessCode={activeAccessCode}
             />
-            {savedIds.length || betaAlertSetup ? (
-              <BetaOutcomeCheckIn outcome={betaOutcome?.outcome || ''} onChange={saveBetaOutcome} />
-            ) : null}
           </section>
         ) : activeView === 'contribute' ? (
           <ContributeView
@@ -1631,7 +2004,7 @@ function App() {
                     <dd>Ready Soon</dd>
                   </div>
                   <div>
-                    <dt>{savedIds.length}</dt>
+                    <dt>{activeSavedIds.length}</dt>
                     <dd>Saved By You</dd>
                   </div>
                   <div>
@@ -1679,7 +2052,7 @@ function App() {
             {showFirstSessionGuide ? (
               <FirstSessionGuide
                 progress={guideProgress}
-                savedCount={savedIds.length}
+                savedCount={activeSavedIds.length}
                 onBrowse={browseProgramsFromGuide}
                 onFocusSetup={() => setActiveView('alerts')}
                 onImproveLibrary={() => setActiveView('contribute')}
@@ -1693,7 +2066,7 @@ function App() {
               <section className="results-board">
                 <div className="board-toolbar">
                   <div>
-                    <span>{savedOnly ? 'Saved Programs' : 'Library Results'}</span>
+                    <span>{libraryScope === 'saved' ? 'Saved Programs' : libraryScope === 'history' ? 'Application History' : 'Library Results'}</span>
                     <strong>{filtered.length} {filtered.length === 1 ? 'program' : 'programs'}</strong>
                   </div>
                   <div className="board-toolbar-actions">
@@ -1707,22 +2080,32 @@ function App() {
                     </label>
                     <div className="result-view-switch" aria-label="Program list view">
                       <button
-                        className={!savedOnly ? 'active' : ''}
+                        className={libraryScope === 'all' ? 'active' : ''}
                         type="button"
-                        aria-pressed={!savedOnly}
-                        onClick={() => setSavedOnly(false)}
+                        aria-pressed={libraryScope === 'all'}
+                        onClick={() => setLibraryScope('all')}
                       >
                         All
                       </button>
                       <button
-                        className={savedOnly ? 'active' : ''}
+                        className={libraryScope === 'saved' ? 'active' : ''}
                         type="button"
-                        aria-pressed={savedOnly}
-                        onClick={() => setSavedOnly(true)}
-                        disabled={!savedIds.length && !savedOnly}
+                        aria-pressed={libraryScope === 'saved'}
+                        onClick={() => setLibraryScope('saved')}
+                        disabled={!activeSavedIds.length && libraryScope !== 'saved'}
                       >
                         Saved
-                        <span>{savedIds.length}</span>
+                        <span>{activeSavedIds.length}</span>
+                      </button>
+                      <button
+                        className={libraryScope === 'history' ? 'active' : ''}
+                        type="button"
+                        aria-pressed={libraryScope === 'history'}
+                        onClick={() => setLibraryScope('history')}
+                        disabled={!historyProgramIdSet.size && libraryScope !== 'history'}
+                      >
+                        History
+                        <span>{historyProgramIdSet.size}</span>
                       </button>
                     </div>
                     <button type="button" onClick={resetFilters}>
@@ -1738,6 +2121,10 @@ function App() {
                           opportunity={opportunity}
                           selected={selectedId === opportunity.id}
                           saved={savedIds.includes(opportunity.id)}
+                          progress={getProgramBoardState(
+                            programEvidence[opportunity.id],
+                            applicationAttemptsByProgram[opportunity.id],
+                          )}
                           onSelect={() => selectOpportunity(opportunity.id)}
                           onSave={() => toggleSaved(opportunity.id)}
                         />
@@ -1752,11 +2139,15 @@ function App() {
                 <OpportunityDetail
                   opportunity={selectedOpportunity}
                   saved={selectedOpportunity ? savedIds.includes(selectedOpportunity.id) : false}
+                  watched={selectedOpportunity ? activeWatchIntentIdSet.has(selectedOpportunity.id) : false}
                   onSave={() => selectedOpportunity && toggleSaved(selectedOpportunity.id)}
+                  onToggleWatch={() => selectedOpportunity && setOpportunityWatching(
+                    selectedOpportunity.id,
+                    !activeWatchIntentIdSet.has(selectedOpportunity.id),
+                  )}
                   justSaved={Boolean(
                     selectedOpportunity && selectedOpportunity.id === lastSavedId && savedIds.includes(selectedOpportunity.id),
                   )}
-                  onFocusSetup={() => selectedOpportunity && startAlertsForOpportunity(selectedOpportunity.id)}
                   onOfficialSourceClick={() => {
                     if (selectedOpportunity) {
                       trackProductEvent('official_source_clicked', {
@@ -1770,6 +2161,18 @@ function App() {
                     }
                   }}
                   onImproveLibrary={() => setActiveView('contribute')}
+                  programEvidence={selectedOpportunity ? programEvidence[selectedOpportunity.id] : null}
+                  applicationAttempts={selectedOpportunity ? applicationAttemptsByProgram[selectedOpportunity.id] ?? [] : []}
+                  applicationMutationState={applicationMutationState}
+                  onMarkApplied={(options) => selectedOpportunity && markOpportunityApplied(selectedOpportunity.id, options)}
+                  onApplicationOutcomeChange={(attemptId, outcome) => selectedOpportunity && updateApplicationOutcome(
+                    attemptId,
+                    selectedOpportunity.id,
+                    outcome,
+                  )}
+                  onProgramEvidenceSave={(updates) =>
+                    selectedOpportunity && saveProgramEvidenceForOpportunity(selectedOpportunity.id, updates)
+                  }
                   onVerificationSave={saveVerificationEdit}
                   onVerificationReset={resetVerificationEdit}
                   sourceCheckEntries={selectedOpportunity ? sourceCheckLog[selectedOpportunity.id] ?? [] : []}
@@ -2262,6 +2665,8 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
   const [alertCandidates, setAlertCandidates] = useState([]);
   const [alertCandidateTotal, setAlertCandidateTotal] = useState(0);
   const [betaMetrics, setBetaMetrics] = useState(null);
+  const [betaParticipants, setBetaParticipants] = useState(null);
+  const [betaParticipantsLoading, setBetaParticipantsLoading] = useState(false);
   const [searchResult, setSearchResult] = useState(null);
   const [sourceRunResult, setSourceRunResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -2270,6 +2675,7 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
   const [alertResultByCandidateId, setAlertResultByCandidateId] = useState({});
   const [showAllAlertCandidates, setShowAllAlertCandidates] = useState(false);
   const [showMaintainerTools, setShowMaintainerTools] = useState(false);
+  const [activeMaintainerSection, setActiveMaintainerSection] = useState('review');
   const [actionMessage, setActionMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [lastRefreshedAt, setLastRefreshedAt] = useState('');
@@ -2289,8 +2695,8 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
   const visibleAlertCandidates = showAllAlertCandidates ? alertCandidates : alertCandidates.slice(0, 6);
   const hiddenAlertCandidateCount = Math.max(alertCandidates.length - visibleAlertCandidates.length, 0);
   const reviewEvents = reviewHistory ? buildReviewHistoryEvents(reviewHistory) : [];
-  const reviewNeedsAttention = reviewEvents.filter((event) => event.needsAttention).length;
   const readinessAttentionTotal = readinessQueue?.needsAttention ?? 0;
+  const maintainerActionTotal = readinessAttentionTotal + discoveryCandidates.length + pendingAlertTotal;
 
   const updateSearchDraft = (field, value) => {
     setSearchDraft((currentDraft) => ({
@@ -2328,13 +2734,14 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
     }
 
     try {
-      const [statusPayload, readinessPayload, historyPayload, discoveryPayload, alertPayload, metricsPayload] = await Promise.all([
+      const [statusPayload, readinessPayload, historyPayload, discoveryPayload, alertPayload, metricsPayload, participantsPayload] = await Promise.all([
         callAdminEndpoint('/watch/status'),
         callAdminEndpoint('/watch/readiness'),
         callAdminEndpoint('/watch/history'),
         callAdminEndpoint('/watch/discovery/candidates?status=pending_review'),
         callAdminEndpoint('/watch/candidates'),
         callAdminEndpoint('/analytics/summary'),
+        callAdminEndpoint('/analytics/participants?limit=50'),
       ]);
 
       setStatus(statusPayload);
@@ -2344,9 +2751,10 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
       setAlertCandidates(alertPayload.candidates ?? []);
       setAlertCandidateTotal(alertPayload.totalPending ?? alertPayload.candidates?.length ?? 0);
       setBetaMetrics(metricsPayload);
+      setBetaParticipants(participantsPayload);
       setLastRefreshedAt(new Date().toISOString());
       if (!quiet) {
-        setActionMessage('Review queues refreshed.');
+        setActionMessage('Review queue refreshed.');
       }
     } catch (error) {
       setErrorMessage(error.message);
@@ -2354,6 +2762,48 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
       if (showLoading) {
         setLoading(false);
       }
+    }
+  };
+
+  const loadParticipantPage = async (offset) => {
+    setBetaParticipantsLoading(true);
+    setErrorMessage('');
+
+    try {
+      const payload = await callAdminEndpoint(`/analytics/participants?limit=50&offset=${Math.max(0, offset)}`);
+      setBetaParticipants(payload);
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setBetaParticipantsLoading(false);
+    }
+  };
+
+  const updateParticipantSegment = async (workspaceId, testerSegment) => {
+    setBetaParticipantsLoading(true);
+    setErrorMessage('');
+
+    try {
+      await callAdminEndpoint('/analytics/participants/segment', {
+        method: 'POST',
+        body: { workspaceId, testerSegment },
+      });
+      setBetaParticipants((current) => current ? {
+        ...current,
+        participants: (current.participants ?? []).map((participant) => (
+          participant.workspaceId === workspaceId
+            ? { ...participant, testerSegment }
+            : participant
+        )),
+      } : current);
+      setActionMessage('Tester segment updated.');
+      const metricsPayload = await callAdminEndpoint('/analytics/summary');
+      setBetaMetrics(metricsPayload);
+    } catch (error) {
+      setErrorMessage(error.message);
+      throw error;
+    } finally {
+      setBetaParticipantsLoading(false);
     }
   };
 
@@ -2579,21 +3029,39 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
     });
   };
 
+  const recordMonitoringAudit = async (audit) => {
+    setErrorMessage('');
+    await callAdminEndpoint('/analytics/monitoring-audits', { method: 'POST', body: audit });
+    setActionMessage('Monitoring evidence saved.');
+    await loadQueues({ quiet: true, showLoading: false });
+  };
+
+  const recordOperationalTime = async (entry) => {
+    setErrorMessage('');
+    await callAdminEndpoint('/analytics/operations', { method: 'POST', body: entry });
+    setActionMessage('Operational time saved.');
+    await loadQueues({ quiet: true, showLoading: false });
+  };
+
   return (
     <section className="maintainer-review-view" aria-label="ApplyFirst maintainer review">
       <section className="maintainer-hero">
         <div>
           <span>Maintainer Review</span>
-          <h1 className="page-hero-title">Review Signals Before They Reach Students.</h1>
-          <p>
-            Use this beta console to review discovered source URLs, inspect alert candidates, and keep high-risk
-            actions behind a maintainer decision.
-          </p>
+          <h1 className="page-hero-title">Review Sources And Alerts.</h1>
+          <p>Resolve source issues, URL changes, and alerts before students see them.</p>
         </div>
-        <div className="maintainer-access-card">
-          <span>Admin Session</span>
+        <form
+          className="maintainer-access-card"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (canLoad && !loading) {
+              loadQueues();
+            }
+          }}
+        >
           <label>
-            <span>Worker Admin Token</span>
+            <span>Admin Token</span>
             <input
               type="password"
               value={adminToken}
@@ -2602,19 +3070,21 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
               autoComplete="off"
             />
           </label>
-          <p>{workerBaseUrl ? `Connected to ${workerBaseUrl}` : 'Set VITE_WATCH_ENDPOINT to enable live review.'}</p>
-          {lastRefreshedAt ? <p>Last refreshed {formatDateTime(lastRefreshedAt)}</p> : null}
-          <button type="button" onClick={loadQueues} disabled={!canLoad || loading}>
-            {loading ? 'Loading...' : 'Load Queues'}
+          <div className="maintainer-connection-state">
+            <strong>{workerBaseUrl ? 'Watch Worker Connected' : 'Worker Not Configured'}</strong>
+            <span>{lastRefreshedAt ? `Updated ${formatDateTime(lastRefreshedAt)}` : 'Enter token and press Enter'}</span>
+          </div>
+          <button type="submit" disabled={!canLoad || loading}>
+            {loading ? 'Loading...' : status ? 'Refresh Queue' : 'Load Queue'}
           </button>
-        </div>
+        </form>
       </section>
 
       {errorMessage ? <p className="maintainer-message error">{errorMessage}</p> : null}
       {actionMessage ? <p className="maintainer-message">{actionMessage}</p> : null}
 
       {!status ? (
-        <MaintainerEmptyState canLoad={canLoad} />
+        <MaintainerEmptyState />
       ) : (
         <>
           <MaintainerReviewSummary
@@ -2622,45 +3092,138 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
             readinessCount={readinessAttentionTotal}
             discoveryCount={discoveryCandidates.length}
             alertCount={pendingAlertTotal}
-            reviewCount={reviewNeedsAttention}
             lastRefreshedAt={lastRefreshedAt}
           />
 
-          {betaMetrics ? <BetaMetricsPanel metrics={betaMetrics} /> : null}
+          <nav className="maintainer-section-tabs" aria-label="Maintainer workspaces">
+            <button
+              className={activeMaintainerSection === 'review' ? 'active' : ''}
+              type="button"
+              onClick={() => setActiveMaintainerSection('review')}
+              aria-pressed={activeMaintainerSection === 'review'}
+            >
+              <span>Review</span>
+              <strong>{maintainerActionTotal}</strong>
+            </button>
+            <button
+              className={activeMaintainerSection === 'insights' ? 'active' : ''}
+              type="button"
+              onClick={() => setActiveMaintainerSection('insights')}
+              aria-pressed={activeMaintainerSection === 'insights'}
+            >
+              <span>Beta Metrics</span>
+            </button>
+            <button
+              className={activeMaintainerSection === 'activity' ? 'active' : ''}
+              type="button"
+              onClick={() => setActiveMaintainerSection('activity')}
+              aria-pressed={activeMaintainerSection === 'activity'}
+            >
+              <span>History</span>
+              <strong>{reviewEvents.length}</strong>
+            </button>
+          </nav>
 
-          {readinessQueue ? (
-            <MonitoringReadinessQueue
-              queue={readinessQueue}
-              onCheckSource={(programId) => runSourceDryRun([programId], programId)}
-              onFindUrl={(programId) => {
-                updateSearchDraft('programIds', programId);
-                runDiscoverySearch(true, [programId], programId);
-              }}
-              readinessActions={readinessActionByProgramId}
-              loading={loading}
-              canLoad={canLoad}
-            />
-          ) : null}
+          {activeMaintainerSection === 'review' ? (
+            <section className="maintainer-section-stack" aria-label="Review queues">
+              {readinessQueue ? (
+                <MonitoringReadinessQueue
+                  queue={readinessQueue}
+                  onCheckSource={(programId) => runSourceDryRun([programId], programId)}
+                  onFindUrl={(programId) => {
+                    updateSearchDraft('programIds', programId);
+                    runDiscoverySearch(true, [programId], programId);
+                  }}
+                  readinessActions={readinessActionByProgramId}
+                  loading={loading}
+                  canLoad={canLoad}
+                />
+              ) : null}
 
-          <DiscoveryCandidateReviewPanel
-            candidates={discoveryCandidates}
-            loading={loading}
-            onReviewCandidate={reviewDiscoveryCandidate}
-          />
+              {discoveryCandidates.length ? (
+                <DiscoveryCandidateReviewPanel
+                  candidates={discoveryCandidates}
+                  loading={loading}
+                  onReviewCandidate={reviewDiscoveryCandidate}
+                />
+              ) : null}
 
-          <section className="maintainer-panel maintainer-tools-panel">
-            <div className="maintainer-tools-heading">
-              <div>
-                <span>Operator Tools</span>
-                <h2>Run Targeted Checks.</h2>
-                <p>Use these when a record needs a manual source check or URL search.</p>
-              </div>
-              <button type="button" onClick={() => setShowMaintainerTools((isVisible) => !isVisible)}>
-                {showMaintainerTools ? 'Hide Tools' : 'Show Tools'}
-              </button>
-            </div>
-            {showMaintainerTools ? (
-              <section className="maintainer-ops-grid">
+              {pendingAlertTotal ? (
+                <section className="maintainer-panel">
+                  <div className="maintainer-panel-heading">
+                    <div>
+                      <span>Alert Review</span>
+                      <h2>{pendingAlertTotal} Alert{pendingAlertTotal === 1 ? ' Needs' : 's Need'} Review</h2>
+                    </div>
+                    <p>Verify the source, preview recipients, then send.</p>
+                  </div>
+                  {pendingAlertTotal > alertCandidates.length ? (
+                    <p className="maintainer-queue-note">
+                      Showing the newest {alertCandidates.length} loaded alerts. Use the Worker API for deeper paging when the queue grows.
+                    </p>
+                  ) : null}
+                  <div className="maintainer-card-list maintainer-alert-list">
+                    {visibleAlertCandidates.map((candidate) => {
+                      const activeAction = alertActionByCandidateId[candidate.id];
+                      const actionResult = alertResultByCandidateId[candidate.id];
+                      const isDryRunning = activeAction === 'dryRun';
+                      const isSending = activeAction === 'send';
+
+                      return (
+                        <article className={`maintainer-candidate-card ${activeAction ? 'is-busy' : ''}`} key={candidate.id}>
+                          <div className="maintainer-card-header">
+                            <div>
+                              <span>{formatDisplayLabel(candidate.candidateType)}</span>
+                              <h3>{candidate.programName || candidate.program_id}</h3>
+                            </div>
+                            {candidate.url ? (
+                              <a href={candidate.url} target="_blank" rel="noreferrer">Official Source</a>
+                            ) : null}
+                          </div>
+                          <p className="maintainer-card-note">{candidate.summary || candidate.title}</p>
+                          <div className="maintainer-actions">
+                            <button className="maintainer-primary-action" type="button" onClick={() => sendAlertCandidate(candidate, true)} disabled={loading || Boolean(activeAction)}>
+                              {isDryRunning ? 'Checking...' : 'Preview Recipients'}
+                            </button>
+                            <button className="maintainer-danger-action" type="button" onClick={() => sendAlertCandidate(candidate, false)} disabled={loading || Boolean(activeAction)}>
+                              {isSending ? 'Sending...' : 'Send This Alert'}
+                            </button>
+                          </div>
+                          {actionResult ? (
+                            <AlertCandidateActionResult
+                              result={actionResult}
+                              onDismiss={() => dismissAlertCandidateResult(candidate.id)}
+                            />
+                          ) : null}
+                        </article>
+                      );
+                    })}
+                  </div>
+                  {hiddenAlertCandidateCount ? (
+                    <button className="maintainer-show-more" type="button" onClick={() => setShowAllAlertCandidates(true)}>
+                      Show {hiddenAlertCandidateCount} More Pending Alert{hiddenAlertCandidateCount === 1 ? '' : 's'}
+                    </button>
+                  ) : showAllAlertCandidates && alertCandidates.length > 6 ? (
+                    <button className="maintainer-show-more" type="button" onClick={() => setShowAllAlertCandidates(false)}>
+                      Show Fewer Pending Alerts
+                    </button>
+                  ) : null}
+                </section>
+              ) : null}
+
+              <section className="maintainer-panel maintainer-tools-panel">
+                <div className="maintainer-tools-heading">
+                  <div>
+                    <span>Manual Tools</span>
+                    <h2>Check A Specific Program</h2>
+                    <p>Run a source check or search for a current URL.</p>
+                  </div>
+                  <button type="button" onClick={() => setShowMaintainerTools((isVisible) => !isVisible)}>
+                    {showMaintainerTools ? 'Hide Tools' : 'Open Tools'}
+                  </button>
+                </div>
+                {showMaintainerTools ? (
+                  <section className="maintainer-ops-grid">
                 <section className="maintainer-utility-panel">
                   <div className="maintainer-panel-heading">
                     <div>
@@ -2752,211 +3315,844 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
                   </div>
                   {searchResult ? <DiscoverySearchSummary result={searchResult} /> : null}
                 </section>
+                  </section>
+                ) : null}
               </section>
-            ) : null}
-          </section>
+            </section>
+          ) : null}
 
-          <section className="maintainer-panel">
-            <div className="maintainer-panel-heading">
-              <div>
-                <span>Alert Review</span>
-                <h2>{pendingAlertTotal} Pending Alert{pendingAlertTotal === 1 ? '' : 's'}</h2>
-              </div>
-              <p>Preview recipients first. Send only after the official source and alert copy are trustworthy.</p>
-            </div>
-            {pendingAlertTotal > alertCandidates.length ? (
-              <p className="maintainer-queue-note">
-                Showing the newest {alertCandidates.length} loaded alerts. Use the Worker API for deeper paging when the queue grows.
-              </p>
-            ) : null}
-            <div className="maintainer-card-list maintainer-alert-list">
-              {alertCandidates.length ? (
-                visibleAlertCandidates.map((candidate) => {
-                  const activeAction = alertActionByCandidateId[candidate.id];
-                  const actionResult = alertResultByCandidateId[candidate.id];
-                  const isDryRunning = activeAction === 'dryRun';
-                  const isSending = activeAction === 'send';
+          {activeMaintainerSection === 'insights' && betaMetrics ? (
+            <BetaMetricsPanel
+              metrics={betaMetrics}
+              participants={betaParticipants}
+              participantsLoading={betaParticipantsLoading}
+              onParticipantPageChange={loadParticipantPage}
+              onParticipantSegmentChange={updateParticipantSegment}
+              onRecordAudit={recordMonitoringAudit}
+              onRecordTime={recordOperationalTime}
+            />
+          ) : null}
 
-                  return (
-                    <article className={`maintainer-candidate-card ${activeAction ? 'is-busy' : ''}`} key={candidate.id}>
-                      <div className="maintainer-card-header">
-                        <div>
-                          <span>{formatDisplayLabel(candidate.candidateType)}</span>
-                          <h3>{candidate.programName || candidate.program_id}</h3>
-                        </div>
-                        {candidate.url ? (
-                          <a href={candidate.url} target="_blank" rel="noreferrer">
-                            Official Source
-                          </a>
-                        ) : null}
-                      </div>
-                      <p className="maintainer-card-note">{candidate.summary || candidate.title}</p>
-                      <div className="maintainer-actions">
-                        <button className="maintainer-primary-action" type="button" onClick={() => sendAlertCandidate(candidate, true)} disabled={loading || Boolean(activeAction)}>
-                          {isDryRunning ? 'Checking...' : 'Preview Recipients'}
-                        </button>
-                        <button className="maintainer-danger-action" type="button" onClick={() => sendAlertCandidate(candidate, false)} disabled={loading || Boolean(activeAction)}>
-                          {isSending ? 'Sending...' : 'Send This Alert'}
-                        </button>
-                      </div>
-                      {actionResult ? (
-                        <AlertCandidateActionResult
-                          result={actionResult}
-                          onDismiss={() => dismissAlertCandidateResult(candidate.id)}
-                        />
-                      ) : null}
-                    </article>
-                  );
-                })
-              ) : (
-                <p className="maintainer-empty">No pending alert candidates.</p>
-              )}
-            </div>
-            {hiddenAlertCandidateCount ? (
-              <button className="maintainer-show-more" type="button" onClick={() => setShowAllAlertCandidates(true)}>
-                Show {hiddenAlertCandidateCount} More Pending Alert{hiddenAlertCandidateCount === 1 ? '' : 's'}
-              </button>
-            ) : showAllAlertCandidates && alertCandidates.length > 6 ? (
-              <button className="maintainer-show-more" type="button" onClick={() => setShowAllAlertCandidates(false)}>
-                Show Fewer Pending Alerts
-              </button>
-            ) : null}
-          </section>
-
-          {reviewHistory ? <ReviewHistoryPanel history={reviewHistory} events={reviewEvents} /> : null}
+          {activeMaintainerSection === 'activity' && reviewHistory ? (
+            <ReviewHistoryPanel history={reviewHistory} events={reviewEvents} />
+          ) : null}
         </>
       )}
     </section>
   );
 }
 
-function BetaMetricsPanel({ metrics }) {
+function BetaMetricsPanel({
+  metrics,
+  participants,
+  participantsLoading,
+  onParticipantPageChange,
+  onParticipantSegmentChange,
+  onRecordAudit,
+  onRecordTime,
+}) {
   const funnel = Object.fromEntries((metrics.funnel ?? []).map((item) => [item.eventName, item.participants]));
   const outcomes = Object.fromEntries((metrics.outcomes ?? []).map((item) => [item.outcome, item.participants]));
   const engagement = Object.fromEntries(
-    (metrics.alertEngagement ?? []).map((item) => [item.action, item.participants]),
+    (metrics.alertEngagement ?? []).map((item) => [item.action, item]),
   );
-  const meaningfulOutcomes = (outcomes.found_relevant_program ?? 0) + (outcomes.applied_earlier ?? 0);
-  const funnelRows = [
-    ['Opened A Beta Workspace', funnel.session_started ?? 0],
+  const studentValue = metrics.studentValue ?? {};
+  const independent = metrics.independentUsability ?? {};
+  const reliability = metrics.reliability ?? {};
+  const operations = metrics.operations ?? {};
+  const invitations = metrics.invitations ?? {};
+  const waitlist = metrics.waitlist ?? {};
+  const lifecycle = metrics.programLifecycle ?? {};
+  const lifecycleApplications = lifecycle.applications ?? {};
+  const lifecycleWatches = lifecycle.watches ?? {};
+  const lifecyclePersistence = lifecycle.persistentValue ?? {};
+  const waitlistPipeline = waitlist.pipeline ?? {};
+  const activation = studentValue.eligibleActivation ?? {};
+  const discovery = studentValue.newToStudentDiscovery ?? {};
+  const externalActions = studentValue.externalActions ?? {};
+  const timelyAction = studentValue.timelyExternalAction ?? {};
+  const leadTime = studentValue.discoveryLeadTime ?? {};
+  const sourceFreshness = reliability.sourceFreshness ?? {};
+  const accuracy = reliability.informationAccuracy ?? {};
+  const knownOpenings = reliability.knownOpenings ?? {};
+  const relevantWindow = independent.relevantWindowReturn ?? {};
+  const studentValueMetrics = [
+    {
+      label: 'Eligible Activated',
+      value: formatCountOf(activation.numerator, activation.denominator),
+      detail: 'Student-reported useful decisions among relevance respondents',
+    },
+    {
+      label: 'Found Relevant',
+      value: studentValue.foundRelevant ?? 0,
+      detail: 'Students reporting at least one relevant program',
+    },
+    {
+      label: 'New Discovery',
+      value: discovery.students ?? 0,
+      detail: `${formatCountOf(discovery.programPairs, discovery.denominator)} answered relevant program pairs`,
+    },
+    {
+      label: 'External Action',
+      value: externalActions.students ?? 0,
+      detail: `${externalActions.programPairs ?? 0} self-reported program pairs · ${externalActions.submissions ?? 0} submitted`,
+    },
+    {
+      label: 'Timely Action',
+      value: timelyAction.status === 'available'
+        ? formatCountOf(timelyAction.programPairs, timelyAction.denominator)
+        : 'N/A',
+      detail: 'External actions before a verified deadline',
+    },
+    {
+      label: 'Discovery Lead Time',
+      value: leadTime.status === 'available' ? `${leadTime.median} days` : 'N/A',
+      detail: leadTime.status === 'available'
+        ? `${leadTime.count} observations · ${leadTime.min}-${leadTime.max} day range`
+        : 'Requires a verified fixed deadline',
+    },
+  ];
+  const journeyRows = [
     ['Viewed A Program', funnel.program_viewed ?? 0],
     ['Saved A Program', funnel.program_saved ?? 0],
-    ['Started Watching', funnel.watch_started ?? 0],
     ['Enabled Alerts', funnel.alerts_enabled ?? 0],
     ['Visited An Official Source', funnel.official_source_clicked ?? 0],
   ];
+  const combinedProgramInsights = mergeProgramInsights(metrics.topPrograms, studentValue.programEvidence);
+  const relevanceBreakdown = (lifecycle.relevance ?? []).map((row) => ({
+    label: formatDisplayLabel(row.value),
+    students: row.students,
+    records: row.programPairs,
+  }));
+  const applicationOutcomeBreakdown = (lifecycleApplications.outcomes ?? []).map((row) => ({
+    label: applicationOutcomeOptions.find((option) => option.value === row.value)?.label ?? formatDisplayLabel(row.value),
+    students: row.students,
+    records: row.attempts,
+  }));
+  const explicitRelevancePairs = relevanceBreakdown.reduce((total, row) => total + Number(row.records || 0), 0);
+  const applicationAttemptCount = applicationOutcomeBreakdown.reduce((total, row) => total + Number(row.records || 0), 0);
 
   return (
     <section className="maintainer-panel beta-metrics-panel" aria-label="Beta product metrics">
       <div className="maintainer-panel-heading">
         <div>
-          <span>Beta Progress</span>
-          <h2>Are Students Discovering And Applying Earlier?</h2>
+          <span>Beta Metrics</span>
+          <h2>What Value Is ApplyFirst Creating?</h2>
         </div>
-        <p>Workspace-level activity from the last {metrics.periodDays ?? 30} days.</p>
+        <p>Current invite cohort plus the last {metrics.periodDays ?? 30} days of product evidence. Missing responses remain unknown.</p>
       </div>
-      <dl className="beta-metrics-summary">
-        <div>
-          <dt>{metrics.waitlist?.uniqueEmails ?? '-'}</dt>
-          <dd>Unique Waitlist</dd>
+      <BetaMetricSection title="Beta Intake" description="Waitlist interest reconciled with private invitations without storing raw email in analytics.">
+        <dl className="beta-evidence-grid">
+          <BetaEvidenceMetric metric={{
+            label: 'Interested',
+            value: waitlistPipeline.available ? waitlistPipeline.interested : 'N/A',
+            detail: waitlistPipeline.available
+              ? `${waitlist.total ?? 0} production waitlist submission${waitlist.total === 1 ? '' : 's'}`
+              : 'Capture database is unavailable',
+          }} />
+          <BetaEvidenceMetric metric={{
+            label: 'Invited From Waitlist',
+            value: waitlistPipeline.available ? waitlistPipeline.invitedFromWaitlist : 'N/A',
+            detail: `${invitations.invited ?? 0} total beta invite${invitations.invited === 1 ? '' : 's'} across all cohorts`,
+          }} />
+          <BetaEvidenceMetric metric={{
+            label: 'Opened Access',
+            value: waitlistPipeline.available ? waitlistPipeline.openedFromWaitlist : 'N/A',
+            detail: `${invitations.opened ?? 0} of ${invitations.invited ?? 0} total invited students opened a workspace`,
+          }} />
+          <BetaEvidenceMetric metric={{
+            label: 'Still Waiting',
+            value: waitlistPipeline.available ? waitlistPipeline.stillWaiting : 'N/A',
+            detail: 'Interested students without a sent or active invitation',
+          }} />
+        </dl>
+      </BetaMetricSection>
+      <BetaMetricSection title="Student Value" description="Useful decisions and observable next steps, not setup completion.">
+        <dl className="beta-evidence-grid">
+          {studentValueMetrics.map((metric) => <BetaEvidenceMetric metric={metric} key={metric.label} />)}
+        </dl>
+        <CohortOutcomeList rows={studentValue.testerSegments} />
+      </BetaMetricSection>
+      <BetaMetricSection
+        title="Program Lifecycle"
+        description="Relevance judgments, application events, and active watches are counted independently."
+      >
+        <dl className="beta-compact-metrics">
+          <BetaEvidenceMetric metric={{
+            label: 'Explicit Relevance',
+            value: explicitRelevancePairs,
+            detail: 'Student-program judgments; inferred application relevance excluded',
+          }} />
+          <BetaEvidenceMetric metric={{
+            label: 'Application Attempts',
+            value: applicationAttemptCount,
+            detail: `${lifecycleApplications.repeatProgramPairs ?? 0} repeat-cycle program pair${lifecycleApplications.repeatProgramPairs === 1 ? '' : 's'}`,
+          }} />
+          <BetaEvidenceMetric metric={{
+            label: 'Active Watches',
+            value: lifecycleWatches.programPairs ?? 0,
+            detail: `${lifecycleWatches.students ?? 0} student${lifecycleWatches.students === 1 ? '' : 's'} opted in`,
+          }} />
+        </dl>
+        <div className="beta-metric-columns">
+          <MetricBreakdownList title="Relevance" rows={relevanceBreakdown} emptyLabel="No explicit relevance responses yet." />
+          <MetricBreakdownList title="Application Outcomes" rows={applicationOutcomeBreakdown} emptyLabel="No application attempts yet." />
         </div>
-        <div>
-          <dt>{metrics.workspaces?.total ?? 0}</dt>
-          <dd>Workspaces Seen</dd>
-        </div>
-        <div>
-          <dt>{metrics.workspaces?.activated30Days ?? 0}</dt>
-          <dd>Core Setup Complete</dd>
-        </div>
-        <div>
-          <dt>{meaningfulOutcomes}</dt>
-          <dd>Useful Outcomes</dd>
-        </div>
-      </dl>
+        <dl className="beta-compact-metrics">
+          <BetaEvidenceMetric metric={{
+            label: 'Applied + Watching',
+            value: lifecyclePersistence.appliedAndWatching ?? 0,
+            detail: 'Student-program pairs still monitored after an application',
+          }} />
+          <BetaEvidenceMetric metric={{
+            label: 'Not Selected + Watching',
+            value: lifecyclePersistence.notSelectedAndWatching ?? 0,
+            detail: 'Non-selection did not end monitoring',
+          }} />
+          <BetaEvidenceMetric metric={{
+            label: 'Future Cycle + Watching',
+            value: lifecyclePersistence.futureCycleAndWatching ?? 0,
+            detail: 'Explicit future-cycle fit with an active watch',
+          }} />
+          <BetaEvidenceMetric metric={{
+            label: 'Named-Cycle Reapplications',
+            value: lifecycleApplications.namedCycleReapplicationPairs ?? 0,
+            detail: 'Pairs with attempts recorded in more than one named cycle',
+          }} />
+        </dl>
+      </BetaMetricSection>
+
+      <div className="beta-metric-columns">
+        <BetaMetricSection title="Independent Usability" description="Whether students can get value without high-touch coaching.">
+          <dl className="beta-compact-metrics">
+            <BetaEvidenceMetric metric={{
+              label: 'First Useful Decision',
+              value: independent.timeToFirstUsefulDecision?.status === 'available'
+                ? `${independent.timeToFirstUsefulDecision.median}h median`
+                : 'N/A',
+              detail: independent.timeToFirstUsefulDecision?.status === 'available'
+                ? `${independent.timeToFirstUsefulDecision.count} students · ${independent.timeToFirstUsefulDecision.min}-${independent.timeToFirstUsefulDecision.max}h range`
+                : 'No eligible decisions yet',
+            }} />
+            <BetaEvidenceMetric metric={{
+              label: 'Relevant-Window Return',
+              value: relevantWindow.status === 'available'
+                ? formatCountOf(relevantWindow.returnedStudents, relevantWindow.eligibleStudents)
+                : 'N/A',
+              detail: relevantWindow.status === 'available'
+                ? `${relevantWindow.eligibleAlerts} mature alerts · ${relevantWindow.immatureAlerts} still observing`
+                : 'No mature relevant alert window',
+            }} />
+            <BetaEvidenceMetric metric={{
+              label: 'Setup Completed',
+              value: independent.setupCompleted30Days ?? 0,
+              detail: 'Secondary onboarding diagnostic',
+            }} />
+            <BetaEvidenceMetric metric={{
+              label: 'Ordinary Return',
+              value: independent.ordinaryReturn30Days ?? 0,
+              detail: 'Secondary engagement diagnostic',
+            }} />
+          </dl>
+          <MetricBreakdownList title="Support Used" rows={studentValue.supportLevels} emptyLabel="No support context recorded yet." />
+        </BetaMetricSection>
+
+        <BetaMetricSection title="Trust & Reliability" description="Whether students can depend on source data and alerts.">
+          <dl className="beta-compact-metrics">
+            <BetaEvidenceMetric metric={{
+              label: 'Fresh Sources',
+              value: formatCountOf(sourceFreshness.numerator, sourceFreshness.denominator),
+              detail: `${sourceFreshness.due ?? 0} active or warmup sources due`,
+            }} />
+            <BetaEvidenceMetric metric={{
+              label: 'Audited Accuracy',
+              value: accuracy.denominator ? formatCountOf(accuracy.numerator, accuracy.denominator) : 'N/A',
+              detail: `${accuracy.auditedRecords ?? 0} audited records`,
+            }} />
+            <BetaEvidenceMetric metric={{
+              label: 'Confirmed Alert Accuracy',
+              value: accuracy.byField?.alertCorrect?.denominator
+                ? formatCountOf(accuracy.byField.alertCorrect.numerator, accuracy.byField.alertCorrect.denominator)
+                : 'N/A',
+              detail: 'Maintainer-confirmed alert audits',
+            }} />
+            <BetaEvidenceMetric metric={{
+              label: 'Known Openings Detected',
+              value: knownOpenings.denominator ? formatCountOf(knownOpenings.numerator, knownOpenings.denominator) : 'N/A',
+              detail: 'Maintainer-audited known openings',
+            }} />
+            <BetaEvidenceMetric metric={{
+              label: 'Incorrect Alert Reports',
+              value: engagement.inaccurate?.events ?? 0,
+              detail: `${engagement.inaccurate?.participants ?? 0} watcher${engagement.inaccurate?.participants === 1 ? '' : 's'} · ${reliability.deliveries?.sent ?? 0} sent deliveries`,
+            }} />
+            <BetaEvidenceMetric metric={{
+              label: 'Detection To Alert',
+              value: reliability.notificationLatency?.all?.status === 'available'
+                ? `${reliability.notificationLatency.all.median}h median`
+                : 'N/A',
+              detail: `${formatLatencyPath(reliability.notificationLatency?.automatic, 'auto')} · ${formatLatencyPath(reliability.notificationLatency?.manual, 'manual')}`,
+            }} />
+            <BetaEvidenceMetric metric={{
+              label: 'Correction Time',
+              value: reliability.correctionTime?.status === 'available'
+                ? `${reliability.correctionTime.median}h median`
+                : 'N/A',
+              detail: `${reliability.corrections?.resolved ?? 0} of ${reliability.corrections?.recorded ?? 0} correction records resolved`,
+            }} />
+            <BetaEvidenceMetric metric={{
+              label: 'Delivery Failures',
+              value: reliability.deliveries?.failed ?? 0,
+              detail: `${reliability.deliveries?.total ?? 0} delivery attempts`,
+            }} />
+          </dl>
+        </BetaMetricSection>
+      </div>
+
+      <BetaMetricSection title="Operational Burden" description="Human work required to keep the beta accurate and useful.">
+        <dl className="beta-operations-strip">
+          <BetaEvidenceMetric metric={{ label: 'Programs Monitored', value: operations.monitoredPrograms ?? 0, detail: 'Enabled official sources' }} />
+          <BetaEvidenceMetric metric={{ label: 'Active Watchers', value: operations.activeWatchers ?? 0, detail: `${operations.watchedPrograms ?? 0} watched programs` }} />
+          <BetaEvidenceMetric metric={{ label: 'Manual Alert Review', value: formatCountOf(reliability.alertCandidates?.manualReview, reliability.alertCandidates?.total), detail: `${reliability.alertCandidates?.automatic ?? 0} automatic · ${reliability.alertCandidates?.total ?? 0} total` }} />
+          <BetaEvidenceMetric metric={{ label: 'Failed Checks', value: reliability.failedChecks ?? 0, detail: 'Sources requiring intervention' }} />
+          <BetaEvidenceMetric metric={{ label: 'URL Review Queue', value: reliability.pendingDiscoveryReview ?? 0, detail: 'Discovery candidates awaiting review' }} />
+          <BetaEvidenceMetric metric={{
+            label: 'Human Time / 7d',
+            value: operations.time7Days?.status === 'available' ? formatMinutes(operations.time7Days.total) : 'N/A',
+            detail: operations.time7Days?.status === 'available'
+              ? `${operations.time7Days.entryCount} manually logged entr${operations.time7Days.entryCount === 1 ? 'y' : 'ies'}`
+              : 'No time entries logged for this period',
+          }} />
+        </dl>
+      </BetaMetricSection>
+
+      {combinedProgramInsights.length ? (
+        <BetaMetricSection title="Program Insights" description="Behavior and student-reported value by program.">
+          <div className="beta-program-insights">
+            {combinedProgramInsights.slice(0, 8).map((program) => (
+              <article key={program.programId}>
+                <strong>{getBetaMetricProgramName(program.programId)}</strong>
+                <span>{program.uniqueViewers ?? program.views ?? 0} views · {program.saves ?? 0} saves · {program.sourceClicks ?? 0} source visits</span>
+                <span>{program.relevantStudents ?? 0} relevant · {program.newDiscoveryStudents ?? 0} new discoveries · {program.externalActionStudents ?? 0} external actions · {program.submissions ?? 0} submitted</span>
+              </article>
+            ))}
+          </div>
+        </BetaMetricSection>
+      ) : null}
+
       <details className="beta-metrics-details">
-        <summary>View Funnel And Feedback</summary>
+        <summary>Product Diagnostics</summary>
         <div className="beta-metrics-detail-grid">
           <section>
-            <h3>Student Funnel</h3>
-            <dl>
-              {funnelRows.map(([label, value]) => (
-                <div key={label}>
-                  <dt>{label}</dt>
-                  <dd>{value}</dd>
-                </div>
-              ))}
-              <div>
-                <dt>Returned On Multiple Days</dt>
-                <dd>{metrics.workspaces?.returning30Days ?? 0}</dd>
-              </div>
-            </dl>
+            <h3>Student Journey</h3>
+            {journeyRows.map(([label, value]) => (
+              <p key={label}><strong>{value}</strong><span>{label}</span></p>
+            ))}
           </section>
           <section>
-            <h3>Reported Outcomes</h3>
+            <h3>Secondary Signals</h3>
             <dl>
-              <div><dt>Found A Relevant Program</dt><dd>{outcomes.found_relevant_program ?? 0}</dd></div>
-              <div><dt>Applied Earlier</dt><dd>{outcomes.applied_earlier ?? 0}</dd></div>
-              <div><dt>Not Yet</dt><dd>{outcomes.not_yet ?? 0}</dd></div>
-            </dl>
-            <h3>Alert Feedback</h3>
-            <dl>
-              <div><dt>Opened Official Source</dt><dd>{engagement.source_clicked ?? 0}</dd></div>
-              <div><dt>Useful</dt><dd>{engagement.useful ?? 0}</dd></div>
-              <div><dt>Not Relevant</dt><dd>{engagement.not_relevant ?? 0}</dd></div>
-              <div><dt>Already Knew</dt><dd>{engagement.already_knew ?? 0}</dd></div>
-              <div><dt>Information Looks Wrong</dt><dd>{engagement.inaccurate ?? 0}</dd></div>
+              <div><dt>Started Watching</dt><dd>{funnel.watch_started ?? 0}</dd></div>
+              <div><dt>Saved Focus</dt><dd>{funnel.focus_saved ?? 0}</dd></div>
+              <div><dt>Submitted An Update</dt><dd>{funnel.contribution_submitted ?? 0}</dd></div>
+              <div><dt>Alert Marked Useful</dt><dd>{engagement.useful?.events ?? 0}</dd></div>
+              <div><dt>Historical: Applied Earlier</dt><dd>{outcomes.applied_earlier ?? 0}</dd></div>
+              <div><dt>Waitlist Demand</dt><dd>{metrics.waitlist?.uniqueEmails ?? '-'}</dd></div>
             </dl>
           </section>
         </div>
-        {metrics.topPrograms?.length ? (
-          <section className="beta-top-programs">
-            <h3>Programs Drawing Action</h3>
-            <div className="beta-top-programs-list">
-              {metrics.topPrograms.slice(0, 6).map((program) => (
-                <div key={program.programId}>
-                  <strong>{formatDisplayLabel(program.programId)}</strong>
-                  <span>{program.saves} saved · {program.sourceClicks} source visits · {program.views} views</span>
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
+        <BetaSegmentationDetails
+          studentSegments={studentValue.segments}
+          opportunityCategories={studentValue.opportunityCategories}
+          waitlistSegments={metrics.waitlist?.segments}
+        />
       </details>
+      <MetricBreakdownList title="Friction Categories" rows={studentValue.frictionCategories} emptyLabel="No friction has been categorized yet." />
+      <BetaEvidenceEntryForms onRecordAudit={onRecordAudit} onRecordTime={onRecordTime} />
+      {participants && (participants.total ?? participants.participants?.length ?? 0) > 0 ? (
+        <BetaParticipantActivityPanel
+          payload={participants}
+          loading={participantsLoading}
+          onPageChange={onParticipantPageChange}
+          onSegmentChange={onParticipantSegmentChange}
+        />
+      ) : null}
     </section>
   );
 }
 
-function MaintainerReviewSummary({ status, readinessCount, discoveryCount, alertCount, reviewCount, lastRefreshedAt }) {
+function BetaMetricSection({ title, description, children }) {
+  return (
+    <section className="beta-metric-section">
+      <div className="beta-metric-section-heading">
+        <h3>{title}</h3>
+        <p>{description}</p>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function BetaEvidenceMetric({ metric }) {
+  return (
+    <div className="beta-evidence-metric">
+      <dt>{metric.label}</dt>
+      <dd>
+        <strong>{metric.value}</strong>
+        <span>{metric.detail}</span>
+      </dd>
+    </div>
+  );
+}
+
+function MetricBreakdownList({ title, rows = [], emptyLabel }) {
+  return (
+    <section className="beta-breakdown-list">
+      <h4>{title}</h4>
+      {rows.length ? rows.map((row) => (
+        <p key={row.label}>
+          <span>{formatDisplayLabel(row.label)}</span>
+          <strong>{row.students} student{row.students === 1 ? '' : 's'} · {row.records} record{row.records === 1 ? '' : 's'}</strong>
+        </p>
+      )) : <p>{emptyLabel}</p>}
+    </section>
+  );
+}
+
+function CohortOutcomeList({ rows = [] }) {
+  if (!rows.length) return null;
+
+  return (
+    <section className="beta-cohort-outcomes">
+      <h4>Value By Tester Group</h4>
+      <div>
+        {rows.map((row) => (
+          <article key={row.testerSegment}>
+            <strong>{testerSegmentOptions.find((option) => option.value === row.testerSegment)?.label ?? formatDisplayLabel(row.testerSegment)}</strong>
+            <span>{row.students} student{row.students === 1 ? '' : 's'}</span>
+            <p>{row.eligibleActivated} activated · {row.foundRelevant} found relevant · {row.newDiscoveryStudents} new discovery · {row.externalActionStudents} external action</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function BetaSegmentationDetails({ studentSegments = [], opportunityCategories = [], waitlistSegments = {} }) {
+  const classRoleRows = studentSegments.slice(0, 8).map((row) => ({
+    label: `${row.classYear} / ${row.roleTrack}`,
+    value: `${row.students} student${row.students === 1 ? '' : 's'} · ${row.records} decision${row.records === 1 ? '' : 's'}`,
+  }));
+  const categoryRows = opportunityCategories.slice(0, 8).map((row) => ({
+    label: row.label,
+    value: `${row.relevantStudents} relevant · ${row.externalActionStudents} external action`,
+  }));
+  const waitlistRows = [
+    ...(waitlistSegments?.classYears ?? []).slice(0, 4).map((row) => ({ label: row.label, value: `${row.students} signup${row.students === 1 ? '' : 's'}` })),
+    ...(waitlistSegments?.interests ?? []).slice(0, 4).map((row) => ({ label: row.label, value: `${row.students} signup${row.students === 1 ? '' : 's'}` })),
+  ];
+
+  return (
+    <div className="beta-segment-diagnostics">
+      <SimpleMetricRows title="Class Year / Role" rows={classRoleRows} emptyLabel="No voluntary profile segments yet." />
+      <SimpleMetricRows title="Opportunity Categories" rows={categoryRows} emptyLabel="No category decisions yet." />
+      <SimpleMetricRows title="Waitlist Context" rows={waitlistRows} emptyLabel="Waitlist segments are unavailable." />
+    </div>
+  );
+}
+
+function SimpleMetricRows({ title, rows, emptyLabel }) {
+  return (
+    <section>
+      <h4>{title}</h4>
+      {rows.length ? rows.map((row, index) => (
+        <p key={`${row.label}-${index}`}><span>{row.label}</span><strong>{row.value}</strong></p>
+      )) : <p><span>{emptyLabel}</span></p>}
+    </section>
+  );
+}
+
+function mergeProgramInsights(eventRows = [], evidenceRows = []) {
+  const rowsByProgram = new Map();
+
+  for (const row of eventRows ?? []) rowsByProgram.set(row.programId, { ...row });
+  for (const row of evidenceRows ?? []) {
+    rowsByProgram.set(row.programId, { ...(rowsByProgram.get(row.programId) ?? {}), ...row });
+  }
+
+  return [...rowsByProgram.values()].sort(
+    (left, right) =>
+      (right.externalActionStudents ?? 0) - (left.externalActionStudents ?? 0) ||
+      (right.relevantStudents ?? 0) - (left.relevantStudents ?? 0) ||
+      (right.saves ?? 0) - (left.saves ?? 0) ||
+      (right.uniqueViewers ?? right.views ?? 0) - (left.uniqueViewers ?? left.views ?? 0),
+  );
+}
+
+function formatCountOf(value = 0, total = 0) {
+  return total ? `${value} of ${total}` : 'N/A';
+}
+
+function formatMinutes(value = 0) {
+  if (!value) return '0h';
+  const hours = Math.floor(value / 60);
+  const minutes = value % 60;
+  return hours ? `${hours}h${minutes ? ` ${minutes}m` : ''}` : `${minutes}m`;
+}
+
+function formatLatencyPath(metric, label) {
+  return metric?.status === 'available'
+    ? `${metric.median}h ${label} (${metric.count})`
+    : `${label} N/A`;
+}
+
+function BetaEvidenceEntryForms({ onRecordAudit, onRecordTime }) {
+  const [auditDraft, setAuditDraft] = useState({
+    programId: '',
+    auditType: 'known_opening',
+    eventAt: '',
+    verifiedDeadlineAt: '',
+    detected: '',
+    detectedAt: '',
+    alertCandidateId: '',
+    statusCorrect: '',
+    deadlineCorrect: '',
+    eligibilityCorrect: '',
+    urlCorrect: '',
+    freshnessCorrect: '',
+    alertCorrect: '',
+    evidenceUrl: '',
+    evidenceNote: '',
+  });
+  const [timeDraft, setTimeDraft] = useState({
+    category: 'monitoring_review',
+    minutes: '',
+    periodDate: new Date().toISOString().slice(0, 10),
+    note: '',
+  });
+  const [auditState, setAuditState] = useState('idle');
+  const [timeState, setTimeState] = useState('idle');
+  const updateAudit = (field, value) => setAuditDraft((current) => ({ ...current, [field]: value }));
+  const updateTime = (field, value) => setTimeDraft((current) => ({ ...current, [field]: value }));
+  const toNullableBoolean = (value) => value === '' ? null : value === 'true';
+
+  const submitAudit = async (event) => {
+    event.preventDefault();
+    setAuditState('saving');
+    try {
+      const payload = {
+        ...auditDraft,
+        detected: toNullableBoolean(auditDraft.detected),
+        statusCorrect: toNullableBoolean(auditDraft.statusCorrect),
+        deadlineCorrect: toNullableBoolean(auditDraft.deadlineCorrect),
+        eligibilityCorrect: toNullableBoolean(auditDraft.eligibilityCorrect),
+        urlCorrect: toNullableBoolean(auditDraft.urlCorrect),
+        freshnessCorrect: toNullableBoolean(auditDraft.freshnessCorrect),
+        alertCorrect: toNullableBoolean(auditDraft.alertCorrect),
+      };
+      if (auditDraft.auditType === 'correction') {
+        payload.reportedAt = auditDraft.eventAt;
+        payload.resolvedAt = auditDraft.verifiedDeadlineAt;
+        payload.eventAt = '';
+        payload.verifiedDeadlineAt = '';
+      }
+      await onRecordAudit(payload);
+      setAuditState('saved');
+    } catch {
+      setAuditState('error');
+    }
+  };
+
+  const submitTime = async (event) => {
+    event.preventDefault();
+    setTimeState('saving');
+    try {
+      await onRecordTime({ ...timeDraft, minutes: Number(timeDraft.minutes) });
+      setTimeDraft((current) => ({ ...current, minutes: '', note: '' }));
+      setTimeState('saved');
+    } catch {
+      setTimeState('error');
+    }
+  };
+
+  return (
+    <details className="beta-evidence-entry">
+      <summary>Record Manual Beta Evidence</summary>
+      <p>Use this only for verified monitoring audits or approximate maintainer time.</p>
+      <div className="beta-evidence-entry-grid">
+        <form onSubmit={submitAudit}>
+          <h4>Monitoring Audit</h4>
+          <label>
+            <span>Program ID</span>
+            <input required list="beta-audit-programs" value={auditDraft.programId} onChange={(event) => updateAudit('programId', event.target.value)} />
+            <datalist id="beta-audit-programs">
+              {opportunities.map((opportunity) => <option value={opportunity.id} key={opportunity.id}>{opportunity.name}</option>)}
+            </datalist>
+          </label>
+          <label>
+            <span>Audit Type</span>
+            <select value={auditDraft.auditType} onChange={(event) => updateAudit('auditType', event.target.value)}>
+              <option value="known_opening">Known Opening</option>
+              <option value="information_accuracy">Information Accuracy</option>
+              <option value="correction">Correction</option>
+            </select>
+          </label>
+          {auditDraft.auditType === 'known_opening' ? (
+            <>
+              <label><span>Verified Opening</span><input type="datetime-local" value={auditDraft.eventAt} onChange={(event) => updateAudit('eventAt', event.target.value)} /></label>
+              <label><span>Verified Deadline</span><input type="datetime-local" value={auditDraft.verifiedDeadlineAt} onChange={(event) => updateAudit('verifiedDeadlineAt', event.target.value)} /></label>
+              <BooleanAuditSelect label="Did ApplyFirst Detect It?" value={auditDraft.detected} onChange={(value) => updateAudit('detected', value)} />
+              {auditDraft.detected === 'true' ? (
+                <>
+                  <label><span>First Verified Detection</span><input type="datetime-local" value={auditDraft.detectedAt} onChange={(event) => updateAudit('detectedAt', event.target.value)} /></label>
+                  <label><span>Alert Candidate ID</span><input value={auditDraft.alertCandidateId} onChange={(event) => updateAudit('alertCandidateId', event.target.value)} /></label>
+                </>
+              ) : null}
+            </>
+          ) : null}
+          {auditDraft.auditType === 'information_accuracy' ? (
+            <div className="beta-audit-accuracy-grid">
+              <BooleanAuditSelect label="Status Correct" value={auditDraft.statusCorrect} onChange={(value) => updateAudit('statusCorrect', value)} />
+              <BooleanAuditSelect label="Deadline Correct" value={auditDraft.deadlineCorrect} onChange={(value) => updateAudit('deadlineCorrect', value)} />
+              <BooleanAuditSelect label="Eligibility Correct" value={auditDraft.eligibilityCorrect} onChange={(value) => updateAudit('eligibilityCorrect', value)} />
+              <BooleanAuditSelect label="URL Correct" value={auditDraft.urlCorrect} onChange={(value) => updateAudit('urlCorrect', value)} />
+              <BooleanAuditSelect label="Freshness Correct" value={auditDraft.freshnessCorrect} onChange={(value) => updateAudit('freshnessCorrect', value)} />
+              <BooleanAuditSelect label="Alert Correct" value={auditDraft.alertCorrect} onChange={(value) => updateAudit('alertCorrect', value)} />
+            </div>
+          ) : null}
+          {auditDraft.auditType === 'correction' ? (
+            <>
+              <label><span>Reported</span><input type="datetime-local" value={auditDraft.eventAt} onChange={(event) => updateAudit('eventAt', event.target.value)} /></label>
+              <label><span>Resolved</span><input type="datetime-local" value={auditDraft.verifiedDeadlineAt} onChange={(event) => updateAudit('verifiedDeadlineAt', event.target.value)} /></label>
+            </>
+          ) : null}
+          <label><span>Evidence URL</span><input type="url" value={auditDraft.evidenceUrl} onChange={(event) => updateAudit('evidenceUrl', event.target.value)} /></label>
+          <label><span>Short Note</span><textarea value={auditDraft.evidenceNote} onChange={(event) => updateAudit('evidenceNote', event.target.value)} /></label>
+          <button type="submit" disabled={auditState === 'saving'}>{auditState === 'saving' ? 'Saving...' : 'Save Audit'}</button>
+          {auditState === 'saved' ? <small>Audit saved.</small> : auditState === 'error' ? <small>Audit could not be saved.</small> : null}
+        </form>
+        <form onSubmit={submitTime}>
+          <h4>Human Time</h4>
+          <label>
+            <span>Work Type</span>
+            <select value={timeDraft.category} onChange={(event) => updateTime('category', event.target.value)}>
+              <option value="monitoring_review">Monitoring / Review</option>
+              <option value="data_correction">Correcting Data</option>
+              <option value="user_support">Supporting Students</option>
+            </select>
+          </label>
+          <label><span>Minutes</span><input required min="1" max="1440" type="number" value={timeDraft.minutes} onChange={(event) => updateTime('minutes', event.target.value)} /></label>
+          <label><span>Date</span><input required type="date" value={timeDraft.periodDate} onChange={(event) => updateTime('periodDate', event.target.value)} /></label>
+          <label><span>Optional Note</span><textarea value={timeDraft.note} onChange={(event) => updateTime('note', event.target.value)} /></label>
+          <button type="submit" disabled={timeState === 'saving'}>{timeState === 'saving' ? 'Saving...' : 'Save Time'}</button>
+          {timeState === 'saved' ? <small>Time saved.</small> : timeState === 'error' ? <small>Time could not be saved.</small> : null}
+        </form>
+      </div>
+    </details>
+  );
+}
+
+function BooleanAuditSelect({ label, value, onChange }) {
+  return (
+    <label>
+      <span>{label}</span>
+      <select value={value} onChange={(event) => onChange(event.target.value)}>
+        <option value="">Not Audited</option>
+        <option value="true">Yes</option>
+        <option value="false">No</option>
+      </select>
+    </label>
+  );
+}
+
+function getBetaMetricProgramName(programId) {
+  const opportunity = opportunities.find((item) => item.id === programId);
+
+  if (opportunity) {
+    return getOpportunityDisplayTitle(opportunity);
+  }
+
+  const acronyms = new Set(['ai', 'hrt', 'mlh', 'nasa', 'nsf', 'pm', 'swe', 'vc']);
+
+  return String(programId || '')
+    .replace(/[-_]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => {
+      const normalizedWord = word.toLowerCase();
+
+      return acronyms.has(normalizedWord)
+        ? normalizedWord.toUpperCase()
+        : `${normalizedWord.charAt(0).toUpperCase()}${normalizedWord.slice(1)}`;
+    })
+    .join(' ');
+}
+
+function BetaParticipantActivityPanel({ payload, loading, onPageChange, onSegmentChange }) {
+  const participantRows = payload.participants ?? [];
+  const firstVisible = participantRows.length ? payload.offset + 1 : 0;
+  const lastVisible = payload.offset + participantRows.length;
+
+  return (
+    <details className="beta-participant-details">
+      <summary>
+        <span>View Participant Activity</span>
+        <small>{payload.total ?? participantRows.length} workspace{(payload.total ?? participantRows.length) === 1 ? '' : 's'}</small>
+      </summary>
+      <div className="beta-participant-intro">
+        <p>Match each masked code to the private invite registry. Full codes and student identities are not stored here.</p>
+        <span>Showing {firstVisible}-{lastVisible} of {payload.total ?? participantRows.length} workspaces.</span>
+      </div>
+      {participantRows.length ? (
+        <div className="beta-participant-table-wrap">
+          <table className="beta-participant-table">
+            <thead>
+              <tr>
+                <th scope="col">Invite</th>
+                <th scope="col">Tester Group</th>
+                <th scope="col">Last Active</th>
+                <th scope="col">Activity</th>
+                <th scope="col">Programs</th>
+                <th scope="col">Setup</th>
+                <th scope="col">Value</th>
+                <th scope="col">Support</th>
+              </tr>
+            </thead>
+            <tbody>
+              {participantRows.map((participant) => {
+                const hasActivity =
+                  participant.programViews > 0 ||
+                  participant.programsSaved > 0 ||
+                  participant.programsWatched > 0 ||
+                  participant.focusCompleted ||
+                  participant.alertsEnabled ||
+                  participant.sourceClicks > 0 ||
+                  participant.contributions > 0;
+                return (
+                  <tr key={participant.workspaceId}>
+                    <td>
+                      <strong>{participant.codeLabel}</strong>
+                      <span>{hasActivity ? 'Explored' : 'Opened only'}</span>
+                    </td>
+                    <td>
+                      <label className="beta-participant-segment">
+                        <span className="sr-only">Tester group for {participant.codeLabel}</span>
+                        <select
+                          value={participant.testerSegment || 'unknown'}
+                          onChange={(event) => onSegmentChange(participant.workspaceId, event.target.value)}
+                          disabled={loading}
+                        >
+                          {testerSegmentOptions.map((option) => (
+                            <option value={option.value} key={option.value}>{option.label}</option>
+                          ))}
+                        </select>
+                      </label>
+                    </td>
+                    <td>
+                      <strong>{formatDateTime(participant.latestActivityAt)}</strong>
+                      <span>{participant.activeDays} active day{participant.activeDays === 1 ? '' : 's'}</span>
+                    </td>
+                    <td>
+                      <strong>{participant.sessions} session{participant.sessions === 1 ? '' : 's'}</strong>
+                      <span>{participant.programViews} program view{participant.programViews === 1 ? '' : 's'}</span>
+                    </td>
+                    <td>
+                      <strong>{participant.programsSaved} ever saved · {participant.programsWatched} ever watched</strong>
+                      <span>{participant.sourceClicks} official source click{participant.sourceClicks === 1 ? '' : 's'}</span>
+                    </td>
+                    <td>
+                      <strong>{participant.focusCompleted ? 'Focus set' : 'Focus not set'}</strong>
+                      <span>{participant.alertsEnabled ? 'Alerts enabled' : 'Alerts not enabled'}</span>
+                    </td>
+                    <td>
+                      <strong>{participant.eligibleActivated ? 'Eligible activated' : 'No eligible decision yet'}</strong>
+                      <span>{participant.relevantPrograms ?? 0} relevant · {participant.newDiscoveries ?? 0} newly discovered</span>
+                      <span>{participant.relevantWindowEligible ? (participant.relevantWindowReturned ? 'Returned after a relevant alert' : 'No return after mature alert yet') : 'Relevant-window return: N/A'}</span>
+                    </td>
+                    <td>
+                      <strong>{participant.latestSupportLevel ? formatDisplayLabel(participant.latestSupportLevel) : 'Not recorded'}</strong>
+                      <span>{participant.externalActions ?? 0} external action{participant.externalActions === 1 ? '' : 's'} · {formatDisplayLabel(participant.latestActionState || 'none')}</span>
+                      <span>Legacy check-in: {formatBetaOutcome(participant.latestOutcome)}</span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="maintainer-empty">No student workspaces have been opened yet.</p>
+      )}
+      {payload.offset > 0 || payload.hasMore ? (
+        <div className="beta-participant-pagination" aria-label="Participant activity pages">
+          <button
+            type="button"
+            onClick={() => onPageChange(Math.max(0, payload.offset - payload.limit))}
+            disabled={loading || payload.offset === 0}
+          >
+            Previous
+          </button>
+          <span>{loading ? 'Loading...' : `${firstVisible}-${lastVisible} of ${payload.total}`}</span>
+          <button
+            type="button"
+            onClick={() => onPageChange(payload.offset + payload.limit)}
+            disabled={loading || !payload.hasMore}
+          >
+            Next
+          </button>
+        </div>
+      ) : null}
+    </details>
+  );
+}
+
+function formatBetaOutcome(outcome) {
+  const outcomeLabels = {
+    found_relevant_program: 'Found A Relevant Program',
+    applied_earlier: 'Applied Earlier',
+    not_yet: 'Not Yet',
+  };
+
+  return outcomeLabels[outcome] || 'No Outcome Yet';
+}
+
+function formatPercent(value, total) {
+  if (!total) {
+    return '0%';
+  }
+
+  return `${Math.round((value / total) * 100)}%`;
+}
+
+function MaintainerReviewSummary({ status, readinessCount, discoveryCount, alertCount, lastRefreshedAt }) {
   const actionTotal = readinessCount + discoveryCount + alertCount;
   const primaryStatus = actionTotal
-    ? `${actionTotal} Action${actionTotal === 1 ? '' : 's'} Need Your Review`
-    : 'No Actions Needed';
+    ? `${actionTotal} Item${actionTotal === 1 ? '' : 's'} Need Review`
+    : 'Nothing Needs Review';
   const primaryDetail = actionTotal
-    ? 'These can affect student-facing alerts. Handle them before trusting or sending signals.'
-    : 'ApplyFirst is still tracking sources, watches, and audit history in the background.';
+    ? 'Resolve these before sending student alerts.'
+    : 'Source monitoring continues in the background.';
   const primaryTasks = [
     {
-      label: 'Source Readiness',
+      label: 'Source Checks',
       value: readinessCount,
-      status: readinessCount ? 'Needs Action' : 'Tracking Only',
-      action: readinessCount ? 'Check source gaps first' : 'No action needed',
-      detail: readinessCount ? 'Timing, source, or alert-risk issues.' : 'No urgent source gaps.',
+      action: readinessCount ? 'Review Sources' : 'Clear',
+      detail: readinessCount ? 'Check failed or uncertain sources.' : 'No source issues.',
       tone: readinessCount ? 'attention' : 'calm',
     },
     {
-      label: 'Candidate URLs',
+      label: 'New URLs',
       value: discoveryCount,
-      status: discoveryCount ? 'Needs Action' : 'Tracking Only',
-      action: discoveryCount ? 'Accept or reject URLs' : 'No action needed',
-      detail: discoveryCount ? 'Discovered pages waiting for a maintainer decision.' : 'No URLs waiting.',
+      action: discoveryCount ? 'Compare URLs' : 'Clear',
+      detail: discoveryCount ? 'Accept or reject discovered pages.' : 'No URLs to review.',
       tone: discoveryCount ? 'attention' : 'calm',
     },
     {
-      label: 'Alert Queue',
+      label: 'Alerts',
       value: alertCount,
-      status: alertCount ? 'Needs Action' : 'Tracking Only',
-      action: alertCount ? 'Preview before sending' : 'No action needed',
-      detail: alertCount ? 'Opening signals that may email watched students.' : 'No alerts waiting.',
+      action: alertCount ? 'Preview And Send' : 'Clear',
+      detail: alertCount ? 'Check recipients before sending.' : 'No alerts to review.',
       tone: alertCount ? 'attention' : 'calm',
     },
   ];
@@ -2965,7 +4161,7 @@ function MaintainerReviewSummary({ status, readinessCount, discoveryCount, alert
     <section className="maintainer-summary-panel" aria-label="Maintainer review summary">
       <div className="maintainer-summary-heading">
         <div>
-          <span>Review Cockpit</span>
+          <span>Review Summary</span>
           <h2>{primaryStatus}</h2>
           <p>{primaryDetail}</p>
         </div>
@@ -2978,22 +4174,18 @@ function MaintainerReviewSummary({ status, readinessCount, discoveryCount, alert
           <article className={`maintainer-task-card ${task.tone}`} key={task.label}>
             <strong>{task.value}</strong>
             <div>
-              <span>{task.status}</span>
+              <span>{task.label}</span>
               <h3>{task.action}</h3>
-              <p><b>{task.label}:</b> {task.detail}</p>
+              <p>{task.detail}</p>
             </div>
           </article>
         ))}
       </div>
-      <div className="maintainer-tracking-label">
-        <span>Tracking Only</span>
-        <p>These numbers help you understand system health, but they do not require action by themselves.</p>
-      </div>
       <div className="maintainer-system-row" aria-label="Worker status">
         <MaintainerMetric label="Active Watches" value={status?.activeWatchRequests ?? status?.watchRequests ?? '-'} />
-        <MaintainerMetric label="Pending Source Alerts" value={status?.pendingCandidates ?? '-'} />
-        <MaintainerMetric label="Audit Items" value={reviewCount} />
-        <MaintainerMetric label="Unsubscribed" value={status?.unsubscribedWatchRequests ?? '-'} />
+        <MaintainerMetric label="Monitored Sources" value={status?.officialSources ?? '-'} />
+        <MaintainerMetric label="Checks Due" value={status?.dueSources ?? '-'} />
+        <MaintainerMetric label="Alert Deliveries" value={status?.alertDeliveries ?? '-'} />
       </div>
     </section>
   );
@@ -3004,10 +4196,10 @@ function DiscoveryCandidateReviewPanel({ candidates, loading, onReviewCandidate 
     <section className="maintainer-panel maintainer-candidate-review-panel">
       <div className="maintainer-panel-heading">
         <div>
-          <span>Candidate URLs</span>
-          <h2>{candidates.length} Candidate{candidates.length === 1 ? '' : 's'} Need Review</h2>
+          <span>URL Review</span>
+          <h2>{candidates.length} URL{candidates.length === 1 ? ' Needs' : 's Need'} Review</h2>
         </div>
-        <p>Accept only official or organization-owned pages. Rejected items stay in D1 for audit.</p>
+        <p>Compare both pages. Accept only an official, current source.</p>
       </div>
       <div className="maintainer-card-list">
         {candidates.length ? (
@@ -3071,28 +4263,25 @@ function DiscoveryCandidateReviewPanel({ candidates, loading, onReviewCandidate 
   );
 }
 
-function MaintainerEmptyState({ canLoad }) {
+function MaintainerEmptyState() {
   const steps = [
-    'Paste the Worker admin token.',
-    'Load queues from the watch worker.',
-    'Review source gaps, URL candidates, alerts, and recent activity.',
+    'Enter the Worker admin token.',
+    'Press Enter or select Load Queue.',
+    'Resolve the flagged sources, URLs, and alerts.',
   ];
 
   return (
     <section className="maintainer-panel maintainer-empty-state" aria-label="Maintainer start state">
       <div>
         <span>Start Here</span>
-        <h2>Load Review Queues.</h2>
-        <p>
-          Maintainer tasks appear after ApplyFirst loads the worker status, readiness queue, URL candidates, pending alerts, and audit history.
-        </p>
+        <h2>Load The Review Queue.</h2>
+        <p>ApplyFirst will load the items that need a maintainer decision.</p>
       </div>
       <ol>
         {steps.map((step) => (
           <li key={step}>{step}</li>
         ))}
       </ol>
-      <p>{canLoad ? 'Ready to load.' : 'Add the admin token to begin.'}</p>
     </section>
   );
 }
@@ -3132,18 +4321,45 @@ function AlertCandidateActionResult({ result, onDismiss }) {
 
 function MonitoringReadinessQueue({ queue, onCheckSource, onFindUrl, readinessActions, loading, canLoad }) {
   const groups = queue.groups ?? [];
+  const attentionGroup = groups.find((group) => group.key === 'attention');
+  const attentionItems = attentionGroup?.items ?? [];
+  const trackingGroups = groups.filter((group) => group.key !== 'attention');
+  const trackingCount = trackingGroups.reduce((total, group) => total + (group.items?.length ?? 0), 0);
 
   return (
     <section className="maintainer-panel monitoring-readiness-panel" aria-label="Monitoring readiness queue">
       <div className="maintainer-panel-heading readiness-heading">
         <div>
           <span>Review Queue</span>
-          <h2>{queue.needsAttention ?? 0} Program{queue.needsAttention === 1 ? '' : 's'} Need Action</h2>
+          <h2>{queue.needsAttention ?? 0} Program{queue.needsAttention === 1 ? ' Needs' : 's Need'} Review</h2>
         </div>
-        <p>Only the action group needs a maintainer decision. The other groups show tracking state.</p>
+        <p>Resolve these source or URL issues. Routine tracking is listed below.</p>
       </div>
-      <div className="readiness-groups">
-        {groups.map((group) => (
+      {attentionItems.length ? (
+        <div className="readiness-action-list">
+          {attentionItems.map((item) => (
+            <ReadinessItemCard
+              item={item}
+              key={item.programId}
+              onCheckSource={onCheckSource}
+              onFindUrl={onFindUrl}
+              activeAction={readinessActions[item.programId] ?? ''}
+              loading={loading}
+              canLoad={canLoad}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="maintainer-clear-state">
+          <strong>No source issues need review.</strong>
+          <span>Tracking continues in the background.</span>
+        </div>
+      )}
+      {trackingGroups.length ? (
+        <details className="readiness-tracking-details">
+          <summary>View Tracking Status <span>{trackingCount}</span></summary>
+          <div className="readiness-groups">
+        {trackingGroups.map((group) => (
           <section className="readiness-group" key={group.key}>
             <div className="readiness-group-heading">
               <div>
@@ -3155,7 +4371,7 @@ function MonitoringReadinessQueue({ queue, onCheckSource, onFindUrl, readinessAc
             <div className="readiness-item-list">
               {group.items?.length ? (
                 group.items
-                  .slice(0, 6)
+                  .slice(0, 4)
                   .map((item) => (
                     <ReadinessItemCard
                       item={item}
@@ -3173,7 +4389,9 @@ function MonitoringReadinessQueue({ queue, onCheckSource, onFindUrl, readinessAc
             </div>
           </section>
         ))}
-      </div>
+          </div>
+        </details>
+      ) : null}
     </section>
   );
 }
@@ -3750,6 +4968,7 @@ function AlertSetupPanel({
   waitlistIntent,
   alertEndpoint,
   watchEndpoint,
+  accessCode,
 }) {
   const getPreferenceCardClassName = (value) =>
     `alert-preference-card${isPreferenceUnset(value) ? ' is-missing' : ' is-complete'}`;
@@ -3878,16 +5097,15 @@ function BetaAlertSystem({
       ? `${missingSetupFields.slice(0, -1).join(', ')} and ${missingSetupFields.at(-1)}`
       : missingSetupFields[0];
   const alertReadyMatches = matches.filter((item) => getMonitoringReadiness(item).alertable);
-  const savedProgramIds = new Set(savedOpportunities.map((item) => item.id));
-  const watchedPrograms = uniqueOpportunitiesById([...watchIntentOpportunities, ...savedOpportunities]);
+  const watchedPrograms = uniqueOpportunitiesById(watchIntentOpportunities);
   const watchedPreview = watchedPrograms.slice(0, 6);
-  const watchedProgramIds = new Set(watchedPreview.map((item) => item.id));
+  const watchedProgramIds = new Set(watchedPrograms.map((item) => item.id));
   const suggestedMatches = hasPreviewFocus
     ? alertReadyMatches.filter((item) => !watchedProgramIds.has(item.id)).slice(0, 3)
     : [];
-  const hasWatchedPrograms = watchedPreview.length > 0;
-  const watchedAlertReadyCount = watchedPreview.filter((item) => getMonitoringReadiness(item).alertable).length;
-  const watchedNeedsSourceCheck = watchedPreview.length - watchedAlertReadyCount;
+  const hasWatchedPrograms = watchedPrograms.length > 0;
+  const watchedAlertReadyCount = watchedPrograms.filter((item) => getMonitoringReadiness(item).alertable).length;
+  const watchedNeedsSourceCheck = watchedPrograms.length - watchedAlertReadyCount;
   const currentWatchSetup = {
     classYear: alertPrefs.classYear,
     roleTrack: alertPrefs.roleTrack,
@@ -3896,7 +5114,7 @@ function BetaAlertSystem({
     email: email.trim(),
     phoneNumber: phoneNumber.trim(),
     contactMethod,
-    watchedProgramIds: watchedPreview.map((item) => item.id),
+    watchedProgramIds: watchedPrograms.map((item) => item.id),
   };
   const hasUnsavedWatchSetupChanges =
     Boolean(betaAlertSetup) && !watchSetupMatches(betaAlertSetup, currentWatchSetup);
@@ -3909,7 +5127,7 @@ function BetaAlertSystem({
         ? 'Add a phone number to receive text alerts.'
         : 'Add an email to receive opening alerts.'
       : !hasWatchedPrograms
-        ? 'Save a program or set My Focus from a listing first.'
+        ? 'Choose at least one program to watch first.'
       : needsTurnstile
         ? 'Complete the verification before starting alerts.'
       : isSavedWatchSetupCurrent
@@ -3949,18 +5167,14 @@ function BetaAlertSystem({
     matchingProgramIds: matches.map((item) => item.id),
     alertReadyProgramIds: alertReadyMatches.map((item) => item.id),
     savedProgramIds: savedOpportunities.map((item) => item.id),
-    watchedProgramIds: watchedPreview.map((item) => item.id),
-    watchedPrograms: watchedPreview.map((item) => ({
+    watchedProgramIds: watchedPrograms.map((item) => item.id),
+    watchedPrograms: watchedPrograms.map((item) => ({
       id: item.id,
       name: item.name,
       organization: item.organization,
       url: item.previousUrl || item.url,
       readiness: getMonitoringReadiness(item).status,
-      reason: watchIntentOpportunities.some((watchIntent) => watchIntent.id === item.id)
-        ? 'Selected for alerts'
-        : savedProgramIds.has(item.id)
-          ? 'Saved by student'
-          : 'Matches focus setup',
+      reason: 'Selected for alerts',
     })),
     captureStatus,
   });
@@ -4005,6 +5219,7 @@ function BetaAlertSystem({
         if (watchEndpoint) {
           requests.push(
             postJson(watchEndpoint, {
+              accessCode,
               source: 'applyfirst-watch-request',
               email: payload.email,
               classYear: payload.classYear,
@@ -4867,7 +6082,15 @@ function FilterSelect({ label, value, onChange, options, labels = {}, placeholde
   );
 }
 
-function OpportunityRecord({ opportunity, selected, saved, onSelect, onSave }) {
+function getProgramBoardState(evidence = {}, attempts = []) {
+  const applicationCount = attempts?.length || (evidence.actionState === 'submitted' ? 1 : 0);
+  return {
+    scope: 'active',
+    label: applicationCount ? (applicationCount === 1 ? 'Applied' : `Applied ${applicationCount}x`) : '',
+  };
+}
+
+function OpportunityRecord({ opportunity, selected, saved, progress, onSelect, onSave }) {
   const tracks = getOpportunityTracks(opportunity);
   const monitorSignal = getMonitorSignal(opportunity);
   const primaryTrack = tracks[0];
@@ -4880,7 +6103,12 @@ function OpportunityRecord({ opportunity, selected, saved, onSelect, onSave }) {
     <article className={`opportunity-record${selected ? ' selected' : ''}`} role="listitem">
       <button className="record-main" type="button" onClick={onSelect}>
         <div className="record-title">
-          <span className={`status-pill status-${opportunity.status}`}>{statusLabels[opportunity.status]}</span>
+          <div className="record-status-row">
+            <span className={`status-pill status-${opportunity.status}`}>{statusLabels[opportunity.status]}</span>
+            {progress?.label ? (
+              <span className={`record-progress record-progress-${progress.scope}`}>{progress.label}</span>
+            ) : null}
+          </div>
           <h3>
             <span>{displayTitle}</span>
             {isConfirmed ? (
@@ -4918,11 +6146,18 @@ function OpportunityRecord({ opportunity, selected, saved, onSelect, onSave }) {
 function OpportunityDetail({
   opportunity,
   saved,
+  watched,
   onSave,
+  onToggleWatch,
   justSaved,
-  onFocusSetup,
   onOfficialSourceClick,
   onImproveLibrary,
+  programEvidence,
+  applicationAttempts,
+  applicationMutationState,
+  onProgramEvidenceSave,
+  onMarkApplied,
+  onApplicationOutcomeChange,
   onVerificationSave,
   onVerificationReset,
   sourceCheckEntries,
@@ -4942,33 +6177,23 @@ function OpportunityDetail({
   const monitorSignal = getMonitorSignal(opportunity);
   const verificationState = getVerificationState(opportunity);
   const sourceUpdatePlan = getSourceUpdatePlan(opportunity);
-  const sourceStatusLabel =
-    verificationState === 'verified'
-      ? 'Source Confirmed'
-      : verificationState === 'watchOnly'
-        ? 'Prep Source'
-        : 'Needs Source Check';
   const sourceStatusTone =
     verificationState === 'verified'
       ? 'verified'
       : verificationState === 'watchOnly'
         ? 'watch'
         : 'review';
-  const programDetails = [
-    { label: 'Eligibility', value: getEligibilityDetailText(opportunity) },
-    { label: 'Format / Location', value: getProgramFormatText(opportunity) },
-    { label: 'Length', value: getProgramLengthText(opportunity) },
-    { label: 'Opportunity Type', value: opportunity.category },
-    { label: 'Funding / Pay', value: opportunity.funding || 'Not Listed Yet' },
-    { label: 'Role Area', value: tracks.join(' + ') },
-  ].filter((detail) => Boolean(detail.value));
-  const timingDetails = [
-    { label: 'Current Status', value: statusLabels[opportunity.status] },
-    { label: 'Opening Window', value: opportunity.openDate },
-    { label: 'Deadline', value: opportunity.deadline },
-    { label: 'Cycle Notes', value: opportunity.timing },
-  ];
-  const sourceSummary = getStudentSourceSummary(opportunity, verificationState, sourceStatusLabel);
+  const programHighlights = [
+    { label: 'Class Year', value: opportunity.classYears?.join(', ') || 'Not Listed Yet' },
+    { label: 'Format', value: getProgramFormatText(opportunity) },
+    { label: 'Duration', value: getProgramLengthText(opportunity) },
+    { label: 'Pay / Funding', value: opportunity.funding },
+    { label: 'Focus', value: tracks.join(' + ') },
+  ].filter((detail) => {
+    const normalizedValue = cleanText(detail.value).toLowerCase();
+    return normalizedValue && !['not listed yet', 'varies by posting'].includes(normalizedValue);
+  });
+  const eligibilityDetail = getEligibilityDetailText(opportunity);
   const sourceActionLabel =
     opportunity.actionLabel ||
     (['open', 'deadlineSoon'].includes(opportunity.status) || monitorSignal.actionLabel === 'Apply Now'
@@ -4976,6 +6201,13 @@ function OpportunityDetail({
       : 'View Official Source');
   const displayTitle = getOpportunityDisplayTitle(opportunity);
   const displaySubtitle = getOpportunityDisplaySubtitle(opportunity);
+  const displayMetadata = [...new Set([
+    displaySubtitle,
+    displaySubtitle !== opportunity.category ? opportunity.category : '',
+  ].filter(Boolean))];
+  const compactSourceNote = verificationState === 'watchOnly'
+    ? 'Check the official source for the latest application window.'
+    : 'Confirm the details on the official page before applying.';
 
   return (
     <section className="detail-panel">
@@ -4983,8 +6215,17 @@ function OpportunityDetail({
         <div className="detail-status-strip">
           <span className={`status-pill status-${opportunity.status}`}>{statusLabels[opportunity.status]}</span>
         </div>
-        <h2>{displayTitle}</h2>
-        <p>{displaySubtitle}</p>
+        <h2 className="detail-title-line">
+          <span>{displayTitle}</span>
+          {verificationState === 'verified' ? (
+            <span className="detail-verified-mark" title="Official source confirmed" aria-label="Official source confirmed">
+              <VerifiedIcon />
+            </span>
+          ) : null}
+        </h2>
+        <p className="detail-header-meta">
+          {displayMetadata.map((item) => <span key={item}>{item}</span>)}
+        </p>
       </div>
       <div className="detail-actions">
         <a
@@ -5006,22 +6247,32 @@ function OpportunityDetail({
           <BookmarkIcon filled={saved} />
           {saved ? 'Saved' : 'Save'}
         </button>
-        <button className="detail-watch-action" type="button" onClick={onFocusSetup}>
-          Watch This Program
+        <button
+          className={`detail-watch-action${watched ? ' active' : ''}`}
+          type="button"
+          onClick={onToggleWatch}
+          aria-pressed={watched}
+        >
+          {watched ? 'Watching' : 'Watch'}
         </button>
       </div>
+      {verificationState !== 'verified' ? (
+        <div className={`detail-source-trust detail-source-trust-${sourceStatusTone}`} aria-label="Source trust">
+          <strong>{verificationState === 'watchOnly' ? 'Dates Not Confirmed' : 'Details Need Confirmation'}</strong>
+          <span>{compactSourceNote}</span>
+        </div>
+      ) : null}
       {justSaved ? (
         <section className="save-next-step" aria-label="Saved program next step">
           <div>
             <span>Saved</span>
-            <strong>Next: Start Watching</strong>
-            <p>Add your focus once so ApplyFirst knows which openings to track for beta alerts.</p>
+            <strong>{watched ? 'Saved and Watching' : 'Saved to Your Library'}</strong>
+            <p>{watched ? 'ApplyFirst will keep monitoring this program.' : 'Watch it separately if you want opening alerts.'}</p>
           </div>
-          <button type="button" onClick={onFocusSetup}>
-            Set Focus
-          </button>
+          {!watched ? <button type="button" onClick={onToggleWatch}>Watch Program</button> : null}
         </section>
       ) : null}
+      <ProgramSummaryBar details={programHighlights} />
       <section className="detail-overview-section" aria-label="Program description">
         <div className="detail-overview-copy">
           <span>About The Program</span>
@@ -5030,23 +6281,26 @@ function OpportunityDetail({
           ))}
           <DetailAboutList items={opportunity.aboutHighlights} />
         </div>
-        <div className="detail-listing-heading">
-          <span>At A Glance</span>
-        </div>
-        <DetailFactGrid details={programDetails} />
       </section>
-      <DetailListingSection title="Timing" details={timingDetails} />
-      <section className={`student-source-summary student-source-summary-${sourceStatusTone}`} aria-label="Source trust">
-        <div>
-          <span>Source</span>
-          <strong>
-            {verificationState === 'verified' ? <VerifiedIcon /> : null}
-            {sourceSummary.title}
-          </strong>
-        </div>
-        <p>{sourceSummary.note}</p>
-        <small>{sourceSummary.meta}</small>
+      <section className="detail-eligibility-section" aria-label="Eligibility">
+        <span>Eligibility</span>
+        <p><FormattedDetailValue value={eligibilityDetail} /></p>
       </section>
+      <ProgramProgressPanel
+        saved={saved}
+        watched={watched}
+        attempts={applicationAttempts}
+        mutationState={applicationMutationState}
+        applicationSaving={applicationMutationState?.[opportunity.id] === 'saving'}
+        onMarkApplied={onMarkApplied}
+        onOutcomeChange={onApplicationOutcomeChange}
+      />
+      <ProgramDecisionCheckIn
+        key={opportunity.id}
+        evidence={programEvidence}
+        hasApplied={applicationAttempts.length > 0}
+        onSave={onProgramEvidenceSave}
+      />
       <button className="detail-feedback-link" type="button" onClick={onImproveLibrary}>
         Suggest An Update
       </button>
@@ -5090,22 +6344,223 @@ function OpportunityDetail({
   );
 }
 
-function DetailListingSection({ title, details }) {
+function ProgramProgressPanel({
+  saved,
+  watched,
+  attempts = [],
+  mutationState = {},
+  applicationSaving,
+  onMarkApplied,
+  onOutcomeChange,
+}) {
   return (
-    <section className="detail-listing-section" aria-label={title}>
-      <div className="detail-listing-heading">
-        <span>{title}</span>
+    <section className="program-progress-panel" aria-label="Your program activity">
+      <div className="program-progress-heading">
+        <div>
+          <span>Your Activity</span>
+          <strong>Program Status</strong>
+        </div>
+        <button
+          type="button"
+          onClick={() => onMarkApplied({ allowDuplicate: attempts.length > 0 })}
+          disabled={applicationSaving}
+        >
+          {applicationSaving ? 'Saving...' : attempts.length ? 'Add Another Application' : 'Mark Applied'}
+        </button>
       </div>
-      <DetailFactGrid details={details} />
+      <div className="program-state-summary" aria-label="Saved and watch status">
+        <span className={saved ? 'active' : ''}>{saved ? 'Saved' : 'Not Saved'}</span>
+        <span className={watched ? 'active' : ''}>{watched ? 'Watching' : 'Not Watching'}</span>
+        <span className={attempts.length ? 'active' : ''}>
+          {attempts.length ? `${attempts.length} ${attempts.length === 1 ? 'Application' : 'Applications'}` : 'No Application Yet'}
+        </span>
+      </div>
+      {attempts.length ? (
+        <div className="application-history" aria-label="Application history">
+          <div className="application-history-heading">
+            <strong>Application History</strong>
+            <span>Private to your beta workspace</span>
+          </div>
+          {attempts.map((attempt) => (
+            <article className="application-attempt" key={attempt.id}>
+              <div>
+                <strong>Applied {formatDateTime(attempt.appliedAt)}</strong>
+                {attempt.cycleLabel ? <span>{attempt.cycleLabel}</span> : null}
+              </div>
+              <label>
+                <span className="sr-only">Application outcome</span>
+                <select
+                  value={attempt.outcome || 'pending'}
+                  onChange={(event) => onOutcomeChange(attempt.id, event.target.value)}
+                  disabled={mutationState[attempt.id] === 'saving'}
+                >
+                  {applicationOutcomeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+            </article>
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }
 
-function DetailFactGrid({ details }) {
+function ProgramDecisionCheckIn({ evidence, hasApplied, onSave }) {
+  const hasExplicitResponse = evidence?.relevanceSource === 'explicit';
+  const [showInferredEditor, setShowInferredEditor] = useState(false);
+  const [editing, setEditing] = useState(!hasExplicitResponse);
+  const [draft, setDraft] = useState(() => ({
+    relevance: hasExplicitResponse ? evidence?.relevance ?? '' : '',
+    priorAwareness: hasExplicitResponse ? evidence?.priorAwareness ?? '' : '',
+    eligibilityUnclearReason: hasExplicitResponse ? evidence?.eligibilityUnclearReason ?? '' : '',
+  }));
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    if (dirty || editing) return;
+    setDraft({
+      relevance: hasExplicitResponse ? evidence?.relevance ?? '' : '',
+      priorAwareness: hasExplicitResponse ? evidence?.priorAwareness ?? '' : '',
+      eligibilityUnclearReason: hasExplicitResponse ? evidence?.eligibilityUnclearReason ?? '' : '',
+    });
+  }, [dirty, editing, evidence?.updatedAt, hasExplicitResponse]);
+
+  if (hasApplied && !hasExplicitResponse && !showInferredEditor) {
+    return (
+      <section className="program-decision-check-in program-decision-summary" aria-label="Inferred program relevance">
+        <div>
+          <small>Relevance</small>
+          <strong>Inferred from application</strong>
+        </div>
+        <button type="button" onClick={() => setShowInferredEditor(true)}>Add Your Answer</button>
+      </section>
+    );
+  }
+
+  const selectedOption = programRelevanceOptions.find((option) => option.value === draft.relevance);
+  const showAwareness = ['this_cycle', 'future_cycle'].includes(draft.relevance);
+  const showEligibilityReason = draft.relevance === 'eligibility_unclear';
+  const updateEvidence = (field, value) => {
+    setDraft((current) => ({ ...current, [field]: value }));
+    setDirty(true);
+  };
+  const selectRelevance = (value) => {
+    setDraft((current) => ({
+      ...current,
+      relevance: value,
+      priorAwareness: ['this_cycle', 'future_cycle'].includes(value) ? current.priorAwareness : '',
+      eligibilityUnclearReason: value === 'eligibility_unclear' ? current.eligibilityUnclearReason : '',
+    }));
+    setDirty(true);
+  };
+  const saveDecision = async () => {
+    const saved = await onSave?.(draft);
+    if (saved !== false) {
+      setDirty(false);
+      setEditing(false);
+    }
+  };
+
+  if (hasExplicitResponse && !editing) {
+    return (
+      <section className="program-decision-check-in program-decision-summary" aria-label="Program relevance">
+        <div>
+          <small>Your Relevance Check</small>
+          <strong>{selectedOption?.label || 'Response Saved'}</strong>
+        </div>
+        <button type="button" onClick={() => setEditing(true)}>Edit</button>
+      </section>
+    );
+  }
+
   return (
-    <dl className="detail-listing-grid">
+    <section className="program-decision-check-in" aria-label="Program relevance">
+      <header className="program-decision-heading">
+        <div>
+          <small>Optional Check-In</small>
+          <strong>Is this opportunity relevant to you?</strong>
+          <p>Help ApplyFirst understand which programs are useful to students like you.</p>
+        </div>
+        {hasExplicitResponse ? <button type="button" onClick={() => setEditing(false)}>Cancel</button> : null}
+      </header>
+      <div className="program-decision-body">
+        <fieldset className="program-decision-primary-question">
+          <legend className="sr-only">Is this opportunity relevant to you?</legend>
+          <div className="program-decision-options">
+            {programRelevanceOptions.map((option) => (
+              <button
+                className={draft.relevance === option.value ? 'active' : ''}
+                type="button"
+                key={option.value}
+                onClick={() => selectRelevance(option.value)}
+                aria-pressed={draft.relevance === option.value}
+                disabled={evidence?.saveState === 'saving'}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+        {draft.relevance && (showAwareness || showEligibilityReason) ? (
+          <div className="program-decision-followup">
+            {showAwareness ? (
+              <fieldset>
+                <legend>Did you know about this opportunity before ApplyFirst?</legend>
+                <div className="program-decision-options compact">
+                  {[
+                    ['no', 'No, this is new to me'],
+                    ['yes', 'Yes'],
+                    ['unsure', 'Not sure'],
+                  ].map(([value, label]) => (
+                    <button
+                      className={draft.priorAwareness === value ? 'active' : ''}
+                      type="button"
+                      key={value}
+                      onClick={() => updateEvidence('priorAwareness', value)}
+                      aria-pressed={draft.priorAwareness === value}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+            ) : null}
+            {showEligibilityReason ? (
+              <label>
+                <span>What is unclear?</span>
+                <select
+                  value={draft.eligibilityUnclearReason}
+                  onChange={(event) => updateEvidence('eligibilityUnclearReason', event.target.value)}
+                >
+                  <option value="">Choose One</option>
+                  {eligibilityUnclearOptions.map((option) => (
+                    <option value={option.value} key={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+          </div>
+        ) : null}
+        {draft.relevance ? (
+          <div className="program-decision-save">
+            <button type="button" onClick={saveDecision} disabled={!dirty || evidence?.saveState === 'saving'}>
+              {evidence?.saveState === 'saving' ? 'Saving...' : 'Save Response'}
+            </button>
+            <span>No application details or private notes are collected here.</span>
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function ProgramSummaryBar({ details }) {
+  return (
+    <dl className="detail-summary-bar" aria-label="Program highlights">
       {details.map((detail) => (
-        <div className={cleanText(detail.value).length > 76 ? 'wide' : ''} key={detail.label}>
+        <div className={`detail-summary-item${detail.label === 'Focus' ? ' detail-summary-focus' : ''}`} key={detail.label}>
           <dt>{detail.label}</dt>
           <dd><FormattedDetailValue value={detail.value} /></dd>
         </div>
@@ -5178,7 +6633,7 @@ function getEligibilityDetailText(opportunity) {
 }
 
 function getProgramFormatText(opportunity) {
-  return cleanText(opportunity.location) || 'Not Listed Yet';
+  return cleanText(opportunity.location);
 }
 
 function getProgramLengthText(opportunity) {
@@ -5216,75 +6671,7 @@ function getProgramLengthText(opportunity) {
     return `${amount} ${normalizedUnit}`;
   }
 
-  switch (opportunity.category) {
-    case 'Discovery Program':
-      return opportunity.timing === 'Rolling'
-        ? 'Discovery Timeline Varies'
-        : `${opportunity.timing} Discovery Program; Exact Length Varies`;
-    case 'Winternship':
-      return 'Short Winter Program; Exact Length Varies';
-    case 'Community / Prep Program':
-      return 'Prep Timeline Varies';
-    case 'Scholarship / Funding':
-      return 'Sponsor Award Timeline Varies';
-    case 'Conference / Travel Funding':
-      return 'Event Or Award Timeline Varies';
-    case 'Full-Time Alternative':
-      return opportunity.timing === 'Rolling' ? 'Alternative Path Timeline Varies' : `${opportunity.timing} Alternative Path`;
-    default:
-      if (opportunity.category === 'Fellowship') {
-        return opportunity.timing === 'Rolling' ? 'Cohort Dependent; Exact Length Not Listed' : `${opportunity.timing} Fellowship; Exact Length Not Listed`;
-      }
-
-      if (opportunity.category === 'Startup / VC Fellowship') {
-        return opportunity.timing === 'Rolling' ? 'Portfolio Timeline Varies' : `${opportunity.timing} Startup Fellowship; Exact Length Varies`;
-      }
-
-      return opportunity.timing === 'Rolling' ? 'Cohort Or Posting Dependent' : 'Not Listed Yet';
-  }
-}
-
-function getPublicSourceNote(opportunity) {
-  let sourceNote = cleanText(opportunity.sourceNote);
-
-  if (!sourceNote) {
-    return 'Open the official page before applying. ApplyFirst uses source checks to decide what can trigger beta alerts.';
-  }
-
-  sourceNote = sourceNote.split(/\bExcerpt:/i)[0].trim();
-
-  return sourceNote
-    .replace(/before sending public alerts/gi, 'before students rely on alerts')
-    .replace(/before alerts/gi, 'before students rely on alerts')
-    .replace(/before sharing/gi, 'before applying')
-    .replace(/Review before students rely on alerts\.?/gi, 'Review the official page before applying.');
-}
-
-function getStudentSourceSummary(opportunity, verificationState, sourceStatusLabel) {
-  const lastCheckedText = opportunity.lastChecked ? `Last checked ${opportunity.lastChecked}.` : 'Needs a current source check.';
-  const publicNote = getPublicSourceNote(opportunity);
-
-  if (verificationState === 'verified') {
-    return {
-      title: sourceStatusLabel,
-      note: publicNote,
-      meta: lastCheckedText,
-    };
-  }
-
-  if (verificationState === 'watchOnly') {
-    return {
-      title: sourceStatusLabel,
-      note: 'Useful for prep, but ApplyFirst should confirm current-cycle dates before sending opening alerts.',
-      meta: lastCheckedText,
-    };
-  }
-
-  return {
-    title: 'Needs Confirmation',
-    note: 'Check the official page before applying. ApplyFirst will not send beta alerts from this record until the current source is reviewed.',
-    meta: lastCheckedText,
-  };
+  return '';
 }
 
 function getRecordTimingSignal(opportunity, monitorSignal) {

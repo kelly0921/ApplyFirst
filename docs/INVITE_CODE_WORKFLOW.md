@@ -33,6 +33,7 @@ Use these columns:
 - `code_label`
 - `sent_at`
 - `status`
+- `tester_segment`
 - `notes`
 
 Recommended statuses:
@@ -42,6 +43,28 @@ Recommended statuses:
 - `active`
 - `paused`
 - `revoked`
+
+Recommended tester segments are `unknown`, `rsa_assisted`, `independent_waitlist`, and `other`. This cohort label does not imply that a specific outcome received human help.
+
+## Syncing Privacy-Safe Invite Counts
+
+The private registry remains the source of truth for names, emails, and plaintext codes. The analytics database stores only namespaced SHA-256 hashes for the code and recipient email, plus the masked label, send status, tester segment, and invite date. The recipient hash is used only to reconcile the production waitlist with invitations; raw email is never copied into analytics.
+
+Validate the local registry without uploading anything:
+
+```powershell
+npm run watch:invites:sync:dry
+```
+
+After migrations are applied, sync the hash-only records from a machine already logged into Wrangler:
+
+```powershell
+npm run watch:invites:sync
+```
+
+The local command uses Wrangler's existing Cloudflare login and does not require `WATCH_ADMIN_TOKEN`. Automated environments can still set `WATCH_ADMIN_TOKEN` and `WATCH_WORKER_URL` to sync through the protected Worker API instead.
+
+This makes Maintainer Mode's overall invite counts and the **Interested / Invited From Waitlist / Opened Access / Still Waiting** pipeline measurable without storing raw student identity in analytics. The sync treats the private registry as authoritative and removes stale hash records that are no longer present.
 
 ## Code Format
 

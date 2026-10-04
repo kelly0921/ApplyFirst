@@ -16,6 +16,9 @@ const PRODUCT_EVENT_NAMES = new Set([
   'program_saved',
   'program_unsaved',
   'watch_started',
+  'watch_stopped',
+  'application_recorded',
+  'application_outcome_updated',
   'focus_saved',
   'alerts_enabled',
   'official_source_clicked',
@@ -23,6 +26,69 @@ const PRODUCT_EVENT_NAMES = new Set([
   'outcome_reported',
 ]);
 const PRODUCT_OUTCOMES = new Set(['found_relevant_program', 'applied_earlier', 'not_yet']);
+const PRODUCT_EVENT_CONTEXT_FIELDS = new Set(['view', 'source', 'status', 'resultCount', 'queryLength']);
+const PROGRAM_RELEVANCE_VALUES = new Set([
+  'this_cycle',
+  'future_cycle',
+  'not_a_fit',
+  'not_eligible',
+  'eligibility_unclear',
+]);
+const PRIOR_AWARENESS_VALUES = new Set(['yes', 'no', 'unsure']);
+const ELIGIBILITY_UNCLEAR_REASONS = new Set([
+  'class_year',
+  'major_or_field',
+  'location',
+  'work_authorization',
+  'experience_requirements',
+  'other',
+]);
+const APPLICATION_OUTCOMES = new Set([
+  'pending',
+  'accepted',
+  'not_selected',
+  'withdrew',
+  'did_not_complete',
+  'prefer_not_to_say',
+]);
+const PROGRAM_ACTION_VALUES = new Set([
+  'preparing',
+  'started_application',
+  'submitted',
+  'registered_interest',
+  'decided_not_to_apply',
+  'waiting',
+  'watching',
+  'no_action_yet',
+]);
+const EXTERNAL_ACTION_VALUES = new Set(['started_application', 'submitted', 'registered_interest']);
+const SUPPORT_LEVEL_VALUES = new Set([
+  'none',
+  'product_only',
+  'generic_reminder',
+  'group_support',
+  'one_to_one_support',
+]);
+const ATTRIBUTION_VALUES = new Set(['yes', 'no', 'unsure']);
+const FRICTION_CATEGORY_VALUES = new Set([
+  'did_not_know_program_existed',
+  'eligibility_unclear',
+  'timing_unclear',
+  'deadline_unclear',
+  'stale_information',
+  'broken_or_indirect_link',
+  'not_relevant',
+  'location_restriction',
+  'missing_opportunity_type',
+  'too_much_information',
+  'not_enough_information',
+  'needed_personal_advice',
+  'other',
+]);
+const MONITORING_AUDIT_TYPES = new Set(['known_opening', 'information_accuracy', 'correction']);
+const OPERATIONAL_TIME_CATEGORIES = new Set(['monitoring_review', 'data_correction', 'user_support']);
+const TESTER_SEGMENT_VALUES = new Set(['unknown', 'rsa_assisted', 'independent_waitlist', 'other']);
+const BETA_INVITATION_STATUS_VALUES = new Set(['not_sent', 'sent', 'active', 'paused', 'revoked']);
 const ALERT_ENGAGEMENT_ACTIONS = new Set([
   'source_clicked',
   'useful',
@@ -101,6 +167,7 @@ async function handleRequest(request, env, ctx) {
   const url = new URL(request.url);
   const candidateSendMatch = url.pathname.match(/^\/watch\/candidates\/([^/]+)\/send$/);
   const discoveryCandidateReviewMatch = url.pathname.match(/^\/watch\/discovery\/candidates\/([^/]+)\/review$/);
+  const applicationOutcomeMatch = url.pathname.match(/^\/analytics\/application-attempts\/([^/]+)\/outcome$/);
 
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders(env) });
@@ -137,9 +204,71 @@ async function handleRequest(request, env, ctx) {
       return jsonResponse(env, await recordProductEvent(env, body), { status: 201 });
     }
 
+    if (request.method === 'GET' && url.pathname === '/analytics/program-evidence') {
+      return jsonResponse(env, await getProgramEvidence(env, url));
+    }
+
+    if (request.method === 'POST' && url.pathname === '/analytics/program-evidence') {
+      const body = await readJson(request, {});
+      return jsonResponse(env, await saveProgramEvidence(env, body), { status: 201 });
+    }
+
+    if (request.method === 'GET' && url.pathname === '/analytics/application-attempts') {
+      return jsonResponse(env, await getApplicationAttempts(env, url));
+    }
+
+    if (request.method === 'POST' && url.pathname === '/analytics/application-attempts') {
+      const body = await readJson(request, {});
+      const result = await createApplicationAttempt(env, body);
+      return jsonResponse(env, result, { status: result.created ? 201 : 200 });
+    }
+
+    if (request.method === 'POST' && applicationOutcomeMatch) {
+      const body = await readJson(request, {});
+      return jsonResponse(env, await updateApplicationOutcome(env, applicationOutcomeMatch[1], body));
+    }
+
+    if (request.method === 'GET' && url.pathname === '/analytics/program-watches') {
+      return jsonResponse(env, await getProgramWatches(env, url));
+    }
+
+    if (request.method === 'POST' && url.pathname === '/analytics/program-watches') {
+      const body = await readJson(request, {});
+      return jsonResponse(env, await saveProgramWatch(env, body));
+    }
+
     if (request.method === 'GET' && url.pathname === '/analytics/summary') {
       await requireAdminToken(request, env);
       return jsonResponse(env, await getBetaAnalyticsSummary(env));
+    }
+
+    if (request.method === 'GET' && url.pathname === '/analytics/participants') {
+      await requireAdminToken(request, env);
+      return jsonResponse(env, await getBetaParticipantActivity(env, url));
+    }
+
+    if (request.method === 'POST' && url.pathname === '/analytics/participants/segment') {
+      await requireAdminToken(request, env);
+      const body = await readJson(request, {});
+      return jsonResponse(env, await updateBetaWorkspaceSegment(env, body));
+    }
+
+    if (request.method === 'POST' && url.pathname === '/analytics/invitations/sync') {
+      await requireAdminToken(request, env);
+      const body = await readJson(request, {});
+      return jsonResponse(env, await syncBetaInvitations(env, body));
+    }
+
+    if (request.method === 'POST' && url.pathname === '/analytics/monitoring-audits') {
+      await requireAdminToken(request, env);
+      const body = await readJson(request, {});
+      return jsonResponse(env, await saveMonitoringAudit(env, body), { status: 201 });
+    }
+
+    if (request.method === 'POST' && url.pathname === '/analytics/operations') {
+      await requireAdminToken(request, env);
+      const body = await readJson(request, {});
+      return jsonResponse(env, await saveOperationalTimeEntry(env, body), { status: 201 });
     }
 
     if (request.method === 'GET' && url.pathname === '/watch/engagement') {
@@ -276,8 +405,16 @@ async function saveBetaWorkspace(env, body) {
   const accessCodeHash = await hashAccessCode(accessCode);
   const now = new Date().toISOString();
   const existing = await env.DB.prepare(
-    `select id
+    `select id, tester_segment as testerSegment
      from beta_access_workspaces
+     where access_code_hash = ?
+     limit 1`,
+  )
+    .bind(accessCodeHash)
+    .first();
+  const invitation = await env.DB.prepare(
+    `select tester_segment as testerSegment
+     from beta_invitations
      where access_code_hash = ?
      limit 1`,
   )
@@ -286,17 +423,21 @@ async function saveBetaWorkspace(env, body) {
   const stateJson = JSON.stringify(normalizeWorkspaceState(body.state));
   const codeLabel = createAccessCodeLabel(accessCode);
   const workspaceId = existing?.id || crypto.randomUUID();
+  const testerSegment = invitation?.testerSegment && invitation.testerSegment !== 'unknown'
+    ? invitation.testerSegment
+    : existing?.testerSegment || 'unknown';
 
   if (existing?.id) {
     await env.DB.prepare(
       `update beta_access_workspaces
        set code_label = ?,
            state_json = ?,
+           tester_segment = ?,
            last_seen_at = ?,
            updated_at = ?
        where id = ?`,
     )
-      .bind(codeLabel, stateJson, now, now, existing.id)
+      .bind(codeLabel, stateJson, testerSegment, now, now, existing.id)
       .run();
   } else {
     await env.DB.prepare(
@@ -305,11 +446,12 @@ async function saveBetaWorkspace(env, body) {
         access_code_hash,
         code_label,
         state_json,
+        tester_segment,
         last_seen_at,
         updated_at
-      ) values (?, ?, ?, ?, ?, ?)`,
+      ) values (?, ?, ?, ?, ?, ?, ?)`,
     )
-      .bind(workspaceId, accessCodeHash, codeLabel, stateJson, now, now)
+      .bind(workspaceId, accessCodeHash, codeLabel, stateJson, testerSegment, now, now)
       .run();
   }
 
@@ -387,6 +529,706 @@ async function recordProductEvent(env, body) {
   };
 }
 
+async function getProgramEvidence(env, url) {
+  const workspace = await findWorkspaceByAccessCode(env, url.searchParams.get('code'));
+  const programId = cleanString(url.searchParams.get('programId'), 160);
+  const whereProgram = programId ? 'and program_id = ?' : '';
+  const statement = env.DB.prepare(
+    `select
+      id,
+      program_id as programId,
+      relevance,
+      relevance_source as relevanceSource,
+      relevance_updated_at as relevanceUpdatedAt,
+      prior_awareness as priorAwareness,
+      eligibility_unclear_reason as eligibilityUnclearReason,
+      first_relevant_at as firstRelevantAt,
+      action_state as actionState,
+      action_at as actionAt,
+      support_level as supportLevel,
+      attribution,
+      friction_category as frictionCategory,
+      class_year as classYear,
+      role_track as roleTrack,
+      opportunity_category as opportunityCategory,
+      updated_at as updatedAt
+     from beta_program_evidence
+     where workspace_id = ?
+       ${whereProgram}
+     order by updated_at desc`,
+  );
+  const result = programId
+    ? await statement.bind(workspace.id, programId).all()
+    : await statement.bind(workspace.id).all();
+
+  return {
+    ok: true,
+    evidence: result.results || [],
+  };
+}
+
+async function saveProgramEvidence(env, body) {
+  const workspace = await findWorkspaceByAccessCode(env, body.accessCode || body.code);
+  const programId = cleanString(body.programId, 160);
+
+  if (!programId) {
+    throw httpError(400, 'Program is required.');
+  }
+
+  const relevance = normalizeOptionalEnum(body.relevance, PROGRAM_RELEVANCE_VALUES, 'program relevance');
+  const priorAwareness = normalizeOptionalEnum(body.priorAwareness, PRIOR_AWARENESS_VALUES, 'prior awareness');
+  const eligibilityUnclearReason = normalizeOptionalEnum(
+    body.eligibilityUnclearReason,
+    ELIGIBILITY_UNCLEAR_REASONS,
+    'eligibility uncertainty reason',
+  );
+  const actionState = normalizeOptionalEnum(body.actionState, PROGRAM_ACTION_VALUES, 'program action');
+  const supportLevel = normalizeOptionalEnum(body.supportLevel, SUPPORT_LEVEL_VALUES, 'support level');
+  const attribution = normalizeOptionalEnum(body.attribution, ATTRIBUTION_VALUES, 'ApplyFirst attribution');
+  const frictionCategory = normalizeOptionalEnum(body.frictionCategory, FRICTION_CATEGORY_VALUES, 'friction category');
+
+  if (
+    !relevance &&
+    !actionState &&
+    !priorAwareness &&
+    !eligibilityUnclearReason &&
+    !supportLevel &&
+    !attribution &&
+    !frictionCategory
+  ) {
+    throw httpError(400, 'Add at least one supported program decision field.');
+  }
+
+  if (eligibilityUnclearReason && relevance !== 'eligibility_unclear') {
+    throw httpError(400, 'Eligibility uncertainty details require an eligibility-unclear response.');
+  }
+
+  if (priorAwareness && !['this_cycle', 'future_cycle'].includes(relevance)) {
+    throw httpError(400, 'Prior awareness is only collected for relevant opportunities.');
+  }
+
+  const now = new Date().toISOString();
+  const existing = await env.DB.prepare(
+    `select id, relevance, relevance_source as relevanceSource,
+      first_relevant_at as firstRelevantAt,
+      first_decision_at as firstDecisionAt, action_state as actionState, action_at as actionAt
+     from beta_program_evidence
+     where workspace_id = ? and program_id = ?
+     limit 1`,
+  )
+    .bind(workspace.id, programId)
+    .first();
+  const becomesRelevant = ['this_cycle', 'future_cycle'].includes(relevance);
+  const firstRelevantAt = existing?.firstRelevantAt || (becomesRelevant ? now : null);
+  const effectiveRelevance = relevance || existing?.relevance || '';
+  const effectiveActionState = actionState || existing?.actionState || '';
+  const firstDecisionAt = existing?.firstDecisionAt || (
+    isEligibleActivation({ relevance: effectiveRelevance, actionState: effectiveActionState }) ? now : null
+  );
+  const actionAt = actionState && actionState !== existing?.actionState
+    ? now
+    : existing?.actionAt || null;
+  const id = existing?.id || crypto.randomUUID();
+
+  await env.DB.prepare(
+    `insert into beta_program_evidence (
+      id,
+      workspace_id,
+      program_id,
+      relevance,
+      relevance_source,
+      relevance_updated_at,
+      prior_awareness,
+      eligibility_unclear_reason,
+      first_relevant_at,
+      first_decision_at,
+      action_state,
+      action_at,
+      support_level,
+      attribution,
+      friction_category,
+      class_year,
+      role_track,
+      opportunity_category,
+      updated_at
+    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    on conflict(workspace_id, program_id) do update set
+      relevance = coalesce(nullif(excluded.relevance, ''), beta_program_evidence.relevance),
+      relevance_source = case
+        when excluded.relevance != '' then 'explicit'
+        else beta_program_evidence.relevance_source
+      end,
+      relevance_updated_at = case
+        when excluded.relevance != '' then excluded.relevance_updated_at
+        else beta_program_evidence.relevance_updated_at
+      end,
+      prior_awareness = case
+        when excluded.relevance in ('not_a_fit', 'not_eligible', 'eligibility_unclear') then null
+        else coalesce(nullif(excluded.prior_awareness, ''), beta_program_evidence.prior_awareness)
+      end,
+      eligibility_unclear_reason = case
+        when excluded.relevance = 'eligibility_unclear' then nullif(excluded.eligibility_unclear_reason, '')
+        when excluded.relevance != '' then null
+        else beta_program_evidence.eligibility_unclear_reason
+      end,
+      first_relevant_at = coalesce(beta_program_evidence.first_relevant_at, excluded.first_relevant_at),
+      first_decision_at = coalesce(beta_program_evidence.first_decision_at, excluded.first_decision_at),
+      action_state = coalesce(nullif(excluded.action_state, ''), beta_program_evidence.action_state),
+      action_at = case
+        when excluded.action_state != '' and excluded.action_state != coalesce(beta_program_evidence.action_state, '')
+          then excluded.action_at
+        else beta_program_evidence.action_at
+      end,
+      support_level = coalesce(nullif(excluded.support_level, ''), beta_program_evidence.support_level),
+      attribution = coalesce(nullif(excluded.attribution, ''), beta_program_evidence.attribution),
+      friction_category = coalesce(nullif(excluded.friction_category, ''), beta_program_evidence.friction_category),
+      class_year = coalesce(nullif(excluded.class_year, ''), beta_program_evidence.class_year),
+      role_track = coalesce(nullif(excluded.role_track, ''), beta_program_evidence.role_track),
+      opportunity_category = coalesce(nullif(excluded.opportunity_category, ''), beta_program_evidence.opportunity_category),
+      updated_at = excluded.updated_at`,
+  )
+    .bind(
+      id,
+      workspace.id,
+      programId,
+      relevance,
+      relevance ? 'explicit' : '',
+      relevance ? now : null,
+      priorAwareness,
+      eligibilityUnclearReason,
+      firstRelevantAt,
+      firstDecisionAt,
+      actionState,
+      actionAt,
+      supportLevel,
+      attribution,
+      frictionCategory,
+      cleanString(body.classYear, 80),
+      cleanString(body.roleTrack, 120),
+      cleanString(body.opportunityCategory, 120),
+      now,
+    )
+    .run();
+
+  if (actionState && actionState !== existing?.actionState) {
+    await env.DB.prepare(
+      `insert into beta_program_action_events (
+        id, workspace_id, program_id, action_state, action_at, support_level, source
+      ) values (?, ?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(
+        crypto.randomUUID(),
+        workspace.id,
+        programId,
+        actionState,
+        actionAt || now,
+        supportLevel || null,
+        'student_check_in',
+      )
+      .run();
+  }
+
+  return {
+    ok: true,
+    id,
+    programId,
+    eligibleActivated: Boolean(firstDecisionAt),
+    savedAt: now,
+  };
+}
+
+async function getApplicationAttempts(env, url) {
+  const workspace = await findWorkspaceByAccessCode(env, url.searchParams.get('code'));
+  const programId = cleanString(url.searchParams.get('programId'), 160);
+  const whereProgram = programId ? 'and program_id = ?' : '';
+  const statement = env.DB.prepare(
+    `select
+      id,
+      program_id as programId,
+      applied_at as appliedAt,
+      cycle_label as cycleLabel,
+      outcome,
+      outcome_updated_at as outcomeUpdatedAt,
+      source,
+      created_at as createdAt,
+      updated_at as updatedAt
+     from beta_application_attempts
+     where workspace_id = ?
+       ${whereProgram}
+     order by applied_at desc, created_at desc`,
+  );
+  const result = programId
+    ? await statement.bind(workspace.id, programId).all()
+    : await statement.bind(workspace.id).all();
+
+  return { ok: true, attempts: result.results || [] };
+}
+
+async function createApplicationAttempt(env, body) {
+  const workspace = await findWorkspaceByAccessCode(env, body.accessCode || body.code);
+  const programId = cleanString(body.programId, 160);
+
+  if (!programId) {
+    throw httpError(400, 'Program is required.');
+  }
+
+  if (body.allowDuplicate !== undefined && typeof body.allowDuplicate !== 'boolean') {
+    throw httpError(400, 'allowDuplicate must be true or false.');
+  }
+
+  if (body.cycleUnspecified !== undefined && typeof body.cycleUnspecified !== 'boolean') {
+    throw httpError(400, 'cycleUnspecified must be true or false.');
+  }
+
+  const now = new Date().toISOString();
+  const id = crypto.randomUUID();
+  const appliedAt = normalizeOptionalTimestamp(body.appliedAt) || now;
+  const suppliedCycleLabel = cleanString(body.cycleLabel, 80);
+  const attemptYear = /^\d{4}/.test(appliedAt) ? appliedAt.slice(0, 4) : '';
+  const cycleLabel = body.cycleUnspecified === true ? '' : suppliedCycleLabel || attemptYear;
+  const allowDuplicate = body.allowDuplicate === true;
+  const idempotencyKey = allowDuplicate ? null : buildApplicationAttemptKey(cycleLabel, appliedAt);
+  const creationMode = allowDuplicate ? 'explicit_additional' : 'ordinary';
+  const outcome = normalizeRequiredEnum(body.outcome || 'pending', APPLICATION_OUTCOMES, 'application outcome');
+  const source = allowDuplicate ? 'student_add_another_application' : 'student_mark_applied';
+
+  const insertResult = await env.DB.prepare(
+    `insert or ignore into beta_application_attempts (
+      id, workspace_id, program_id, applied_at, cycle_label,
+      idempotency_key, creation_mode, outcome, outcome_updated_at,
+      source, created_at, updated_at
+    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  )
+    .bind(
+      id,
+      workspace.id,
+      programId,
+      appliedAt,
+      cycleLabel,
+      idempotencyKey,
+      creationMode,
+      outcome,
+      outcome === 'pending' ? null : now,
+      source,
+      now,
+      now,
+    )
+    .run();
+
+  const created = Number(insertResult.meta?.changes ?? 1) > 0;
+
+  if (!created && idempotencyKey) {
+    const existingAttempt = await env.DB.prepare(
+      `select id, program_id as programId, applied_at as appliedAt,
+        cycle_label as cycleLabel, outcome, outcome_updated_at as outcomeUpdatedAt,
+        source, created_at as createdAt, updated_at as updatedAt
+       from beta_application_attempts
+       where workspace_id = ? and program_id = ? and idempotency_key = ?
+       limit 1`,
+    )
+      .bind(workspace.id, programId, idempotencyKey)
+      .first();
+
+    if (!existingAttempt) {
+      throw httpError(409, 'An application attempt already exists for this cycle.');
+    }
+
+    return { ok: true, created: false, attempt: existingAttempt };
+  }
+
+  const existingEvidence = await env.DB.prepare(
+    `select id, relevance, relevance_source as relevanceSource
+     from beta_program_evidence
+     where workspace_id = ? and program_id = ?
+     limit 1`,
+  )
+    .bind(workspace.id, programId)
+    .first();
+
+  if (existingEvidence?.relevanceSource !== 'explicit') {
+    await env.DB.prepare(
+      `insert into beta_program_evidence (
+        id, workspace_id, program_id, relevance, relevance_source,
+        relevance_updated_at, first_relevant_at, first_decision_at, updated_at
+      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      on conflict(workspace_id, program_id) do update set
+        relevance = case
+          when beta_program_evidence.relevance_source = 'explicit' then beta_program_evidence.relevance
+          else excluded.relevance
+        end,
+        relevance_source = case
+          when beta_program_evidence.relevance_source = 'explicit' then beta_program_evidence.relevance_source
+          else excluded.relevance_source
+        end,
+        relevance_updated_at = case
+          when beta_program_evidence.relevance_source = 'explicit' then beta_program_evidence.relevance_updated_at
+          else excluded.relevance_updated_at
+        end,
+        first_relevant_at = coalesce(beta_program_evidence.first_relevant_at, excluded.first_relevant_at),
+        first_decision_at = coalesce(beta_program_evidence.first_decision_at, excluded.first_decision_at),
+        updated_at = excluded.updated_at`,
+    )
+      .bind(
+        existingEvidence?.id || crypto.randomUUID(),
+        workspace.id,
+        programId,
+        'this_cycle',
+        'inferred_applied',
+        now,
+        appliedAt,
+        appliedAt,
+        now,
+      )
+      .run();
+  }
+
+  return {
+    ok: true,
+    created: true,
+    attempt: {
+      id,
+      programId,
+      appliedAt,
+      cycleLabel,
+      outcome,
+      outcomeUpdatedAt: outcome === 'pending' ? null : now,
+      source,
+      createdAt: now,
+      updatedAt: now,
+    },
+  };
+}
+
+async function updateApplicationOutcome(env, attemptIdValue, body) {
+  const workspace = await findWorkspaceByAccessCode(env, body.accessCode || body.code);
+  const attemptId = cleanString(attemptIdValue, 160);
+  const outcome = normalizeRequiredEnum(body.outcome, APPLICATION_OUTCOMES, 'application outcome');
+  const now = new Date().toISOString();
+  const result = await env.DB.prepare(
+    `update beta_application_attempts
+     set outcome = ?, outcome_updated_at = ?, updated_at = ?
+     where id = ? and workspace_id = ?`,
+  )
+    .bind(outcome, outcome === 'pending' ? null : now, now, attemptId, workspace.id)
+    .run();
+
+  if (!Number(result.meta?.changes || 0)) {
+    throw httpError(404, 'Application attempt was not found.');
+  }
+
+  return { ok: true, attemptId, outcome, updatedAt: now };
+}
+
+async function getProgramWatches(env, url) {
+  const workspace = await findWorkspaceByAccessCode(env, url.searchParams.get('code'));
+  const result = await env.DB.prepare(
+    `select program_id as programId, is_watching as isWatching,
+      started_at as startedAt, stopped_at as stoppedAt, updated_at as updatedAt
+     from beta_program_watches
+     where workspace_id = ?
+     order by updated_at desc`,
+  )
+    .bind(workspace.id)
+    .all();
+
+  return {
+    ok: true,
+    watches: (result.results || []).map((row) => ({ ...row, isWatching: Boolean(row.isWatching) })),
+  };
+}
+
+async function saveProgramWatch(env, body) {
+  const workspace = await findWorkspaceByAccessCode(env, body.accessCode || body.code);
+  const programId = cleanString(body.programId, 160);
+
+  if (!programId || typeof body.watching !== 'boolean') {
+    throw httpError(400, 'Program and watching state are required.');
+  }
+
+  const now = new Date().toISOString();
+  await env.DB.prepare(
+    `insert into beta_program_watches (
+      id, workspace_id, program_id, is_watching, started_at, stopped_at, updated_at
+    ) values (?, ?, ?, ?, ?, ?, ?)
+    on conflict(workspace_id, program_id) do update set
+      is_watching = excluded.is_watching,
+      started_at = case
+        when excluded.is_watching = 1 then coalesce(beta_program_watches.started_at, excluded.started_at)
+        else beta_program_watches.started_at
+      end,
+      stopped_at = case when excluded.is_watching = 0 then excluded.stopped_at else null end,
+      updated_at = excluded.updated_at`,
+  )
+    .bind(
+      crypto.randomUUID(),
+      workspace.id,
+      programId,
+      body.watching ? 1 : 0,
+      body.watching ? now : null,
+      body.watching ? null : now,
+      now,
+    )
+    .run();
+
+  if (body.watching) {
+    await env.DB.prepare(
+      `insert into watch_request_programs (
+        id, watch_request_id, program_id, program_name, organization,
+        official_url, readiness, reason, created_at
+      )
+      select lower(hex(randomblob(16))), request.id, ?, ?, ?, ?, ?, ?, ?
+      from watch_requests request
+      where request.workspace_id = ?
+        and request.status = 'active'
+        and (request.unsubscribed_at is null or request.unsubscribed_at = '')
+        and not exists (
+          select 1 from watch_request_programs linked
+          where linked.watch_request_id = request.id and linked.program_id = ?
+        )`,
+    )
+      .bind(
+        programId,
+        cleanString(body.programName, 180),
+        cleanString(body.organization, 160),
+        cleanString(body.officialUrl, 500),
+        cleanString(body.readiness, 120),
+        'Watched by student',
+        now,
+        workspace.id,
+        programId,
+      )
+      .run();
+  }
+
+  return { ok: true, programId, watching: body.watching, updatedAt: now };
+}
+
+async function findWorkspaceByAccessCode(env, value) {
+  const accessCode = normalizeAccessCode(value);
+
+  if (!BETA_WORKSPACE_CODE_PATTERN.test(accessCode)) {
+    throw httpError(400, 'A valid beta workspace code is required.');
+  }
+
+  const accessCodeHash = await hashAccessCode(accessCode);
+  const workspace = await env.DB.prepare(
+    `select id
+     from beta_access_workspaces
+     where access_code_hash = ?
+     limit 1`,
+  )
+    .bind(accessCodeHash)
+    .first();
+
+  if (!workspace?.id) {
+    throw httpError(409, 'Beta workspace is still initializing. Try again shortly.');
+  }
+
+  return workspace;
+}
+
+async function saveMonitoringAudit(env, body) {
+  const programId = cleanString(body.programId, 160);
+  const auditType = normalizeRequiredEnum(body.auditType, MONITORING_AUDIT_TYPES, 'audit type');
+
+  if (!programId) {
+    throw httpError(400, 'Program is required.');
+  }
+
+  const id = cleanString(body.id, 120) || crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  await env.DB.prepare(
+    `insert into monitoring_audits (
+      id, program_id, official_source_id, audit_type, event_at, verified_deadline_at,
+      detected, detected_at, alert_candidate_id, status_correct, deadline_correct,
+      eligibility_correct, url_correct, freshness_correct, alert_correct, evidence_url, evidence_note,
+      reported_at, resolved_at, reviewed_by, updated_at
+    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    on conflict(id) do update set
+      event_at = excluded.event_at,
+      verified_deadline_at = excluded.verified_deadline_at,
+      detected = excluded.detected,
+      detected_at = excluded.detected_at,
+      alert_candidate_id = excluded.alert_candidate_id,
+      status_correct = excluded.status_correct,
+      deadline_correct = excluded.deadline_correct,
+      eligibility_correct = excluded.eligibility_correct,
+      url_correct = excluded.url_correct,
+      freshness_correct = excluded.freshness_correct,
+      alert_correct = excluded.alert_correct,
+      evidence_url = excluded.evidence_url,
+      evidence_note = excluded.evidence_note,
+      reported_at = excluded.reported_at,
+      resolved_at = excluded.resolved_at,
+      reviewed_by = excluded.reviewed_by,
+      updated_at = excluded.updated_at`,
+  )
+    .bind(
+      id,
+      programId,
+      cleanString(body.officialSourceId, 120) || null,
+      auditType,
+      normalizeOptionalTimestamp(body.eventAt),
+      normalizeOptionalTimestamp(body.verifiedDeadlineAt),
+      normalizeNullableBoolean(body.detected),
+      normalizeOptionalTimestamp(body.detectedAt),
+      cleanString(body.alertCandidateId, 120) || null,
+      normalizeNullableBoolean(body.statusCorrect),
+      normalizeNullableBoolean(body.deadlineCorrect),
+      normalizeNullableBoolean(body.eligibilityCorrect),
+      normalizeNullableBoolean(body.urlCorrect),
+      normalizeNullableBoolean(body.freshnessCorrect),
+      normalizeNullableBoolean(body.alertCorrect),
+      cleanString(body.evidenceUrl, 500),
+      cleanString(body.evidenceNote, 1200),
+      normalizeOptionalTimestamp(body.reportedAt),
+      normalizeOptionalTimestamp(body.resolvedAt),
+      cleanString(body.reviewedBy || 'Kelly', 120),
+      now,
+    )
+    .run();
+
+  return { ok: true, id, savedAt: now };
+}
+
+async function saveOperationalTimeEntry(env, body) {
+  const category = normalizeRequiredEnum(body.category, OPERATIONAL_TIME_CATEGORIES, 'operational category');
+  const minutes = Math.round(Number(body.minutes));
+
+  if (!Number.isFinite(minutes) || minutes < 1 || minutes > 1440) {
+    throw httpError(400, 'Minutes must be between 1 and 1440.');
+  }
+
+  const periodDate = normalizeDateOnly(body.periodDate) || new Date().toISOString().slice(0, 10);
+  const id = crypto.randomUUID();
+
+  await env.DB.prepare(
+    `insert into operational_time_entries (id, category, minutes, period_date, note)
+     values (?, ?, ?, ?, ?)`,
+  )
+    .bind(id, category, minutes, periodDate, cleanString(body.note, 500))
+    .run();
+
+  return { ok: true, id, savedAt: new Date().toISOString() };
+}
+
+async function updateBetaWorkspaceSegment(env, body) {
+  const workspaceId = cleanString(body.workspaceId, 120);
+  const testerSegment = normalizeRequiredEnum(body.testerSegment, TESTER_SEGMENT_VALUES, 'tester segment');
+
+  if (!workspaceId) {
+    throw httpError(400, 'Workspace is required.');
+  }
+
+  const result = await env.DB.prepare(
+    `update beta_access_workspaces
+     set tester_segment = ?, updated_at = ?
+     where id = ?`,
+  )
+    .bind(testerSegment, new Date().toISOString(), workspaceId)
+    .run();
+
+  if (!Number(result.meta?.changes || 0)) {
+    throw httpError(404, 'Workspace was not found.');
+  }
+
+  return { ok: true, workspaceId, testerSegment };
+}
+
+async function syncBetaInvitations(env, body) {
+  const invitations = Array.isArray(body.invitations) ? body.invitations.slice(0, 500) : [];
+
+  if (!invitations.length) {
+    throw httpError(400, 'Add at least one invitation record.');
+  }
+
+  const normalized = invitations.map((invitation) => {
+    const accessCodeHash = cleanString(invitation?.accessCodeHash, 64).toLowerCase();
+    const codeLabel = cleanString(invitation?.codeLabel, 20);
+    const status = normalizeRequiredEnum(
+      invitation?.status || 'not_sent',
+      BETA_INVITATION_STATUS_VALUES,
+      'invitation status',
+    );
+    const testerSegment = normalizeRequiredEnum(
+      invitation?.testerSegment || 'unknown',
+      TESTER_SEGMENT_VALUES,
+      'tester segment',
+    );
+
+    if (!/^[a-f0-9]{64}$/.test(accessCodeHash)) {
+      throw httpError(400, 'Invitation hashes must be 64-character SHA-256 values.');
+    }
+
+    if (!/^\.\.\.[A-Z0-9]{4}$/.test(codeLabel)) {
+      throw httpError(400, 'Invitation labels must use the masked ...1234 format.');
+    }
+
+    return {
+      accessCodeHash,
+      recipientEmailHash: normalizeOptionalHash(invitation?.recipientEmailHash, 'recipient email hash'),
+      codeLabel,
+      status,
+      testerSegment,
+      invitedAt: normalizeOptionalTimestamp(invitation?.invitedAt),
+    };
+  });
+  const now = new Date().toISOString();
+
+  for (const invitation of normalized) {
+    await env.DB.prepare(
+      `insert into beta_invitations (
+        access_code_hash, recipient_email_hash, code_label, tester_segment, status, invited_at, updated_at
+      ) values (?, ?, ?, ?, ?, ?, ?)
+      on conflict(access_code_hash) do update set
+        recipient_email_hash = excluded.recipient_email_hash,
+        code_label = excluded.code_label,
+        tester_segment = excluded.tester_segment,
+        status = excluded.status,
+        invited_at = coalesce(excluded.invited_at, beta_invitations.invited_at),
+        updated_at = excluded.updated_at`,
+    )
+      .bind(
+        invitation.accessCodeHash,
+        invitation.recipientEmailHash,
+        invitation.codeLabel,
+        invitation.testerSegment,
+        invitation.status,
+        invitation.invitedAt,
+        now,
+      )
+      .run();
+
+    if (invitation.testerSegment !== 'unknown') {
+      await env.DB.prepare(
+        `update beta_access_workspaces
+         set tester_segment = ?, updated_at = ?
+         where access_code_hash = ?`,
+      )
+        .bind(invitation.testerSegment, now, invitation.accessCodeHash)
+        .run();
+    }
+  }
+
+  const currentHashes = normalized.map((invitation) => invitation.accessCodeHash);
+  const deleteResult = await env.DB.prepare(
+    `delete from beta_invitations
+     where access_code_hash not in (${currentHashes.map(() => '?').join(', ')})`,
+  )
+    .bind(...currentHashes)
+    .run();
+
+  return {
+    ok: true,
+    synced: normalized.length,
+    invited: normalized.filter((invitation) => ['sent', 'active'].includes(invitation.status)).length,
+    emailLinked: normalized.filter((invitation) => invitation.recipientEmailHash).length,
+    removed: Number(deleteResult?.meta?.changes || 0),
+    savedAt: now,
+  };
+}
+
 async function getBetaAnalyticsSummary(env) {
   const now = Date.now();
   const since7Days = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -408,9 +1250,18 @@ async function getBetaAnalyticsSummary(env) {
     activatedResult,
     returningResult,
     outcomesResult,
+    meaningfulOutcomesResult,
     topProgramsResult,
     alertEngagementResult,
     waitlistTotals,
+    waitlistPipeline,
+    studentValue,
+    independentUsability,
+    reliability,
+    operations,
+    waitlistSegments,
+    invitations,
+    programLifecycle,
   ] = await Promise.all([
     env.DB.prepare(
       `select
@@ -469,17 +1320,26 @@ async function getBetaAnalyticsSummary(env) {
       .bind(since30Days)
       .all(),
     env.DB.prepare(
+      `select count(distinct workspace_id) as count
+       from beta_product_events
+       where event_name = 'outcome_reported'
+         and created_at >= ?
+         and outcome in ('found_relevant_program', 'applied_earlier')`,
+    )
+      .bind(since30Days)
+      .first(),
+    env.DB.prepare(
       `select program_id as programId,
-        count(case when event_name = 'program_viewed' then 1 end) as views,
-        count(case when event_name = 'program_saved' then 1 end) as saves,
-        count(case when event_name = 'official_source_clicked' then 1 end) as sourceClicks
+        count(distinct case when event_name = 'program_viewed' then workspace_id end) as uniqueViewers,
+        count(distinct case when event_name = 'program_saved' then workspace_id end) as saves,
+        count(distinct case when event_name = 'official_source_clicked' then workspace_id end) as sourceClicks
        from beta_product_events
        where created_at >= ?
          and program_id is not null
          and program_id != ''
          and event_name in ('program_viewed', 'program_saved', 'official_source_clicked')
        group by program_id
-       order by saves desc, sourceClicks desc, views desc
+       order by saves desc, sourceClicks desc, uniqueViewers desc
        limit 8`,
     )
       .bind(since30Days)
@@ -495,6 +1355,14 @@ async function getBetaAnalyticsSummary(env) {
       .bind(since30Days)
       .all(),
     getCaptureWaitlistTotals(env),
+    getCaptureWaitlistPipeline(env),
+    getStudentValueMetrics(env, since30Days),
+    getIndependentUsabilityMetrics(env, since30Days),
+    getReliabilityMetrics(env, since30Days),
+    getOperationsMetrics(env, since7Days, since30Days),
+    getCaptureWaitlistSegments(env),
+    getBetaInvitationMetrics(env, since30Days),
+    getProgramLifecycleMetrics(env, since30Days),
   ]);
 
   return {
@@ -508,15 +1376,256 @@ async function getBetaAnalyticsSummary(env) {
       activated30Days: Number(activatedResult?.count || 0),
       returning30Days: Number(returningResult?.count || 0),
     },
-    waitlist: waitlistTotals,
+    waitlist: {
+      ...waitlistTotals,
+      pipeline: waitlistPipeline,
+      segments: waitlistSegments,
+    },
+    invitations,
     funnel: normalizeCountRows(funnelResult.results, 'eventName'),
     outcomes: normalizeCountRows(outcomesResult.results, 'outcome'),
+    meaningfulOutcomes30Days: Number(meaningfulOutcomesResult?.count || 0),
     alertEngagement: normalizeCountRows(alertEngagementResult.results, 'action'),
     topPrograms: (topProgramsResult.results || []).map((row) => ({
       programId: row.programId,
-      views: Number(row.views || 0),
+      uniqueViewers: Number(row.uniqueViewers || 0),
       saves: Number(row.saves || 0),
       sourceClicks: Number(row.sourceClicks || 0),
+    })),
+    studentValue,
+    programLifecycle,
+    independentUsability: {
+      ...independentUsability,
+      setupCompleted30Days: Number(activatedResult?.count || 0),
+      ordinaryReturn30Days: Number(returningResult?.count || 0),
+    },
+    reliability,
+    operations,
+  };
+}
+
+async function getProgramLifecycleMetrics(env, since30Days) {
+  const [relevanceRows, applicationRows, repeatRow, watchRow, persistenceRow] = await Promise.all([
+    env.DB.prepare(
+      `select relevance as value,
+        count(distinct workspace_id) as students,
+        count(*) as programPairs
+       from beta_program_evidence
+       where relevance_source = 'explicit'
+         and relevance_updated_at >= ?
+       group by relevance
+       order by programPairs desc`,
+    ).bind(since30Days).all(),
+    env.DB.prepare(
+      `select outcome as value,
+        count(distinct workspace_id) as students,
+        count(*) as attempts
+       from beta_application_attempts
+       where applied_at >= ?
+       group by outcome
+       order by attempts desc`,
+    ).bind(since30Days).all(),
+    env.DB.prepare(
+      `select count(*) as repeatProgramPairs,
+        count(case when namedCycles > 1 then 1 end) as namedCycleReapplicationPairs
+       from (
+         select workspace_id, program_id,
+           count(distinct case
+             when cycle_label is not null and trim(cycle_label) != '' then cycle_label
+           end) as namedCycles
+         from beta_application_attempts
+         group by workspace_id, program_id
+         having count(*) > 1
+       )`,
+    ).first(),
+    env.DB.prepare(
+      `select count(distinct workspace_id) as students,
+        count(*) as programPairs
+       from beta_program_watches
+       where is_watching = 1`,
+    ).first(),
+    env.DB.prepare(
+      `select
+        count(case when exists (
+          select 1 from beta_application_attempts attempt
+          where attempt.workspace_id = watch.workspace_id
+            and attempt.program_id = watch.program_id
+        ) then 1 end) as appliedAndWatching,
+        count(case when exists (
+          select 1 from beta_application_attempts attempt
+          where attempt.workspace_id = watch.workspace_id
+            and attempt.program_id = watch.program_id
+            and attempt.outcome = 'not_selected'
+        ) then 1 end) as notSelectedAndWatching,
+        count(case when exists (
+          select 1 from beta_program_evidence evidence
+          where evidence.workspace_id = watch.workspace_id
+            and evidence.program_id = watch.program_id
+            and evidence.relevance = 'future_cycle'
+            and evidence.relevance_source = 'explicit'
+        ) then 1 end) as futureCycleAndWatching
+       from beta_program_watches watch
+       where watch.is_watching = 1`,
+    ).first(),
+  ]);
+
+  return {
+    relevance: (relevanceRows.results || []).map((row) => ({
+      value: cleanString(row.value, 80),
+      students: Number(row.students || 0),
+      programPairs: Number(row.programPairs || 0),
+    })),
+    applications: {
+      outcomes: (applicationRows.results || []).map((row) => ({
+        value: cleanString(row.value, 80),
+        students: Number(row.students || 0),
+        attempts: Number(row.attempts || 0),
+      })),
+      repeatProgramPairs: Number(repeatRow?.repeatProgramPairs || 0),
+      namedCycleReapplicationPairs: Number(repeatRow?.namedCycleReapplicationPairs || 0),
+    },
+    watches: {
+      students: Number(watchRow?.students || 0),
+      programPairs: Number(watchRow?.programPairs || 0),
+    },
+    persistentValue: {
+      appliedAndWatching: Number(persistenceRow?.appliedAndWatching || 0),
+      notSelectedAndWatching: Number(persistenceRow?.notSelectedAndWatching || 0),
+      futureCycleAndWatching: Number(persistenceRow?.futureCycleAndWatching || 0),
+    },
+  };
+}
+
+async function getBetaParticipantActivity(env, url) {
+  const limit = Math.max(1, Math.min(Number(url.searchParams.get('limit')) || 50, 100));
+  const offset = Math.max(0, Number(url.searchParams.get('offset')) || 0);
+  const [totalRow, participantResult] = await Promise.all([
+    env.DB.prepare('select count(*) as total from beta_access_workspaces').first(),
+    env.DB.prepare(
+      `with workspace_page as (
+        select id, code_label, tester_segment, created_at, last_seen_at
+        from beta_access_workspaces
+        order by coalesce(last_seen_at, created_at) desc
+        limit ? offset ?
+      )
+       select
+        w.id as workspaceId,
+        w.code_label as codeLabel,
+        w.tester_segment as testerSegment,
+        w.created_at as firstSeenAt,
+        w.last_seen_at as lastSeenAt,
+        coalesce(max(e.created_at), w.last_seen_at, w.created_at) as latestActivityAt,
+        count(distinct e.session_id) as sessions,
+        count(distinct substr(e.created_at, 1, 10)) as activeDays,
+        count(case when e.event_name = 'program_viewed' then 1 end) as programViews,
+        count(distinct case when e.event_name = 'program_saved' then e.program_id end) as programsSaved,
+        count(distinct case when e.event_name = 'watch_started' then e.program_id end) as programsWatched,
+        max(case when e.event_name = 'focus_saved' then 1 else 0 end) as focusCompleted,
+        max(case when e.event_name = 'alerts_enabled' then 1 else 0 end) as alertsEnabled,
+        count(case when e.event_name = 'official_source_clicked' then 1 end) as sourceClicks,
+        count(case when e.event_name = 'contribution_submitted' then 1 end) as contributions,
+        exists(
+          select 1 from beta_program_evidence activation
+          where activation.workspace_id = w.id
+            and activation.relevance_source = 'explicit'
+            and activation.first_decision_at is not null
+        ) as eligibleActivated,
+        (
+          select count(*) from beta_program_evidence relevant
+          where relevant.workspace_id = w.id
+            and relevant.relevance_source = 'explicit'
+            and relevant.relevance in ('this_cycle', 'future_cycle')
+        ) as relevantPrograms,
+        (
+          select count(*) from beta_program_evidence discovery
+          where discovery.workspace_id = w.id
+            and discovery.relevance_source = 'explicit'
+            and discovery.prior_awareness = 'no'
+            and discovery.relevance in ('this_cycle', 'future_cycle')
+        ) as newDiscoveries,
+        (
+          select count(distinct attempt.program_id) from beta_application_attempts attempt
+          where attempt.workspace_id = w.id
+        ) as externalActions,
+        (
+          select 'applied' from beta_application_attempts latest_attempt
+          where latest_attempt.workspace_id = w.id
+          order by latest_attempt.applied_at desc, latest_attempt.created_at desc limit 1
+        ) as latestActionState,
+        (
+          select support_level from beta_program_evidence latest_support
+          where latest_support.workspace_id = w.id and latest_support.support_level is not null
+          order by latest_support.updated_at desc limit 1
+        ) as latestSupportLevel,
+        exists(
+          select 1
+          from alert_deliveries relevant_delivery
+          inner join watch_requests relevant_request on relevant_request.id = relevant_delivery.watch_request_id
+          where relevant_request.workspace_id = w.id
+            and relevant_delivery.status = 'sent'
+            and relevant_delivery.sent_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-48 hours')
+        ) as relevantWindowEligible,
+        exists(
+          select 1
+          from alert_deliveries relevant_delivery
+          inner join watch_requests relevant_request on relevant_request.id = relevant_delivery.watch_request_id
+          inner join beta_product_events return_event on return_event.workspace_id = relevant_request.workspace_id
+          where relevant_request.workspace_id = w.id
+            and relevant_delivery.status = 'sent'
+            and relevant_delivery.sent_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-48 hours')
+            and return_event.created_at > relevant_delivery.sent_at
+        ) as relevantWindowReturned,
+        (
+          select outcome
+          from beta_product_events outcome_event
+          where outcome_event.workspace_id = w.id
+            and outcome_event.event_name = 'outcome_reported'
+          order by outcome_event.created_at desc
+          limit 1
+        ) as latestOutcome
+       from workspace_page w
+       left join beta_product_events e on e.workspace_id = w.id
+       group by w.id, w.code_label, w.tester_segment, w.created_at, w.last_seen_at
+       order by latestActivityAt desc`,
+    )
+      .bind(limit, offset)
+      .all(),
+  ]);
+
+  const total = Number(totalRow?.total || 0);
+
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    total,
+    limit,
+    offset,
+    hasMore: offset + limit < total,
+    participants: (participantResult.results || []).map((row) => ({
+      workspaceId: row.workspaceId,
+      codeLabel: row.codeLabel || 'Unlabeled',
+      testerSegment: row.testerSegment || 'unknown',
+      firstSeenAt: row.firstSeenAt,
+      lastSeenAt: row.lastSeenAt,
+      latestActivityAt: row.latestActivityAt,
+      sessions: Number(row.sessions || 0),
+      activeDays: Number(row.activeDays || 0),
+      programViews: Number(row.programViews || 0),
+      programsSaved: Number(row.programsSaved || 0),
+      programsWatched: Number(row.programsWatched || 0),
+      focusCompleted: Boolean(row.focusCompleted),
+      alertsEnabled: Boolean(row.alertsEnabled),
+      sourceClicks: Number(row.sourceClicks || 0),
+      contributions: Number(row.contributions || 0),
+      eligibleActivated: Boolean(row.eligibleActivated),
+      relevantPrograms: Number(row.relevantPrograms || 0),
+      newDiscoveries: Number(row.newDiscoveries || 0),
+      externalActions: Number(row.externalActions || 0),
+      latestActionState: row.latestActionState || '',
+      latestSupportLevel: row.latestSupportLevel || '',
+      relevantWindowEligible: Boolean(row.relevantWindowEligible),
+      relevantWindowReturned: Boolean(row.relevantWindowReturned),
+      latestOutcome: row.latestOutcome || '',
     })),
   };
 }
@@ -530,10 +1639,11 @@ async function getCaptureWaitlistTotals(env) {
     const row = await env.CAPTURE_DB.prepare(
       `select
         count(*) as total,
-        count(distinct lower(email)) as uniqueEmails
+        count(distinct lower(trim(email))) as uniqueEmails
        from waitlist_requests
        where email is not null
-         and trim(email) != ''`,
+         and trim(email) != ''
+         and source = 'applyfirst-waitlist'`,
     ).first();
 
     return {
@@ -545,6 +1655,662 @@ async function getCaptureWaitlistTotals(env) {
     console.error(JSON.stringify({ event: 'capture_waitlist_metrics_failed', error: error.message }));
     return { total: null, uniqueEmails: null, available: false };
   }
+}
+
+async function getCaptureWaitlistPipeline(env) {
+  const unavailable = {
+    available: false,
+    interested: null,
+    invitedFromWaitlist: null,
+    openedFromWaitlist: null,
+    stillWaiting: null,
+  };
+
+  if (!env.CAPTURE_DB) return unavailable;
+
+  try {
+    const [waitlistResult, invitationResult] = await Promise.all([
+      env.CAPTURE_DB.prepare(
+        `select lower(trim(email)) as email
+         from waitlist_requests
+         where email is not null
+           and trim(email) != ''
+           and source = 'applyfirst-waitlist'
+         group by lower(trim(email))`,
+      ).all(),
+      env.DB.prepare(
+        `select invitation.recipient_email_hash as recipientEmailHash,
+          invitation.status,
+          workspace.id as workspaceId
+         from beta_invitations invitation
+         left join beta_access_workspaces workspace
+           on workspace.access_code_hash = invitation.access_code_hash
+         where invitation.recipient_email_hash is not null
+           and invitation.recipient_email_hash != ''`,
+      ).all(),
+    ]);
+    const waitlistHashes = new Set(await Promise.all(
+      (waitlistResult.results || []).map((row) => sha256Hex(`applyfirst-waitlist-email:${row.email}`)),
+    ));
+    const invitedHashes = new Set();
+    const openedHashes = new Set();
+
+    for (const invitation of invitationResult.results || []) {
+      const emailHash = cleanString(invitation.recipientEmailHash, 64).toLowerCase();
+      if (!waitlistHashes.has(emailHash) || !['sent', 'active'].includes(invitation.status)) continue;
+      invitedHashes.add(emailHash);
+      if (invitation.workspaceId) openedHashes.add(emailHash);
+    }
+
+    return {
+      available: true,
+      interested: waitlistHashes.size,
+      invitedFromWaitlist: invitedHashes.size,
+      openedFromWaitlist: openedHashes.size,
+      stillWaiting: Math.max(0, waitlistHashes.size - invitedHashes.size),
+    };
+  } catch (error) {
+    console.error(JSON.stringify({ event: 'capture_waitlist_pipeline_failed', error: error.message }));
+    return unavailable;
+  }
+}
+
+async function getCaptureWaitlistSegments(env) {
+  if (!env.CAPTURE_DB) {
+    return { available: false, classYears: [], interests: [] };
+  }
+
+  try {
+    const [classYears, interests] = await Promise.all([
+      env.CAPTURE_DB.prepare(
+        `with latest_waitlist as (
+          select email, class_year, interest,
+            row_number() over (
+              partition by lower(trim(email))
+              order by datetime(created_at) desc, id desc
+            ) as row_number
+          from waitlist_requests
+          where email is not null
+            and trim(email) != ''
+            and source = 'applyfirst-waitlist'
+        )
+         select coalesce(nullif(trim(class_year), ''), 'Not provided') as label,
+          count(distinct lower(email)) as students
+         from latest_waitlist
+         where row_number = 1
+         group by label
+         order by students desc
+         limit 12`,
+      ).all(),
+      env.CAPTURE_DB.prepare(
+        `with latest_waitlist as (
+          select email, class_year, interest,
+            row_number() over (
+              partition by lower(trim(email))
+              order by datetime(created_at) desc, id desc
+            ) as row_number
+          from waitlist_requests
+          where email is not null
+            and trim(email) != ''
+            and source = 'applyfirst-waitlist'
+        )
+         select coalesce(nullif(trim(interest), ''), 'Not provided') as label,
+          count(distinct lower(email)) as students
+         from latest_waitlist
+         where row_number = 1
+         group by label
+         order by students desc
+         limit 12`,
+      ).all(),
+    ]);
+
+    return {
+      available: true,
+      classYears: normalizeSegmentRows(classYears.results),
+      interests: normalizeSegmentRows(interests.results),
+    };
+  } catch (error) {
+    console.error(JSON.stringify({ event: 'capture_waitlist_segments_failed', error: error.message }));
+    return { available: false, classYears: [], interests: [] };
+  }
+}
+
+function normalizeOptionalHash(value, label) {
+  const hash = cleanString(value, 64).toLowerCase();
+  if (!hash) return null;
+  if (!/^[a-f0-9]{64}$/.test(hash)) {
+    throw httpError(400, `${label} must be a 64-character SHA-256 value.`);
+  }
+  return hash;
+}
+
+async function getBetaInvitationMetrics(env, since30Days) {
+  const row = await env.DB.prepare(
+    `select
+      count(*) as registered,
+      count(case when invitation.status in ('sent', 'active') then 1 end) as invited,
+      count(case
+        when invitation.status in ('sent', 'active')
+          and workspace.id is not null
+        then 1 end) as opened,
+      count(case
+        when invitation.status in ('sent', 'active')
+          and invitation.invited_at >= ?
+        then 1 end) as invited30Days,
+      count(case
+        when invitation.status in ('sent', 'active')
+          and invitation.invited_at >= ?
+          and workspace.id is not null
+        then 1 end) as opened30Days,
+      count(case when invitation.status = 'not_sent' then 1 end) as notSent,
+      count(case when invitation.status = 'paused' then 1 end) as paused,
+      count(case when invitation.status = 'revoked' then 1 end) as revoked
+     from beta_invitations invitation
+     left join beta_access_workspaces workspace
+       on workspace.access_code_hash = invitation.access_code_hash`,
+  )
+    .bind(since30Days, since30Days)
+    .first();
+
+  return {
+    registered: Number(row?.registered || 0),
+    invited: Number(row?.invited || 0),
+    opened: Number(row?.opened || 0),
+    invited30Days: Number(row?.invited30Days || 0),
+    opened30Days: Number(row?.opened30Days || 0),
+    notSent: Number(row?.notSent || 0),
+    paused: Number(row?.paused || 0),
+    revoked: Number(row?.revoked || 0),
+  };
+}
+
+async function getStudentValueMetrics(env, since30Days) {
+  const [
+    summaryRow,
+    evidenceRows,
+    actionRows,
+    actionSummaryRow,
+    supportRows,
+    frictionRows,
+    segmentRows,
+    cohortRows,
+    categoryRows,
+    programRows,
+    programActionRows,
+  ] = await Promise.all([
+    env.DB.prepare(
+      `select
+        count(distinct case
+          when relevance_source = 'explicit' and relevance is not null and relevance != ''
+          then workspace_id end) as decisionStudents,
+        count(distinct case
+          when relevance_source = 'explicit' and first_decision_at is not null
+          then workspace_id end) as eligibleActivated,
+        count(distinct case
+          when relevance_source = 'explicit' and relevance in ('this_cycle', 'future_cycle')
+          then workspace_id end) as foundRelevant,
+        count(distinct case
+          when relevance_source = 'explicit'
+            and prior_awareness = 'no' and relevance in ('this_cycle', 'future_cycle')
+          then workspace_id end) as newDiscoveryStudents,
+        count(case
+          when relevance_source = 'explicit'
+            and prior_awareness = 'no' and relevance in ('this_cycle', 'future_cycle')
+          then 1 end) as newDiscoveryPairs,
+        count(case
+          when relevance_source = 'explicit'
+            and prior_awareness in ('yes', 'no', 'unsure')
+            and relevance in ('this_cycle', 'future_cycle')
+          then 1 end) as awarenessAnsweredPairs,
+        (
+          select count(*) from beta_program_watches watch
+          where watch.is_watching = 1
+        ) as watchingPairs,
+        0 as preparingPairs,
+        0 as deliberateSkipPairs,
+        count(case
+          when relevance_source = 'explicit'
+            and relevance in ('this_cycle', 'future_cycle')
+            and (prior_awareness is null or prior_awareness = '')
+          then 1 end) as awarenessUnknownPairs,
+        count(case when relevance_source = 'explicit' then 1 end) as evidencePairs
+       from beta_program_evidence
+       where updated_at >= ?`,
+    ).bind(since30Days).first(),
+    env.DB.prepare(
+      `select
+        workspace_id as workspaceId,
+        program_id as programId,
+        first_relevant_at as firstRelevantAt,
+        action_state as actionState,
+        action_at as actionAt,
+        (
+          select verified_deadline_at
+          from monitoring_audits audit
+          where audit.program_id = beta_program_evidence.program_id
+            and audit.verified_deadline_at is not null
+            and audit.verified_deadline_at != ''
+          order by audit.created_at desc
+          limit 1
+        ) as deadlineAt
+       from beta_program_evidence
+       where updated_at >= ?
+         and relevance_source = 'explicit'
+         and relevance in ('this_cycle', 'future_cycle')`,
+    ).bind(since30Days).all(),
+    env.DB.prepare(
+      `select
+        attempt.workspace_id as workspaceId,
+        attempt.program_id as programId,
+        'submitted' as actionState,
+        attempt.applied_at as actionAt,
+        (
+          select verified_deadline_at
+          from monitoring_audits audit
+          where audit.program_id = attempt.program_id
+            and audit.verified_deadline_at is not null
+            and audit.verified_deadline_at != ''
+          order by audit.created_at desc
+          limit 1
+        ) as deadlineAt
+       from beta_application_attempts attempt
+       where attempt.applied_at >= ?`,
+    ).bind(since30Days).all(),
+    env.DB.prepare(
+      `select
+        count(distinct workspace_id) as externalActionStudents,
+        count(distinct workspace_id || ':' || program_id) as externalActionPairs,
+        count(*) as submittedPairs
+       from beta_application_attempts
+       where applied_at >= ?`,
+    ).bind(since30Days).first(),
+    env.DB.prepare(
+      `select coalesce(nullif(support_level, ''), 'unknown') as label,
+        count(distinct workspace_id) as students,
+        count(*) as records
+       from beta_program_evidence
+       where updated_at >= ?
+         and relevance_source = 'explicit'
+       group by label
+       order by records desc`,
+    ).bind(since30Days).all(),
+    env.DB.prepare(
+      `select friction_category as label,
+        count(distinct workspace_id) as students,
+        count(*) as records
+       from beta_program_evidence
+       where updated_at >= ?
+         and friction_category is not null
+         and friction_category != ''
+       group by friction_category
+       order by records desc`,
+    ).bind(since30Days).all(),
+    env.DB.prepare(
+      `select class_year as classYear, role_track as roleTrack,
+        count(distinct workspace_id) as students,
+        count(*) as records
+       from beta_program_evidence
+       where updated_at >= ?
+         and (class_year != '' or role_track != '')
+       group by class_year, role_track
+       order by records desc
+       limit 20`,
+    ).bind(since30Days).all(),
+    env.DB.prepare(
+      `select coalesce(nullif(workspace.tester_segment, ''), 'unknown') as testerSegment,
+        count(distinct evidence.workspace_id) as students,
+        count(distinct case
+          when evidence.relevance_source = 'explicit' and evidence.first_decision_at is not null
+          then evidence.workspace_id end) as eligibleActivated,
+        count(distinct case
+          when evidence.relevance_source = 'explicit'
+            and evidence.relevance in ('this_cycle', 'future_cycle')
+          then evidence.workspace_id end) as foundRelevant,
+        count(distinct case
+          when evidence.relevance_source = 'explicit'
+            and evidence.prior_awareness = 'no'
+            and evidence.relevance in ('this_cycle', 'future_cycle')
+          then evidence.workspace_id end) as newDiscoveryStudents,
+        count(distinct case
+          when exists (
+            select 1 from beta_application_attempts attempt
+            where attempt.workspace_id = evidence.workspace_id
+              and attempt.applied_at >= ?
+          )
+          then evidence.workspace_id end) as externalActionStudents
+       from beta_program_evidence evidence
+       inner join beta_access_workspaces workspace on workspace.id = evidence.workspace_id
+       where evidence.updated_at >= ?
+         and evidence.relevance_source = 'explicit'
+       group by testerSegment
+       order by students desc`,
+    ).bind(since30Days, since30Days).all(),
+    env.DB.prepare(
+      `select coalesce(nullif(opportunity_category, ''), 'Not provided') as label,
+        count(distinct workspace_id) as students,
+        count(*) as records,
+        count(distinct case
+          when relevance_source = 'explicit' and relevance in ('this_cycle', 'future_cycle')
+          then workspace_id end) as relevantStudents,
+        count(distinct case
+          when exists (
+            select 1 from beta_application_attempts attempt
+            where attempt.workspace_id = beta_program_evidence.workspace_id
+              and attempt.program_id = beta_program_evidence.program_id
+              and attempt.applied_at >= ?
+          ) then workspace_id end) as externalActionStudents
+       from beta_program_evidence
+       where updated_at >= ?
+         and relevance_source = 'explicit'
+       group by label
+       order by records desc`,
+    ).bind(since30Days, since30Days).all(),
+    env.DB.prepare(
+      `select program_id as programId,
+        count(distinct workspace_id) as students,
+        count(distinct case
+          when relevance_source = 'explicit' and relevance in ('this_cycle', 'future_cycle')
+          then workspace_id end) as relevantStudents,
+        count(distinct case
+          when relevance_source = 'explicit'
+            and prior_awareness = 'no' and relevance in ('this_cycle', 'future_cycle')
+          then workspace_id end) as newDiscoveryStudents
+       from beta_program_evidence
+       where updated_at >= ?
+         and relevance_source = 'explicit'
+       group by program_id
+       order by relevantStudents desc, students desc
+       limit 12`,
+    ).bind(since30Days).all(),
+    env.DB.prepare(
+      `select program_id as programId,
+        count(distinct workspace_id) as externalActionStudents,
+        count(*) as submissions
+       from beta_application_attempts
+       where applied_at >= ?
+       group by program_id`,
+    ).bind(since30Days).all(),
+  ]);
+  const timing = calculateTimingEvidence(evidenceRows.results || [], actionRows.results || []);
+  const programActionsById = new Map(
+    (programActionRows.results || []).map((row) => [row.programId, row]),
+  );
+  const programEvidenceById = new Map(
+    (programRows.results || []).map((row) => [row.programId, row]),
+  );
+  const measuredProgramIds = new Set([...programEvidenceById.keys(), ...programActionsById.keys()]);
+
+  return {
+    eligibleActivation: {
+      numerator: Number(summaryRow?.eligibleActivated || 0),
+      denominator: Number(summaryRow?.decisionStudents || 0),
+    },
+    foundRelevant: Number(summaryRow?.foundRelevant || 0),
+    newToStudentDiscovery: {
+      students: Number(summaryRow?.newDiscoveryStudents || 0),
+      programPairs: Number(summaryRow?.newDiscoveryPairs || 0),
+      unknownPairs: Number(summaryRow?.awarenessUnknownPairs || 0),
+      denominator: Number(summaryRow?.awarenessAnsweredPairs || 0),
+    },
+    externalActions: {
+      students: Number(actionSummaryRow?.externalActionStudents || 0),
+      programPairs: Number(actionSummaryRow?.externalActionPairs || 0),
+      submissions: Number(actionSummaryRow?.submittedPairs || 0),
+      watching: Number(summaryRow?.watchingPairs || 0),
+      preparing: Number(summaryRow?.preparingPairs || 0),
+      deliberateSkips: Number(summaryRow?.deliberateSkipPairs || 0),
+    },
+    discoveryLeadTime: timing.discoveryLeadTime,
+    timelyExternalAction: timing.timelyExternalAction,
+    supportLevels: normalizeGroupedRows(supportRows.results),
+    frictionCategories: normalizeGroupedRows(frictionRows.results),
+    segments: (segmentRows.results || []).map((row) => ({
+      classYear: cleanString(row.classYear, 80) || 'Not provided',
+      roleTrack: cleanString(row.roleTrack, 120) || 'Not provided',
+      students: Number(row.students || 0),
+      records: Number(row.records || 0),
+    })),
+    testerSegments: (cohortRows.results || []).map((row) => ({
+      testerSegment: cleanString(row.testerSegment, 80) || 'unknown',
+      students: Number(row.students || 0),
+      eligibleActivated: Number(row.eligibleActivated || 0),
+      foundRelevant: Number(row.foundRelevant || 0),
+      newDiscoveryStudents: Number(row.newDiscoveryStudents || 0),
+      externalActionStudents: Number(row.externalActionStudents || 0),
+    })),
+    opportunityCategories: (categoryRows.results || []).map((row) => ({
+      label: cleanString(row.label, 120),
+      students: Number(row.students || 0),
+      records: Number(row.records || 0),
+      relevantStudents: Number(row.relevantStudents || 0),
+      externalActionStudents: Number(row.externalActionStudents || 0),
+    })),
+    programEvidence: [...measuredProgramIds].map((programId) => {
+      const evidence = programEvidenceById.get(programId) || {};
+      const actions = programActionsById.get(programId) || {};
+      return {
+        programId: cleanString(programId, 160),
+        students: Number(evidence.students || 0),
+        relevantStudents: Number(evidence.relevantStudents || 0),
+        newDiscoveryStudents: Number(evidence.newDiscoveryStudents || 0),
+        externalActionStudents: Number(actions.externalActionStudents || 0),
+        submissions: Number(actions.submissions || 0),
+      };
+    }),
+  };
+}
+
+async function getIndependentUsabilityMetrics(env, since30Days) {
+  const [decisionRows, relevantWindowRows] = await Promise.all([
+    env.DB.prepare(
+      `select workspace.created_at as workspaceCreatedAt,
+        min(evidence.first_decision_at) as firstDecisionAt
+       from beta_access_workspaces workspace
+       inner join beta_program_evidence evidence on evidence.workspace_id = workspace.id
+       where evidence.first_decision_at >= ?
+       group by workspace.id`,
+    ).bind(since30Days).all(),
+    env.DB.prepare(
+      `select
+        delivery.id as deliveryId,
+        request.workspace_id as workspaceId,
+        candidate.program_id as programId,
+        delivery.sent_at as sentAt,
+        max(case when event.created_at > delivery.sent_at then 1 else 0 end) as returned,
+        max(case
+          when event.event_name = 'official_source_clicked'
+            and event.program_id = candidate.program_id
+            and event.created_at > delivery.sent_at
+          then 1 else 0 end) as sourceClicked,
+        max(case when engagement.created_at > delivery.sent_at then 1 else 0 end) as feedbackGiven,
+        max(case
+          when attempt.applied_at > delivery.sent_at
+          then 1 else 0 end) as externalAction
+       from alert_deliveries delivery
+       inner join watch_requests request on request.id = delivery.watch_request_id
+       inner join alert_candidates candidate on candidate.id = delivery.alert_candidate_id
+       left join beta_product_events event on event.workspace_id = request.workspace_id
+       left join alert_engagement_events engagement
+         on engagement.alert_candidate_id = delivery.alert_candidate_id
+        and engagement.watch_request_id = delivery.watch_request_id
+       left join beta_application_attempts attempt
+         on attempt.workspace_id = request.workspace_id
+        and attempt.program_id = candidate.program_id
+       where delivery.status = 'sent'
+         and request.workspace_id is not null
+         and delivery.sent_at >= ?
+       group by delivery.id`,
+    ).bind(since30Days).all(),
+  ]);
+
+  return {
+    timeToFirstUsefulDecision: calculateElapsedHours(decisionRows.results || [], 'workspaceCreatedAt', 'firstDecisionAt'),
+    relevantWindowReturn: calculateRelevantWindowReturn(relevantWindowRows.results || []),
+  };
+}
+
+async function getReliabilityMetrics(env, since30Days) {
+  const now = new Date().toISOString();
+  const [freshness, auditRows, openingRows, latencyRows, candidateCounts, failures, deliveryCounts, discoveryPending, correctionRows] = await Promise.all([
+    env.DB.prepare(
+      `select
+        count(*) as eligible,
+        count(case
+          when official_sources.last_checked_at is not null
+            and coalesce(trim(official_sources.last_error_message), '') = ''
+            and source_schedule_profiles.next_check_at > ?
+          then 1 end) as fresh,
+        count(case when source_schedule_profiles.next_check_at <= ? then 1 end) as due
+       from official_sources
+       inner join source_schedule_profiles
+         on source_schedule_profiles.official_source_id = official_sources.id
+       where official_sources.enabled = 1
+         and source_schedule_profiles.current_phase in ('warmup', 'active')`,
+    ).bind(now, now).first(),
+    env.DB.prepare(
+      `select status_correct as statusCorrect, deadline_correct as deadlineCorrect,
+        eligibility_correct as eligibilityCorrect, url_correct as urlCorrect,
+        freshness_correct as freshnessCorrect, alert_correct as alertCorrect
+       from monitoring_audits
+       where audit_type = 'information_accuracy' and created_at >= ?`,
+    ).bind(since30Days).all(),
+    env.DB.prepare(
+      `select detected from monitoring_audits
+       where audit_type = 'known_opening' and created_at >= ?`,
+    ).bind(since30Days).all(),
+    env.DB.prepare(
+      `select candidate.id,
+        coalesce(
+          (
+            select audit.detected_at
+            from monitoring_audits audit
+            where audit.alert_candidate_id = candidate.id
+              and audit.detected = 1
+              and audit.detected_at is not null
+            order by audit.created_at asc
+            limit 1
+          ),
+          source_check.created_at
+        ) as detectedAt,
+        candidate.created_at as candidateAt,
+        min(delivery.sent_at) as sentAt,
+        case when candidate.status in ('auto_ready', 'auto_sent') and candidate.reviewed_at is null then 'automatic' else 'manual' end as deliveryPath
+       from alert_candidates candidate
+       inner join source_checks source_check on source_check.id = candidate.source_check_id
+       inner join alert_deliveries delivery
+         on delivery.alert_candidate_id = candidate.id and delivery.status = 'sent'
+       where candidate.created_at >= ?
+       group by candidate.id`,
+    ).bind(since30Days).all(),
+    env.DB.prepare(
+      `select
+        count(*) as total,
+        count(case when status not in ('auto_ready', 'auto_sent') then 1 end) as manualReview,
+        count(case when status in ('auto_ready', 'auto_sent') then 1 end) as automatic
+       from alert_candidates
+       where created_at >= ?`,
+    ).bind(since30Days).first(),
+    env.DB.prepare(
+      `select count(*) as count from official_sources
+       where enabled = 1 and last_error_message is not null and trim(last_error_message) != ''`,
+    ).first(),
+    env.DB.prepare(
+      `select
+        count(*) as total,
+        count(case when status = 'failed' then 1 end) as failed,
+        count(case when status = 'sent' then 1 end) as sent
+       from alert_deliveries
+       where created_at >= ?`,
+    ).bind(since30Days).first(),
+    env.DB.prepare(
+      `select count(*) as count from discovery_candidates where status = 'pending_review'`,
+    ).first(),
+    env.DB.prepare(
+      `select reported_at as reportedAt, resolved_at as resolvedAt
+       from monitoring_audits
+       where audit_type = 'correction' and reported_at is not null and created_at >= ?`,
+    ).bind(since30Days).all(),
+  ]);
+
+  return {
+    sourceFreshness: {
+      numerator: Number(freshness?.fresh || 0),
+      denominator: Number(freshness?.eligible || 0),
+      due: Number(freshness?.due || 0),
+    },
+    informationAccuracy: calculateAccuracyCoverage(auditRows.results || []),
+    knownOpenings: calculateKnownOpeningCoverage(openingRows.results || []),
+    notificationLatency: calculateNotificationLatency(latencyRows.results || []),
+    correctionTime: calculateElapsedHours(correctionRows.results || [], 'reportedAt', 'resolvedAt'),
+    corrections: {
+      recorded: correctionRows.results?.length || 0,
+      resolved: (correctionRows.results || []).filter((row) => row.resolvedAt).length,
+    },
+    alertCandidates: {
+      total: Number(candidateCounts?.total || 0),
+      manualReview: Number(candidateCounts?.manualReview || 0),
+      automatic: Number(candidateCounts?.automatic || 0),
+    },
+    failedChecks: Number(failures?.count || 0),
+    deliveries: {
+      total: Number(deliveryCounts?.total || 0),
+      sent: Number(deliveryCounts?.sent || 0),
+      failed: Number(deliveryCounts?.failed || 0),
+    },
+    pendingDiscoveryReview: Number(discoveryPending?.count || 0),
+  };
+}
+
+async function getOperationsMetrics(env, since7Days, since30Days) {
+  const [programs, watchers, time7Days, time30Days] = await Promise.all([
+    env.DB.prepare('select count(*) as count from official_sources where enabled = 1').first(),
+    env.DB.prepare(
+      `select count(distinct coalesce(
+          case when watch_requests.workspace_id is not null and watch_requests.workspace_id != ''
+            then 'workspace:' || watch_requests.workspace_id end,
+          case when watch_requests.email is not null and watch_requests.email != ''
+            then 'email:' || lower(watch_requests.email) end,
+          case when watch_requests.phone is not null and watch_requests.phone != ''
+            then 'phone:' || watch_requests.phone end,
+          'request:' || watch_requests.id
+        )) as students,
+        count(distinct watch_request_programs.program_id) as programs
+       from watch_request_programs
+       inner join watch_requests on watch_requests.id = watch_request_programs.watch_request_id
+       where watch_requests.status = 'active'
+         and (watch_requests.unsubscribed_at is null or watch_requests.unsubscribed_at = '')
+         and (
+           watch_requests.workspace_id is null
+           or not exists (
+             select 1 from beta_program_watches preference
+             where preference.workspace_id = watch_requests.workspace_id
+               and preference.program_id = watch_request_programs.program_id
+           )
+           or exists (
+             select 1 from beta_program_watches preference
+             where preference.workspace_id = watch_requests.workspace_id
+               and preference.program_id = watch_request_programs.program_id
+               and preference.is_watching = 1
+           )
+         )`,
+    ).first(),
+    env.DB.prepare(
+      `select category, sum(minutes) as minutes, count(*) as entries
+       from operational_time_entries where period_date >= ? group by category`,
+    ).bind(since7Days.slice(0, 10)).all(),
+    env.DB.prepare(
+      `select category, sum(minutes) as minutes, count(*) as entries
+       from operational_time_entries where period_date >= ? group by category`,
+    ).bind(since30Days.slice(0, 10)).all(),
+  ]);
+
+  return {
+    monitoredPrograms: Number(programs?.count || 0),
+    activeWatchers: Number(watchers?.students || 0),
+    watchedPrograms: Number(watchers?.programs || 0),
+    time7Days: normalizeTimeRows(time7Days.results),
+    time30Days: normalizeTimeRows(time30Days.results),
+  };
 }
 
 async function handleAlertEngagement(env, url) {
@@ -634,16 +2400,28 @@ async function saveWatchRequest(request, env, ctx) {
   const id = crypto.randomUUID();
   const unsubscribeToken = createSecureToken();
   const now = new Date().toISOString();
+  const accessCode = normalizeAccessCode(body.accessCode || body.code);
+  let workspaceId = null;
+
+  if (BETA_WORKSPACE_CODE_PATTERN.test(accessCode)) {
+    const accessCodeHash = await hashAccessCode(accessCode);
+    const workspace = await env.DB.prepare(
+      'select id from beta_access_workspaces where access_code_hash = ? limit 1',
+    )
+      .bind(accessCodeHash)
+      .first();
+    workspaceId = workspace?.id || null;
+  }
   const watchedPrograms = normalizeWatchedPrograms(body.watchedPrograms);
   const watchedProgramIds = uniqueStrings([
     ...arrayify(body.watchedProgramIds),
     ...watchedPrograms.map((program) => program.id),
-    ...arrayify(body.savedProgramIds),
   ]).slice(0, 50);
 
   await env.DB.prepare(
     `insert into watch_requests (
       id,
+      workspace_id,
       source,
       email,
       phone,
@@ -664,10 +2442,11 @@ async function saveWatchRequest(request, env, ctx) {
       unsubscribe_token,
       status,
       raw_payload_json
-    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       id,
+      workspaceId,
       cleanString(body.source || 'applyfirst-watch-request', 80),
       email,
       phone,
@@ -729,6 +2508,31 @@ async function saveWatchRequest(request, env, ctx) {
 
   if (programRows.length) {
     await env.DB.batch(programRows);
+  }
+
+  if (workspaceId) {
+    await env.DB.prepare(
+      `update beta_program_watches
+       set is_watching = 0, stopped_at = ?, updated_at = ?
+       where workspace_id = ? and is_watching = 1`,
+    )
+      .bind(now, now, workspaceId)
+      .run();
+
+    if (watchedProgramIds.length) {
+      await env.DB.batch(
+        watchedProgramIds.map((programId) => env.DB.prepare(
+          `insert into beta_program_watches (
+            id, workspace_id, program_id, is_watching, started_at, stopped_at, updated_at
+          ) values (?, ?, ?, 1, ?, null, ?)
+          on conflict(workspace_id, program_id) do update set
+            is_watching = 1,
+            started_at = coalesce(beta_program_watches.started_at, excluded.started_at),
+            stopped_at = null,
+            updated_at = excluded.updated_at`,
+        ).bind(crypto.randomUUID(), workspaceId, programId, now, now)),
+      );
+    }
   }
 
   if (shouldAutoAlertExistingOpenOnWatch(env) && watchedProgramIds.length) {
@@ -841,6 +2645,20 @@ async function getSourcesForMonitoring(env, { limit, now, force, programIds = []
       inner join watch_requests
         on watch_requests.id = watch_request_programs.watch_request_id
       where watch_requests.status = 'active'
+        and (
+          watch_requests.workspace_id is null
+          or not exists (
+            select 1 from beta_program_watches preference
+            where preference.workspace_id = watch_requests.workspace_id
+              and preference.program_id = watch_request_programs.program_id
+          )
+          or exists (
+            select 1 from beta_program_watches preference
+            where preference.workspace_id = watch_requests.workspace_id
+              and preference.program_id = watch_request_programs.program_id
+              and preference.is_watching = 1
+          )
+        )
       group by watch_request_programs.program_id
     ) watched
       on watched.program_id = official_sources.program_id
@@ -1279,6 +3097,20 @@ async function getDiscoveryQueue(env, url) {
       inner join watch_requests
         on watch_requests.id = watch_request_programs.watch_request_id
       where watch_requests.status = 'active'
+        and (
+          watch_requests.workspace_id is null
+          or not exists (
+            select 1 from beta_program_watches preference
+            where preference.workspace_id = watch_requests.workspace_id
+              and preference.program_id = watch_request_programs.program_id
+          )
+          or exists (
+            select 1 from beta_program_watches preference
+            where preference.workspace_id = watch_requests.workspace_id
+              and preference.program_id = watch_request_programs.program_id
+              and preference.is_watching = 1
+          )
+        )
       group by watch_request_programs.program_id
     ) watched
       on watched.program_id = official_sources.program_id
@@ -3087,6 +4919,20 @@ async function getReadinessQueue(env) {
         on watch_requests.id = watch_request_programs.watch_request_id
       where watch_requests.status = 'active'
         and (watch_requests.unsubscribed_at is null or watch_requests.unsubscribed_at = '')
+        and (
+          watch_requests.workspace_id is null
+          or not exists (
+            select 1 from beta_program_watches preference
+            where preference.workspace_id = watch_requests.workspace_id
+              and preference.program_id = watch_request_programs.program_id
+          )
+          or exists (
+            select 1 from beta_program_watches preference
+            where preference.workspace_id = watch_requests.workspace_id
+              and preference.program_id = watch_request_programs.program_id
+              and preference.is_watching = 1
+          )
+        )
       group by watch_request_programs.program_id
     ) watched
       on watched.program_id = official_sources.program_id
@@ -3361,6 +5207,20 @@ async function sendCandidateNotifications(env, candidateId, options = {}) {
     where watch_requests.status = 'active'
       and (watch_requests.unsubscribed_at is null or watch_requests.unsubscribed_at = '')
       and watch_request_programs.program_id = ?
+      and (
+        watch_requests.workspace_id is null
+        or not exists (
+          select 1 from beta_program_watches preference
+          where preference.workspace_id = watch_requests.workspace_id
+            and preference.program_id = watch_request_programs.program_id
+        )
+        or exists (
+          select 1 from beta_program_watches preference
+          where preference.workspace_id = watch_requests.workspace_id
+            and preference.program_id = watch_request_programs.program_id
+            and preference.is_watching = 1
+        )
+      )
     order by case when watch_requests.id = ? then 0 else 1 end,
       watch_requests.created_at asc
     limit 100`,
@@ -4516,6 +6376,11 @@ function normalizeEventTimestamp(value) {
 
 function normalizeProductEventContext(value) {
   const context = value && typeof value === 'object' ? value : {};
+  const unsupportedFields = Object.keys(context).filter((field) => !PRODUCT_EVENT_CONTEXT_FIELDS.has(field));
+
+  if (unsupportedFields.length) {
+    throw httpError(400, 'Unsupported product event context field.');
+  }
 
   return {
     view: cleanString(context.view, 40),
@@ -4523,6 +6388,300 @@ function normalizeProductEventContext(value) {
     status: cleanString(context.status, 60),
     resultCount: normalizeMetricNumber(context.resultCount),
     queryLength: normalizeMetricNumber(context.queryLength),
+  };
+}
+
+function normalizeOptionalEnum(value, allowedValues, label) {
+  const normalized = cleanString(value, 80).toLowerCase();
+
+  if (!normalized) {
+    return '';
+  }
+
+  if (!allowedValues.has(normalized)) {
+    throw httpError(400, `Choose a supported ${label}.`);
+  }
+
+  return normalized;
+}
+
+function normalizeRequiredEnum(value, allowedValues, label) {
+  const normalized = normalizeOptionalEnum(value, allowedValues, label);
+
+  if (!normalized) {
+    throw httpError(400, `Choose a supported ${label}.`);
+  }
+
+  return normalized;
+}
+
+function normalizeNullableBoolean(value) {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+
+  if (value === true || value === 1 || value === '1' || value === 'true') {
+    return 1;
+  }
+
+  if (value === false || value === 0 || value === '0' || value === 'false') {
+    return 0;
+  }
+
+  throw httpError(400, 'Use true, false, or leave this audit field blank.');
+}
+
+function normalizeOptionalTimestamp(value) {
+  const normalized = cleanString(value, 80);
+
+  if (!normalized) {
+    return null;
+  }
+
+  const timestamp = Date.parse(normalized);
+
+  if (!Number.isFinite(timestamp)) {
+    throw httpError(400, 'Use a valid date and time.');
+  }
+
+  return new Date(timestamp).toISOString();
+}
+
+function buildApplicationAttemptKey(cycleLabel, appliedAt) {
+  const normalizedCycle = cleanString(cycleLabel, 80)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  const appliedYear = /^\d{4}/.test(cleanString(appliedAt, 80))
+    ? cleanString(appliedAt, 80).slice(0, 4)
+    : '';
+
+  return `ordinary:${normalizedCycle || (appliedYear ? `year-${appliedYear}` : 'unspecified')}`;
+}
+
+function normalizeDateOnly(value) {
+  const normalized = cleanString(value, 20);
+
+  if (!normalized) {
+    return '';
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized) || !Number.isFinite(Date.parse(`${normalized}T00:00:00Z`))) {
+    throw httpError(400, 'Use a valid date in YYYY-MM-DD format.');
+  }
+
+  return normalized;
+}
+
+function isEligibleActivation({ relevance }) {
+  return PROGRAM_RELEVANCE_VALUES.has(relevance);
+}
+
+function calculateTimingEvidence(rows, actionRows = rows) {
+  const uniqueRows = dedupeRows(rows, (row) => `${row.workspaceId}:${row.programId}`);
+  const leadDays = [];
+  let relevantWithoutDeadline = 0;
+
+  for (const row of uniqueRows) {
+    const deadlineAt = parseTimestamp(row.deadlineAt);
+    const firstRelevantAt = parseTimestamp(row.firstRelevantAt);
+
+    if (!deadlineAt) {
+      relevantWithoutDeadline += 1;
+    } else if (firstRelevantAt && deadlineAt >= firstRelevantAt) {
+      leadDays.push((deadlineAt - firstRelevantAt) / (24 * 60 * 60 * 1000));
+    }
+
+  }
+
+  const actionsByPair = new Map();
+  for (const row of actionRows) {
+    if (!EXTERNAL_ACTION_VALUES.has(cleanString(row.actionState, 80))) continue;
+    const key = `${row.workspaceId}:${row.programId}`;
+    const actionAt = parseTimestamp(row.actionAt);
+    const deadlineAt = parseTimestamp(row.deadlineAt);
+    if (!actionAt || !deadlineAt) continue;
+    const existing = actionsByPair.get(key);
+    actionsByPair.set(key, {
+      workspaceId: row.workspaceId,
+      deadlineAt,
+      earliestActionAt: existing ? Math.min(existing.earliestActionAt, actionAt) : actionAt,
+    });
+  }
+  const timelyRows = [...actionsByPair.values()].filter((row) => row.earliestActionAt <= row.deadlineAt);
+  const timelyStudents = new Set(timelyRows.map((row) => row.workspaceId));
+
+  return {
+    discoveryLeadTime: summarizeNumericValues(leadDays, relevantWithoutDeadline),
+    timelyExternalAction: {
+      students: timelyStudents.size,
+      programPairs: timelyRows.length,
+      denominator: actionsByPair.size,
+      status: actionsByPair.size ? 'available' : 'not_available',
+    },
+  };
+}
+
+function calculateElapsedHours(rows, startKey, endKey) {
+  const values = rows
+    .map((row) => {
+      const start = parseTimestamp(row[startKey]);
+      const end = parseTimestamp(row[endKey]);
+      return start && end && end >= start ? (end - start) / (60 * 60 * 1000) : null;
+    })
+    .filter((value) => value !== null);
+
+  return summarizeNumericValues(values, rows.length - values.length);
+}
+
+function calculateRelevantWindowReturn(rows, now = Date.now()) {
+  const responseWindowMs = 48 * 60 * 60 * 1000;
+  const eligibleRows = rows.filter((row) => {
+    const sentAt = parseTimestamp(row.sentAt);
+    return sentAt && now - sentAt >= responseWindowMs;
+  });
+  const returnedStudents = new Set();
+  const sourceClickStudents = new Set();
+  const feedbackStudents = new Set();
+  const actionStudents = new Set();
+  const eligibleStudents = new Set();
+
+  for (const row of eligibleRows) {
+    eligibleStudents.add(row.workspaceId);
+    if (Number(row.returned)) returnedStudents.add(row.workspaceId);
+    if (Number(row.sourceClicked)) sourceClickStudents.add(row.workspaceId);
+    if (Number(row.feedbackGiven)) feedbackStudents.add(row.workspaceId);
+    if (Number(row.externalAction)) actionStudents.add(row.workspaceId);
+  }
+
+  return {
+    status: eligibleRows.length ? 'available' : 'not_available',
+    observationWindowHours: 48,
+    eligibleStudents: eligibleStudents.size,
+    eligibleAlerts: eligibleRows.length,
+    returnedStudents: returnedStudents.size,
+    sourceClickStudents: sourceClickStudents.size,
+    feedbackStudents: feedbackStudents.size,
+    externalActionStudents: actionStudents.size,
+    immatureAlerts: rows.length - eligibleRows.length,
+  };
+}
+
+function calculateAccuracyCoverage(rows) {
+  const fields = ['statusCorrect', 'deadlineCorrect', 'eligibilityCorrect', 'urlCorrect', 'freshnessCorrect', 'alertCorrect'];
+  const byField = {};
+  let numerator = 0;
+  let denominator = 0;
+
+  for (const field of fields) {
+    const observed = rows.filter((row) => row[field] !== null && row[field] !== undefined);
+    const correct = observed.filter((row) => Number(row[field]) === 1).length;
+    byField[field] = { numerator: correct, denominator: observed.length };
+    numerator += correct;
+    denominator += observed.length;
+  }
+
+  return { numerator, denominator, auditedRecords: rows.length, byField };
+}
+
+function calculateKnownOpeningCoverage(rows) {
+  const observed = rows.filter((row) => row.detected !== null && row.detected !== undefined);
+
+  return {
+    numerator: observed.filter((row) => Number(row.detected) === 1).length,
+    denominator: observed.length,
+    unaudited: rows.length - observed.length,
+  };
+}
+
+function calculateNotificationLatency(rows) {
+  const groups = { all: [], automatic: [], manual: [] };
+
+  for (const row of rows) {
+    const detectedAt = parseTimestamp(row.detectedAt);
+    const sentAt = parseTimestamp(row.sentAt);
+
+    if (!detectedAt || !sentAt || sentAt < detectedAt) {
+      continue;
+    }
+
+    const hours = (sentAt - detectedAt) / (60 * 60 * 1000);
+    groups.all.push(hours);
+    groups[row.deliveryPath === 'automatic' ? 'automatic' : 'manual'].push(hours);
+  }
+
+  return {
+    all: summarizeNumericValues(groups.all, rows.length - groups.all.length),
+    automatic: summarizeNumericValues(groups.automatic, 0),
+    manual: summarizeNumericValues(groups.manual, 0),
+  };
+}
+
+function summarizeNumericValues(values, unavailableCount = 0) {
+  const sorted = values.filter(Number.isFinite).sort((left, right) => left - right);
+
+  if (!sorted.length) {
+    return { status: 'not_available', count: 0, unavailableCount, median: null, min: null, max: null };
+  }
+
+  const middle = Math.floor(sorted.length / 2);
+  const median = sorted.length % 2
+    ? sorted[middle]
+    : (sorted[middle - 1] + sorted[middle]) / 2;
+
+  return {
+    status: 'available',
+    count: sorted.length,
+    unavailableCount,
+    median: roundMetric(median),
+    min: roundMetric(sorted[0]),
+    max: roundMetric(sorted.at(-1)),
+  };
+}
+
+function parseTimestamp(value) {
+  const timestamp = Date.parse(cleanString(value, 80));
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function roundMetric(value) {
+  return Math.round(value * 10) / 10;
+}
+
+function dedupeRows(rows, keyForRow) {
+  const rowsByKey = new Map();
+  for (const row of rows) rowsByKey.set(keyForRow(row), row);
+  return [...rowsByKey.values()];
+}
+
+function normalizeGroupedRows(rows) {
+  return (rows || []).map((row) => ({
+    label: cleanString(row.label, 120),
+    students: Number(row.students || 0),
+    records: Number(row.records || 0),
+  }));
+}
+
+function normalizeSegmentRows(rows) {
+  return (rows || []).map((row) => ({
+    label: cleanString(row.label, 160),
+    students: Number(row.students || 0),
+  }));
+}
+
+function normalizeTimeRows(rows) {
+  const entries = Object.fromEntries(
+    (rows || []).map((row) => [cleanString(row.category, 80), Number(row.minutes || 0)]),
+  );
+  const entryCount = (rows || []).reduce((sum, row) => sum + Number(row.entries || 0), 0);
+
+  return {
+    monitoringReview: entries.monitoring_review || 0,
+    dataCorrection: entries.data_correction || 0,
+    userSupport: entries.user_support || 0,
+    total: Object.values(entries).reduce((sum, minutes) => sum + minutes, 0),
+    entryCount,
+    status: entryCount ? 'available' : 'not_available',
   };
 }
 
@@ -4881,4 +7040,13 @@ function jsonResponse(env, body, init = {}) {
   });
 }
 
-export { classifySourceText };
+export {
+  buildApplicationAttemptKey,
+  calculateAccuracyCoverage,
+  calculateKnownOpeningCoverage,
+  calculateNotificationLatency,
+  calculateRelevantWindowReturn,
+  calculateTimingEvidence,
+  classifySourceText,
+  isEligibleActivation,
+};

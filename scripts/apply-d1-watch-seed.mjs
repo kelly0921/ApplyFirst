@@ -7,7 +7,7 @@ const skipGenerate = args.has('--skip-generate');
 const dryRun = args.has('--dry-run');
 const maxAttempts = Number.parseInt(getArgValue('--attempts') ?? '3', 10);
 const retryDelayMs = Number.parseInt(getArgValue('--retry-delay-ms') ?? '2500', 10);
-const seedPath = new URL('../cloudflare/d1/watch-seed.generated.sql', import.meta.url);
+const seedPath = new URL('../cloudflare/seeds/watch-seed.generated.sql', import.meta.url);
 const seedFilePath = fileURLToPath(seedPath);
 const projectRoot = fileURLToPath(new URL('..', import.meta.url));
 const wranglerBinary = process.execPath;
@@ -39,7 +39,7 @@ const sql = stripSqlLineComments(await readFile(seedPath, 'utf8'));
 const statements = splitSqlStatements(sql);
 
 if (!statements.length) {
-  throw new Error('No SQL statements found in cloudflare/d1/watch-seed.generated.sql');
+  throw new Error('No SQL statements found in cloudflare/seeds/watch-seed.generated.sql');
 }
 
 console.log(`${dryRun ? 'Would apply' : 'Applying'} ${statements.length} D1 seed statements.`);

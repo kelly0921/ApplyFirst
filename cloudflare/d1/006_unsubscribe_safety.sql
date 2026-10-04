@@ -1,6 +1,6 @@
-alter table watch_requests add column unsubscribe_token text;
-alter table watch_requests add column unsubscribed_at text;
-alter table watch_requests add column unsubscribe_reason text;
+-- These columns now exist in 001_watch_foundation.sql for fresh databases.
+-- Production databases that predate that baseline received them when this
+-- migration was first applied, so only the idempotent indexes remain here.
 
 create unique index if not exists idx_watch_requests_unsubscribe_token
   on watch_requests(unsubscribe_token)

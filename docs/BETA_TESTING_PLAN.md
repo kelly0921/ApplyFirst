@@ -1,10 +1,10 @@
 # ApplyFirst Beta Testing Plan
 
-Use this plan to expand the beta without paying for infrastructure before the product proves its value. The primary outcome is whether students discover a relevant opportunity and apply earlier. Saving programs, setting a focus, and enabling alerts are supporting behaviors, not the end result.
+Use this plan to expand the beta without paying for infrastructure before the product proves its value. The primary outcome is whether the right students make useful opportunity decisions, discover programs that are new to them, and take observable action while a verified window is open. Saving programs, setting a focus, enabling alerts, and ordinary return use are diagnostics rather than end results.
 
 ## Rollout Plan
 
-Start with the 12 confirmed Recruiting Season Accelerator students. Give each student a unique workspace code so their saved programs, focus, alert setup, and outcome check-in follow that code across browsers.
+Start with the 12 confirmed Recruiting Season Accelerator students. Give each student a unique workspace code so saved programs, focus, alert setup, and program-level decisions follow that code across browsers. In Maintainer Mode, classify these masked workspaces as RSA-assisted; classify later direct waitlist testers as independent/waitlist.
 
 Hold the first cohort for one stable week before inviting more waitlist users. Stability means:
 
@@ -12,7 +12,7 @@ Hold the first cohort for one stable week before inviting more waitlist users. S
 - No incorrect automatic opening emails.
 - Monitoring backlog stays near zero and scheduled checks continue running.
 - At least 8 of 12 students open a workspace.
-- At least 5 students save a relevant program or start watching one.
+- At least 5 students record one useful opportunity decision. Saving or watching is not required when a student correctly determines a program is not relevant or they are not eligible.
 
 If those conditions hold, invite 5-8 additional waitlist users. After that, expand in batches of 15-25. Do not invite the entire waitlist at once; each batch should be large enough to reveal patterns while still making individual failures easy to investigate.
 
@@ -20,32 +20,32 @@ Pause expansion when a student-facing failure repeats, an inaccurate alert is se
 
 ## What To Measure
 
-The north-star outcome is the number of students who report either `Found A Relevant Program` or `Applied Earlier`.
+Evaluate the beta in this order:
 
-Use these supporting measures to diagnose where the product helps or loses students:
+1. Student value: Eligible Activation, relevant programs, new-to-student discovery, meaningful external action, timely action, and descriptive discovery lead time.
+2. Independent usability: time to first useful decision, recorded support level, and Relevant-Window Return.
+3. Trust and reliability: source freshness, audited accuracy, known-opening detection, incorrect alerts, latency, and correction time.
+4. Scalability: monitored programs, active watchers, review burden, failed checks, delivery failures, and approximate maintainer time.
+5. Diagnostics: views, saves, watches, My Focus, alerts, sessions, ordinary return, source clicks, contributions, and waitlist demand.
 
-- Reach: unique waitlist emails, invited workspaces, and workspaces opened.
-- Discovery: students who view a program, save a program, or visit an official source.
-- Activation: students who save a program, set My Focus, and enable alerts.
-- Retention: students who return on at least two different days within 30 days.
-- Alert value: official-source clicks plus `Useful`, `Not Relevant`, `Already Knew`, and `Information Looks Wrong` feedback.
-- Coverage quality: monitored sources due, failed source checks, pending candidates, incorrect alerts, and alert delivery failures.
-- Student outcomes: `Found A Relevant Program`, `Applied Earlier`, or `Not Yet` from the My Focus check-in.
+`Applied Earlier` is preserved as historical self-report but is no longer a primary measure. New evidence keeps explicit relevance, prior awareness, application attempts and outcomes, watch preference, and verified timing/status as separate records. Applying is not used as a proxy for relevance or as a command to stop alerts.
 
-Do not optimize for raw page views or waitlist size alone. A smaller cohort that discovers and acts on relevant programs is more valuable than a large inactive list.
+See [Beta metric definitions](./BETA_METRIC_DEFINITIONS.md) for exact numerators, denominators, exclusions, and N/A rules.
 
-## Beta Success Thresholds
+## Beta Decision Gates
 
-Use these as directional launch gates, not permanent targets:
+Use evidence as directional launch gates, not permanent percentage targets:
 
-- Access rate: at least 70% of invited students open their workspace.
-- Discovery rate: at least 50% of opened workspaces view an opportunity and at least 35% save or watch one.
-- Activation rate: at least 30% of opened workspaces save a program, set My Focus, and enable alerts.
-- Return rate: at least 25% of opened workspaces return on another day.
-- Outcome rate: at least 25% of opened workspaces report finding a relevant program or applying earlier.
-- Trust: no false automatic opening alerts in the first cohort; any inaccurate alert feedback is reviewed before the next batch.
+- At least several students independently record an eligible opportunity decision, rather than only completing setup.
+- New-to-student discovery and external action records include their actual denominators and unknown responses.
+- Relevant-Window Return is evaluated only after students receive a relevant alert and its 48-hour response window matures.
+- Known-opening audits show whether monitored programs were actually detected.
+- No confirmed incorrect automatic opening alert remains unresolved before expanding a cohort.
+- Manual review, correction, and support time remain understandable as watcher count grows.
 
-The Maintainer Mode `Beta Progress` panel reports these first-party metrics for the last 30 days. Analytics are tied to hashed beta workspaces, not plaintext invite codes. Search terms are not stored. Program IDs, high-signal actions, alert feedback, and explicit outcome responses are stored so the funnel can be evaluated without adding a paid analytics vendor.
+Maintainer Mode reports the value hierarchy, lower-level diagnostics, program evidence, and masked participant activity. Analytics remain tied to hashed beta workspaces. Search terms and student identity are not stored in product analytics.
+
+Before reviewing a cohort, update each student-specific row in `docs/private/INVITE_CODES.csv`, run `npm run watch:invites:sync:dry`, and then sync the hash-only registry after the Worker is deployed. Shared prototype codes are excluded from invited/opened counts. Student-value measures come from the optional program check-in; monitoring accuracy and known-opening coverage require sampled maintainer audits; human-time measures remain `N/A` until a time entry is recorded. Never replace missing evidence with a zero.
 
 ## Cost Guardrails
 
@@ -121,6 +121,22 @@ Ask the tester to share their screen and think out loud.
    - Ask: What made it feel useful or not useful?
    - Ask: Does the expanded program view give enough detail: description, eligibility, format/location, length, funding/pay, timing, and source status?
    - Ask: Does the Start Here guide make it clear what to do next?
+   - After they inspect a meaningful program, ask them to use the optional relevance check-in. Confirm that prior awareness appears only for a current- or future-cycle fit, and that eligibility uncertainty asks what is unclear.
+   - Ask them to save one program, watch it, and mark it Applied. Confirm those three states remain independent.
+   - Ask them to update the application outcome, add another application attempt for the same program, and find both records in Application History.
+   - Stop watching the test program. Confirm it can remain Saved and its application history remains intact.
+
+### Lifecycle Edge-Case Regression
+
+Before deploying a lifecycle change, verify these histories without redesigning the state model:
+
+1. Current-cycle relevance -> Watch -> Applied -> Not Selected -> remains Watching -> Add Another Application in a later cycle.
+2. Future-cycle relevance -> Watch -> Applied later -> update outcome -> remains Watching.
+3. Applied first -> inferred relevance -> later explicit relevance response supersedes the inference.
+4. Applied -> later explicit Not Eligible; the attempt remains historical while current relevance becomes Not Eligible.
+5. Save + Watch -> Applied -> Stop Watching; Saved and application history remain intact.
+6. Double-click or repeat ordinary Mark Applied; only one same-cycle attempt exists. Use Add Another Application to create an intentional same-cycle repeat.
+7. Migrate repeated legacy `submitted` events; same-year duplicates collapse, distinct years remain separate attempts, ambiguous timestamps collapse to one unspecified attempt, and only explicit legacy program-watch reasons become watches.
 
 4. My Focus
    - Ask them to open My Focus and set their class year, role track, and timing preference.
@@ -147,6 +163,8 @@ The beta is working if:
 - Students can explain the product in one sentence without help.
 - Students understand this is not a generic job board.
 - Students save at least one program they would actually track.
+- Students understand that Saved is a bookmark, Watching controls future alerts, and Application History records each attempt without treating the program as permanently completed.
+- Students can represent a realistic repeat-cycle lifecycle: applied before, still watching, applied again later.
 - Students can use the expanded program view like a job-board detail page and know what is still missing or needs verification.
 - Students understand Start Here as a short onboarding path, not a permanent dashboard widget.
 - My Focus feels useful rather than like arbitrary settings.
@@ -195,7 +213,7 @@ Ask these at the end:
 - What was the most useful part?
 - What was the most confusing part?
 - What opportunity type matters most to you?
-- What would make this worth checking weekly?
+- What would make you return when a relevant program changes or opens?
 - Would you give ApplyFirst your email for opening reminders?
 - Would you rather get ApplyFirst alerts by email or text?
 - What should ApplyFirst watch that is missing today?

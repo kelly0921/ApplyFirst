@@ -1,2 +1,2 @@
-student_name,email,invite_code,code_label,sent_at,status,notes
+student_name,email,invite_code,code_label,sent_at,status,tester_segment,notes
 Example Student,student@example.com,AF-EXAMPLE-8X2Q,...8X2Q,2026-08-22,not_sent,Template row only. Do not put real codes in this template.
