@@ -14,6 +14,7 @@
   --blue: #2f5bd6;
   --green: var(--brand-accent);
   --rose: #b05668;
+  --danger: #a33a4e;
   --gold: #5867c9;
   --blue-soft: #eef4ff;
   --green-soft: #e8f7fb;
@@ -58,6 +59,50 @@ button {
 
 a {
   color: inherit;
+}
+
+.app-error-boundary {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+}
+
+.app-error-boundary section {
+  width: min(100%, 520px);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  padding: 28px;
+}
+
+.app-error-boundary span {
+  color: var(--brand-accent);
+  font-size: 0.75rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.app-error-boundary h1 {
+  margin: 8px 0;
+  font-size: 2rem;
+}
+
+.app-error-boundary p {
+  margin: 0 0 18px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.app-error-boundary button {
+  min-height: 42px;
+  border: 1px solid var(--brand-accent);
+  border-radius: 7px;
+  background: var(--brand-accent);
+  color: #ffffff;
+  padding: 0 16px;
+  font-weight: 800;
 }
 
 .sr-only {
@@ -5940,6 +5985,12 @@ a {
   color: var(--muted);
   font-size: 0.72rem;
   line-height: 1.4;
+}
+
+.program-progress-panel .program-progress-error {
+  border-left: 3px solid var(--danger);
+  color: var(--danger);
+  padding-left: 8px;
 }
 
 .program-progress-heading button {

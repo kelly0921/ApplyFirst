@@ -23,6 +23,7 @@
     "watch:public-status:test": "node scripts/test-watch-public-status.mjs",
     "watch:analytics:test": "node scripts/test-watch-analytics.mjs",
     "watch:lifecycle:test": "node scripts/test-student-lifecycle-migration.mjs",
+    "frontend:http:test": "node scripts/test-frontend-http.mjs",
     "watch:invites:sync": "node scripts/sync-beta-invitations.mjs",
     "watch:invites:sync:dry": "node scripts/sync-beta-invitations.mjs --dry-run",
     "watch:d1:migrate": "npx wrangler d1 migrations apply applyfirst-watch --config wrangler.watch.toml --remote",

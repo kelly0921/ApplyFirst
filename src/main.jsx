@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import './styles.css';
 import programsScreenshot from '../docs/assets/screenshots/applyfirst-programs-desktop.png';
 import programStatusMixScreenshot from '../docs/assets/screenshots/applyfirst-program-status-mix-desktop.png';
+import { fetchJson, postJson } from './http';
 import { createSourceAnalysis, getSourceReviewDecision } from './monitoring';
 import {
   confidenceLabels,
@@ -326,31 +327,6 @@ function getOpportunityDisplaySubtitle(opportunity) {
   return normalizedOrganization && normalizedTitle.includes(normalizedOrganization)
     ? opportunity.category
     : opportunity.organization;
-}
-
-async function postJson(endpoint, body) {
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    throw new Error('Endpoint returned an error.');
-  }
-
-  return response;
-}
-
-async function fetchJson(endpoint) {
-  const response = await fetch(endpoint);
-  const payload = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    throw new Error(payload.error || `Endpoint returned HTTP ${response.status}.`);
-  }
-
-  return payload;
 }
 
 function getAnalyticsSessionId() {
@@ -1693,6 +1669,11 @@ function App() {
             allowDuplicate,
           },
         );
+
+        if (!response?.attempt?.id || response.attempt.programId !== id) {
+          throw new Error('Application attempt response was incomplete.');
+        }
+
         attempt = response.attempt;
         created = response.created !== false;
       }
@@ -6308,6 +6289,7 @@ function OpportunityDetail({
         attempts={applicationAttempts}
         mutationState={applicationMutationState}
         applicationSaving={applicationMutationState?.[opportunity.id] === 'saving'}
+        applicationError={applicationMutationState?.[opportunity.id] === 'error'}
         onMarkApplied={onMarkApplied}
         onOutcomeChange={onApplicationOutcomeChange}
       />
@@ -6366,6 +6348,7 @@ function ProgramProgressPanel({
   attempts = [],
   mutationState = {},
   applicationSaving,
+  applicationError,
   onMarkApplied,
   onOutcomeChange,
 }) {
@@ -6381,9 +6364,20 @@ function ProgramProgressPanel({
           onClick={() => onMarkApplied({ allowDuplicate: attempts.length > 0 })}
           disabled={applicationSaving}
         >
-          {applicationSaving ? 'Saving...' : attempts.length ? 'Add Another Application' : 'Mark Applied'}
+          {applicationSaving
+            ? 'Saving...'
+            : applicationError
+              ? 'Try Again'
+              : attempts.length
+                ? 'Add Another Application'
+                : 'Mark Applied'}
         </button>
       </div>
+      {applicationError ? (
+        <p className="program-progress-error" role="alert">
+          We could not save this application. Your page is still intact, so please try again.
+        </p>
+      ) : null}
       <div className="program-state-summary" aria-label="Saved and watch status">
         <span className={saved ? 'active' : ''}>{saved ? 'Saved' : 'Not Saved'}</span>
         <span className={watched ? 'active' : ''}>{watched ? 'Watching' : 'Not Watching'}</span>
@@ -7487,8 +7481,44 @@ function EmptyState({ onReset }) {
   );
 }
 
+class AppErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, info) {
+    console.error('ApplyFirst could not render the current view.', error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <main className="app-error-boundary">
+          <section>
+            <span>ApplyFirst</span>
+            <h1>This page needs a quick refresh.</h1>
+            <p>Your saved workspace is still available. Reload to return to the opportunity library.</p>
+            <button type="button" onClick={() => window.location.reload()}>Reload ApplyFirst</button>
+          </section>
+        </main>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 const rootElement = document.getElementById('root');
 const appRoot = rootElement._applyFirstRoot ?? createRoot(rootElement);
 
 rootElement._applyFirstRoot = appRoot;
-appRoot.render(<App />);
+appRoot.render(
+  <AppErrorBoundary>
+    <App />
+  </AppErrorBoundary>,
+);
