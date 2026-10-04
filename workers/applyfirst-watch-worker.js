@@ -4670,15 +4670,24 @@ async function getPublicLibraryStatus(env) {
     inner join program_alert_states
       on program_alert_states.program_id = official_sources.program_id
     where official_sources.enabled = 1
-      and program_alert_states.confidence = 'high'
-      and program_alert_states.status in ('open', 'deadline', 'opening_soon')
-      and lower(coalesce(program_alert_states.review_decision, '')) != 'manual review'
+      and (
+        (
+          program_alert_states.confidence = 'high'
+          and program_alert_states.status in ('open', 'deadline', 'opening_soon')
+          and lower(coalesce(program_alert_states.review_decision, '')) != 'manual review'
+        )
+        or (
+          program_alert_states.confidence in ('high', 'medium')
+          and program_alert_states.status in ('watching', 'closed')
+          and lower(coalesce(program_alert_states.review_decision, '')) = 'monitor only'
+        )
+      )
     order by official_sources.program_id asc`,
   ).all();
   const programs = (rows.results || []).map((row) => ({
     programId: cleanString(row.programId, 160),
     status: cleanString(row.status, 40),
-    confidence: 'high',
+    confidence: cleanString(row.confidence, 40),
     lastCheckedAt: cleanString(row.lastCheckedAt, 40),
     updatedAt: cleanString(row.updatedAt, 40),
   }));
@@ -5805,30 +5814,36 @@ function findCycleYearSignals(sourceText) {
   return signals;
 }
 
-function classifySourceText(sourceText, source) {
+function classifySourceText(sourceText, source, referenceDate = new Date()) {
   const normalized = sourceText.trim().replace(/\s+/g, ' ');
   const sourceSignals = extractSourceStatusSignals(normalized);
-  const openWindow = findDateSignal(normalized, ['open', 'opens', 'applications open', 'apply by', 'will open', 'opens on', 'opens in']);
+  const openWindow = findDateSignal(
+    normalized,
+    ['open', 'opens', 'applications open', 'apply by', 'will open', 'opens on', 'opens in'],
+    false,
+    referenceDate,
+  );
   const deadline = findDateSignal(
     normalized,
     ['deadline', 'due', 'apply by', 'submit by', 'submit your application by', 'closes', 'close'],
     true,
+    referenceDate,
   );
   const saysNotOpenYet =
-    /\b(not yet open|not open yet|applications? (are )?not open|not currently accepting|not accepting applications|no longer taking applications|not currently open)\b/i.test(
+    /\b(not yet open|not open yet|applications? (is |are )?not open|not currently accepting|not accepting applications|no longer taking applications|not currently open)\b/i.test(
       normalized,
     );
   const hasInformationalOpenMention =
     /\b(when|once|if|before|until)\s+applications?\s+(are\s+)?open\b/i.test(normalized) ||
     /\b(first|be first)\s+to\s+know\s+when\s+applications?\s+(are\s+)?open\b/i.test(normalized);
   const saysOpen =
-    /\b(apply now|applications? (are )?open|applications? will close|now accepting|currently accepting|accepting applications|submit your application|register now|registration (is )?open|registration has opened|registrations? (are )?open)\b/i.test(
+    /\b(apply now|applications? (is |are )?open|applications? will close|now accepting|currently accepting|accepting applications|submit your application|register now|registration (is )?open|registration has opened|registrations? (are )?open)\b/i.test(
       normalized,
     ) &&
     !saysNotOpenYet &&
     !hasInformationalOpenMention;
   const saysClosed =
-    /\b(registration (is )?(currently )?closed|registration has closed|registrations? (are )?(currently )?closed|currently closed|applications? (are )?(currently )?closed|application cycle (is )?closed|cycle (is )?closed|no longer accepting|deadline has passed|submissions? (are )?closed)\b/i.test(
+    /\b(registration (is )?(currently )?closed|registration has closed|registrations? (is |are )?(currently )?closed|currently closed|applications? (is |are )?(currently )?closed|application cycle (is )?closed|cycle (is )?closed|no longer accepting|deadline has passed|submissions? (is |are )?closed)\b/i.test(
       normalized,
     );
   const saysSoon = /\b(open soon|coming soon|applications? (are )?coming soon|will be back soon|check back|next cycle|next application cycle|will open|opens on|opens in)\b/i.test(
@@ -5852,7 +5867,8 @@ function classifySourceText(sourceText, source) {
   const mentionsEligibility =
     /\b(freshman|first-year|sophomore|underclass|student|eligible|eligibility|class year)\b/i.test(normalized);
   const detectedDate = deadline || openWindow;
-  const staleDateSignal = isStaleDateSignal(detectedDate) || sourceSignals.hasOnlyPastCycleYears;
+  const deadlineHasPassed = isDateBeforeReference(deadline, referenceDate);
+  const staleDateSignal = isStaleDateSignal(detectedDate, referenceDate) || sourceSignals.hasOnlyPastCycleYears;
   const exactPostingNeeded = isExactPostingNeededSource(source, normalized);
   const analysisOptions = {
     sourceSignals,
@@ -5871,6 +5887,14 @@ function classifySourceText(sourceText, source) {
       ...analysisOptions,
       sourceState: 'Closed',
       sourceAction: 'Keep monitoring the official source; do not send a student opening alert.',
+    });
+  }
+
+  if (deadlineHasPassed && (saysOpen || deadline)) {
+    return buildAnalysis('Deadline passed', 'watching', mentionsEligibility ? 'high' : 'medium', 'Monitor Only', '', source, normalized, deadline, {
+      ...analysisOptions,
+      sourceState: 'Closed',
+      sourceAction: 'The detected application deadline has passed; keep watching for the next cycle.',
     });
   }
 
@@ -6127,7 +6151,7 @@ function normalizeSignalMatchText(value) {
     .trim();
 }
 
-function findDateSignal(sourceText, nearbyWords, requireNearby = false) {
+function findDateSignal(sourceText, nearbyWords, requireNearby = false, referenceDate = new Date()) {
   const datePattern =
     /\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+\d{1,2}(?:,\s*\d{4})?\b|\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/gi;
   const matches = [...sourceText.matchAll(datePattern)];
@@ -6137,18 +6161,45 @@ function findDateSignal(sourceText, nearbyWords, requireNearby = false) {
   }
 
   const lower = sourceText.toLowerCase();
-  const nearbyMatch = matches.find((match) => {
+  const nearbyMatches = matches.filter((match) => {
     const start = Math.max(match.index - 90, 0);
     const end = Math.min(match.index + match[0].length + 90, sourceText.length);
     const context = lower.slice(start, end);
     return nearbyWords.some((word) => context.includes(word));
   });
+  const candidates = nearbyMatches.length ? nearbyMatches : requireNearby ? [] : matches;
 
-  if (nearbyMatch) {
-    return nearbyMatch[0];
+  if (!candidates.length) {
+    return '';
   }
 
-  return requireNearby ? '' : matches[0][0];
+  const referenceDay = startOfUtcDay(referenceDate);
+  const datedCandidates = candidates
+    .map((match) => ({ match, date: parseDateSignal(match[0], referenceDate) }))
+    .filter((candidate) => candidate.date);
+
+  if (!datedCandidates.length) {
+    return candidates[0][0];
+  }
+
+  const futureCandidate = datedCandidates
+    .filter((candidate) => candidate.date.getTime() >= referenceDay.getTime())
+    .sort((a, b) => a.date.getTime() - b.date.getTime())[0];
+
+  if (futureCandidate) {
+    return futureCandidate.match[0];
+  }
+
+  return datedCandidates.sort((a, b) => b.date.getTime() - a.date.getTime())[0].match[0];
+}
+
+function startOfUtcDay(value) {
+  return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
+}
+
+function isDateBeforeReference(signal, referenceDate = new Date()) {
+  const parsedDate = parseDateSignal(signal, referenceDate);
+  return Boolean(parsedDate && parsedDate.getTime() < startOfUtcDay(referenceDate).getTime());
 }
 
 function isStaleDateSignal(signal, referenceDate = new Date()) {

@@ -463,14 +463,14 @@ export const opportunities = [
     category: 'Full-Time Alternative',
     classYears: ['All class years'],
     timing: 'Fall',
-    status: 'open',
+    status: 'expectedSoon',
     confidence: 'high',
     funding: 'Free',
     location: 'Remote',
     url: 'https://jobs.lever.co/palantir/0ccbe620-a3ef-41d1-a5c4-68e56b3c91d0',
     previousUrl: '',
-    openDate: 'Fall 2026 cohort applications are open',
-    deadline: 'Apply while the Fall 2026 cohort remains open; exact close date is not listed',
+    openDate: 'Fall 2026 applications are closed; Palantir says 2027 cohorts will open soon',
+    deadline: '2027 application deadline has not been posted',
     tags: ['AI', 'AIP', 'Foundry', 'No degree required', 'Full-Time Alternative'],
     description:
       'Palantir American Tech Fellowship is a 12-week remote training fellowship for builders learning to deploy Palantir Foundry and AIP in enterprise, industrial, and national-infrastructure settings.',
@@ -479,14 +479,15 @@ export const opportunities = [
     experienceSummary:
       'Fellows complete virtual training with Ontologize, attend live evening sessions, build AIP and Foundry deployment skills, and may interview for full-time roles at Palantir or partner companies.',
     detailBasis:
-      'Official Palantir Lever posting lists the Fall 2026 open status, remote format, 12-week schedule, unpaid training model, and full-time interview path.',
+      'Official Palantir Lever posting confirms the program model and says the Fall 2026 cohort is closed while 2027 cohorts will open soon.',
     why:
       'A useful full-time alternative for builders who may not fit a traditional internship path but already have practical technical experience.',
     prep:
-      'Prepare project evidence across software, data, hardware, automation, robotics, or industrial systems and be ready to show builder-style problem solving.',
+      'Prepare project evidence across software, data, hardware, automation, robotics, or industrial systems and watch for the 2027 cohort application.',
     sourceNote:
-      'Official Palantir Lever posting says Fall 2026 applications are open, the fellowship starts September 15, 2026, runs 12 weeks, is unpaid, and requires 2+ years of hands-on work experience.',
-    lastChecked: '2026-08-22',
+      'Official Palantir Lever posting says Fall 2026 applications are closed and 2027 cohorts will open soon. The page still documents the 12-week remote, unpaid training model and 2+ years of hands-on experience requirement.',
+    lastChecked: '2026-10-04',
+    statusReviewedAt: '2026-10-04T14:40:33.036Z',
   },
   {
     id: 'jane-street-fttp-watch',
@@ -591,14 +592,14 @@ export const opportunities = [
     category: 'Fellowship',
     classYears: ['All class years'],
     timing: 'Rolling',
-    status: 'expectedSoon',
-    confidence: 'medium',
+    status: 'watching',
+    confidence: 'high',
     funding: 'Stipend',
     location: 'Remote',
-    url: 'https://www.outreachy.org/',
-    previousUrl: '',
-    openDate: 'Watch late August or early September for the next initial application window',
-    deadline: 'Verify exact December 2026 initial application deadline',
+    url: 'https://www.outreachy.org/apply/project-selection/',
+    previousUrl: 'https://www.outreachy.org/',
+    openDate: 'December 2026 initial applications opened August 24 and are now closed',
+    deadline: 'Initial application deadline was August 31, 2026; next round is not posted',
     tags: ['Open source', 'Diversity in tech', 'Remote'],
     description:
       'Outreachy is a paid remote internship program centered on open-source and open-science contribution.',
@@ -607,14 +608,15 @@ export const opportunities = [
     experienceSummary:
       'Remote mentored contribution period with open-source communities and project maintainers.',
     detailBasis:
-      'Current official Outreachy pages confirm recurring May/December cycles; exact next deadline needs confirmation.',
+      'The official December 2026 cohort page confirms the August 24 opening, August 31 initial deadline, October-November contribution period, and that new initial applications are closed.',
     why:
       'A practical route into open-source contribution, mentorship, and paid technical experience for students who may not yet have internship access.',
     prep:
       'Read eligibility carefully, complete initial applications early, and budget time for contribution periods before final project selection.',
     sourceNote:
-      'Official Outreachy pages confirm May and December internship cycles; the homepage lists December 2026 applications as early-to-mid August but does not give a specific deadline.',
-    lastChecked: '2026-08-18',
+      'Official Outreachy application page says initial applications for the December 2026-March 2027 cohort are closed. Only applicants who passed the initial stage proceed to the October 5-November 2 contribution period.',
+    lastChecked: '2026-10-04',
+    statusReviewedAt: '2026-10-04T14:40:33.036Z',
   },
   {
     id: 'mlh-open-source-fellowship',
@@ -881,30 +883,31 @@ export const opportunities = [
     category: 'Community / Prep Program',
     classYears: ['Sophomore'],
     timing: 'Fall',
-    status: 'expectedSoon',
+    status: 'open',
     confidence: 'high',
     funding: 'Free',
     location: 'Hybrid',
-    url: 'https://mlt.org/career-prep/',
-    previousUrl: '',
-    openDate: 'Watch fall priority deadlines by track',
-    deadline: 'SWE/Technology priority deadline: November 1',
+    url: 'https://mlt.smapply.org/prog/careerprep2029_application/',
+    previousUrl: 'https://mlt.org/career-prep/',
+    openDate: 'Career Prep 2029 applications opened June 8, 2026',
+    deadline: 'SWE/Technology priority: November 1, 2026; final deadline: January 15, 2027',
     tags: ['Career prep', 'Software engineering', 'Technology', 'Mentorship', 'Recruiting support'],
     description:
       'Management Leadership for Tomorrow Career Prep is a long-running coaching and recruiting-support program that starts in sophomore year and continues through senior year. The Software Engineering/Technology track focuses on applying computer science principles, building technical leadership, and preparing for software engineering, data, cybersecurity, web, systems, and application-development roles.',
     eligibilitySummary:
-      'For eligible current sophomores; the user-provided current-cycle note identifies students graduating Fall 2028-Summer 2029 for this round.',
+      'For college sophomores graduating Fall 2028 through Summer 2029 who are U.S. citizens, permanent residents, or DACA participants and are pursuing a bachelor’s degree.',
     experienceSummary:
       '20+ months of personalized coaching, seminars, interview preparation, job-search guidance, professional network access, employer connections, and recruiting support.',
     detailBasis:
-      'Official MLT Career Prep page confirms the sophomore-through-senior program model, personalized coaching, job-search guidance, employer access, seminars, and Software Engineering/Technology track. Current-cycle graduation range and November 1 priority deadline should be checked against MLT application materials before alerting.',
+      'The official Career Prep 2029 application confirms the open application, current eligibility, track-specific priority deadlines, and January 15, 2027 final deadline.',
     why:
       'High-leverage career-prep pathway for sophomores who want coaching, employer access, and structured recruiting support before internships and full-time recruiting intensify.',
     prep:
-      'Prepare resume, leadership stories, target track rationale, and recruiting goals; verify the current application deadline and eligibility before applying.',
+      'Prepare a resume, leadership examples, your target-track rationale, and evidence of commitment to MLT’s mission before the November 1 SWE/Technology priority deadline.',
     sourceNote:
-      'Official MLT Career Prep page confirms sophomore-year start, multi-year coaching, employer access, seminars, and Software Engineering/Technology track; user-provided current-cycle note adds Fall 2028-Summer 2029 eligibility and November 1 SWE/Technology priority deadline pending application-page confirmation.',
-    lastChecked: '2026-08-24',
+      'Official Career Prep 2029 application says applications are open, SWE/Technology and Corporate Management have a November 1, 2026 priority deadline, and the final deadline is January 15, 2027.',
+    lastChecked: '2026-10-04',
+    statusReviewedAt: '2026-10-04T14:40:33.036Z',
   },
   {
     id: 'forage-virtual-experience',
@@ -1064,7 +1067,8 @@ export const opportunities = [
       'Join the reminder list and prepare a short interest statement plus a resume that shows technical curiosity before the next cohort opens.',
     sourceNote:
       'Official HeadStart Fellowship page still displays the Fall 2026 application and its August 28 close date; treat it as previous-cycle context until a new cohort is posted.',
-    lastChecked: '2026-09-26',
+    lastChecked: '2026-10-04',
+    statusReviewedAt: '2026-10-04T14:40:33.036Z',
   },
   {
     id: 'hack-diversity-fellowship-watch',
@@ -1237,14 +1241,14 @@ export const opportunities = [
     category: 'Discovery Program',
     classYears: ['Freshman', 'Sophomore'],
     timing: 'Rolling',
-    status: 'open',
+    status: 'watching',
     confidence: 'high',
     funding: 'Varies',
     location: 'Insight program',
     url: 'https://www.janestreet.com/join-jane-street/programs-and-events/bridge/',
     previousUrl: '',
-    openDate: 'Jane Street programs page currently lists Bridge as accepting applications',
-    deadline: 'Verify exact session deadline by location before alerting',
+    openDate: 'Sign up to be notified about upcoming Bridge sessions',
+    deadline: 'No current application deadline is posted',
     tags: ['Strategy and product', 'Trading', 'Finance', 'Insight program'],
     description:
       'Bridge is Jane Street’s daylong early insight program for first- and second-year university students exploring Strategy and Product or Institutional Sales and Trading.',
@@ -1253,14 +1257,15 @@ export const opportunities = [
     experienceSummary:
       'Students get a short, interactive look at business, product, strategy, trading, and client-facing work at Jane Street.',
     detailBasis:
-      'Official Jane Street programs page lists Bridge as accepting applications.',
+      'The official Bridge detail page describes the program but currently offers only a notification signup for upcoming sessions.',
     why:
       'Useful for students who want to test finance, product, strategy, or trading interest before committing to a specific internship pipeline.',
     prep:
       'Prepare a short explanation of curiosity about markets, products, or client-facing work and verify the current Bridge track before applying.',
     sourceNote:
-      'Official Jane Street programs page lists Bridge as an accepting program for first- and second-year university students.',
-    lastChecked: '2026-08-22',
+      'Official Bridge page currently says to sign up for notifications about upcoming sessions; no current application or deadline is posted.',
+    lastChecked: '2026-10-04',
+    statusReviewedAt: '2026-10-04T14:40:33.036Z',
   },
   {
     id: 'jane-street-focus-watch',
@@ -1269,14 +1274,14 @@ export const opportunities = [
     category: 'Discovery Program',
     classYears: ['Freshman'],
     timing: 'Rolling',
-    status: 'open',
+    status: 'watching',
     confidence: 'high',
     funding: 'Varies',
     location: 'Multi-day program',
     url: 'https://www.janestreet.com/join-jane-street/programs-and-events/focus/',
     previousUrl: '',
-    openDate: 'Jane Street programs page currently lists FOCUS as accepting applications',
-    deadline: 'Verify exact current-cycle deadline on the official page',
+    openDate: 'Sign up to be notified about upcoming FOCUS sessions',
+    deadline: 'No current application deadline is posted',
     tags: ['Trading', 'Technology', 'STEM access', 'Freshman'],
     description:
       'FOCUS introduces first-year university students to Jane Street’s trading and technology models through a multi-day program for students who have experienced barriers to advanced STEM access.',
@@ -1285,14 +1290,15 @@ export const opportunities = [
     experienceSummary:
       'Students learn through finance, trading, technology, and problem-solving activities designed for early exposure.',
     detailBasis:
-      'Official Jane Street programs page lists FOCUS as accepting applications.',
+      'The official FOCUS detail page describes the program but currently offers only a notification signup for upcoming sessions.',
     why:
       'Strong freshman-facing finance and technology exposure before larger quant recruiting becomes crowded.',
     prep:
       'Prepare a concise story about STEM curiosity, barriers to access, and why trading/technology is worth exploring.',
     sourceNote:
-      'Official Jane Street programs page lists FOCUS as a multi-day first-year program and marks it accepting applications.',
-    lastChecked: '2026-08-22',
+      'Official FOCUS page currently says to sign up for notifications about upcoming sessions; no current application or deadline is posted.',
+    lastChecked: '2026-10-04',
+    statusReviewedAt: '2026-10-04T14:40:33.036Z',
   },
   {
     id: 'jane-street-in-focus-watch',
@@ -1333,14 +1339,14 @@ export const opportunities = [
     category: 'Discovery Program',
     classYears: ['All class years'],
     timing: 'Rolling',
-    status: 'open',
+    status: 'watching',
     confidence: 'high',
     funding: 'Varies',
     location: 'Multi-day program',
     url: 'https://www.janestreet.com/join-jane-street/programs-and-events/insight/',
     previousUrl: '',
-    openDate: 'Jane Street programs page currently lists INSIGHT as accepting applications',
-    deadline: 'Verify exact current-cycle deadline on the official page',
+    openDate: 'Sign up to be notified about upcoming INSIGHT sessions',
+    deadline: 'No current application deadline is posted',
     tags: ['Women in tech', 'Trading', 'Computer science', 'Math'],
     description:
       'INSIGHT is Jane Street’s multi-day program for self-identifying women, transgender, and gender-expansive students to learn how math and computer science are used at the firm.',
@@ -1349,14 +1355,15 @@ export const opportunities = [
     experienceSummary:
       'Students learn through interactive trading, software, probability, and problem-solving sessions.',
     detailBasis:
-      'Official Jane Street programs page lists INSIGHT as accepting applications.',
+      'The official INSIGHT detail page describes the three program tracks but currently offers only a notification signup for upcoming sessions.',
     why:
       'A high-signal route into quant and trading exposure for students who might not otherwise see themselves in the field.',
     prep:
       'Prepare to explain interest in math, CS, markets, or technical problem solving and verify the current session details.',
     sourceNote:
-      'Official Jane Street programs page lists INSIGHT as accepting applications for women, transgender, and gender-expansive students.',
-    lastChecked: '2026-08-22',
+      'Official INSIGHT page currently says to sign up for notifications about upcoming sessions; no current application or deadline is posted.',
+    lastChecked: '2026-10-04',
+    statusReviewedAt: '2026-10-04T14:40:33.036Z',
   },
   {
     id: 'jane-street-jsip-watch',
@@ -1397,14 +1404,14 @@ export const opportunities = [
     category: 'Discovery Program',
     classYears: ['All class years'],
     timing: 'Rolling',
-    status: 'open',
+    status: 'watching',
     confidence: 'high',
     funding: 'Varies',
     location: 'Daylong program',
     url: 'https://www.janestreet.com/join-jane-street/programs-and-events/preview/',
     previousUrl: '',
-    openDate: 'Jane Street programs page currently lists Preview as accepting applications',
-    deadline: 'Verify exact current-cycle deadline on the official page',
+    openDate: 'Sign up to be notified about upcoming Preview sessions',
+    deadline: 'No current application deadline is posted',
     tags: ['Finance', 'Career exploration', 'Daylong program'],
     description:
       'Preview is a daylong Jane Street program for current university students, including undergraduate, graduate, and PhD students, to learn about the firm.',
@@ -1413,14 +1420,15 @@ export const opportunities = [
     experienceSummary:
       'Short-format exposure to Jane Street’s people, roles, problem-solving culture, and career paths.',
     detailBasis:
-      'Official Jane Street programs page lists Preview as accepting applications.',
+      'The official Preview detail page describes the daylong program but currently offers only a notification signup for upcoming sessions.',
     why:
       'Good low-commitment way to learn whether Jane Street’s finance and technical environment is worth deeper pursuit.',
     prep:
       'Use Preview as a first touchpoint, then decide whether FTTP, SEE, INSIGHT, or another track fits better.',
     sourceNote:
-      'Official Jane Street programs page lists Preview as an accepting daylong program for current university students.',
-    lastChecked: '2026-08-22',
+      'Official Preview page currently says to sign up for notifications about upcoming sessions; no current application or deadline is posted.',
+    lastChecked: '2026-10-04',
+    statusReviewedAt: '2026-10-04T14:40:33.036Z',
   },
   {
     id: 'jane-street-qtc-watch',
@@ -1429,14 +1437,14 @@ export const opportunities = [
     category: 'Discovery Program',
     classYears: ['All class years'],
     timing: 'Rolling',
-    status: 'open',
-    confidence: 'high',
+    status: 'verifyManually',
+    confidence: 'needsReview',
     funding: 'Varies',
     location: 'Multi-day program',
     url: 'https://www.janestreet.com/join-jane-street/programs-and-events/qtc/',
     previousUrl: '',
-    openDate: 'Jane Street programs page currently lists QTC as accepting applications',
-    deadline: 'Verify exact current-cycle deadline on the official page',
+    openDate: 'The former QTC link now redirects to Jane Street’s general programs page',
+    deadline: 'No current QTC application deadline is posted',
     tags: ['Quant', 'Trading', 'Probability', 'Finance'],
     description:
       'QTC is Jane Street’s interactive multi-day program for university students to explore how math and probability concepts show up in quantitative trading.',
@@ -1445,14 +1453,15 @@ export const opportunities = [
     experienceSummary:
       'Students work through trading, probability, and decision-making exercises that mirror the thinking behind quantitative trading.',
     detailBasis:
-      'Official Jane Street programs page lists QTC as accepting applications.',
+      'The former QTC detail URL redirects to Jane Street’s general programs page, where a current QTC application is not clearly listed.',
     why:
       'Good fit for students testing quant interest before committing to technical finance recruiting.',
     prep:
       'Brush up on probability, expected value, mental math, and decision-making under uncertainty.',
     sourceNote:
-      'Official Jane Street programs page lists QTC as accepting applications for university students exploring quantitative trading.',
-    lastChecked: '2026-08-22',
+      'The former official QTC URL no longer exposes a program-specific application. Keep this in manual review until Jane Street publishes a current detail or application page.',
+    lastChecked: '2026-10-04',
+    statusReviewedAt: '2026-10-04T14:40:33.036Z',
   },
   {
     id: 'jane-street-wise-watch',
@@ -1461,14 +1470,14 @@ export const opportunities = [
     category: 'Discovery Program',
     classYears: ['Freshman'],
     timing: 'Rolling',
-    status: 'open',
+    status: 'watching',
     confidence: 'high',
     funding: 'Varies',
     location: 'Multi-day program',
     url: 'https://www.janestreet.com/join-jane-street/programs-and-events/wise/',
     previousUrl: '',
-    openDate: 'Jane Street programs page currently lists WiSE as accepting applications',
-    deadline: 'Verify exact current-cycle deadline on the official page',
+    openDate: 'Sign up to be notified about upcoming WiSE sessions',
+    deadline: 'No current application deadline is posted',
     tags: ['Women in tech', 'Math', 'Computer science', 'Incoming college'],
     description:
       'WiSE is Jane Street’s early program for self-identifying women, transgender, and gender-expansive students about to start their first year of university.',
@@ -1477,14 +1486,15 @@ export const opportunities = [
     experienceSummary:
       'Participants learn how math and computer science are used to solve real-world problems in an interactive multi-day setting.',
     detailBasis:
-      'Official Jane Street programs page lists WiSE as accepting applications.',
+      'The official WiSE page references multiple locations but currently exposes only a notification signup, not a live application route.',
     why:
       'Extremely early exposure for students entering college who want to understand quantitative and technical finance before recruiting starts.',
     prep:
       'Prepare a simple curiosity story around math, CS, and why early exposure would help shape your college path.',
     sourceNote:
-      'Official Jane Street programs page lists WiSE as accepting applications for students about to start their first year of university.',
-    lastChecked: '2026-08-22',
+      'Official WiSE page currently says to sign up for notifications about upcoming sessions; no current application or deadline is posted.',
+    lastChecked: '2026-10-04',
+    statusReviewedAt: '2026-10-04T14:40:33.036Z',
   },
   {
     id: 'jane-street-amp-watch',
@@ -1493,14 +1503,14 @@ export const opportunities = [
     category: 'Community / Prep Program',
     classYears: ['Freshman'],
     timing: 'Summer',
-    status: 'open',
+    status: 'expectedSoon',
     confidence: 'high',
-    funding: 'Varies',
-    location: 'Summer program',
+    funding: 'Costs covered plus $5,000 scholarship',
+    location: 'New York City',
     url: 'https://www.janestreet.com/join-jane-street/programs-and-events/amp/',
     previousUrl: '',
-    openDate: 'Jane Street programs page currently lists AMP as accepting applications',
-    deadline: 'Verify exact current-cycle deadline on the official page',
+    openDate: 'AMP 2027 student applications will open in early 2027',
+    deadline: 'Application deadline has not been posted; program runs June 28-July 30, 2027',
     tags: ['Incoming college', 'STEM access', 'Summer program'],
     description:
       'Program AMP is Jane Street’s five-week summer program for same-year high school graduates who have experienced barriers to advanced STEM educational access.',
@@ -1509,14 +1519,15 @@ export const opportunities = [
     experienceSummary:
       'Participants receive intensive STEM and technical exposure before starting college, building readiness for later university-level opportunities.',
     detailBasis:
-      'Official Jane Street programs page lists AMP as accepting applications.',
+      'The official AMP page confirms the 2027 dates, covered costs, scholarship, eligibility, and that student applications will open early next year.',
     why:
       'Worth tracking because it reaches students just before college, before they would know to search underclassmen opportunity lists.',
     prep:
       'Prepare a transition-to-college story and examples of curiosity in math, technology, or STEM access.',
     sourceNote:
-      'Official Jane Street programs page lists AMP as a five-week summer program for same-year high school graduates with barriers to advanced STEM access.',
-    lastChecked: '2026-08-22',
+      'Official AMP page says student applications for the June 28-July 30, 2027 program will open early in 2027. Tuition, housing, meals, travel, and activities are covered, and completers receive a $5,000 scholarship.',
+    lastChecked: '2026-10-04',
+    statusReviewedAt: '2026-10-04T14:40:33.036Z',
   },
   {
     id: 'capital-one-tech-summit',
@@ -1708,7 +1719,8 @@ export const opportunities = [
       'Prepare a portfolio or project link for your chosen role, examples of ownership or teamwork, and monitor for the next 16-week batch.',
     sourceNote:
       'Official Develop for Good page confirms 16-week virtual projects, designer/engineer/manager roles, 5-10 hours per week, the passed September 19, 2026 deadline, and student cash grants for selected eligible students.',
-    lastChecked: '2026-09-26',
+    lastChecked: '2026-10-04',
+    statusReviewedAt: '2026-10-04T14:40:33.036Z',
   },
   {
     id: 'amazon-future-engineer-scholarship',
@@ -2040,30 +2052,31 @@ export const opportunities = [
     category: 'Startup / VC Fellowship',
     classYears: ['All class years'],
     timing: 'Winter',
-    status: 'watching',
+    status: 'open',
     confidence: 'high',
     funding: 'Paid placement',
-    location: 'Portfolio-company dependent',
-    url: 'https://www.kleinerperkins.com/fellows/',
-    previousUrl: 'https://fellows.kleinerperkins.com/',
-    openDate: 'Applications are currently closed; watch for next-year cycle',
-    deadline: 'Next-cycle deadline not posted',
+    location: 'San Francisco Bay Area',
+    url: 'https://jobs.ashbyhq.com/kleinerperkinsfellows/ae095fcc-c38e-4c41-814d-b562f05fa776',
+    previousUrl: 'https://www.kleinerperkins.com/fellows/',
+    openDate: '2027 Engineering Fellow applications are open and reviewed on a rolling basis',
+    deadline: 'January 31, 2027 at 11:59 PM PT',
     tags: ['Startups', 'VC', 'Software engineering', 'Portfolio companies'],
     description:
-      'Kleiner Perkins Fellows connects students with opportunities to work at innovative portfolio companies while receiving mentorship, curriculum, and alumni support.',
+      'The 2027 Kleiner Perkins Engineering Fellowship places students in summer engineering roles at KP portfolio companies in the San Francisco Bay Area, with a founder speaker series, entrepreneurial workshops, cohort events, and long-term alumni support.',
     eligibilitySummary:
-      'Student eligibility and track details vary by cycle; current official page says applications are closed.',
+      'Candidates should have a software-related degree path, experience launching a meaningful project or product, evidence of initiative or campus influence, and availability to work in the Bay Area during the summer.',
     experienceSummary:
       'Fellows work with company partners, gain technical skills, learn from industry leaders, and join a long-term alumni community.',
     detailBasis:
-      'Official Kleiner Perkins Fellows page confirms the program model and current closed status.',
+      'The official 2027 Engineering Fellow application confirms that applications are open through January 31, 2027 and reviewed on a rolling basis.',
     why:
       'Strong startup-placement path for students who want venture-backed company exposure instead of only big-tech pipelines.',
     prep:
-      'Prepare startup-oriented project examples, identify preferred company functions, and watch for next-cycle applications.',
+      'Prepare a startup-oriented technical resume and project examples that show you launched something meaningful, took initiative, and can contribute at an early-stage company.',
     sourceNote:
-      'Official Kleiner Perkins Fellows page says applications are currently closed and describes partner-company work, mentorship, curriculum, and alumni support.',
-    lastChecked: '2026-08-22',
+      'Official Ashby application for the 2027 Engineering Fellowship says applications are open until January 31, 2027 at 11:59 PM PT and will be reviewed on a rolling basis.',
+    lastChecked: '2026-10-04',
+    statusReviewedAt: '2026-10-04T14:40:33.036Z',
   },
   {
     id: 'bessemer-fellows-watch',
@@ -2104,14 +2117,14 @@ export const opportunities = [
     category: 'Startup / VC Fellowship',
     classYears: ['All class years'],
     timing: 'Summer',
-    status: 'open',
-    confidence: 'high',
+    status: 'verifyManually',
+    confidence: 'needsReview',
     funding: 'Paid placement',
     location: 'Portfolio-company dependent',
     url: 'https://www.8vc.com/fellowships',
     previousUrl: '',
-    openDate: 'Official 8VC page currently marks the fellowship as open',
-    deadline: 'Verify current engineering fellowship application deadline',
+    openDate: 'Official page contains conflicting open and closed labels',
+    deadline: 'Confirm the current engineering fellowship cycle before applying',
     tags: ['Startups', 'VC', 'Software engineering', 'AI'],
     description:
       '8VC Fellowship is a three-month summer placement program where undergraduate students work in contributing roles at 8VC portfolio startups.',
@@ -2120,14 +2133,15 @@ export const opportunities = [
     experienceSummary:
       'Fellows submit one application for many startups, work on meaningful technical problems, and gain portfolio-company exposure.',
     detailBasis:
-      'Official 8VC page describes the fellowship and marks the current status as open.',
+      'Official 8VC page describes the fellowship and still links to an application, but the same page contains both open and closed status labels.',
     why:
       'Strong startup and venture-backed engineering pathway for students who want high-growth company exposure.',
     prep:
       'Prepare startup-ready project examples, technical resume, and a clear interest in AI, infrastructure, healthcare, defense, or other portfolio themes.',
     sourceNote:
-      'Official 8VC page describes a unique immersive three-month internship program placing undergraduates at portfolio startups and shows open status.',
-    lastChecked: '2026-08-22',
+      'Official 8VC page contains contradictory open and closed labels. Keep this in manual review until the linked application confirms a current cycle and deadline.',
+    lastChecked: '2026-10-04',
+    statusReviewedAt: '2026-10-04T14:40:33.036Z',
   },
   {
     id: 'thrive-capital-summer-fellowship',
@@ -2459,15 +2473,15 @@ export const opportunities = [
     organization: 'NRF Foundation',
     category: 'Scholarship / Funding',
     classYears: ['All class years'],
-    timing: 'Rolling',
-    status: 'watching',
+    timing: 'Fall',
+    status: 'deadlineSoon',
     confidence: 'high',
     funding: 'Scholarship',
     location: 'United States',
     url: 'https://nrffoundation.org/campus/scholarships',
     previousUrl: '',
-    openDate: 'Scholarship windows vary by NRF program',
-    deadline: 'Track each scholarship page separately when exact dates post',
+    openDate: 'Five NRF Foundation tuition and travel scholarship paths are currently open',
+    deadline: 'October 13, October 20, or October 30, 2026, depending on the scholarship',
     tags: ['Scholarship', 'Retail tech', 'Conference / Travel Funding', 'Leadership'],
     description:
       'NRF Foundation Scholarships collect undergraduate funding opportunities tied to retail leadership, case competitions, student ambassadorship, technology majors, and Student Program travel.',
@@ -2476,14 +2490,15 @@ export const opportunities = [
     experienceSummary:
       'Students can earn tuition scholarships, case competition experience, New York Student Program travel, retail-career exposure, and leadership opportunities.',
     detailBasis:
-      'Official NRF Foundation scholarships page lists several scholarship opportunities and descriptions.',
+      'The official NRF Foundation scholarships page lists open Retail Store Management and Brand Licensing scholarships through October 13, Bright Retail Futures and Ray Greenly scholarships through October 20, and advisor-nominated Rising Retail Stars through October 30.',
     why:
       'Keep as one umbrella record for now: it is useful funding/travel support, but each sub-scholarship only deserves its own record once timing or tech fit becomes strong enough.',
     prep:
       'Review the specific scholarship fit, especially Ray Greenly for technology/data/supply-chain majors and Rising Stars for freshmen/sophomores.',
     sourceNote:
-      'Official NRF Foundation page lists Next Generation, University Challenge, Student Ambassadors, Bright Futures, Ray Greenly, and Rising Stars scholarships.',
-    lastChecked: '2026-08-22',
+      'Official NRF Foundation page confirms multiple open 2026 scholarships. Next Generation reopens in January 2027; Student Ambassador is closed for the 2026 term.',
+    lastChecked: '2026-10-04',
+    statusReviewedAt: '2026-10-04T14:40:33.036Z',
   },
   {
     id: 'google-scholarships-watch',
@@ -2683,30 +2698,31 @@ export const opportunities = [
     category: 'Conference / Travel Funding',
     classYears: ['All class years'],
     timing: 'Spring',
-    status: 'expectedSoon',
-    confidence: 'medium',
+    status: 'watching',
+    confidence: 'high',
     funding: 'Travel support',
     location: 'Conference',
     url: 'https://ghc.anitab.org/awards-programs/scholarships',
     previousUrl: '',
-    openDate: 'Scholarship pages are closed or interest-list only; Kamala Scholars says 2026 applications are coming soon',
-    deadline: 'Verify the current scholarship application window when GHC or AnitaB posts it',
+    openDate: 'GHC scholarship opportunities are currently closed; an interest form is available',
+    deadline: 'Next scholarship application deadline has not been posted',
     tags: ['GHC', 'Women in computing', 'Conference / Travel Funding'],
     description:
       'Grace Hopper Celebration scholarship tracking helps students watch for conference funding and related AnitaB.org student programs.',
     eligibilitySummary:
-      'Scholarship eligibility changes by program; current official scholarship window is not fully posted.',
+      'Scholarship eligibility changes by program; students should join the official interest list and verify each future award’s criteria when applications reopen.',
     experienceSummary:
       'Conference access, recruiting visibility, community programming, technical sessions, and sponsorship pathways.',
     detailBasis:
-      'Current official AnitaB/GHC pages show interest-list or coming-soon status, so dates remain watch-only.',
+      'The current official GHC scholarships page says opportunities are closed and offers an interest form. The 2026 Kamala Scholars application is also closed.',
     why:
       'Major women-in-computing conference pathway with recruiting, community, technical sessions, and visibility for students.',
     prep:
       'Track the official GHC site, school sponsorship paths, employer sponsorships, and local women-in-tech group funding options.',
     sourceNote:
-      'Official AnitaB pages confirm GHC scholarship interest-list status and the Kamala Scholars program, but exact current scholarship dates are not posted.',
-    lastChecked: '2026-08-18',
+      'Official GHC scholarship pages currently show closed status and interest-list access only. Do not send an opening alert until a new application page and future deadline are posted.',
+    lastChecked: '2026-10-04',
+    statusReviewedAt: '2026-10-04T14:40:33.036Z',
   },
 ];
 

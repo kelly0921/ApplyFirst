@@ -26,12 +26,42 @@ const cases = [
     text: 'Launchpad 2025 is a two-day discovery program for second-year students interested in software engineering and quantitative trading.',
     expected: ['Old-cycle signal', 'watching', 'Monitor Only'],
   },
+  {
+    name: 'nearest future priority deadline keeps a multi-deadline application open',
+    source: source('mlt-career-prep', 'https://mlt.smapply.org/prog/careerprep2029_application/'),
+    text: 'The Career Prep Program application is OPEN. Priority deadlines: Financial Services August 1, 2026. Consulting September 1, 2026. SWE / Technology November 1, 2026. Final deadline January 15, 2027. College sophomores are eligible.',
+    expected: ['Application opened', 'open', 'Alert Candidate'],
+    detectedSignal: 'November 1, 2026',
+  },
+  {
+    name: 'stale open copy cannot override a passed deadline',
+    source: source('headstart-fellowship-watch', 'https://www.headstartfellowship.com/fellowship'),
+    text: 'Fall 2026 applications are open now and close August 28, 2026 at 11:59 p.m. ET. First- and second-year university students are eligible.',
+    expected: ['Deadline passed', 'watching', 'Monitor Only'],
+  },
+  {
+    name: 'apply today CTA cannot reopen an expired student cycle',
+    source: source('develop-for-good-student-projects', 'https://www.developforgood.org/for-students'),
+    text: 'Apply today. Winter 2027 batch timeline. September 19, 2026 student volunteer application deadline. University students and recent graduates are eligible.',
+    expected: ['Deadline passed', 'watching', 'Monitor Only'],
+  },
+  {
+    name: 'a deadline later today remains actionable',
+    source: source('goldman-sachs-emerging-leaders-series', 'https://www.goldmansachs.com/careers/students/programs-and-internships/americas/emerging-leaders-series'),
+    text: 'Applications are open to students graduating December 2028 through June 2029 and close October 4, 2026 at 11:59 PM ET.',
+    expected: ['Application opened', 'open', 'Alert Candidate'],
+  },
 ];
 
+const referenceDate = new Date('2026-10-04T16:00:00.000Z');
+
 for (const fixture of cases) {
-  const result = classifySourceText(fixture.text, fixture.source);
+  const result = classifySourceText(fixture.text, fixture.source, referenceDate);
   const actual = [result.result, result.suggestedStatus, result.reviewDecision];
   assert.deepEqual(actual, fixture.expected, fixture.name);
+  if (fixture.detectedSignal) {
+    assert.equal(result.detectedSignal, fixture.detectedSignal, fixture.name);
+  }
   console.log(`PASS ${fixture.name}`);
 }
 

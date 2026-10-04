@@ -84,6 +84,8 @@ const publicMonitorStatusMap = {
   open: 'open',
   deadline: 'deadlineSoon',
   opening_soon: 'expectedSoon',
+  watching: 'watching',
+  closed: 'watching',
 };
 const landingProofSummary = `${opportunities.length}+ Special Programs`;
 const landingSourceCheckedCount = opportunities.filter((opportunity) => getVerificationState(opportunity) === 'verified').length;
@@ -673,9 +675,23 @@ function compareOpportunities(a, b, sortMode) {
 
 function getLiveOpportunityUpdate(opportunity, liveStatus) {
   const status = publicMonitorStatusMap[liveStatus?.status];
-  const checkedDate = String(liveStatus?.lastCheckedAt ?? '').slice(0, 10);
+  const checkedAt = String(liveStatus?.lastCheckedAt ?? '');
+  const checkedDate = checkedAt.slice(0, 10);
+  const isPositiveSignal = ['open', 'deadline', 'opening_soon'].includes(liveStatus?.status);
+  const isConservativeSignal = ['watching', 'closed'].includes(liveStatus?.status);
+  const hasAcceptedConfidence = isPositiveSignal
+    ? liveStatus?.confidence === 'high'
+    : isConservativeSignal && ['high', 'medium'].includes(liveStatus?.confidence);
 
-  if (!status || liveStatus?.confidence !== 'high') {
+  if (!status || !hasAcceptedConfidence) {
+    return null;
+  }
+
+  if (
+    opportunity.statusReviewedAt &&
+    checkedAt &&
+    Date.parse(checkedAt) <= Date.parse(opportunity.statusReviewedAt)
+  ) {
     return null;
   }
 
@@ -685,7 +701,7 @@ function getLiveOpportunityUpdate(opportunity, liveStatus) {
 
   return {
     status,
-    confidence: 'high',
+    confidence: liveStatus.confidence,
     ...(checkedDate ? { lastChecked: checkedDate } : {}),
   };
 }

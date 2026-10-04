@@ -380,6 +380,106 @@ function createVerifiedScheduleOverrides() {
     },
   ],
   [
+    'palantir-american-tech-fellowship',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [9, 10, 11, 12, 1],
+      lastKnownOpenAt: null,
+      activeLeadDays: 120,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 48,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_job_page', 'site:jobs.lever.co/palantir "American Tech Fellowship" "2027"', 'Find the first official 2027 cohort posting.'),
+        createDiscoveryQuery('official_program_page', 'site:palantir.com "American Tech Fellowship" "2027 cohorts"', 'Confirm Palantir announcements when the next cohort opens.'),
+      ],
+      scheduleNote:
+        'The Fall 2026 cohort is closed and Palantir says 2027 cohorts will open soon. Monitor the direct Lever page daily in the expected opening window and keep discovery active for a new posting URL.',
+    },
+  ],
+  [
+    'mlt-career-prep',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [6, 7, 8, 9, 10, 11, 12, 1],
+      lastKnownOpenAt: '2026-06-08',
+      activeLeadDays: 120,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 72,
+      sourceVolatility: 'stable_application_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_application', 'site:mlt.smapply.org/prog "Career Prep 2029"', 'Confirm the current direct Career Prep application and final deadline.'),
+        createDiscoveryQuery('official_program_page', 'site:mlt.org/career-prep "Career Prep" "2029"', 'Check the MLT overview for cycle updates.'),
+      ],
+      scheduleNote:
+        'Career Prep 2029 opened June 8, 2026. The SWE/Technology priority deadline is November 1, 2026 and the final deadline is January 15, 2027; monitor the direct application page daily through the priority window.',
+    },
+  ],
+  [
+    'kleiner-perkins-fellows',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [9, 10, 11, 12, 1],
+      lastKnownOpenAt: '2026-10-04',
+      activeLeadDays: 120,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 48,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_application', 'site:jobs.ashbyhq.com/kleinerperkinsfellows "2027 Kleiner Perkins Engineering Fellow"', 'Confirm the current direct Engineering Fellow application.'),
+        createDiscoveryQuery('official_program_page', 'site:kleinerperkins.com/fellows "Fellows" "2027"', 'Check the KP overview if the application URL changes.'),
+      ],
+      scheduleNote:
+        'The 2027 Engineering Fellowship is open through January 31, 2027 and reviewed on a rolling basis. Monitor the direct Ashby application daily and search for replacement postings if it moves.',
+    },
+  ],
+  [
+    'jane-street-amp-watch',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [1, 2, 3],
+      lastKnownOpenAt: null,
+      activeLeadDays: 120,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 72,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_program_page', 'site:janestreet.com/join-jane-street/programs-and-events/amp "AMP 2027" "student applications"', 'Confirm when AMP 2027 student applications open.'),
+        createDiscoveryQuery('current_cycle_application', 'site:janestreet.com/join-jane-street/open-roles "AMP 2027" student', 'Find the direct student application when Jane Street publishes it.'),
+      ],
+      scheduleNote:
+        'Jane Street says AMP 2027 student applications will open in early 2027. Keep the page in warmup and do not treat open staff roles as student applications.',
+    },
+  ],
+  [
+    'develop-for-good-student-projects',
+    {
+      cycleFrequency: 'semester',
+      expectedOpenMonths: [1, 4, 8, 9],
+      lastKnownOpenAt: '2026-08-26',
+      activeLeadDays: 90,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 21,
+      discoveryCheckIntervalHours: 72,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_student_page', 'site:developforgood.org/for-students "student volunteer application deadline"', 'Confirm the next student project batch and deadline.'),
+        createDiscoveryQuery('official_application', 'site:apply.developforgood.org student volunteer application', 'Find the current role-specific application route.'),
+      ],
+      scheduleNote:
+        'The Winter 2027 student deadline passed September 19, 2026. Keep monitoring for the next batch and do not treat the evergreen Apply Today CTA as an open cycle without a future deadline.',
+    },
+  ],
+  [
     'jane-street-fttp-watch',
     {
       cycleFrequency: 'annual',
@@ -644,7 +744,7 @@ function createVerifiedScheduleOverrides() {
     {
       cycleFrequency: 'semester',
       expectedOpenMonths: [2, 8, 9],
-      lastKnownOpenAt: '2026-08-01',
+      lastKnownOpenAt: '2026-08-24',
       activeLeadDays: 90,
       activeCheckIntervalHours: 24,
       warmupCheckIntervalHours: 72,
@@ -656,7 +756,7 @@ function createVerifiedScheduleOverrides() {
         createDiscoveryQuery('homepage_cycle', 'site:outreachy.org "December 2026 internships" applications', 'Check homepage cycle announcements.'),
       ],
       scheduleNote:
-        'Outreachy runs May and December cycles. Official pages confirm the cadence; exact December 2026 initial deadline needs confirmation.',
+        'The December 2026 initial application window ran August 24-31 and is closed. Monitor the official cycle page for the next initial application window; contribution dates are not a new-applicant opening.',
     },
   ],
   [
@@ -841,7 +941,7 @@ function createVerifiedScheduleOverrides() {
         createDiscoveryQuery('current_cycle_application', '"HeadStart Fellowship" "Fall 2026" "Aug 28"', 'Find current-cycle application references when form URLs move.'),
       ],
       scheduleNote:
-        'Official page confirms Fall 2026 applications close Aug 28. Check daily while the deadline is near, then back off after the window closes.',
+        'The official page still displays a Fall 2026 application that closed August 28. Treat it as closed until a new cohort and future deadline replace the stale open copy.',
     },
   ],
   [
@@ -946,7 +1046,28 @@ function createVerifiedScheduleOverrides() {
         createDiscoveryQuery('current_cycle_deadline', '"Grace Hopper Celebration" scholarship "2026" "deadline"', 'Find current GHC scholarship deadline language.'),
       ],
       scheduleNote:
-        'Official AnitaB pages show interest-list/coming-soon language, not exact scholarship dates. Search during late summer while GHC funding pages update.',
+        'Official AnitaB scholarship pages are closed and offer interest lists. Search during the next expected funding season, but require a live application and future deadline before alerting.',
+    },
+  ],
+  [
+    'nrf-foundation-scholarships',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [8, 9, 10, 1],
+      lastKnownOpenAt: '2026-10-04',
+      activeLeadDays: 90,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 72,
+      sourceVolatility: 'multi_program_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_scholarship_hub', 'site:nrffoundation.org/retail-scholarships "now open" "Deadline to apply"', 'Confirm which NRF scholarships remain open and their deadlines.'),
+        createDiscoveryQuery('technology_scholarship', 'site:nrffoundation.org "Ray Greenly" scholarship deadline', 'Track the technology and supply-chain scholarship directly.'),
+        createDiscoveryQuery('underclassmen_travel', 'site:nrffoundation.org "Rising Retail Stars" deadline', 'Track the freshman and sophomore travel scholarship.'),
+      ],
+      scheduleNote:
+        'Several NRF scholarships are open through October 13, 20, or 30, 2026. Monitor the scholarship hub daily through October and return to warmup for the January 2027 Next Generation opening.',
     },
   ],
   [
