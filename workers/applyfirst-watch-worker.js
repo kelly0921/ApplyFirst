@@ -113,6 +113,38 @@ const ALERT_ENGAGEMENT_ACTIONS = new Set([
   'inaccurate',
 ]);
 const DISCOVERY_SEARCH_PROVIDERS = new Set(['brave', 'tavily']);
+const NEW_PROGRAM_CANDIDATE_STATUSES = new Set(['candidate', 'verified', 'added', 'monitored', 'rejected']);
+const NEW_PROGRAM_CANDIDATE_SOURCES = new Set([
+  'scheduled_research',
+  'maintainer_research',
+  'student_suggestion',
+  'trusted_list',
+  'other',
+]);
+const NEW_PROGRAM_DUPLICATE_TYPES = new Set([
+  'new_program',
+  'new_subprogram',
+  'existing_cycle',
+  'updated_url',
+  'low_confidence_lead',
+]);
+const NEW_PROGRAM_OPPORTUNITY_TYPES = new Set([
+  'Discovery Program',
+  'Fellowship',
+  'Startup / VC Fellowship',
+  'Winternship',
+  'Scholarship / Funding',
+  'Conference / Travel Funding',
+  'Community / Prep Program',
+  'Full-Time Alternative',
+]);
+const NEW_PROGRAM_TRANSITIONS = {
+  candidate: new Set(['verified', 'rejected']),
+  verified: new Set(['candidate', 'added', 'rejected']),
+  added: new Set(['verified', 'monitored', 'rejected']),
+  monitored: new Set(['added', 'rejected']),
+  rejected: new Set(['candidate']),
+};
 const SOURCE_TRUNCATION_NOTICE = 'ApplyFirst note: source page was truncated at the monitoring byte limit.';
 const JOB_BOARD_HOSTS = new Set([
   'boards.greenhouse.io',
@@ -183,6 +215,7 @@ async function handleRequest(request, env, ctx) {
   const url = new URL(request.url);
   const candidateSendMatch = url.pathname.match(/^\/watch\/candidates\/([^/]+)\/send$/);
   const discoveryCandidateReviewMatch = url.pathname.match(/^\/watch\/discovery\/candidates\/([^/]+)\/review$/);
+  const newProgramCandidateReviewMatch = url.pathname.match(/^\/watch\/program-candidates\/([^/]+)\/review$/);
   const applicationOutcomeMatch = url.pathname.match(/^\/analytics\/application-attempts\/([^/]+)\/outcome$/);
 
   if (request.method === 'OPTIONS') {
@@ -328,6 +361,27 @@ async function handleRequest(request, env, ctx) {
     if (request.method === 'GET' && url.pathname === '/watch/discovery/candidates') {
       await requireAdminToken(request, env);
       return jsonResponse(env, await getDiscoveryCandidates(env, url));
+    }
+
+    if (request.method === 'GET' && url.pathname === '/watch/program-candidates') {
+      await requireAdminToken(request, env);
+      return jsonResponse(env, await getNewProgramCandidates(env, url));
+    }
+
+    if (request.method === 'POST' && url.pathname === '/watch/program-candidates') {
+      await requireAdminToken(request, env);
+      const body = await readJson(request, {});
+      const result = await saveNewProgramCandidate(env, body);
+      return jsonResponse(env, result, { status: result.created ? 201 : 200 });
+    }
+
+    if (request.method === 'POST' && newProgramCandidateReviewMatch) {
+      await requireAdminToken(request, env);
+      const body = await readJson(request, {});
+      return jsonResponse(
+        env,
+        await reviewNewProgramCandidate(env, newProgramCandidateReviewMatch[1], body),
+      );
     }
 
     if (request.method === 'POST' && url.pathname === '/watch/discovery/search') {
@@ -4179,6 +4233,469 @@ async function recordDiscoverySearchRun(env, run) {
       }),
     );
   }
+}
+
+async function getNewProgramCandidates(env, url) {
+  const limit = Math.max(1, Math.min(Number(url.searchParams.get('limit')) || 100, 200));
+  const status = cleanString(url.searchParams.get('status') || 'all', 40).toLowerCase();
+
+  if (status !== 'all' && !NEW_PROGRAM_CANDIDATE_STATUSES.has(status)) {
+    throw httpError(400, 'Unknown new-program candidate status.');
+  }
+
+  const whereClause = status === 'all' ? '' : 'where status = ?';
+  const bindings = status === 'all' ? [limit] : [status, limit];
+  const rows = await env.DB.prepare(
+    `${newProgramCandidateSelectFields()}
+     from new_program_candidates
+     ${whereClause}
+     order by
+       case status
+         when 'candidate' then 0
+         when 'verified' then 1
+         when 'added' then 2
+         when 'monitored' then 3
+         else 4
+       end,
+       updated_at desc
+     limit ?`,
+  )
+    .bind(...bindings)
+    .all();
+
+  const countRows = await env.DB.prepare(
+    `select status, count(*) as total
+     from new_program_candidates
+     group by status`,
+  ).all();
+  const eventRows = await env.DB.prepare(
+    `select
+       id,
+       candidate_id as candidateId,
+       from_status as fromStatus,
+       to_status as toStatus,
+       note,
+       actor,
+       created_at as createdAt
+     from new_program_candidate_events
+     order by created_at desc
+     limit 100`,
+  ).all();
+  const counts = Object.fromEntries([...NEW_PROGRAM_CANDIDATE_STATUSES].map((value) => [value, 0]));
+
+  (countRows.results || []).forEach((row) => {
+    if (NEW_PROGRAM_CANDIDATE_STATUSES.has(row.status)) {
+      counts[row.status] = Number(row.total) || 0;
+    }
+  });
+
+  return {
+    ok: true,
+    candidates: (rows.results || []).map(serializeNewProgramCandidate),
+    counts,
+    activeCount: counts.candidate + counts.verified + counts.added,
+    events: eventRows.results || [],
+  };
+}
+
+async function saveNewProgramCandidate(env, body = {}) {
+  const input = await normalizeNewProgramCandidateInput(body);
+  const now = new Date().toISOString();
+  const existing = await env.DB.prepare(
+    `select id, status
+     from new_program_candidates
+     where dedupe_key = ?
+     limit 1`,
+  )
+    .bind(input.dedupeKey)
+    .first();
+
+  let candidateId = existing?.id || crypto.randomUUID();
+  let created = false;
+
+  if (existing) {
+    await env.DB.prepare(
+      `update new_program_candidates
+       set official_url = ?,
+           opportunity_type = coalesce(nullif(?, ''), opportunity_type),
+           roles_json = coalesce(nullif(?, ''), roles_json),
+           class_years_json = coalesce(nullif(?, ''), class_years_json),
+           location = coalesce(nullif(?, ''), location),
+           format = coalesce(nullif(?, ''), format),
+           duration = coalesce(nullif(?, ''), duration),
+           application_status = coalesce(nullif(?, ''), application_status),
+           deadline = coalesce(nullif(?, ''), deadline),
+           evidence_date = coalesce(nullif(?, ''), evidence_date),
+           evidence_note = ?,
+           fit_reason = ?,
+           duplicate_type = ?,
+           duplicate_program_id = coalesce(nullif(?, ''), duplicate_program_id),
+           confidence = ?,
+           source = ?,
+           last_seen_at = ?,
+           updated_at = ?
+       where id = ?`,
+    )
+      .bind(
+        input.officialUrl,
+        input.opportunityType,
+        input.rolesJson,
+        input.classYearsJson,
+        input.location,
+        input.format,
+        input.duration,
+        input.applicationStatus,
+        input.deadline,
+        input.evidenceDate,
+        input.evidenceNote,
+        input.fitReason,
+        input.duplicateType,
+        input.duplicateProgramId,
+        input.confidence,
+        input.source,
+        now,
+        now,
+        candidateId,
+      )
+      .run();
+  } else {
+    const insertResult = await env.DB.prepare(
+      `insert into new_program_candidates (
+        id, dedupe_key, program_name, organization, official_url, opportunity_type,
+        roles_json, class_years_json, location, format, duration, application_status,
+        deadline, evidence_date, evidence_note, fit_reason, duplicate_type,
+        duplicate_program_id, confidence, source, status, first_seen_at, last_seen_at,
+        created_at, updated_at
+      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'candidate', ?, ?, ?, ?)
+      on conflict(dedupe_key) do nothing`,
+    )
+      .bind(
+        candidateId,
+        input.dedupeKey,
+        input.programName,
+        input.organization,
+        input.officialUrl,
+        input.opportunityType,
+        input.rolesJson || '[]',
+        input.classYearsJson || '[]',
+        input.location,
+        input.format,
+        input.duration,
+        input.applicationStatus,
+        input.deadline,
+        input.evidenceDate,
+        input.evidenceNote,
+        input.fitReason,
+        input.duplicateType,
+        input.duplicateProgramId,
+        input.confidence,
+        input.source,
+        now,
+        now,
+        now,
+        now,
+      )
+      .run();
+
+    created = Boolean(insertResult.meta?.changes);
+
+    if (!created) {
+      const concurrentCandidate = await env.DB.prepare(
+        `select id
+         from new_program_candidates
+         where dedupe_key = ?
+         limit 1`,
+      )
+        .bind(input.dedupeKey)
+        .first();
+      candidateId = concurrentCandidate?.id || candidateId;
+    }
+  }
+
+  await env.DB.prepare(
+    `insert into new_program_candidate_events (
+      id, candidate_id, from_status, to_status, note, actor, created_at
+    )
+    select ?, ?, null, 'candidate', ?, ?, ?
+    where not exists (
+      select 1
+      from new_program_candidate_events
+      where candidate_id = ?
+        and from_status is null
+        and to_status = 'candidate'
+    )`,
+  )
+    .bind(
+      crypto.randomUUID(),
+      candidateId,
+      'Research candidate added for maintainer review.',
+      cleanString(body.createdBy || body.actor || 'maintainer', 120),
+      now,
+      candidateId,
+    )
+    .run();
+
+  return {
+    ok: true,
+    created,
+    deduplicated: !created,
+    candidate: await getNewProgramCandidateById(env, candidateId),
+  };
+}
+
+async function reviewNewProgramCandidate(env, candidateId, body = {}) {
+  const requestedStatus = cleanString(body.status || body.decision, 40).toLowerCase();
+
+  if (!NEW_PROGRAM_CANDIDATE_STATUSES.has(requestedStatus)) {
+    throw httpError(400, 'Use status candidate, verified, added, monitored, or rejected.');
+  }
+
+  const candidate = await env.DB.prepare(
+    `select *
+     from new_program_candidates
+     where id = ?
+     limit 1`,
+  )
+    .bind(candidateId)
+    .first();
+
+  if (!candidate) {
+    throw httpError(404, 'New-program candidate not found.');
+  }
+
+  if (candidate.status === requestedStatus) {
+    return {
+      ok: true,
+      changed: false,
+      candidate: await getNewProgramCandidateById(env, candidateId),
+    };
+  }
+
+  if (!NEW_PROGRAM_TRANSITIONS[candidate.status]?.has(requestedStatus)) {
+    throw httpError(409, `Cannot move a new-program candidate from ${candidate.status} to ${requestedStatus}.`);
+  }
+
+  const reviewNote = cleanString(body.reviewNote || body.note, 700);
+  const reviewedBy = cleanString(body.reviewedBy || body.actor || 'maintainer', 120);
+  const programId = cleanString(body.programId || candidate.program_id, 120).toLowerCase();
+  const reviewedConfidence = normalizeDiscoveryConfidence(body.confidence || candidate.confidence);
+
+  if (!reviewNote) {
+    throw httpError(400, 'A review note is required for each stage change.');
+  }
+
+  if (requestedStatus === 'verified' && !['high', 'medium'].includes(reviewedConfidence)) {
+    throw httpError(409, 'Set confidence to high or medium before verifying this candidate.');
+  }
+
+  if (['added', 'monitored'].includes(requestedStatus) && !isValidProgramId(programId)) {
+    throw httpError(400, 'A lowercase library program ID is required before marking this candidate added.');
+  }
+
+  if (requestedStatus === 'monitored') {
+    const officialSource = await env.DB.prepare(
+      `select id
+       from official_sources
+       where program_id = ?
+         and enabled = 1
+       limit 1`,
+    )
+      .bind(programId)
+      .first();
+
+    if (!officialSource) {
+      throw httpError(409, 'Add and enable this program in official_sources before marking it monitored.');
+    }
+  }
+
+  const now = new Date().toISOString();
+  await env.DB.batch([
+    env.DB.prepare(
+      `update new_program_candidates
+       set status = ?,
+           program_id = case when ? != '' then ? else program_id end,
+           confidence = ?,
+           review_note = ?,
+           reviewed_by = ?,
+           verified_at = coalesce(?, verified_at),
+           added_at = coalesce(?, added_at),
+           monitored_at = coalesce(?, monitored_at),
+           rejected_at = coalesce(?, rejected_at),
+           updated_at = ?
+       where id = ?`,
+    ).bind(
+      requestedStatus,
+      programId,
+      programId,
+      reviewedConfidence,
+      reviewNote,
+      reviewedBy,
+      requestedStatus === 'verified' ? now : null,
+      requestedStatus === 'added' ? now : null,
+      requestedStatus === 'monitored' ? now : null,
+      requestedStatus === 'rejected' ? now : null,
+      now,
+      candidateId,
+    ),
+    env.DB.prepare(
+      `insert into new_program_candidate_events (
+        id, candidate_id, from_status, to_status, note, actor, created_at
+      ) values (?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      crypto.randomUUID(),
+      candidateId,
+      candidate.status,
+      requestedStatus,
+      reviewNote,
+      reviewedBy,
+      now,
+    ),
+  ]);
+
+  return {
+    ok: true,
+    changed: true,
+    candidate: await getNewProgramCandidateById(env, candidateId),
+  };
+}
+
+async function normalizeNewProgramCandidateInput(body) {
+  const programName = cleanString(body.programName || body.name, 220);
+  const organization = cleanString(body.organization || body.host, 180);
+  const officialUrl = normalizeUrl(body.officialUrl || body.url);
+  const opportunityType = cleanString(body.opportunityType || body.type, 80);
+  const confidence = normalizeDiscoveryConfidence(body.confidence);
+  const source = cleanString(body.source || 'maintainer_research', 60).toLowerCase();
+  const duplicateType = cleanString(body.duplicateType || 'new_program', 60).toLowerCase();
+  const evidenceNote = cleanString(body.evidenceNote || body.evidence, 1200);
+  const fitReason = cleanString(body.fitReason || body.reason, 900);
+
+  if (!programName || !organization) {
+    throw httpError(400, 'Program name and organization are required.');
+  }
+
+  if (!officialUrl) {
+    throw httpError(400, 'A valid official program URL is required.');
+  }
+
+  if (!evidenceNote || !fitReason) {
+    throw httpError(400, 'Evidence and an ApplyFirst fit reason are required.');
+  }
+
+  if (opportunityType && !NEW_PROGRAM_OPPORTUNITY_TYPES.has(opportunityType)) {
+    throw httpError(400, 'Use an ApplyFirst public opportunity type.');
+  }
+
+  if (!NEW_PROGRAM_CANDIDATE_SOURCES.has(source)) {
+    throw httpError(400, 'Unknown new-program candidate source.');
+  }
+
+  if (!NEW_PROGRAM_DUPLICATE_TYPES.has(duplicateType)) {
+    throw httpError(400, 'Unknown duplicate classification.');
+  }
+
+  const identity = `${normalizeCandidateIdentity(organization)}|${normalizeCandidateIdentity(programName)}`;
+  const roles = normalizeCandidateStringList(body.roles || body.roleAreas);
+  const classYears = normalizeCandidateStringList(body.classYears || body.eligibility);
+
+  return {
+    dedupeKey: await sha256Hex(`applyfirst-new-program:${identity}`),
+    programName,
+    organization,
+    officialUrl,
+    opportunityType,
+    rolesJson: roles.length ? JSON.stringify(roles) : '',
+    classYearsJson: classYears.length ? JSON.stringify(classYears) : '',
+    location: cleanString(body.location, 180),
+    format: cleanString(body.format, 120),
+    duration: cleanString(body.duration, 120),
+    applicationStatus: cleanString(body.applicationStatus, 120),
+    deadline: cleanString(body.deadline, 120),
+    evidenceDate: cleanString(body.evidenceDate, 40),
+    evidenceNote,
+    fitReason,
+    duplicateType,
+    duplicateProgramId: cleanString(body.duplicateProgramId, 120).toLowerCase(),
+    confidence,
+    source,
+  };
+}
+
+function normalizeCandidateIdentity(value) {
+  return cleanString(value, 300)
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+
+function normalizeCandidateStringList(value) {
+  const values = Array.isArray(value) ? value : String(value || '').split(',');
+  return uniqueStrings(values);
+}
+
+function isValidProgramId(value) {
+  return /^[a-z0-9](?:[a-z0-9-]{0,118}[a-z0-9])?$/.test(value);
+}
+
+function newProgramCandidateSelectFields() {
+  return `select
+    id,
+    program_name as programName,
+    organization,
+    official_url as officialUrl,
+    opportunity_type as opportunityType,
+    roles_json as rolesJson,
+    class_years_json as classYearsJson,
+    location,
+    format,
+    duration,
+    application_status as applicationStatus,
+    deadline,
+    evidence_date as evidenceDate,
+    evidence_note as evidenceNote,
+    fit_reason as fitReason,
+    duplicate_type as duplicateType,
+    duplicate_program_id as duplicateProgramId,
+    confidence,
+    source,
+    status,
+    program_id as programId,
+    review_note as reviewNote,
+    reviewed_by as reviewedBy,
+    verified_at as verifiedAt,
+    added_at as addedAt,
+    monitored_at as monitoredAt,
+    rejected_at as rejectedAt,
+    first_seen_at as firstSeenAt,
+    last_seen_at as lastSeenAt,
+    created_at as createdAt,
+    updated_at as updatedAt`;
+}
+
+async function getNewProgramCandidateById(env, candidateId) {
+  const row = await env.DB.prepare(
+    `${newProgramCandidateSelectFields()}
+     from new_program_candidates
+     where id = ?
+     limit 1`,
+  )
+    .bind(candidateId)
+    .first();
+
+  if (!row) {
+    throw httpError(404, 'New-program candidate not found.');
+  }
+
+  return serializeNewProgramCandidate(row);
+}
+
+function serializeNewProgramCandidate(row) {
+  return {
+    ...row,
+    roles: parseJsonArray(row.rolesJson),
+    classYears: parseJsonArray(row.classYearsJson),
+  };
 }
 
 async function getDiscoveryCandidates(env, url) {

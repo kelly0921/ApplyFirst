@@ -99,6 +99,47 @@ Possible current-cycle source URLs found through manual search, Browser Run, or 
 - `reviewed_by`
 - `reviewed_at`
 
+### new_program_candidates
+
+Open-world research leads for programs that are not yet part of the ApplyFirst library. This queue is separate from `discovery_candidates`, which only proposes a new URL for an existing program.
+
+- `id`
+- `dedupe_key` (normalized organization + program name)
+- `program_name`
+- `organization`
+- `official_url`
+- `opportunity_type`
+- `roles_json`
+- `class_years_json`
+- `location`
+- `format`
+- `duration`
+- `application_status`
+- `deadline`
+- `evidence_date`
+- `evidence_note`
+- `fit_reason`
+- `duplicate_type`
+- `duplicate_program_id`
+- `confidence`
+- `source`
+- `status` (`candidate`, `verified`, `added`, `monitored`, or `rejected`)
+- `program_id`
+- review and stage timestamps
+
+Research can create or refresh a candidate, but it cannot publish a library record or create an official source. Verification requires maintainer evidence. `Added` requires the final library program ID. `Monitored` is accepted only when that program ID already exists as an enabled `official_sources` record.
+
+### new_program_candidate_events
+
+Append-only audit history for each new-program stage transition.
+
+- `candidate_id`
+- `from_status`
+- `to_status`
+- `note`
+- `actor`
+- `created_at`
+
 ### discovery_search_runs
 
 Admin-triggered search-provider runs that execute the seasonal query packs and save candidate URLs for review.
@@ -499,6 +540,9 @@ The Cloudflare watch Worker adds the first durable monitoring path:
 - `POST /watch/discovery/search` runs the due discovery query packs through the configured search provider, filters low-signal results, saves candidate URLs for review, and records a discovery search run. Dry-run output includes kept candidates, ignored counts, ignored examples, host-match reasoning, and detected search signals. It accepts `programId` or `programIds` for targeted maintainer queue actions. Requires `WATCH_ADMIN_TOKEN`.
 - `POST /watch/discovery/candidates` saves a possible current-cycle URL for review. Requires `WATCH_ADMIN_TOKEN`.
 - `POST /watch/discovery/candidates/:id/review` accepts or rejects a discovered URL. Accepted candidates can update the official source URL and queue it for immediate verification.
+- `GET /watch/program-candidates` returns the new-program research queue, stage counts, and recent transition history. Requires `WATCH_ADMIN_TOKEN`.
+- `POST /watch/program-candidates` creates or refreshes a research lead from an official source. Matching organization/program identities are deduplicated without resetting a verified or later stage. Requires `WATCH_ADMIN_TOKEN`.
+- `POST /watch/program-candidates/:id/review` moves a lead through the guarded Candidate -> Verified -> Added -> Monitored workflow and records an audit event. It cannot skip stages, and monitoring confirmation requires an enabled D1 official source. Requires `WATCH_ADMIN_TOKEN`.
 - `GET /watch/candidates` lists pending review candidates and requires `WATCH_ADMIN_TOKEN`.
 - `POST /watch/candidates/:id/send` sends reviewed email or text notifications based on each student's selected contact method and logs delivery status.
 - Phone/SMS delivery is supported through Twilio (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and either `TWILIO_MESSAGING_SERVICE_SID` or `TWILIO_FROM_PHONE`) with `SMS_WEBHOOK_URL` retained as an optional custom provider fallback.
@@ -516,7 +560,7 @@ Student alerts must be generated from clean student-facing templates. Internal s
 
 ## Next Implementation Steps
 
-1. Apply migrations through `013`, deploy the watch Worker, sync the hash-only invite registry, and smoke-test relevance, repeat application history, application outcomes, independent watch state, manual audits, operations entries, and the beta summary before inviting the next cohort.
+1. Apply migrations through `016`, deploy the watch Worker, sync the hash-only invite registry, and smoke-test relevance, repeat application history, application outcomes, independent watch state, manual audits, operations entries, new-program intake, and the beta summary before inviting the next cohort.
 2. Use the Maintainer Mode review console to smoke-test discovery search, candidate review, alert dry runs, and reviewed sends before each beta round.
 3. Review Student Value, Independent Usability, Trust, and Operational Burden after one week. Expand only when the evidence and stability gates pass.
 4. Import the regenerated D1 seed after each verified seed/schedule audit update.

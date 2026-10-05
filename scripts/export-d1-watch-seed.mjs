@@ -389,6 +389,131 @@ function createVerifiedScheduleOverrides() {
     },
   ],
   [
+    'microsoft-discovery-program',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [1, 2, 3, 4],
+      lastKnownOpenAt: null,
+      activeLeadDays: 150,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 72,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_program_page', 'site:careers.microsoft.com/v2/global/en/discoveryprogram "Microsoft Discovery Program"', 'Check the stable Discovery Program page for a new cycle.'),
+        createDiscoveryQuery('current_cycle_application', 'site:jobs.careers.microsoft.com "Discovery Program" "rising college freshman" 2027', 'Find the next official Discovery application posting.'),
+        createDiscoveryQuery('current_cycle_deadline', 'site:careers.microsoft.com "Discovery Program" application deadline 2027', 'Confirm future application dates from Microsoft.'),
+      ],
+      scheduleNote:
+        'The official page confirms the four-week incoming-first-year program, but not a 2027 application. Search through winter and spring and keep all opening signals in review until a dated Microsoft posting exists.',
+    },
+  ],
+  [
+    'linkedin-first-play',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [10, 11, 12],
+      lastKnownOpenAt: '2025-11-24',
+      activeLeadDays: 90,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 48,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_program_page', 'site:careers.linkedin.com/pathways-programs/internships/Technical/first-play "First Play"', 'Check the official First Play overview for a new cycle.'),
+        createDiscoveryQuery('current_cycle_application', 'site:linkedin.com/jobs "Software Engineer Intern" "First Play" 2027', 'Find the next LinkedIn-hosted First Play role.'),
+        createDiscoveryQuery('official_announcement', 'site:linkedin.com/company/linkedin "First Play" 2027 applications', 'Find a current official LinkedIn announcement if the job URL changes.'),
+      ],
+      scheduleNote:
+        'Summer 2026 applications opened November 24, 2025 and are now closed. Begin discovery in October, monitor daily during November and December, and never reuse the archived deadline for a future cycle.',
+    },
+  ],
+  [
+    'nvidia-ignite',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [10, 11, 12, 1],
+      lastKnownOpenAt: null,
+      activeLeadDays: 120,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 48,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_program_page', 'site:nvidia.com/en-us/about-nvidia/careers/university-recruiting "NVIDIA Ignite"', 'Confirm that NVIDIA continues to list Ignite.'),
+        createDiscoveryQuery('current_cycle_application', 'site:nvidia.wd5.myworkdayjobs.com "Ignite" 2027', 'Find a direct current-cycle Ignite requisition.'),
+        createDiscoveryQuery('official_announcement', 'site:nvidia.com "NVIDIA Ignite" applications 2027', 'Find a current official application announcement or program update.'),
+      ],
+      scheduleNote:
+        'Official NVIDIA pages confirm the twelve-week program but do not publish the next application timing. Fall and winter are a discovery window based on historical leads only; require a direct official requisition before creating an opening alert.',
+    },
+  ],
+  [
+    'citi-freshman-discovery',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [3, 4],
+      lastKnownOpenAt: null,
+      activeLeadDays: 75,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 48,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_program_page', 'site:jobs.citi.com/early-career-programs-pre-internships "Freshman Discovery"', 'Verify the recurring Freshman Discovery program.'),
+        createDiscoveryQuery('current_cycle_application', 'site:jobs.citi.com "Freshmen Discovery" 2027', 'Find a dated 2027 Citi event or application.'),
+      ],
+      scheduleNote:
+        'Citi says the May program normally opens in late March or early April. Keep monthly checks outside that window, increase discovery in March, and require a dated event listing before alerting.',
+    },
+  ],
+  [
+    'citi-early-identification',
+    {
+      cycleFrequency: 'multiple_per_year',
+      expectedOpenMonths: [2, 11],
+      lastKnownOpenAt: null,
+      activeLeadDays: 60,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 21,
+      discoveryCheckIntervalHours: 48,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_program_page', 'site:jobs.citi.com/early-career-programs-pre-internships "Early Identification"', 'Verify Citi program cadence and eligibility.'),
+        createDiscoveryQuery('current_cycle_application', 'site:jobs.citi.com "Early Identification" December 2026', 'Find a dated December cohort listing.'),
+        createDiscoveryQuery('next_cycle_application', 'site:jobs.citi.com "Early Identification" 2027', 'Find the next March or December cohort application.'),
+      ],
+      scheduleNote:
+        'Citi lists March and December cohorts with applications normally opening in February and November. Treat the cadence as preparation timing only until a dated event or application appears.',
+    },
+  ],
+  [
+    'uber-career-prep',
+    {
+      cycleFrequency: 'unknown',
+      expectedOpenMonths: [],
+      lastKnownOpenAt: null,
+      activeLeadDays: 45,
+      activeCheckIntervalHours: 72,
+      warmupCheckIntervalHours: 168,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 168,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_program_page', 'site:jobs.uber.com/en/teams/emerging-talent/careerprep "Uber Career Prep"', 'Check the official fellowship page for application details.'),
+        createDiscoveryQuery('current_cycle_application', 'site:jobs.uber.com "Uber Career Prep" apply 2027', 'Find a current Uber-hosted application route.'),
+        createDiscoveryQuery('official_announcement', 'site:uber.com "Uber Career Prep" applications', 'Find a dated official program announcement.'),
+      ],
+      scheduleNote:
+        'The official page confirms the fellowship but gives no reliable annual opening month. Check the stable page monthly, run discovery weekly only after a new cycle signal, and keep all alerts in review until a dated application exists.',
+    },
+  ],
+  [
     'palantir-launch-spring-program',
     {
       cycleFrequency: 'annual',

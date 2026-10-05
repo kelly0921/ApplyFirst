@@ -66,6 +66,36 @@ const defaultAlertPrefs = {
   notificationMode: 'waitlist',
   sendTiming: '',
 };
+const newProgramOpportunityTypes = [
+  'Discovery Program',
+  'Fellowship',
+  'Startup / VC Fellowship',
+  'Winternship',
+  'Scholarship / Funding',
+  'Conference / Travel Funding',
+  'Community / Prep Program',
+  'Full-Time Alternative',
+];
+const defaultNewProgramCandidate = {
+  programName: '',
+  organization: '',
+  officialUrl: '',
+  opportunityType: '',
+  roles: '',
+  classYears: '',
+  location: '',
+  format: '',
+  duration: '',
+  applicationStatus: '',
+  deadline: '',
+  evidenceDate: '',
+  evidenceNote: '',
+  fitReason: '',
+  duplicateType: 'new_program',
+  duplicateProgramId: '',
+  confidence: 'needs_review',
+  source: 'maintainer_research',
+};
 const defaultOnboardingProgress = {
   browsed: false,
   saved: false,
@@ -2810,6 +2840,12 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
   const [status, setStatus] = useState(null);
   const [readinessQueue, setReadinessQueue] = useState(null);
   const [reviewHistory, setReviewHistory] = useState(null);
+  const [newProgramQueue, setNewProgramQueue] = useState({
+    candidates: [],
+    counts: {},
+    activeCount: 0,
+    events: [],
+  });
   const [discoveryCandidates, setDiscoveryCandidates] = useState([]);
   const [alertCandidates, setAlertCandidates] = useState([]);
   const [alertCandidateTotal, setAlertCandidateTotal] = useState(0);
@@ -2821,6 +2857,8 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
   const [sourceRunResult, setSourceRunResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [readinessActionByProgramId, setReadinessActionByProgramId] = useState({});
+  const [newProgramActionById, setNewProgramActionById] = useState({});
+  const [newProgramCreateLoading, setNewProgramCreateLoading] = useState(false);
   const [alertActionByCandidateId, setAlertActionByCandidateId] = useState({});
   const [alertResultByCandidateId, setAlertResultByCandidateId] = useState({});
   const [showAllAlertCandidates, setShowAllAlertCandidates] = useState(false);
@@ -2846,7 +2884,9 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
   const hiddenAlertCandidateCount = Math.max(alertCandidates.length - visibleAlertCandidates.length, 0);
   const reviewEvents = reviewHistory ? buildReviewHistoryEvents(reviewHistory) : [];
   const readinessAttentionTotal = readinessQueue?.needsAttention ?? 0;
-  const maintainerActionTotal = readinessAttentionTotal + discoveryCandidates.length + pendingAlertTotal;
+  const newProgramActionTotal = newProgramQueue.activeCount ?? 0;
+  const maintainerActionTotal =
+    newProgramActionTotal + readinessAttentionTotal + discoveryCandidates.length + pendingAlertTotal;
 
   const updateSearchDraft = (field, value) => {
     setSearchDraft((currentDraft) => ({
@@ -2888,6 +2928,7 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
         statusPayload,
         readinessPayload,
         historyPayload,
+        newProgramPayload,
         discoveryPayload,
         alertPayload,
         metricsPayload,
@@ -2897,6 +2938,14 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
         callAdminEndpoint('/watch/status'),
         callAdminEndpoint('/watch/readiness'),
         callAdminEndpoint('/watch/history'),
+        callAdminEndpoint('/watch/program-candidates?status=all&limit=200').catch((error) => ({
+          unavailable: true,
+          error: error.message,
+          candidates: [],
+          counts: {},
+          activeCount: 0,
+          events: [],
+        })),
         callAdminEndpoint('/watch/discovery/candidates?status=pending_review'),
         callAdminEndpoint('/watch/candidates'),
         callAdminEndpoint('/analytics/summary'),
@@ -2912,6 +2961,7 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
       setStatus(statusPayload);
       setReadinessQueue(readinessPayload);
       setReviewHistory(historyPayload);
+      setNewProgramQueue(newProgramPayload);
       setDiscoveryCandidates(discoveryPayload.candidates ?? []);
       setAlertCandidates(alertPayload.candidates ?? []);
       setAlertCandidateTotal(alertPayload.totalPending ?? alertPayload.candidates?.length ?? 0);
@@ -3113,6 +3163,70 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
     }
   };
 
+  const createNewProgramCandidate = async (draft) => {
+    setNewProgramCreateLoading(true);
+    setErrorMessage('');
+    setActionMessage('');
+
+    try {
+      const payload = await callAdminEndpoint('/watch/program-candidates', {
+        method: 'POST',
+        body: {
+          ...draft,
+          roles: draft.roles.split(',').map((value) => value.trim()).filter(Boolean),
+          classYears: draft.classYears.split(',').map((value) => value.trim()).filter(Boolean),
+          createdBy: 'applyfirst-maintainer-console',
+        },
+      });
+      setActionMessage(
+        payload.created
+          ? `${draft.programName} added to new-program review.`
+          : `${draft.programName} already existed; its research evidence was refreshed.`,
+      );
+      await loadQueues({ quiet: true, showLoading: false });
+      return true;
+    } catch (error) {
+      setErrorMessage(error.message);
+      return false;
+    } finally {
+      setNewProgramCreateLoading(false);
+    }
+  };
+
+  const reviewNewProgramCandidate = async (candidate, statusValue, reviewDraft) => {
+    setNewProgramActionById((currentActions) => ({
+      ...currentActions,
+      [candidate.id]: statusValue,
+    }));
+    setErrorMessage('');
+    setActionMessage('');
+
+    try {
+      await callAdminEndpoint(`/watch/program-candidates/${candidate.id}/review`, {
+        method: 'POST',
+        body: {
+          status: statusValue,
+          programId: reviewDraft.programId,
+          confidence: reviewDraft.confidence,
+          reviewNote: reviewDraft.reviewNote,
+          reviewedBy: 'applyfirst-maintainer-console',
+        },
+      });
+      setActionMessage(`${candidate.programName} moved to ${formatDisplayLabel(statusValue)}.`);
+      await loadQueues({ quiet: true, showLoading: false });
+      return true;
+    } catch (error) {
+      setErrorMessage(error.message);
+      return false;
+    } finally {
+      setNewProgramActionById((currentActions) => {
+        const nextActions = { ...currentActions };
+        delete nextActions[candidate.id];
+        return nextActions;
+      });
+    }
+  };
+
   const sendAlertCandidate = async (candidate, dryRun) => {
     if (!dryRun && !window.confirm(`Send this alert to opted-in students watching ${candidate.programName}?`)) {
       return;
@@ -3255,6 +3369,7 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
         <>
           <MaintainerReviewSummary
             status={status}
+            newProgramCount={newProgramActionTotal}
             readinessCount={readinessAttentionTotal}
             discoveryCount={discoveryCandidates.length}
             alertCount={pendingAlertTotal}
@@ -3292,6 +3407,14 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
 
           {activeMaintainerSection === 'review' ? (
             <section className="maintainer-section-stack" aria-label="Review queues">
+              <NewProgramCandidateQueue
+                queue={newProgramQueue}
+                actionById={newProgramActionById}
+                createLoading={newProgramCreateLoading}
+                onCreate={createNewProgramCandidate}
+                onTransition={reviewNewProgramCandidate}
+              />
+
               {readinessQueue ? (
                 <MonitoringReadinessQueue
                   queue={readinessQueue}
@@ -4294,8 +4417,15 @@ function formatPercent(value, total) {
   return `${Math.round((value / total) * 100)}%`;
 }
 
-function MaintainerReviewSummary({ status, readinessCount, discoveryCount, alertCount, lastRefreshedAt }) {
-  const actionTotal = readinessCount + discoveryCount + alertCount;
+function MaintainerReviewSummary({
+  status,
+  newProgramCount,
+  readinessCount,
+  discoveryCount,
+  alertCount,
+  lastRefreshedAt,
+}) {
+  const actionTotal = newProgramCount + readinessCount + discoveryCount + alertCount;
   const primaryStatus = actionTotal
     ? `${actionTotal} Item${actionTotal === 1 ? '' : 's'} Need Review`
     : 'Nothing Needs Review';
@@ -4303,6 +4433,13 @@ function MaintainerReviewSummary({ status, readinessCount, discoveryCount, alert
     ? 'Resolve these before sending student alerts.'
     : 'Source monitoring continues in the background.';
   const primaryTasks = [
+    {
+      label: 'New Programs',
+      value: newProgramCount,
+      action: newProgramCount ? 'Qualify Research' : 'Clear',
+      detail: newProgramCount ? 'Verify, add, then connect monitoring.' : 'No research leads waiting.',
+      tone: newProgramCount ? 'attention' : 'calm',
+    },
     {
       label: 'Source Checks',
       value: readinessCount,
@@ -4356,6 +4493,300 @@ function MaintainerReviewSummary({ status, readinessCount, discoveryCount, alert
         <MaintainerMetric label="Checks Due" value={status?.dueSources ?? '-'} />
         <MaintainerMetric label="Alert Deliveries" value={status?.alertDeliveries ?? '-'} />
       </div>
+    </section>
+  );
+}
+
+function NewProgramCandidateQueue({ queue, actionById, createLoading, onCreate, onTransition }) {
+  const [showForm, setShowForm] = useState(false);
+  const [candidateDraft, setCandidateDraft] = useState(defaultNewProgramCandidate);
+  const [reviewDrafts, setReviewDrafts] = useState({});
+  const candidates = queue?.candidates ?? [];
+  const counts = queue?.counts ?? {};
+  const activeCandidates = candidates.filter((candidate) => ['candidate', 'verified', 'added'].includes(candidate.status));
+  const completedCandidates = candidates.filter((candidate) => ['monitored', 'rejected'].includes(candidate.status));
+  const stages = [
+    { id: 'candidate', label: 'Candidate' },
+    { id: 'verified', label: 'Verified' },
+    { id: 'added', label: 'Added' },
+    { id: 'monitored', label: 'Monitored' },
+  ];
+
+  const updateCandidateDraft = (field, value) => {
+    setCandidateDraft((current) => ({ ...current, [field]: value }));
+  };
+
+  const getReviewDraft = (candidate) => reviewDrafts[candidate.id] ?? {
+    programId: candidate.programId ?? '',
+    reviewNote: '',
+    confidence: candidate.confidence ?? 'needs_review',
+  };
+
+  const updateReviewDraft = (candidate, field, value) => {
+    setReviewDrafts((current) => {
+      const currentDraft = current[candidate.id] ?? {
+        programId: candidate.programId ?? '',
+        reviewNote: '',
+        confidence: candidate.confidence ?? 'needs_review',
+      };
+
+      return {
+        ...current,
+        [candidate.id]: {
+          ...currentDraft,
+          [field]: value,
+        },
+      };
+    });
+  };
+
+  const submitCandidate = async (event) => {
+    event.preventDefault();
+    const created = await onCreate(candidateDraft);
+
+    if (created) {
+      setCandidateDraft(defaultNewProgramCandidate);
+      setShowForm(false);
+    }
+  };
+
+  const transitionCandidate = async (candidate, statusValue) => {
+    const reviewDraft = getReviewDraft(candidate);
+    const changed = await onTransition(candidate, statusValue, reviewDraft);
+
+    if (changed) {
+      setReviewDrafts((current) => {
+        const next = { ...current };
+        delete next[candidate.id];
+        return next;
+      });
+    }
+  };
+
+  if (queue?.unavailable) {
+    return (
+      <section className="maintainer-panel new-program-panel">
+        <div className="maintainer-panel-heading">
+          <div>
+            <span>New Program Research</span>
+            <h2>Candidate Queue Not Deployed Yet</h2>
+          </div>
+          <p>Apply migration 016 and deploy the Watch Worker to enable this queue.</p>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="maintainer-panel new-program-panel" aria-label="New program candidate queue">
+      <div className="new-program-heading">
+        <div className="maintainer-panel-heading">
+          <div>
+            <span>New Program Research</span>
+            <h2>{activeCandidates.length ? `${activeCandidates.length} Lead${activeCandidates.length === 1 ? '' : 's'} Need Action` : 'Research Queue Is Clear'}</h2>
+          </div>
+          <p>Verify the program, add it to the library, then connect its official source.</p>
+        </div>
+        <button className="new-program-add-button" type="button" onClick={() => setShowForm((current) => !current)}>
+          {showForm ? 'Close Form' : 'Add Research Candidate'}
+        </button>
+      </div>
+
+      <div className="new-program-stage-strip" aria-label="New program workflow stages">
+        {stages.map((stage, index) => (
+          <div className={counts[stage.id] ? 'active' : ''} key={stage.id}>
+            <small>0{index + 1}</small>
+            <strong>{counts[stage.id] ?? 0}</strong>
+            <span>{stage.label}</span>
+          </div>
+        ))}
+      </div>
+
+      {showForm ? (
+        <form className="new-program-form" onSubmit={submitCandidate}>
+          <div className="new-program-form-heading">
+            <div>
+              <strong>Add A Research Lead</strong>
+              <p>Use an official source. Saving the lead does not publish it.</p>
+            </div>
+            <span>Required fields are marked *</span>
+          </div>
+          <div className="new-program-form-grid">
+            <label>
+              <span>Program Name *</span>
+              <input required value={candidateDraft.programName} onChange={(event) => updateCandidateDraft('programName', event.target.value)} />
+            </label>
+            <label>
+              <span>Organization *</span>
+              <input required value={candidateDraft.organization} onChange={(event) => updateCandidateDraft('organization', event.target.value)} />
+            </label>
+            <label className="new-program-wide-field">
+              <span>Official Program Page *</span>
+              <input type="url" required value={candidateDraft.officialUrl} onChange={(event) => updateCandidateDraft('officialUrl', event.target.value)} placeholder="https://..." />
+            </label>
+            <label>
+              <span>Opportunity Type</span>
+              <select value={candidateDraft.opportunityType} onChange={(event) => updateCandidateDraft('opportunityType', event.target.value)}>
+                <option value="">Choose type</option>
+                {newProgramOpportunityTypes.map((type) => <option value={type} key={type}>{type}</option>)}
+              </select>
+            </label>
+            <label>
+              <span>Confidence</span>
+              <select value={candidateDraft.confidence} onChange={(event) => updateCandidateDraft('confidence', event.target.value)}>
+                <option value="needs_review">Needs Review</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </label>
+            <label className="new-program-wide-field">
+              <span>Official Evidence *</span>
+              <textarea required value={candidateDraft.evidenceNote} onChange={(event) => updateCandidateDraft('evidenceNote', event.target.value)} placeholder="What does the official page confirm? Include current dates when available." />
+            </label>
+            <label className="new-program-wide-field">
+              <span>Why It Fits ApplyFirst *</span>
+              <textarea required value={candidateDraft.fitReason} onChange={(event) => updateCandidateDraft('fitReason', event.target.value)} placeholder="Explain why this is a special early-career program rather than a standard internship listing." />
+            </label>
+          </div>
+          <details className="new-program-more-fields">
+            <summary>More Program Context</summary>
+            <div className="new-program-form-grid">
+              <label><span>Role Areas</span><input value={candidateDraft.roles} onChange={(event) => updateCandidateDraft('roles', event.target.value)} placeholder="SWE, PM, Quant" /></label>
+              <label><span>Class Years</span><input value={candidateDraft.classYears} onChange={(event) => updateCandidateDraft('classYears', event.target.value)} placeholder="Freshman, Sophomore" /></label>
+              <label><span>Location</span><input value={candidateDraft.location} onChange={(event) => updateCandidateDraft('location', event.target.value)} /></label>
+              <label><span>Format</span><input value={candidateDraft.format} onChange={(event) => updateCandidateDraft('format', event.target.value)} placeholder="Remote, in person, hybrid" /></label>
+              <label><span>Duration</span><input value={candidateDraft.duration} onChange={(event) => updateCandidateDraft('duration', event.target.value)} /></label>
+              <label><span>Application Status</span><input value={candidateDraft.applicationStatus} onChange={(event) => updateCandidateDraft('applicationStatus', event.target.value)} /></label>
+              <label><span>Deadline</span><input value={candidateDraft.deadline} onChange={(event) => updateCandidateDraft('deadline', event.target.value)} /></label>
+              <label><span>Evidence Date</span><input type="date" value={candidateDraft.evidenceDate} onChange={(event) => updateCandidateDraft('evidenceDate', event.target.value)} /></label>
+              <label>
+                <span>Research Source</span>
+                <select value={candidateDraft.source} onChange={(event) => updateCandidateDraft('source', event.target.value)}>
+                  <option value="maintainer_research">Maintainer Research</option>
+                  <option value="scheduled_research">Scheduled Research</option>
+                  <option value="student_suggestion">Student Suggestion</option>
+                  <option value="trusted_list">Trusted List</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+              <label>
+                <span>Duplicate Check</span>
+                <select value={candidateDraft.duplicateType} onChange={(event) => updateCandidateDraft('duplicateType', event.target.value)}>
+                  <option value="new_program">New Program</option>
+                  <option value="new_subprogram">New Subprogram</option>
+                  <option value="existing_cycle">Existing Program Cycle</option>
+                  <option value="updated_url">Updated URL</option>
+                  <option value="low_confidence_lead">Low-Confidence Lead</option>
+                </select>
+              </label>
+              <label className="new-program-wide-field"><span>Related Program ID</span><input value={candidateDraft.duplicateProgramId} onChange={(event) => updateCandidateDraft('duplicateProgramId', event.target.value)} /></label>
+            </div>
+          </details>
+          <div className="maintainer-actions">
+            <button className="maintainer-primary-action" type="submit" disabled={createLoading}>
+              {createLoading ? 'Saving...' : 'Save Candidate'}
+            </button>
+          </div>
+        </form>
+      ) : null}
+
+      {activeCandidates.length ? (
+        <div className="new-program-candidate-list">
+          {activeCandidates.map((candidate) => {
+            const reviewDraft = getReviewDraft(candidate);
+            const activeAction = actionById[candidate.id];
+            const needsProgramId = ['verified', 'added'].includes(candidate.status);
+
+            return (
+              <article className={`new-program-candidate-card stage-${candidate.status}`} key={candidate.id}>
+                <div className="new-program-card-heading">
+                  <div>
+                    <span>{formatDisplayLabel(candidate.status)}</span>
+                    <h3>{candidate.programName}</h3>
+                    <p>{candidate.organization}</p>
+                  </div>
+                  <a href={candidate.officialUrl} target="_blank" rel="noreferrer">Official Source</a>
+                </div>
+                <dl className="new-program-facts">
+                  <div><dt>Type</dt><dd>{candidate.opportunityType || 'Needs classification'}</dd></div>
+                  <div><dt>Confidence</dt><dd>{formatDisplayLabel(reviewDraft.confidence)}</dd></div>
+                  <div><dt>Evidence</dt><dd>{candidate.evidenceDate ? formatDateTime(candidate.evidenceDate) : 'Date not recorded'}</dd></div>
+                  <div><dt>Source</dt><dd>{formatDisplayLabel(candidate.source)}</dd></div>
+                </dl>
+                <div className="new-program-research-notes">
+                  <p><strong>Official evidence</strong>{candidate.evidenceNote}</p>
+                  <p><strong>ApplyFirst fit</strong>{candidate.fitReason}</p>
+                </div>
+                <div className="new-program-review-controls">
+                  <label>
+                    <span>Review Note *</span>
+                    <textarea value={reviewDraft.reviewNote} onChange={(event) => updateReviewDraft(candidate, 'reviewNote', event.target.value)} placeholder="Record what you checked and why this stage is justified." />
+                  </label>
+                  {candidate.status === 'candidate' ? (
+                    <label>
+                      <span>Verified Confidence</span>
+                      <select value={reviewDraft.confidence} onChange={(event) => updateReviewDraft(candidate, 'confidence', event.target.value)}>
+                        <option value="needs_review">Needs Review</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                      </select>
+                    </label>
+                  ) : null}
+                  {needsProgramId ? (
+                    <label>
+                      <span>Library Program ID *</span>
+                      <input value={reviewDraft.programId} onChange={(event) => updateReviewDraft(candidate, 'programId', event.target.value.toLowerCase())} placeholder="program-id-from-opportunities" />
+                    </label>
+                  ) : null}
+                </div>
+                <div className="maintainer-actions new-program-actions">
+                  {candidate.status === 'candidate' ? (
+                    <>
+                      <button type="button" disabled={!reviewDraft.reviewNote.trim() || reviewDraft.confidence === 'needs_review' || Boolean(activeAction)} onClick={() => transitionCandidate(candidate, 'verified')}>
+                        {activeAction === 'verified' ? 'Verifying...' : 'Mark Verified'}
+                      </button>
+                      <button className="maintainer-danger-action" type="button" disabled={!reviewDraft.reviewNote.trim() || Boolean(activeAction)} onClick={() => transitionCandidate(candidate, 'rejected')}>Reject</button>
+                    </>
+                  ) : null}
+                  {candidate.status === 'verified' ? (
+                    <>
+                      <button type="button" disabled={!reviewDraft.reviewNote.trim() || !reviewDraft.programId.trim() || Boolean(activeAction)} onClick={() => transitionCandidate(candidate, 'added')}>
+                        {activeAction === 'added' ? 'Updating...' : 'Mark Added'}
+                      </button>
+                      <button className="maintainer-secondary-action" type="button" disabled={!reviewDraft.reviewNote.trim() || Boolean(activeAction)} onClick={() => transitionCandidate(candidate, 'candidate')}>Return To Candidate</button>
+                    </>
+                  ) : null}
+                  {candidate.status === 'added' ? (
+                    <>
+                      <button type="button" disabled={!reviewDraft.reviewNote.trim() || !reviewDraft.programId.trim() || Boolean(activeAction)} onClick={() => transitionCandidate(candidate, 'monitored')}>
+                        {activeAction === 'monitored' ? 'Checking Source...' : 'Confirm Monitoring'}
+                      </button>
+                      <button className="maintainer-secondary-action" type="button" disabled={!reviewDraft.reviewNote.trim() || Boolean(activeAction)} onClick={() => transitionCandidate(candidate, 'verified')}>Return To Verified</button>
+                    </>
+                  ) : null}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="maintainer-empty">No new-program leads need a decision.</p>
+      )}
+
+      {completedCandidates.length ? (
+        <details className="new-program-completed">
+          <summary>{completedCandidates.length} Completed Or Rejected</summary>
+          <div>
+            {completedCandidates.map((candidate) => (
+              <article key={candidate.id}>
+                <span>{formatDisplayLabel(candidate.status)}</span>
+                <strong>{candidate.programName}</strong>
+                <small>{candidate.programId || candidate.organization}</small>
+              </article>
+            ))}
+          </div>
+        </details>
+      ) : null}
     </section>
   );
 }
@@ -7712,8 +8143,16 @@ function formatDisplayLabel(value) {
     medium: 'Medium',
     needs_review: 'Needs Review',
     pending_review: 'Pending Review',
+    candidate: 'Candidate',
+    verified: 'Verified',
+    added: 'Added',
+    monitored: 'Monitored',
     accepted: 'Accepted',
     rejected: 'Rejected',
+    scheduled_research: 'Scheduled Research',
+    maintainer_research: 'Maintainer Research',
+    student_suggestion: 'Student Suggestion',
+    trusted_list: 'Trusted List',
     source_change: 'Source Change',
     deadline: 'Deadline',
   };

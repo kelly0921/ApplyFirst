@@ -93,6 +93,9 @@ export function getOpportunityTracks(opportunity) {
 
 const repeatedProgramIds = new Set([
   'microsoft-explore-watch',
+  'linkedin-first-play',
+  'nvidia-ignite',
+  'uber-career-prep',
   'palantir-launch-spring-program',
   'palantir-american-tech-fellowship',
   'jane-street-fttp-watch',
@@ -423,6 +426,204 @@ export const opportunities = [
     sourceNote:
       'Official Microsoft overview confirms Explore is for first- and second-year students and describes the U.S. program as a 12-week summer internship; current application posting and deadline still need cycle verification before alerts.',
     lastChecked: '2026-08-22',
+  },
+  {
+    id: 'microsoft-discovery-program',
+    name: 'Microsoft Discovery Program',
+    organization: 'Microsoft',
+    category: 'Discovery Program',
+    classYears: ['Freshman'],
+    timing: 'Summer',
+    status: 'watching',
+    confidence: 'high',
+    funding: 'Varies',
+    location: 'Redmond, WA or Atlanta, GA',
+    url: 'https://careers.microsoft.com/v2/global/en/discoveryprogram',
+    previousUrl: '',
+    openDate: 'Watch winter and spring for the next Discovery Program application',
+    deadline: 'The 2027 application deadline has not been posted',
+    tags: ['Product management', 'UX design', 'Software engineering', 'Incoming freshmen'],
+    description:
+      'Microsoft Discovery is a four-week local program for graduating high-school seniors who are entering college and want early exposure to technology careers before their first year begins.',
+    eligibilitySummary:
+      'Graduating high-school seniors entering a bachelor degree program who meet the official Redmond-area or Atlanta-area school and residency rules.',
+    experienceSummary:
+      'Participants work in a product-team pod, practice customer and product discovery, and gain exposure to software engineering, technical product management, product management, and UX design with Microsoft mentors.',
+    detailBasis:
+      'Current official Microsoft program and eligibility pages; the published 2026 program has passed and a 2027 application has not been posted.',
+    why:
+      'This reaches students immediately before college and adds unusually early product management and UX design exposure alongside engineering.',
+    prep:
+      'Confirm the local school or residency requirement, keep a short technology-interest story ready, and watch the official page for a future application link.',
+    sourceNote:
+      'Official Microsoft Discovery page confirms the four-week program, incoming-first-year audience, local eligibility rules, and software engineering, product management, and UX design exposure. Do not alert until a future-cycle application is explicit.',
+    lastChecked: '2026-10-05',
+    statusReviewedAt: '2026-10-05T13:00:00.000Z',
+  },
+  {
+    id: 'linkedin-first-play',
+    name: 'First Play',
+    organization: 'LinkedIn',
+    category: 'Discovery Program',
+    classYears: ['Freshman', 'Sophomore'],
+    timing: 'Summer',
+    status: 'watching',
+    confidence: 'high',
+    funding: 'Paid program',
+    location: 'Mountain View, CA (hybrid)',
+    url: 'https://careers.linkedin.com/pathways-programs/internships/Technical/first-play',
+    previousUrl: '',
+    openDate: 'Watch November for the next First Play application window',
+    deadline: 'Summer 2026 applications closed December 7, 2025; the next deadline has not been posted',
+    tags: ['Software engineering', 'AI', 'Underclassmen', 'Big tech'],
+    description:
+      'LinkedIn First Play is a paid twelve-week engineering program for students early in their computer science education who want hands-on project experience before a traditional software engineering internship.',
+    eligibilitySummary:
+      'The Summer 2026 cycle required U.S. work eligibility, a CS or related bachelor degree, and an expected graduation date of December 2027 or later; future-cycle rules must be rechecked.',
+    experienceSummary:
+      'Participants join a LinkedIn engineering team, build a practical project, receive cohort programming and mentorship, and practice AI-assisted development. The 2026 cycle included hourly pay, relocation support, hardware, and intern benefits.',
+    detailBasis:
+      'Current official LinkedIn First Play page documents the completed Summer 2026 cycle; LuisaE/opportunities independently surfaced it as an underclassman lead.',
+    why:
+      'It is specifically designed for students still building foundational engineering skills and does not require prior internship experience.',
+    prep:
+      'Prepare foundational coding examples, a project or coursework story, and evidence of curiosity about AI-assisted engineering before the next application window.',
+    sourceNote:
+      'Official LinkedIn page says Summer 2026 applications are closed and confirms the twelve-week hybrid Mountain View program. Monitor for a new cycle rather than treating the archived dates as current.',
+    lastChecked: '2026-10-05',
+    statusReviewedAt: '2026-10-05T13:00:00.000Z',
+  },
+  {
+    id: 'nvidia-ignite',
+    name: 'NVIDIA Ignite',
+    organization: 'NVIDIA',
+    category: 'Discovery Program',
+    classYears: ['Freshman', 'Sophomore'],
+    timing: 'Summer',
+    status: 'watching',
+    confidence: 'high',
+    funding: 'Varies by posting',
+    location: 'U.S. location varies by posting',
+    url: 'https://www.nvidia.com/en-us/about-nvidia/careers/university-recruiting/',
+    previousUrl: '',
+    openDate: 'Watch NVIDIA university roles for the next Ignite application',
+    deadline: 'No current Ignite deadline has been posted',
+    tags: ['Software engineering', 'Hardware', 'AI', 'Underclassmen', 'Pre-internship'],
+    description:
+      'NVIDIA Ignite is a twelve-week summer pre-internship for freshmen and sophomores to work with technical teams on real projects while learning NVIDIA products, engineering culture, and career paths.',
+    eligibilitySummary:
+      'Current freshmen and sophomores from a wide range of backgrounds; role-specific location, work authorization, and technical requirements should be confirmed when a posting appears.',
+    experienceSummary:
+      'Students work hands-on with NVIDIA technical experts and gain early exposure to areas such as software, hardware, AI, research, and accelerated computing.',
+    detailBasis:
+      'Current official NVIDIA U.S. university recruiting page and FY2026 reporting confirm that Ignite remains an active feeder program, but no current Ignite requisition was surfaced.',
+    why:
+      'A high-value early technical pathway that gives underclassmen practical work and industry context before later internship recruiting.',
+    prep:
+      'Keep a technical resume and project portfolio ready, search NVIDIA university roles for Ignite language, and verify the exact location and discipline before applying.',
+    sourceNote:
+      'Official NVIDIA sources confirm the twelve-week freshman and sophomore pre-internship. LuisaE/opportunities also flags Ignite, but opening timing from lead lists is not sufficient for an alert.',
+    lastChecked: '2026-10-05',
+    statusReviewedAt: '2026-10-05T13:00:00.000Z',
+  },
+  {
+    id: 'citi-freshman-discovery',
+    name: 'Freshman Discovery',
+    organization: 'Citi',
+    category: 'Discovery Program',
+    classYears: ['Freshman'],
+    timing: 'Spring',
+    status: 'watching',
+    confidence: 'high',
+    funding: 'Varies',
+    location: 'Remote (U.S.)',
+    url: 'https://jobs.citi.com/early-career-programs-pre-internships',
+    previousUrl: '',
+    openDate: 'Citi says applications usually open in late March or early April for a May program',
+    deadline: 'The next exact application deadline has not been posted',
+    tags: ['Finance', 'Career exploration', 'First-year students', 'Virtual'],
+    description:
+      'Citi Freshman Discovery is a three-day virtual introduction to financial services for first-year students who want foundational industry context before internship recruiting.',
+    eligibilitySummary:
+      'First-year students of any major enrolled in a four-year bachelor degree program at an accredited U.S. institution; students with limited prior financial-services exposure are encouraged.',
+    experienceSummary:
+      'The program combines introductory training, workshops, foundational technical skills, and broad exposure to financial-services work and career paths.',
+    detailBasis:
+      'Current official Citi pre-internship page confirms the audience, U.S.-virtual format, three-day duration, and recurring late-March or early-April application cadence.',
+    why:
+      'It gives first-year students a structured way to understand financial-services careers before they are expected to choose a later internship track.',
+    prep:
+      'Prepare a concise interest statement about financial services and watch Citi pre-internship events in March for a live Freshman Discovery listing.',
+    sourceNote:
+      'Official Citi page confirms the recurring program cadence but does not currently expose a live future-cycle application. Keep the record in monitoring until a dated listing appears.',
+    lastChecked: '2026-10-05',
+    statusReviewedAt: '2026-10-05T13:00:00.000Z',
+  },
+  {
+    id: 'citi-early-identification',
+    name: 'Early Identification',
+    organization: 'Citi',
+    category: 'Discovery Program',
+    classYears: ['Sophomore'],
+    timing: 'Winter',
+    status: 'expectedSoon',
+    confidence: 'high',
+    funding: 'Varies',
+    location: 'Remote (U.S.)',
+    url: 'https://jobs.citi.com/early-career-programs-pre-internships',
+    previousUrl: '',
+    openDate: 'Citi says December cohorts usually open applications in November',
+    deadline: 'The exact December 2026 application deadline has not been posted',
+    tags: ['Finance', 'Mentorship', 'Interview preparation', 'Sophomores', 'Virtual'],
+    description:
+      'Citi Early Identification is a three-week virtual mentorship and training program that helps sophomores explore Citi business areas and prepare for future Summer Analyst recruiting.',
+    eligibilitySummary:
+      'Sophomores enrolled in a four-year bachelor degree program at a U.S. institution; participants may apply to up to two Citi lines of business.',
+    experienceSummary:
+      'Participants receive mentorship, technical training, interview preparation, professional development, and exposure to Citi teams for two to three hours per day.',
+    detailBasis:
+      'Current official Citi pre-internship page confirms March and December cohorts, with applications normally opening in February and November.',
+    why:
+      'The combination of mentorship, business-track exploration, and interview preparation can help sophomores choose and pursue a financial-services path earlier.',
+    prep:
+      'Choose up to two business areas, prepare a finance-interest story, and verify that a dated December listing is live before applying or alerting students.',
+    sourceNote:
+      'The official page supports the recurring November application cadence, not a confirmed live December 2026 application. Treat this as Prepare Now until an official listing appears.',
+    lastChecked: '2026-10-05',
+    statusReviewedAt: '2026-10-05T13:00:00.000Z',
+  },
+  {
+    id: 'uber-career-prep',
+    name: 'Uber Career Prep',
+    organization: 'Uber',
+    category: 'Fellowship',
+    classYears: ['All class years'],
+    timing: 'Rolling',
+    status: 'watching',
+    confidence: 'high',
+    funding: 'Unpaid fellowship',
+    location: 'Remote',
+    url: 'https://jobs.uber.com/en/teams/emerging-talent/careerprep/?countryiso2=us',
+    previousUrl: '',
+    openDate: 'Watch the official program page for the next application cycle',
+    deadline: 'No current application deadline is listed',
+    tags: ['Software engineering', 'Mentorship', 'Technical interview prep', 'Undergraduates'],
+    description:
+      'Uber Career Prep is a virtual software engineering fellowship for undergraduate engineering students who want structured technical practice, mentorship, and a clearer path into technology recruiting.',
+    eligibilitySummary:
+      'Undergraduate engineering students; the current official page does not publish a specific class-year or next-cycle application requirement.',
+    experienceSummary:
+      'Fellows complete five technical and professional workshops, receive one-to-one mentorship from an Uber software engineer, practice mock interviews, and complete technical assignments. Uber says the fellowship concludes with a conversion interview for possible internship consideration.',
+    detailBasis:
+      'Current official Uber Career Prep program and participant-story pages confirm the virtual fellowship model; the next application window is not listed.',
+    why:
+      'It combines technical interview preparation with direct company mentorship and a potential internship pathway rather than offering generic self-guided practice.',
+    prep:
+      'Strengthen data structures and algorithms fundamentals, document community impact, and watch for a future application or eligibility update.',
+    sourceNote:
+      'Official Uber page confirms the active program model and virtual cohorts; zapplyjobs also surfaced it as an underclassman fellowship lead. Do not infer that applications are open without a dated official route.',
+    lastChecked: '2026-10-05',
+    statusReviewedAt: '2026-10-05T13:00:00.000Z',
   },
   {
     id: 'palantir-launch-spring-program',

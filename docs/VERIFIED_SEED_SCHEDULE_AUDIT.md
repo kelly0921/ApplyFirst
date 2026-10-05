@@ -57,6 +57,19 @@ Programs with exact current-cycle deadlines or rolling applications can be shown
 
 High-volatility pages get search-provider discovery during `warmup`, `active`, or `unknown`. Stable community/funding pages get lower-frequency source checks and usually skip URL discovery.
 
+## 2026-10-05 New-Program Radar Additions
+
+| Program | Official source | Public state | Monitoring rule |
+| --- | --- | --- | --- |
+| Microsoft Discovery Program | https://careers.microsoft.com/v2/global/en/discoveryprogram | Monitoring | Distinct from Explore: incoming first-year students, four weeks, local Redmond/Atlanta eligibility, and exposure to SWE, PM, and UX. Search winter and spring for a dated future application. |
+| LinkedIn First Play | https://careers.linkedin.com/pathways-programs/internships/Technical/first-play | Monitoring | Summer 2026 is closed. Begin discovery in October and search LinkedIn careers and official announcements during the prior November-December application season. |
+| NVIDIA Ignite | https://www.nvidia.com/en-us/about-nvidia/careers/university-recruiting/ | Monitoring | Official source confirms the twelve-week freshman/sophomore pre-internship but not the next opening date. Historical lead timing may guide discovery, never an automatic alert. |
+| Citi Freshman Discovery | https://jobs.citi.com/early-career-programs-pre-internships | Monitoring | Citi says May programs normally open in late March or early April. Require a dated event listing before alerting. |
+| Citi Early Identification | https://jobs.citi.com/early-career-programs-pre-internships | Opening Soon | Citi lists March and December cohorts with applications normally opening in February and November. The cadence supports preparation only until a live listing appears. |
+| Uber Career Prep | https://jobs.uber.com/en/teams/emerging-talent/careerprep/?countryiso2=us | Monitoring | The official fellowship page has no reliable opening month. Check monthly and require a dated Uber application route before alerting. |
+
+All six records were approved after maintainer review. No record was marked `Open Now`, and no historical deadline was reused as current-cycle evidence.
+
 ## 2026-08-22 Monitoring Strategy Upgrade
 
 - Keep source checks as the primary monitoring path: official URLs are still checked by cadence and only high-confidence fresh openings can email watched students.

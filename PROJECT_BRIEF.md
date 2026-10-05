@@ -112,7 +112,9 @@ Secondary sources:
 
 Duplicate appearances across trusted lists should become a positive signal. If a program shows up repeatedly, prioritize it for official verification and richer notes.
 
-LuisaE/opportunities should be treated as a key audit checklist, not just inspiration. The repo confirms that ApplyFirst should keep watching early CS programs, internship alternatives, CS exploratory programs, CS fellowships, conference funding, sponsor-backed scholarships, mentorship, research, and finance exploratory programs. It also surfaces missing candidates to evaluate carefully, including LinkedIn First Play, Google ASDI, Uber STAR, Visa Sophomore, NVIDIA Ignite, Oracle first-year SWE, Meta University, JPMorganChase Fellowship, Bank of America freshman technology programs, and similar underclassmen-specific pathways. These should only be promoted into the library after official-source verification and scope review.
+LuisaE/opportunities should be treated as a key audit checklist, not just inspiration. The repo confirms that ApplyFirst should keep watching early CS programs, internship alternatives, CS exploratory programs, CS fellowships, conference funding, sponsor-backed scholarships, mentorship, research, and finance exploratory programs. It also surfaces missing candidates to evaluate carefully, including Google ASDI, Uber STAR, Visa Sophomore, Oracle first-year SWE, Meta University, JPMorganChase Fellowship, Bank of America freshman technology programs, and similar underclassmen-specific pathways. These should only be promoted into the library after official-source verification and scope review.
+
+The October 5, 2026 radar promoted LinkedIn First Play and NVIDIA Ignite after official-source review. It also added Microsoft Discovery Program, Citi Freshman Discovery, Citi Early Identification, and Uber Career Prep. These records begin as monitored or preparation-stage programs; historical cadence never counts as proof that a new application is open.
 
 ## Manual Verification Workflow
 
