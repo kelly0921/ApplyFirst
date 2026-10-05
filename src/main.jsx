@@ -3,7 +3,16 @@ import { createRoot } from 'react-dom/client';
 import './styles.css';
 import programsScreenshot from '../docs/assets/screenshots/applyfirst-programs-desktop.png';
 import programStatusMixScreenshot from '../docs/assets/screenshots/applyfirst-program-status-mix-desktop.png';
+import { reportClientIssue } from './client-observability';
 import { fetchJson, postJson } from './http';
+import {
+  createApplicationAttempt,
+  loadBetaWorkspace,
+  saveApplicationOutcome,
+  saveBetaWorkspace,
+  saveProgramEvidence,
+  saveProgramWatch,
+} from './workspace-api';
 import { createSourceAnalysis, getSourceReviewDecision } from './monitoring';
 import {
   confidenceLabels,
@@ -364,6 +373,38 @@ function sendProductEvent(workerBaseUrl, accessCode, sessionId, eventName, detai
   });
 }
 
+function logClientIssue(operation, error, details = {}) {
+  let accessCode = details.accessCode || '';
+  let sessionId = '';
+
+  try {
+    accessCode ||= window.localStorage.getItem(accessCodeStorageKey) || '';
+    sessionId = window.sessionStorage.getItem(analyticsSessionStorageKey) || '';
+  } catch {
+    // Reporting still writes to the local console when browser storage is unavailable.
+  }
+
+  void reportClientIssue({
+    workerBaseUrl: getWorkerBaseUrl(watchEndpoint),
+    accessCode,
+    sessionId,
+    operation,
+    error,
+    details: {
+      componentStack: details.componentStack || '',
+      programId: details.programId || '',
+      view: details.view || getClientViewLabel(),
+    },
+  });
+}
+
+function getClientViewLabel() {
+  const hashView = String(window.location.hash || '')
+    .replace(/^#/, '')
+    .split(/[?&/]/, 1)[0];
+  return hashView || window.location.pathname || 'unknown';
+}
+
 let turnstileScriptPromise;
 const turnstileScriptSelector = 'script[data-applyfirst-turnstile]';
 const turnstileReadyCallback = '__applyFirstTurnstileReady';
@@ -552,11 +593,6 @@ function normalizeInviteCode(value) {
 
 function isWorkspaceInviteCode(value) {
   return betaWorkspaceInviteCodePattern.test(normalizeInviteCode(value));
-}
-
-function isAcceptedInviteCode(value) {
-  const normalizedCode = normalizeInviteCode(value);
-  return inviteCodes.includes(normalizedCode) || isWorkspaceInviteCode(normalizedCode);
 }
 
 function normalizeStoredIds(value) {
@@ -850,9 +886,12 @@ function App() {
   const [applicationAttemptsState, setApplicationAttemptsState] = useState('idle');
   const [applicationMutationState, setApplicationMutationState] = useState({});
   const [programWatchState, setProgramWatchState] = useState('idle');
+  const [watchMutationState, setWatchMutationState] = useState({});
   const [watchIntentProgramIds, setWatchIntentProgramIds] = useState([]);
   const [lastSavedId, setLastSavedId] = useState(null);
   const [workspaceSyncState, setWorkspaceSyncState] = useState('idle');
+  const [workspaceSyncError, setWorkspaceSyncError] = useState('');
+  const [workspaceRetryKey, setWorkspaceRetryKey] = useState(0);
   const lastWorkspaceSnapshotRef = useRef('');
   const analyticsSessionIdRef = useRef(cleanCaptureMode ? '' : getAnalyticsSessionId());
   const analyticsSessionTrackedRef = useRef(false);
@@ -861,6 +900,33 @@ function App() {
   const applicationAttemptInFlightRef = useRef(new Set());
   const ordinaryApplicationAttemptKeysRef = useRef(new Set());
   const applicationAttemptInteractionAtRef = useRef(new Map());
+
+  useEffect(() => {
+    if (cleanCaptureMode) {
+      return undefined;
+    }
+
+    const handleRuntimeError = (event) => {
+      const error = event.error instanceof Error
+        ? event.error
+        : new Error(event.message || 'Unhandled browser error.');
+      logClientIssue('runtime_error', error, { view: activeView });
+    };
+    const handleUnhandledRejection = (event) => {
+      const error = event.reason instanceof Error
+        ? event.reason
+        : new Error(String(event.reason || 'Unhandled promise rejection.'));
+      logClientIssue('unhandled_promise', error, { view: activeView });
+    };
+
+    window.addEventListener('error', handleRuntimeError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
+    return () => {
+      window.removeEventListener('error', handleRuntimeError);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
+  }, [activeView, cleanCaptureMode]);
 
   const opportunityRecords = useMemo(
     () =>
@@ -1173,18 +1239,21 @@ function App() {
 
     if (!hasAccess || !activeAccessCode) {
       setWorkspaceSyncState('idle');
+      setWorkspaceSyncError('');
       return;
     }
 
     if (!isWorkspaceInviteCode(activeAccessCode) || !activeWatchEndpoint) {
       setWorkspaceSyncState('local');
+      setWorkspaceSyncError('');
       return;
     }
 
     let cancelled = false;
     setWorkspaceSyncState('loading');
+    setWorkspaceSyncError('');
 
-    fetchJson(`${getWorkerBaseUrl(activeWatchEndpoint)}/workspace?code=${encodeURIComponent(activeAccessCode)}`)
+    loadBetaWorkspace(getWorkerBaseUrl(activeWatchEndpoint), activeAccessCode)
       .then((payload) => {
         if (cancelled) {
           return;
@@ -1195,16 +1264,22 @@ function App() {
         }
         setWorkspaceSyncState(payload.exists ? 'loaded' : 'new');
       })
-      .catch(() => {
+      .catch((error) => {
         if (!cancelled) {
-          setWorkspaceSyncState('local');
+          logClientIssue('workspace_load', error, { view: activeView });
+          setWorkspaceSyncState('loadError');
+          setWorkspaceSyncError(
+            error?.status === 403
+              ? 'This invite code is no longer active. Return to About and enter a current code.'
+              : 'Your workspace could not load. Changes are not syncing until you retry.',
+          );
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [activeAccessCode, activeWatchEndpoint, cleanCaptureMode, hasAccess]);
+  }, [activeAccessCode, activeWatchEndpoint, cleanCaptureMode, hasAccess, workspaceRetryKey]);
 
   useEffect(() => {
     if (
@@ -1228,8 +1303,11 @@ function App() {
         );
         setProgramEvidenceState('loaded');
       })
-      .catch(() => {
-        if (!cancelled) setProgramEvidenceState('unavailable');
+      .catch((error) => {
+        if (!cancelled) {
+          logClientIssue('program_evidence_load', error, { view: activeView });
+          setProgramEvidenceState('unavailable');
+        }
       });
 
     return () => {
@@ -1257,8 +1335,11 @@ function App() {
         setApplicationAttempts(Array.isArray(payload.attempts) ? payload.attempts : []);
         setApplicationAttemptsState('loaded');
       })
-      .catch(() => {
-        if (!cancelled) setApplicationAttemptsState('unavailable');
+      .catch((error) => {
+        if (!cancelled) {
+          logClientIssue('application_attempts_load', error, { view: activeView });
+          setApplicationAttemptsState('unavailable');
+        }
       });
 
     return () => {
@@ -1296,8 +1377,11 @@ function App() {
         }
         setProgramWatchState('loaded');
       })
-      .catch(() => {
-        if (!cancelled) setProgramWatchState('unavailable');
+      .catch((error) => {
+        if (!cancelled) {
+          logClientIssue('program_watches_load', error, { view: activeView });
+          setProgramWatchState('unavailable');
+        }
       });
 
     return () => {
@@ -1306,7 +1390,7 @@ function App() {
   }, [activeAccessCode, activeWatchEndpoint, canSyncWorkspace, cleanCaptureMode, programWatchState, workspaceSyncState]);
 
   useEffect(() => {
-    if (cleanCaptureMode || !canSyncWorkspace || !['loaded', 'new', 'synced', 'syncError'].includes(workspaceSyncState)) {
+    if (cleanCaptureMode || !canSyncWorkspace || !['loaded', 'new', 'synced'].includes(workspaceSyncState)) {
       return;
     }
 
@@ -1319,18 +1403,24 @@ function App() {
 
     const timer = window.setTimeout(() => {
       setWorkspaceSyncState('syncing');
-      postJson(`${getWorkerBaseUrl(activeWatchEndpoint)}/workspace`, {
-        accessCode: activeAccessCode,
-        state: {
+      saveBetaWorkspace(
+        getWorkerBaseUrl(activeWatchEndpoint),
+        activeAccessCode,
+        {
           ...workspaceState,
           savedAt: new Date().toISOString(),
         },
-      })
+      )
         .then(() => {
           lastWorkspaceSnapshotRef.current = workspaceSnapshot;
+          setWorkspaceSyncError('');
           setWorkspaceSyncState('synced');
         })
-        .catch(() => setWorkspaceSyncState('syncError'));
+        .catch((error) => {
+          logClientIssue('workspace_save', error, { view: activeView });
+          setWorkspaceSyncError('Your latest changes did not sync. Retry before closing this page.');
+          setWorkspaceSyncState('syncError');
+        });
     }, 700);
 
     return () => window.clearTimeout(timer);
@@ -1348,6 +1438,16 @@ function App() {
     watchIntentProgramIds,
     workspaceSyncState,
   ]);
+
+  const retryWorkspaceSync = () => {
+    setWorkspaceSyncError('');
+    if (workspaceSyncState === 'syncError') {
+      setWorkspaceSyncState('loaded');
+      return;
+    }
+    setWorkspaceSyncState('loading');
+    setWorkspaceRetryKey((current) => current + 1);
+  };
 
   useEffect(() => {
     if (!showInternalTools && activeView === 'maintainer') {
@@ -1467,7 +1567,7 @@ function App() {
     }
 
     try {
-      await postJson(`${getWorkerBaseUrl(activeWatchEndpoint)}/analytics/program-evidence`, {
+      await saveProgramEvidence(getWorkerBaseUrl(activeWatchEndpoint), {
         accessCode: activeAccessCode,
         programId,
         relevance: nextEvidence.relevance,
@@ -1487,7 +1587,8 @@ function App() {
         },
       }));
       return true;
-    } catch {
+    } catch (error) {
+      logClientIssue('program_relevance_save', error, { programId, view: 'programs' });
       setProgramEvidence((current) => ({
         ...current,
         [programId]: { ...nextEvidence, saveState: 'error' },
@@ -1556,11 +1657,11 @@ function App() {
         ? [id, ...currentIds.filter((programId) => programId !== id)].slice(0, 50)
         : currentIds.filter((programId) => programId !== id)
     ));
-    setProgramWatchState('saving');
+    setWatchMutationState((current) => ({ ...current, [id]: 'saving' }));
 
     if (canSyncWorkspace && opportunity) {
       try {
-        await postJson(`${getWorkerBaseUrl(activeWatchEndpoint)}/analytics/program-watches`, {
+        await saveProgramWatch(getWorkerBaseUrl(activeWatchEndpoint), {
           accessCode: activeAccessCode,
           programId: id,
           programName: opportunity.name,
@@ -1569,14 +1670,15 @@ function App() {
           readiness: getMonitoringReadiness(opportunity).label,
           watching,
         });
-        setProgramWatchState('saved');
-      } catch {
+        setWatchMutationState((current) => ({ ...current, [id]: 'saved' }));
+      } catch (error) {
+        logClientIssue('program_watch_save', error, { programId: id, view: 'programs' });
         setWatchIntentProgramIds(previousIds);
-        setProgramWatchState('error');
+        setWatchMutationState((current) => ({ ...current, [id]: 'error' }));
         return false;
       }
     } else {
-      setProgramWatchState('local');
+      setWatchMutationState((current) => ({ ...current, [id]: 'local' }));
     }
 
     trackProductEvent(watching ? 'watch_started' : 'watch_stopped', {
@@ -1657,8 +1759,8 @@ function App() {
       };
 
       if (canSyncWorkspace) {
-        const response = await postJson(
-          `${getWorkerBaseUrl(activeWatchEndpoint)}/analytics/application-attempts`,
+        const response = await createApplicationAttempt(
+          getWorkerBaseUrl(activeWatchEndpoint),
           {
             accessCode: activeAccessCode,
             programId: id,
@@ -1704,7 +1806,8 @@ function App() {
         });
       }
       return true;
-    } catch {
+    } catch (error) {
+      logClientIssue('application_attempt_save', error, { programId: id, view: 'programs' });
       if (!allowDuplicate) ordinaryApplicationAttemptKeysRef.current.delete(ordinaryAttemptKey);
       setApplicationMutationState((current) => ({ ...current, [id]: 'error' }));
       return false;
@@ -1718,8 +1821,9 @@ function App() {
 
     try {
       if (canSyncWorkspace) {
-        await postJson(
-          `${getWorkerBaseUrl(activeWatchEndpoint)}/analytics/application-attempts/${encodeURIComponent(attemptId)}/outcome`,
+        await saveApplicationOutcome(
+          getWorkerBaseUrl(activeWatchEndpoint),
+          attemptId,
           { accessCode: activeAccessCode, outcome },
         );
       }
@@ -1735,7 +1839,8 @@ function App() {
         context: { view: 'programs', source: outcome },
       });
       return true;
-    } catch {
+    } catch (error) {
+      logClientIssue('application_outcome_save', error, { programId, view: 'programs' });
       setApplicationMutationState((current) => ({ ...current, [attemptId]: 'error' }));
       return false;
     }
@@ -1872,8 +1977,11 @@ function App() {
       setApplicationAttemptsState('idle');
       setApplicationMutationState({});
       setProgramWatchState('idle');
+      setWatchMutationState({});
     }
     setActiveAccessCode(normalizedAccessCode);
+    setWorkspaceSyncError('');
+    setWorkspaceSyncState('idle');
     setHasAccess(true);
     setActiveView('monitor');
   };
@@ -1901,6 +2009,7 @@ function App() {
         alertStrategy={alertStrategy}
         waitlistIntent={waitlistIntent}
         waitlistEndpoint={activeWaitlistEndpoint}
+        watchEndpoint={activeWatchEndpoint}
         onWaitlistSave={saveWaitlistIntent}
         onWaitlistReset={resetWaitlistIntent}
         onGrantAccess={grantAccess}
@@ -1921,6 +2030,15 @@ function App() {
         />
       )}
       <main className="workspace">
+        {canSyncWorkspace && ['loadError', 'syncError'].includes(workspaceSyncState) ? (
+          <section className="workspace-sync-alert" role="alert" aria-label="Workspace sync issue">
+            <div>
+              <strong>Workspace Not Synced</strong>
+              <span>{workspaceSyncError}</span>
+            </div>
+            <button type="button" onClick={retryWorkspaceSync}>Retry Sync</button>
+          </section>
+        ) : null}
         {activeView === 'maintainer' && showInternalTools ? (
           <MaintainerReviewConsole
             watchEndpoint={activeWatchEndpoint}
@@ -2137,6 +2255,7 @@ function App() {
                   opportunity={selectedOpportunity}
                   saved={selectedOpportunity ? savedIds.includes(selectedOpportunity.id) : false}
                   watched={selectedOpportunity ? activeWatchIntentIdSet.has(selectedOpportunity.id) : false}
+                  watchMutationState={selectedOpportunity ? watchMutationState[selectedOpportunity.id] : ''}
                   onSave={() => selectedOpportunity && toggleSaved(selectedOpportunity.id)}
                   onToggleWatch={() => selectedOpportunity && setOpportunityWatching(
                     selectedOpportunity.id,
@@ -2208,24 +2327,51 @@ function LandingPage({
   alertStrategy,
   waitlistIntent,
   waitlistEndpoint,
+  watchEndpoint,
   onWaitlistSave,
   onWaitlistReset,
   onGrantAccess,
 }) {
   const [inviteCode, setInviteCode] = useState('');
   const [accessError, setAccessError] = useState('');
+  const [accessState, setAccessState] = useState('idle');
 
-  const submitInviteCode = (event) => {
+  const submitInviteCode = async (event) => {
     event.preventDefault();
     const normalizedCode = normalizeInviteCode(inviteCode);
 
-    if (isAcceptedInviteCode(normalizedCode)) {
+    if (inviteCodes.includes(normalizedCode)) {
       setAccessError('');
-      onGrantAccess(isWorkspaceInviteCode(normalizedCode) ? normalizedCode : '');
+      onGrantAccess('');
       return;
     }
 
-    setAccessError('Use a beta code like AF-NAME-1234, or a current prototype access code.');
+    if (!isWorkspaceInviteCode(normalizedCode)) {
+      setAccessError('Enter the invite code from your ApplyFirst email.');
+      return;
+    }
+
+    const workerBaseUrl = getWorkerBaseUrl(watchEndpoint);
+    if (!workerBaseUrl) {
+      setAccessError('Invite verification is temporarily unavailable. Please try again later.');
+      return;
+    }
+
+    setAccessState('checking');
+    setAccessError('');
+    try {
+      await loadBetaWorkspace(workerBaseUrl, normalizedCode);
+      onGrantAccess(normalizedCode);
+    } catch (error) {
+      logClientIssue('invite_verification', error, { accessCode: normalizedCode, view: 'about' });
+      setAccessError(
+        error?.status === 403
+          ? 'This invite code is not active. Check the code in your invitation email.'
+          : 'We could not verify this invite code. Please try again.',
+      );
+    } finally {
+      setAccessState('idle');
+    }
   };
 
   return (
@@ -2280,13 +2426,19 @@ function LandingPage({
                 <input
                   type="text"
                   value={inviteCode}
-                  onChange={(event) => setInviteCode(event.target.value)}
+                  onChange={(event) => {
+                    setInviteCode(event.target.value);
+                    setAccessError('');
+                  }}
                   placeholder="AF-NAME-1234"
                   autoComplete="off"
+                  disabled={accessState === 'checking'}
                 />
               </label>
               {accessError ? <p className="form-error">{accessError}</p> : null}
-              <button type="submit">Open ApplyFirst</button>
+              <button type="submit" disabled={accessState === 'checking'}>
+                {accessState === 'checking' ? 'Checking Invite...' : 'Open ApplyFirst'}
+              </button>
             </form>
             <a className="panel-waitlist-link" href="#waitlist">
               Need access? Join the waitlist
@@ -2613,7 +2765,7 @@ function Header({
             </button>
           ) : null}
         </div>
-        <div className="nav-status" aria-label="Workspace status">
+        <div className="nav-status" aria-label="Additional navigation">
           {showInternalTools ? <span className="internal-status">Maintainer</span> : null}
           {showReviewToolsToggle ? (
             <button className="internal-tools-toggle" type="button" onClick={onToggleInternalTools}>
@@ -2663,6 +2815,7 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
   const [alertCandidateTotal, setAlertCandidateTotal] = useState(0);
   const [betaMetrics, setBetaMetrics] = useState(null);
   const [betaParticipants, setBetaParticipants] = useState(null);
+  const [clientErrors, setClientErrors] = useState(null);
   const [betaParticipantsLoading, setBetaParticipantsLoading] = useState(false);
   const [searchResult, setSearchResult] = useState(null);
   const [sourceRunResult, setSourceRunResult] = useState(null);
@@ -2731,7 +2884,16 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
     }
 
     try {
-      const [statusPayload, readinessPayload, historyPayload, discoveryPayload, alertPayload, metricsPayload, participantsPayload] = await Promise.all([
+      const [
+        statusPayload,
+        readinessPayload,
+        historyPayload,
+        discoveryPayload,
+        alertPayload,
+        metricsPayload,
+        participantsPayload,
+        clientErrorPayload,
+      ] = await Promise.all([
         callAdminEndpoint('/watch/status'),
         callAdminEndpoint('/watch/readiness'),
         callAdminEndpoint('/watch/history'),
@@ -2739,6 +2901,12 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
         callAdminEndpoint('/watch/candidates'),
         callAdminEndpoint('/analytics/summary'),
         callAdminEndpoint('/analytics/participants?limit=50'),
+        callAdminEndpoint('/analytics/client-errors?limit=20').catch((error) => ({
+          unavailable: true,
+          error: error.message,
+          summary: {},
+          recent: [],
+        })),
       ]);
 
       setStatus(statusPayload);
@@ -2749,6 +2917,7 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
       setAlertCandidateTotal(alertPayload.totalPending ?? alertPayload.candidates?.length ?? 0);
       setBetaMetrics(metricsPayload);
       setBetaParticipants(participantsPayload);
+      setClientErrors(clientErrorPayload);
       setLastRefreshedAt(new Date().toISOString());
       if (!quiet) {
         setActionMessage('Review queue refreshed.');
@@ -3116,8 +3285,8 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
               onClick={() => setActiveMaintainerSection('activity')}
               aria-pressed={activeMaintainerSection === 'activity'}
             >
-              <span>History</span>
-              <strong>{reviewEvents.length}</strong>
+              <span>Activity</span>
+              <strong>{reviewEvents.length + (clientErrors?.recent?.length ?? 0)}</strong>
             </button>
           </nav>
 
@@ -3330,8 +3499,11 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
             />
           ) : null}
 
-          {activeMaintainerSection === 'activity' && reviewHistory ? (
-            <ReviewHistoryPanel history={reviewHistory} events={reviewEvents} />
+          {activeMaintainerSection === 'activity' ? (
+            <section className="maintainer-section-stack" aria-label="Maintainer activity and reliability">
+              {clientErrors ? <ClientErrorLogPanel payload={clientErrors} /> : null}
+              {reviewHistory ? <ReviewHistoryPanel history={reviewHistory} events={reviewEvents} /> : null}
+            </section>
           ) : null}
         </>
       )}
@@ -4458,6 +4630,111 @@ function MaintainerMetric({ label, value }) {
       {label}
     </span>
   );
+}
+
+function ClientErrorLogPanel({ payload }) {
+  const [showAllErrors, setShowAllErrors] = useState(false);
+  const recentErrors = payload.recent ?? [];
+  const visibleErrors = showAllErrors ? recentErrors : recentErrors.slice(0, 5);
+  const hiddenErrorCount = Math.max(recentErrors.length - visibleErrors.length, 0);
+  const summary = payload.summary ?? {};
+
+  return (
+    <section className="maintainer-panel client-error-panel" aria-label="Client reliability log">
+      <div className="maintainer-panel-heading client-error-heading">
+        <div>
+          <span>Reliability</span>
+          <h2>Student-Side Errors</h2>
+        </div>
+        <p>Sanitized failures from synced beta workspaces. Invite codes and personal details are removed.</p>
+      </div>
+
+      {payload.unavailable ? (
+        <p className="client-error-unavailable">
+          Client error reporting is unavailable. {payload.error || 'Check the Worker deployment and D1 migration.'}
+        </p>
+      ) : null}
+
+      <div className="client-error-summary" aria-label="Client error summary">
+        <span>
+          <strong>{summary.occurrences7Days ?? 0}</strong>
+          Errors In 7 Days
+        </span>
+        <span>
+          <strong>{summary.affectedWorkspaces7Days ?? 0}</strong>
+          Students Affected
+        </span>
+        <span>
+          <strong>{summary.occurrences30Days ?? 0}</strong>
+          Errors In 30 Days
+        </span>
+      </div>
+
+      <div className="client-error-list">
+        {visibleErrors.length ? (
+          visibleErrors.map((error) => (
+            <article className="client-error-item" key={error.id}>
+              <div className="client-error-topline">
+                <div>
+                  <strong>{formatClientOperation(error.operation)}</strong>
+                  <span>{error.codeLabel || 'Unknown Workspace'}</span>
+                </div>
+                <time dateTime={error.lastSeenAt}>{formatDateTime(error.lastSeenAt)}</time>
+              </div>
+              <p>{error.message || 'No diagnostic message was provided.'}</p>
+              <div className="client-error-meta">
+                {error.httpStatus ? <span>HTTP {error.httpStatus}</span> : null}
+                {error.view ? <span>{formatDisplayLabel(error.view)}</span> : null}
+                {error.programId ? <span>{error.programId}</span> : null}
+                <span>{error.occurrenceCount ?? 1} Occurrence{error.occurrenceCount === 1 ? '' : 's'}</span>
+              </div>
+              {error.stack || error.componentStack ? (
+                <details className="client-error-details">
+                  <summary>Technical Details</summary>
+                  {error.errorName ? <strong>{error.errorName}</strong> : null}
+                  {error.stack ? <pre>{error.stack}</pre> : null}
+                  {error.componentStack ? <pre>{error.componentStack}</pre> : null}
+                  <small>Fingerprint: {String(error.fingerprint || '').slice(0, 12)}</small>
+                </details>
+              ) : null}
+            </article>
+          ))
+        ) : (
+          <p className="maintainer-empty">No student-side errors have been reported.</p>
+        )}
+      </div>
+
+      {hiddenErrorCount ? (
+        <button className="review-history-toggle" type="button" onClick={() => setShowAllErrors(true)}>
+          Show {hiddenErrorCount} More Error{hiddenErrorCount === 1 ? '' : 's'}
+        </button>
+      ) : showAllErrors && recentErrors.length > 5 ? (
+        <button className="review-history-toggle" type="button" onClick={() => setShowAllErrors(false)}>
+          Show Fewer Errors
+        </button>
+      ) : null}
+    </section>
+  );
+}
+
+function formatClientOperation(operation) {
+  const labels = {
+    application_attempt_save: 'Mark Applied Failed',
+    application_attempts_load: 'Application History Load Failed',
+    application_outcome_save: 'Outcome Update Failed',
+    invite_verification: 'Invite Verification Failed',
+    program_evidence_load: 'Program Activity Load Failed',
+    program_relevance_save: 'Relevance Save Failed',
+    program_watches_load: 'Watch List Load Failed',
+    program_watch_save: 'Watch Update Failed',
+    react_render: 'Page Render Failed',
+    runtime_error: 'Browser Runtime Error',
+    unhandled_promise: 'Unhandled Browser Request',
+    workspace_load: 'Workspace Load Failed',
+    workspace_save: 'Workspace Sync Failed',
+  };
+
+  return labels[operation] || formatDisplayLabel(operation || 'Client Error');
 }
 
 function ReviewHistoryPanel({ history, events: providedEvents }) {
@@ -6144,6 +6421,7 @@ function OpportunityDetail({
   opportunity,
   saved,
   watched,
+  watchMutationState,
   onSave,
   onToggleWatch,
   justSaved,
@@ -6249,10 +6527,16 @@ function OpportunityDetail({
           type="button"
           onClick={onToggleWatch}
           aria-pressed={watched}
+          disabled={watchMutationState === 'saving'}
         >
-          {watched ? 'Watching' : 'Watch'}
+          {watchMutationState === 'saving' ? 'Saving...' : watched ? 'Watching' : 'Watch'}
         </button>
       </div>
+      {watchMutationState === 'error' ? (
+        <p className="detail-action-error" role="alert">
+          Watch status was not saved. Please try again.
+        </p>
+      ) : null}
       {verificationState !== 'verified' ? (
         <div className={`detail-source-trust detail-source-trust-${sourceStatusTone}`} aria-label="Source trust">
           <strong>{verificationState === 'watchOnly' ? 'Dates Not Confirmed' : 'Details Need Confirmation'}</strong>
@@ -6409,6 +6693,9 @@ function ProgramProgressPanel({
                   ))}
                 </select>
               </label>
+              {mutationState[attempt.id] === 'error' ? (
+                <p className="application-attempt-error" role="alert">Outcome not saved. Try again.</p>
+              ) : null}
             </article>
           ))}
         </div>
@@ -6560,6 +6847,9 @@ function ProgramDecisionCheckIn({ evidence, hasApplied, onSave }) {
             </button>
             <span>No application details or private notes are collected here.</span>
           </div>
+        ) : null}
+        {evidence?.saveState === 'error' ? (
+          <p className="program-decision-error" role="alert">Your response was not saved. Please try again.</p>
         ) : null}
       </div>
     </section>
@@ -7492,7 +7782,10 @@ class AppErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, info) {
-    console.error('ApplyFirst could not render the current view.', error, info);
+    logClientIssue('react_render', error, {
+      componentStack: info?.componentStack || '',
+      view: getClientViewLabel(),
+    });
   }
 
   render() {

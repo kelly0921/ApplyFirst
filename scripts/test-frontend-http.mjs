@@ -28,7 +28,10 @@ try {
     status: 404,
     headers: { 'Content-Type': 'application/json' },
   });
-  await assert.rejects(() => postJson('https://worker.example/missing', {}), /Workspace not found/);
+  await assert.rejects(
+    () => postJson('https://worker.example/missing', {}),
+    (error) => error.message === 'Workspace not found.' && error.status === 404,
+  );
 
   globalThis.fetch = async () => new Response(JSON.stringify({ ok: true, records: 72 }), {
     status: 200,

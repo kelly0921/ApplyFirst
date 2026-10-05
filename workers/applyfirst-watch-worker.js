@@ -27,6 +27,21 @@ const PRODUCT_EVENT_NAMES = new Set([
 ]);
 const PRODUCT_OUTCOMES = new Set(['found_relevant_program', 'applied_earlier', 'not_yet']);
 const PRODUCT_EVENT_CONTEXT_FIELDS = new Set(['view', 'source', 'status', 'resultCount', 'queryLength']);
+const CLIENT_ERROR_OPERATIONS = new Set([
+  'workspace_load',
+  'workspace_save',
+  'program_evidence_load',
+  'program_relevance_save',
+  'program_watches_load',
+  'program_watch_save',
+  'application_attempts_load',
+  'application_attempt_save',
+  'application_outcome_save',
+  'invite_verification',
+  'react_render',
+  'runtime_error',
+  'unhandled_promise',
+]);
 const PROGRAM_RELEVANCE_VALUES = new Set([
   'this_cycle',
   'future_cycle',
@@ -89,6 +104,7 @@ const MONITORING_AUDIT_TYPES = new Set(['known_opening', 'information_accuracy',
 const OPERATIONAL_TIME_CATEGORIES = new Set(['monitoring_review', 'data_correction', 'user_support']);
 const TESTER_SEGMENT_VALUES = new Set(['unknown', 'rsa_assisted', 'independent_waitlist', 'other']);
 const BETA_INVITATION_STATUS_VALUES = new Set(['not_sent', 'sent', 'active', 'paused', 'revoked']);
+const ACTIVE_BETA_INVITATION_STATUS_VALUES = new Set(['sent', 'active']);
 const ALERT_ENGAGEMENT_ACTIONS = new Set([
   'source_clicked',
   'useful',
@@ -202,6 +218,16 @@ async function handleRequest(request, env, ctx) {
     if (request.method === 'POST' && url.pathname === '/analytics/events') {
       const body = await readJson(request, {});
       return jsonResponse(env, await recordProductEvent(env, body), { status: 201 });
+    }
+
+    if (request.method === 'POST' && url.pathname === '/analytics/client-errors') {
+      const body = await readJson(request, {});
+      return jsonResponse(env, await recordClientError(env, body), { status: 201 });
+    }
+
+    if (request.method === 'GET' && url.pathname === '/analytics/client-errors') {
+      await requireAdminToken(request, env);
+      return jsonResponse(env, await getClientErrorLog(env, url));
     }
 
     if (request.method === 'GET' && url.pathname === '/analytics/program-evidence') {
@@ -347,6 +373,15 @@ async function handleRequest(request, env, ctx) {
     return jsonResponse(env, { ok: false, error: 'Not found.' }, { status: 404 });
   } catch (error) {
     const status = error.status || 500;
+    if (status >= 500) {
+      console.error('[ApplyFirst watch worker failure]', {
+        method: request.method,
+        pathname: url.pathname,
+        status,
+        message: error?.message || 'Unknown worker error.',
+        stack: error?.stack || '',
+      });
+    }
     return jsonResponse(
       env,
       {
@@ -361,8 +396,8 @@ async function handleRequest(request, env, ctx) {
 async function getBetaWorkspace(env, url) {
   const accessCode = normalizeAccessCode(url.searchParams.get('code'));
 
-  if (!accessCode) {
-    throw httpError(400, 'Invite code is required.');
+  if (!BETA_WORKSPACE_CODE_PATTERN.test(accessCode)) {
+    throw httpError(400, 'A valid beta workspace code is required.');
   }
 
   const accessCodeHash = await hashAccessCode(accessCode);
@@ -376,9 +411,16 @@ async function getBetaWorkspace(env, url) {
     .first();
 
   if (!row) {
+    const invitation = await findBetaInvitationByHash(env, accessCodeHash);
+
+    if (!ACTIVE_BETA_INVITATION_STATUS_VALUES.has(invitation?.status)) {
+      throw httpError(403, 'Invite code is not active.');
+    }
+
     return {
       ok: true,
       exists: false,
+      invited: true,
       state: null,
     };
   }
@@ -398,8 +440,8 @@ async function getBetaWorkspace(env, url) {
 async function saveBetaWorkspace(env, body) {
   const accessCode = normalizeAccessCode(body.accessCode || body.code);
 
-  if (!accessCode) {
-    throw httpError(400, 'Invite code is required.');
+  if (!BETA_WORKSPACE_CODE_PATTERN.test(accessCode)) {
+    throw httpError(400, 'A valid beta workspace code is required.');
   }
 
   const accessCodeHash = await hashAccessCode(accessCode);
@@ -412,14 +454,11 @@ async function saveBetaWorkspace(env, body) {
   )
     .bind(accessCodeHash)
     .first();
-  const invitation = await env.DB.prepare(
-    `select tester_segment as testerSegment
-     from beta_invitations
-     where access_code_hash = ?
-     limit 1`,
-  )
-    .bind(accessCodeHash)
-    .first();
+  const invitation = await findBetaInvitationByHash(env, accessCodeHash);
+
+  if (!existing?.id && !ACTIVE_BETA_INVITATION_STATUS_VALUES.has(invitation?.status)) {
+    throw httpError(403, 'Invite code is not active.');
+  }
   const stateJson = JSON.stringify(normalizeWorkspaceState(body.state));
   const codeLabel = createAccessCodeLabel(accessCode);
   const workspaceId = existing?.id || crypto.randomUUID();
@@ -461,6 +500,17 @@ async function saveBetaWorkspace(env, body) {
     codeLabel,
     savedAt: now,
   };
+}
+
+async function findBetaInvitationByHash(env, accessCodeHash) {
+  return env.DB.prepare(
+    `select tester_segment as testerSegment, status
+     from beta_invitations
+     where access_code_hash = ?
+     limit 1`,
+  )
+    .bind(accessCodeHash)
+    .first();
 }
 
 async function recordProductEvent(env, body) {
@@ -526,6 +576,184 @@ async function recordProductEvent(env, body) {
     ok: true,
     eventId,
     recordedAt: new Date().toISOString(),
+  };
+}
+
+async function recordClientError(env, body) {
+  const workspace = await findWorkspaceByAccessCode(env, body.accessCode || body.code);
+  const operation = normalizeRequiredEnum(body.operation, CLIENT_ERROR_OPERATIONS, 'client operation');
+  const errorName = sanitizeClientErrorField(body.errorName, 80);
+  const httpStatus = normalizeClientErrorStatus(body.httpStatus);
+  const message = sanitizeClientErrorField(body.message || 'Unknown client error.', 600);
+  const stack = sanitizeClientErrorField(body.stack, 3000);
+  const componentStack = sanitizeClientErrorField(body.componentStack, 2000);
+  const view = sanitizeClientErrorField(body.view, 80);
+  const programId = sanitizeClientErrorField(body.programId, 160);
+  const sessionId = sanitizeClientErrorField(body.sessionId, 120);
+  const occurredAt = normalizeEventTimestamp(body.occurredAt);
+  const dayKey = occurredAt.slice(0, 10);
+  const fingerprint = await sha256Hex([
+    operation,
+    errorName,
+    httpStatus ?? '',
+    message,
+    stack.slice(0, 500),
+  ].join('|'));
+  const now = new Date().toISOString();
+
+  await env.DB.prepare(
+    `insert into beta_client_errors (
+      id,
+      workspace_id,
+      fingerprint,
+      day_key,
+      operation,
+      error_name,
+      http_status,
+      message,
+      stack,
+      component_stack,
+      view,
+      program_id,
+      session_id,
+      occurrence_count,
+      first_seen_at,
+      last_seen_at,
+      created_at,
+      updated_at
+    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+    on conflict(workspace_id, fingerprint, day_key) do update set
+      occurrence_count = beta_client_errors.occurrence_count + 1,
+      last_seen_at = excluded.last_seen_at,
+      stack = case when excluded.stack <> '' then excluded.stack else beta_client_errors.stack end,
+      component_stack = case
+        when excluded.component_stack <> '' then excluded.component_stack
+        else beta_client_errors.component_stack
+      end,
+      view = case when excluded.view <> '' then excluded.view else beta_client_errors.view end,
+      program_id = case
+        when excluded.program_id <> '' then excluded.program_id
+        else beta_client_errors.program_id
+      end,
+      session_id = case
+        when excluded.session_id <> '' then excluded.session_id
+        else beta_client_errors.session_id
+      end,
+      updated_at = excluded.updated_at`,
+  )
+    .bind(
+      crypto.randomUUID(),
+      workspace.id,
+      fingerprint,
+      dayKey,
+      operation,
+      errorName,
+      httpStatus,
+      message,
+      stack,
+      componentStack,
+      view,
+      programId,
+      sessionId,
+      occurredAt,
+      occurredAt,
+      now,
+      now,
+    )
+    .run();
+
+  console.log(JSON.stringify({
+    event: 'client_error_reported',
+    workspaceId: workspace.id,
+    fingerprint,
+    operation,
+    httpStatus,
+    occurredAt,
+  }));
+
+  return {
+    ok: true,
+    fingerprint,
+    recordedAt: now,
+  };
+}
+
+async function getClientErrorLog(env, url) {
+  const requestedLimit = Number(url.searchParams.get('limit') || 12);
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.min(Math.max(Math.trunc(requestedLimit), 1), 50)
+    : 12;
+  const now = Date.now();
+  const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const [summary, operationsResult, recentResult] = await Promise.all([
+    env.DB.prepare(
+      `select
+        coalesce(sum(case when last_seen_at >= ? then occurrence_count else 0 end), 0) as occurrences7Days,
+        count(distinct case when last_seen_at >= ? then workspace_id end) as affectedWorkspaces7Days,
+        coalesce(sum(case when last_seen_at >= ? then occurrence_count else 0 end), 0) as occurrences30Days,
+        count(distinct case when last_seen_at >= ? then workspace_id end) as affectedWorkspaces30Days
+       from beta_client_errors`,
+    )
+      .bind(sevenDaysAgo, sevenDaysAgo, thirtyDaysAgo, thirtyDaysAgo)
+      .first(),
+    env.DB.prepare(
+      `select
+        operation,
+        sum(occurrence_count) as occurrences,
+        count(distinct workspace_id) as affectedWorkspaces,
+        max(last_seen_at) as lastSeenAt
+       from beta_client_errors
+       where last_seen_at >= ?
+       group by operation
+       order by occurrences desc, lastSeenAt desc`,
+    )
+      .bind(thirtyDaysAgo)
+      .all(),
+    env.DB.prepare(
+      `select
+        error.id,
+        workspace.code_label as codeLabel,
+        error.fingerprint,
+        error.operation,
+        error.error_name as errorName,
+        error.http_status as httpStatus,
+        error.message,
+        error.stack,
+        error.component_stack as componentStack,
+        error.view,
+        error.program_id as programId,
+        error.occurrence_count as occurrenceCount,
+        error.first_seen_at as firstSeenAt,
+        error.last_seen_at as lastSeenAt
+       from beta_client_errors error
+       inner join beta_access_workspaces workspace on workspace.id = error.workspace_id
+       order by error.last_seen_at desc
+       limit ?`,
+    )
+      .bind(limit)
+      .all(),
+  ]);
+
+  return {
+    ok: true,
+    generatedAt: new Date(now).toISOString(),
+    summary: {
+      occurrences7Days: numberOrZero(summary?.occurrences7Days),
+      affectedWorkspaces7Days: numberOrZero(summary?.affectedWorkspaces7Days),
+      occurrences30Days: numberOrZero(summary?.occurrences30Days),
+      affectedWorkspaces30Days: numberOrZero(summary?.affectedWorkspaces30Days),
+    },
+    operations: (operationsResult.results || []).map((row) => ({
+      ...row,
+      occurrences: numberOrZero(row.occurrences),
+      affectedWorkspaces: numberOrZero(row.affectedWorkspaces),
+    })),
+    recent: (recentResult.results || []).map((row) => ({
+      ...row,
+      httpStatus: row.httpStatus === null || row.httpStatus === undefined ? null : Number(row.httpStatus),
+      occurrenceCount: numberOrZero(row.occurrenceCount),
+    })),
   };
 }
 
@@ -6484,6 +6712,29 @@ function cleanString(value, maxLength) {
   }
 
   return String(value).trim().slice(0, maxLength);
+}
+
+function sanitizeClientErrorField(value, maxLength) {
+  if (value === null || value === undefined) {
+    return '';
+  }
+
+  return String(value)
+    .replace(/\bAF-[A-Z0-9][A-Z0-9-]{4,58}[A-Z0-9]\b/gi, '[invite-code]')
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[email]')
+    .replace(/https?:\/\/[^\s)\]}>'"]+/gi, '[url]')
+    .replace(/[^\S\r\n]+/g, ' ')
+    .trim()
+    .slice(0, maxLength);
+}
+
+function normalizeClientErrorStatus(value) {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+
+  const status = Number(value);
+  return Number.isInteger(status) && status >= 100 && status <= 599 ? status : null;
 }
 
 function numberOrZero(value) {

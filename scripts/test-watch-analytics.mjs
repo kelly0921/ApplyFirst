@@ -13,6 +13,11 @@ import {
 
 const queries = [];
 const ordinaryAttempts = new Map();
+const workspaceAccessCodeHash = (code) => createHash('sha256')
+  .update(`applyfirst-beta-workspace:${code.trim().toUpperCase()}`)
+  .digest('hex');
+const existingWorkspaceHash = workspaceAccessCodeHash('AF-TEST-1234');
+const issuedInviteHash = workspaceAccessCodeHash('AF-NEW-5678');
 const waitlistEmailHash = (email) => createHash('sha256')
   .update(`applyfirst-waitlist-email:${email.trim().toLowerCase()}`)
   .digest('hex');
@@ -55,6 +60,31 @@ function createStatement(query) {
       return this;
     },
     async first() {
+      if (/select id, code_label, state_json/i.test(query) && /from beta_access_workspaces/i.test(query)) {
+        return this.bindings[0] === existingWorkspaceHash
+          ? {
+              id: 'workspace-1',
+              code_label: '...1234',
+              state_json: JSON.stringify({ savedIds: ['example-program'] }),
+              last_seen_at: '2026-10-04T12:00:00.000Z',
+              updated_at: '2026-10-04T12:00:00.000Z',
+              created_at: '2026-10-01T12:00:00.000Z',
+            }
+          : null;
+      }
+
+      if (/select id, tester_segment as testerSegment/i.test(query) && /from beta_access_workspaces/i.test(query)) {
+        return this.bindings[0] === existingWorkspaceHash
+          ? { id: 'workspace-1', testerSegment: 'independent_waitlist' }
+          : null;
+      }
+
+      if (/select tester_segment as testerSegment, status/i.test(query) && /from beta_invitations/i.test(query)) {
+        return this.bindings[0] === issuedInviteHash
+          ? { testerSegment: 'independent_waitlist', status: 'sent' }
+          : null;
+      }
+
       if (/from alert_candidates[\s\S]*left join official_sources/i.test(query)) {
         return {
           id: 'candidate-1',
@@ -89,6 +119,15 @@ function createStatement(query) {
 
       if (/select count\(\*\) as total\s+from beta_access_workspaces/i.test(query)) {
         return { total: 12 };
+      }
+
+      if (/from beta_client_errors/i.test(query) && /occurrences7Days/i.test(query)) {
+        return {
+          occurrences7Days: 3,
+          affectedWorkspaces7Days: 2,
+          occurrences30Days: 7,
+          affectedWorkspaces30Days: 4,
+        };
       }
 
       if (/from beta_access_workspaces/i.test(query)) {
@@ -158,6 +197,38 @@ function createStatement(query) {
       return {};
     },
     async all() {
+      if (/from beta_client_errors/i.test(query) && /group by operation/i.test(query)) {
+        return {
+          results: [{
+            operation: 'application_attempt_save',
+            occurrences: 3,
+            affectedWorkspaces: 2,
+            lastSeenAt: '2026-10-04T12:00:00.000Z',
+          }],
+        };
+      }
+
+      if (/from beta_client_errors error/i.test(query)) {
+        return {
+          results: [{
+            id: 'client-error-1',
+            codeLabel: '...1234',
+            fingerprint: 'f'.repeat(64),
+            operation: 'application_attempt_save',
+            errorName: 'Error',
+            httpStatus: 502,
+            message: 'Application request failed.',
+            stack: 'Error: Application request failed.',
+            componentStack: '',
+            view: 'programs',
+            programId: 'example-program',
+            occurrenceCount: 3,
+            firstSeenAt: '2026-10-04T11:00:00.000Z',
+            lastSeenAt: '2026-10-04T12:00:00.000Z',
+          }],
+        };
+      }
+
       if (/select distinct[\s\S]*from watch_requests[\s\S]*inner join watch_request_programs/i.test(query)) {
         return {
           results: [{
@@ -366,6 +437,56 @@ function createStatement(query) {
   };
 }
 
+const existingWorkspaceResponse = await watchWorker.fetch(
+  new Request('https://worker.example/workspace?code=AF-TEST-1234'),
+  env,
+  {},
+);
+const existingWorkspacePayload = await existingWorkspaceResponse.json();
+assert.equal(existingWorkspaceResponse.status, 200);
+assert.equal(existingWorkspacePayload.exists, true);
+assert.deepEqual(existingWorkspacePayload.state.savedIds, ['example-program']);
+
+const issuedInviteResponse = await watchWorker.fetch(
+  new Request('https://worker.example/workspace?code=AF-NEW-5678'),
+  env,
+  {},
+);
+const issuedInvitePayload = await issuedInviteResponse.json();
+assert.equal(issuedInviteResponse.status, 200);
+assert.equal(issuedInvitePayload.exists, false);
+assert.equal(issuedInvitePayload.invited, true);
+
+const unknownInviteResponse = await watchWorker.fetch(
+  new Request('https://worker.example/workspace?code=AF-FAKE-9999'),
+  env,
+  {},
+);
+assert.equal(unknownInviteResponse.status, 403);
+
+const unknownWorkspaceSave = await watchWorker.fetch(
+  new Request('https://worker.example/workspace', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ accessCode: 'AF-FAKE-9999', state: { savedIds: ['example-program'] } }),
+  }),
+  env,
+  {},
+);
+assert.equal(unknownWorkspaceSave.status, 403);
+
+const issuedWorkspaceSave = await watchWorker.fetch(
+  new Request('https://worker.example/workspace', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ accessCode: 'AF-NEW-5678', state: { savedIds: ['example-program'] } }),
+  }),
+  env,
+  {},
+);
+assert.equal(issuedWorkspaceSave.status, 200);
+assert.ok(queries.some((statement) => /insert into beta_access_workspaces/i.test(statement.query)));
+
 const eventResponse = await watchWorker.fetch(
   new Request('https://worker.example/analytics/events', {
     method: 'POST',
@@ -442,6 +563,78 @@ const invalidEventResponse = await watchWorker.fetch(
   {},
 );
 assert.equal(invalidEventResponse.status, 400);
+
+const clientErrorQueryStart = queries.length;
+const clientErrorResponse = await watchWorker.fetch(
+  new Request('https://worker.example/analytics/client-errors', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      accessCode: 'AF-TEST-1234',
+      operation: 'application_attempt_save',
+      errorName: 'TypeError',
+      httpStatus: 502,
+      message: 'AF-TEST-1234 failed for student@example.com at https://example.com/private',
+      stack: 'TypeError at https://example.com/app.js:1:2',
+      componentStack: 'ProgramDetail student@example.com',
+      view: 'programs',
+      programId: 'example-program',
+      sessionId: 'session-1',
+      occurredAt: '2026-10-04T12:00:00.000Z',
+    }),
+  }),
+  env,
+  {},
+);
+const clientErrorPayload = await clientErrorResponse.json();
+assert.equal(clientErrorResponse.status, 201);
+assert.equal(clientErrorPayload.ok, true);
+const clientErrorQueries = queries.slice(clientErrorQueryStart);
+const clientErrorInsert = clientErrorQueries.find((statement) => /insert into beta_client_errors/i.test(statement.query));
+assert.ok(clientErrorInsert);
+assert.equal(clientErrorInsert.bindings.includes('AF-TEST-1234'), false);
+assert.equal(clientErrorInsert.bindings.some((value) => String(value).includes('student@example.com')), false);
+assert.equal(clientErrorInsert.bindings.some((value) => String(value).includes('https://example.com')), false);
+assert.ok(clientErrorInsert.bindings.includes('[invite-code] failed for [email] at [url]'));
+assert.match(clientErrorInsert.query, /on conflict\(workspace_id, fingerprint, day_key\)/i);
+assert.match(clientErrorInsert.query, /occurrence_count = beta_client_errors\.occurrence_count \+ 1/i);
+
+const invalidClientOperationResponse = await watchWorker.fetch(
+  new Request('https://worker.example/analytics/client-errors', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      accessCode: 'AF-TEST-1234',
+      operation: 'arbitrary_operation',
+      message: 'Unsupported operation.',
+    }),
+  }),
+  env,
+  {},
+);
+assert.equal(invalidClientOperationResponse.status, 400);
+
+const unauthorizedClientErrorsResponse = await watchWorker.fetch(
+  new Request('https://worker.example/analytics/client-errors'),
+  env,
+  {},
+);
+assert.equal(unauthorizedClientErrorsResponse.status, 401);
+
+const clientErrorsResponse = await watchWorker.fetch(
+  new Request('https://worker.example/analytics/client-errors?limit=20', {
+    headers: { authorization: 'Bearer test-admin-token' },
+  }),
+  env,
+  {},
+);
+const clientErrorsPayload = await clientErrorsResponse.json();
+assert.equal(clientErrorsResponse.status, 200);
+assert.equal(clientErrorsPayload.summary.occurrences7Days, 3);
+assert.equal(clientErrorsPayload.summary.affectedWorkspaces7Days, 2);
+assert.equal(clientErrorsPayload.operations[0].operation, 'application_attempt_save');
+assert.equal(clientErrorsPayload.recent[0].codeLabel, '...1234');
+assert.equal(clientErrorsPayload.recent[0].occurrenceCount, 3);
 
 const summaryResponse = await watchWorker.fetch(
   new Request('https://worker.example/analytics/summary', {

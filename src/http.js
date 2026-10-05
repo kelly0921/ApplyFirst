@@ -7,7 +7,9 @@ export async function postJson(endpoint, body) {
   const payload = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(payload.error || `Endpoint returned HTTP ${response.status}.`);
+    const error = new Error(payload.error || `Endpoint returned HTTP ${response.status}.`);
+    error.status = response.status;
+    throw error;
   }
 
   return payload;
@@ -18,7 +20,9 @@ export async function fetchJson(endpoint) {
   const payload = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(payload.error || `Endpoint returned HTTP ${response.status}.`);
+    const error = new Error(payload.error || `Endpoint returned HTTP ${response.status}.`);
+    error.status = response.status;
+    throw error;
   }
 
   return payload;
