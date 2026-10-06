@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { classifySourceText } from '../workers/applyfirst-watch-worker.js';
+import { classifyFetchFailure, classifySourceText } from '../workers/applyfirst-watch-worker.js';
 
 const cases = [
   {
@@ -153,6 +153,141 @@ for (const fixture of cases) {
   }
   console.log(`PASS ${fixture.name}`);
 }
+
+const expiredDeadlineFetchFailure = classifyFetchFailure(
+  source('goldman-sachs-emerging-leaders-series', 'https://www.goldmansachs.com/careers/students/programs-and-internships/americas/emerging-leaders-series', {
+    curated_status: 'deadline',
+    curated_status_reviewed_at: '2026-10-04T16:04:48.100Z',
+    curated_deadline: 'October 4, 2026 at 11:59 PM ET',
+  }),
+  'Official source returned HTTP 403.',
+  new Date('2026-10-05T04:01:00.000Z'),
+);
+assert.deepEqual(
+  [expiredDeadlineFetchFailure.result, expiredDeadlineFetchFailure.suggestedStatus, expiredDeadlineFetchFailure.reviewDecision],
+  ['Deadline passed', 'watching', 'Monitor Only'],
+  'a fetch error must not preserve a passed curated deadline as student-facing urgency',
+);
+assert.equal(expiredDeadlineFetchFailure.sourceState, 'Fetch Error');
+console.log('PASS fetch error returns a passed audited deadline to monitoring');
+
+const expiredOpenFetchFailure = classifyFetchFailure(
+  source('dated-open-program', 'https://example.com/dated-open', {
+    curated_status: 'open',
+    curated_status_reviewed_at: '2026-09-01T12:00:00.000Z',
+    curated_deadline: 'Applications close September 30, 2026',
+  }),
+  'Official source returned HTTP 403.',
+  new Date('2026-10-05T12:00:00.000Z'),
+);
+assert.deepEqual(
+  [expiredOpenFetchFailure.result, expiredOpenFetchFailure.suggestedStatus, expiredOpenFetchFailure.reviewDecision],
+  ['Deadline passed', 'watching', 'Monitor Only'],
+  'an expired audited open state must return to monitoring when the live source is blocked',
+);
+console.log('PASS fetch error expires an audited open state with a known closing date');
+
+const expiredOpeningSoonFetchFailure = classifyFetchFailure(
+  source('dated-opening-window', 'https://example.com/opening-window', {
+    curated_status: 'opening_soon',
+    curated_status_reviewed_at: '2026-09-01T12:00:00.000Z',
+    curated_open_date: 'Applications are expected to open September 15, 2026',
+  }),
+  'Official source fetch timed out.',
+  new Date('2026-10-05T12:00:00.000Z'),
+);
+assert.deepEqual(
+  [
+    expiredOpeningSoonFetchFailure.result,
+    expiredOpeningSoonFetchFailure.suggestedStatus,
+    expiredOpeningSoonFetchFailure.reviewDecision,
+  ],
+  ['Audited opening window passed', 'watching', 'Monitor Only'],
+  'an expired audited opening-soon state must not remain a prep signal',
+);
+console.log('PASS fetch error expires an audited opening-soon window');
+
+const multiDeadlineStillActive = classifyFetchFailure(
+  source('multi-deadline-program', 'https://example.com/multi-deadline', {
+    curated_status: 'deadline',
+    curated_status_reviewed_at: '2026-10-01T12:00:00.000Z',
+    curated_deadline: 'Deadlines are October 13, October 20, or October 30, 2026',
+  }),
+  'Official source returned HTTP 403.',
+  new Date('2026-10-21T12:00:00.000Z'),
+);
+assert.deepEqual(
+  [multiDeadlineStillActive.suggestedStatus, multiDeadlineStillActive.reviewDecision],
+  ['verifyManually', 'Manual Review'],
+  'a later audited deadline must keep the timing window from being treated as expired',
+);
+
+const multiDeadlineExpired = classifyFetchFailure(
+  source('multi-deadline-program', 'https://example.com/multi-deadline', {
+    curated_status: 'deadline',
+    curated_status_reviewed_at: '2026-10-01T12:00:00.000Z',
+    curated_deadline: 'Deadlines are October 13, October 20, or October 30, 2026',
+  }),
+  'Official source returned HTTP 403.',
+  new Date('2026-10-31T12:00:00.000Z'),
+);
+assert.deepEqual(
+  [multiDeadlineExpired.suggestedStatus, multiDeadlineExpired.reviewDecision],
+  ['watching', 'Monitor Only'],
+  'a multi-deadline state expires only after its final audited date passes',
+);
+console.log('PASS multi-deadline expiry uses the last remaining audited date');
+
+const datelessOpenFetchFailure = classifyFetchFailure(
+  source('rolling-open-program', 'https://example.com/rolling', {
+    curated_status: 'open',
+    curated_status_reviewed_at: '2026-09-01T12:00:00.000Z',
+    curated_deadline: 'Reviewed on a rolling basis; no closing date is posted',
+  }),
+  'Official source returned HTTP 403.',
+  new Date('2026-10-05T12:00:00.000Z'),
+);
+assert.deepEqual(
+  [datelessOpenFetchFailure.suggestedStatus, datelessOpenFetchFailure.reviewDecision],
+  ['verifyManually', 'Manual Review'],
+  'date-less rolling programs must become uncertain rather than inventing an expiry date',
+);
+console.log('PASS date-less audited state does not invent temporal precision');
+
+const expiredAuditWithAmbiguousLivePage = classifySourceText(
+  'Student program information and eligibility details are available on this page.',
+  source('expired-audit-ambiguous-page', 'https://example.com/ambiguous', {
+    curated_status: 'opening_soon',
+    curated_status_reviewed_at: '2026-09-01T12:00:00.000Z',
+    curated_open_date: 'Applications were expected to open September 15, 2026',
+  }),
+  new Date('2026-10-05T12:00:00.000Z'),
+);
+assert.deepEqual(
+  [
+    expiredAuditWithAmbiguousLivePage.result,
+    expiredAuditWithAmbiguousLivePage.suggestedStatus,
+    expiredAuditWithAmbiguousLivePage.reviewDecision,
+  ],
+  ['Audited opening window passed', 'watching', 'Monitor Only'],
+  'an ambiguous successful fetch must not preserve an expired opening-soon state',
+);
+
+const expiredAuditWithNewOpening = classifySourceText(
+  'Applications are open now for eligible undergraduate students. Apply by December 1, 2026.',
+  source('expired-audit-new-opening', 'https://example.com/new-opening', {
+    curated_status: 'opening_soon',
+    curated_status_reviewed_at: '2026-09-01T12:00:00.000Z',
+    curated_open_date: 'Applications were expected to open September 15, 2026',
+  }),
+  new Date('2026-10-05T12:00:00.000Z'),
+);
+assert.deepEqual(
+  [expiredAuditWithNewOpening.result, expiredAuditWithNewOpening.suggestedStatus, expiredAuditWithNewOpening.reviewDecision],
+  ['Application opened', 'open', 'Alert Candidate'],
+  'a fresh independently verified opening may replace an expired audited warmup state',
+);
+console.log('PASS expired audit degrades unless a fresh current signal independently qualifies');
 
 function source(programId, url, overrides = {}) {
   return {

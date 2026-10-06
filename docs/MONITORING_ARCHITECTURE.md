@@ -10,7 +10,7 @@ The first production-worthy monitoring promise should be:
 2. Start source checks before the expected opening season instead of polling every record forever.
 3. Fetch due official program pages and normalize page text into comparable snapshots.
 4. Detect whether the page changed and classify the result into an operational review decision.
-5. Send high-confidence watched-program opening alerts automatically and hold uncertain candidates for review.
+5. Send fresh, high-confidence opening alerts to matching opted-in students, prioritize explicit Watches, and hold uncertain candidates for review.
 
 ## Recommended Backend Direction
 
@@ -425,7 +425,7 @@ The local monitoring classifier currently produces:
 - `Monitor Only`: the page is worth monitoring but not actionable.
 - `Manual Review`: the page text is ambiguous or failed to fetch.
 
-Only high-confidence opening transitions tied to opted-in watched programs can send automatically in beta. Deadline changes, medium-confidence openings, large-page failures, and ambiguous source changes stay in review.
+Only fresh, high-confidence opening transitions tied to an opted-in student's My Focus or an explicit Watch can send automatically in beta. Explicit Watches receive priority. Deadline changes, medium-confidence openings, large-page failures, and ambiguous source changes stay in review.
 
 Maintainer source runs also return a `sourceState` and `sourceAction` pair:
 
@@ -554,13 +554,65 @@ The Cloudflare watch Worker adds the first durable monitoring path:
 
 The first official seed/schedule audit lives in `docs/VERIFIED_SEED_SCHEDULE_AUDIT.md`. It documents which records are confirmed from official sources, which have current-cycle dates, which are discovery-first, and which expected opening months drive D1 `source_schedule_profiles`.
 
-The Worker can send beta email or text alerts automatically when an official source has a high-confidence opening signal for a program a student follows. Deadline changes, medium-confidence openings, large-page failures, and ambiguous eligibility changes stay in review.
+The Worker can send beta email alerts automatically when an official source has a fresh, high-confidence opening signal for a program that matches a student's My Focus setup. An explicit Watch raises a program's priority but is not required for matching coverage. Deadline changes, medium-confidence openings, large-page failures, and ambiguous eligibility changes stay in review. SMS remains disabled for the email-first beta.
 
-Student alerts must be generated from clean student-facing templates. Internal source-check notes, raw page excerpts, classifier labels, and maintainer instructions stay in D1 for review and should not appear in outbound student notifications. Each email includes a tokenized unsubscribe link plus `List-Unsubscribe` and one-click unsubscribe headers; SMS alerts include a manage-alerts link and `Reply STOP` language. Unsubscribed watch requests are excluded before delivery.
+Student alerts must be generated from clean student-facing templates. Internal source-check notes, raw page excerpts, classifier labels, and maintainer instructions stay in D1 for review and should not appear in outbound student notifications. Each email includes a tokenized unsubscribe link plus `List-Unsubscribe` and one-click unsubscribe headers. SMS is disabled for the email-first beta. Unsubscribed watch requests are excluded before delivery.
+
+## Proactive Delivery Layer
+
+The proactive-delivery iteration reuses the verified library, source checks, alert candidates, explicit Watch state, My Focus, relevance evidence, application attempts, Cloudflare Email binding, and unsubscribe flow. It adds a server-side delivery catalog generated from `src/opportunities.js` plus a durable batch/item ledger.
+
+Potential student-facing sends use three explainable classes:
+
+- `act_now`: a fresh, high-confidence actionable change for either an explicitly watched program or a source-ready program that matches My Focus. Explicit Watches receive priority. Broad Focus alerts require the monitored state to change after the student subscribed and within the freshness window, so joining does not trigger a backlog of emails for programs that were already open.
+- `prepare`: a verified approaching cycle with a real preparation benefit. It never claims that an application is open and is deduplicated per student, program, and defensible cycle.
+- `discover`: a newly verified or newly matched nonurgent program. These items are ranked into a weekly personalized digest capped at five; no email is created when no item clears the rules.
+
+The digest cap is not a fill target. An item must have a current opening or deadline, a defensible upcoming cycle, an available interest route, or a newly verified high-priority exact Focus match. Broad matches with unknown timing stay in the Library. A one-item digest is valid, and zero qualifying items means no email.
+
+### Delivery copy-state matrix
+
+`DELIVERY_COPY_STATE_MATRIX` and `buildDeliveryCopyState()` in `workers/proactive-delivery.js` are the executable source of truth for student-facing certainty. Email templates consume the resolved state instead of interpreting raw status strings independently.
+
+| Copy state | Required evidence | Student-facing status | Timing language | Trust language |
+|---|---|---|---|---|
+| `current_open` | `open`, high confidence, no selected-source error, and either a source check within 14 days with `Alert Candidate` or a matching curated audit within 45 days | Open Now | Deadline: Not confirmed yet | Status verified on the official source |
+| `current_open_with_deadline` | `current_open` plus a non-expired deadline from a current matching curated audit | Open Now | Deadline: `[date]` | Status and deadline verified on the official source |
+| `current_deadline` | `deadline`, high confidence, a source check within 14 days with `Deadline Candidate`, and its detected non-expired date | Deadline Update | Deadline: `[date]` | Deadline verified on the official source |
+| `expected_cycle` | Prepare/opening-soon state with expected timing from curated or seasonal metadata; no current opening claim | Prepare | Expected application cycle: `[month or cycle]` | Source: Official program page |
+| `official_source_timing_unknown` | Verified program and official source, but no defensible current status or expected timing | Discover | Timing: Not confirmed yet | Source: Official program page |
+| `source_unavailable` | Latest selected source check failed or was blocked and no current actionable state survives | Monitoring | Timing: Current timing unavailable | Source: Official program page |
+| `source_confirmation_pending` | Official-source confirmation is incomplete | Discover | Timing: Not confirmed yet | Official source confirmation in progress |
+
+Focus matches explain only the class-year and role fields that participated in matching; they never assert eligibility. Unless eligibility is independently established, delivery copy asks the student to confirm official requirements. An explicit Watch is described as “You asked ApplyFirst to watch this program.” `newlyVerified` is a ranking/input state and never renders as “New to ApplyFirst” or “New to you”; “New to ApplyFirst” requires an explicit `newToApplyFirst` fact.
+
+Focus-only digest candidates are suppressed when their latest source is unavailable and no current actionable timing remains. The source error remains in the Maintainer readiness queue. A prior application plus an active Watch can produce “applications are open again” only when a new defensible cycle is currently verified.
+
+Matching uses class year, role track, public opportunity type, current monitored status, Watch state, and explicit relevance. My Focus provides broad matching coverage; Watch is an optional priority signal; Save remains a bookmark and does not change delivery eligibility. The stored match reason remains student-readable. Low-confidence, unverified, or `needs_review` records are excluded.
+
+Workspace-backed subscriptions use relevance, Watch, and application history for lifecycle suppression. Legacy active alert opt-ins without a workspace still receive conservative My Focus matching from their saved class year and role track. Those legacy rows are deduplicated by email, and they never inherit per-program history from other null-workspace records.
+
+Before delivery, the Worker suppresses same-cycle acquisition messages after an application attempt, current-cycle messages for explicit future-cycle mismatch, generic recommendations after explicit `not_a_fit` or `not_eligible`, and Watch-specific alerts after Watch is stopped. A prior non-selection does not end a Watch, and a defensible new cycle can create a new delivery.
+
+Delivery deduplication is cycle-aware. Immediate and digest items share a durable ledger so an immediate alert does not immediately reappear in the next digest. New cycle keys permit legitimate future sends; ambiguous cycle data stays unspecified instead of gaining false precision.
+
+Audited temporal states expire conservatively. `open` and `deadline` records with known closing dates return to Monitoring after the final audited deadline passes, while `opening_soon` records return to Monitoring after their audited opening date passes unless a fresh official signal independently establishes a current state. A blocked or failed fetch never preserves an expired actionable state. Students receive the conservative public status; Maintainer Mode retains the fetch error, last audited verification, and last successful fetch for follow-up. Expired states are not eligible for immediate, preparation, or discovery delivery.
+
+The allowlisted entry sources are `manual_library`, `search`, `watched_program_alert`, `focus_match_alert`, `personalized_discovery_digest`, `prepare_alert`, `direct_or_shared_link`, and `unknown`. Email links use a hashed delivery token. The raw token is removed from the browser URL and is never stored in product-event context. Server validation replaces it with a delivery batch ID, allowing near-term downstream actions to be described as originating from a delivery surface without claiming the email caused the action.
+
+Migration `017_proactive_delivery.sql` adds:
+
+- `program_delivery_catalog`
+- `proactive_delivery_runs`
+- `proactive_delivery_batches`
+- `proactive_delivery_items`
+- `proactive_delivery_engagement_events`
+
+The proactive scheduler is feature-gated by `PROACTIVE_DELIVERY_ENABLED`. While enabled, each cron run can evaluate fresh immediate Focus matches, while personalized digests remain limited to their configured weekly window. Both paths reject scheduled delivery while the flag is off. Manual admin dry runs and controlled smoke sends remain available, and the existing explicit-Watch opening-alert path keeps its separate configuration. The proactive flag remains `false` until migration, seed sync, dry runs, template review, and live immediate and digest smoke tests are complete. SMS remains separately disabled through `SMS_ALERTS_ENABLED=false` for this email-first iteration.
 
 ## Next Implementation Steps
 
-1. Apply migrations through `016`, deploy the watch Worker, sync the hash-only invite registry, and smoke-test relevance, repeat application history, application outcomes, independent watch state, manual audits, operations entries, new-program intake, and the beta summary before inviting the next cohort.
+1. Apply migrations through `017`, deploy the watch Worker, sync the delivery catalog seed, and smoke-test relevance, repeat application history, application outcomes, independent watch state, proactive-delivery dry runs, manual audits, operations entries, new-program intake, and the beta summary before inviting the next cohort.
 2. Use the Maintainer Mode review console to smoke-test discovery search, candidate review, alert dry runs, and reviewed sends before each beta round.
 3. Review Student Value, Independent Usability, Trust, and Operational Burden after one week. Expand only when the evidence and stability gates pass.
 4. Import the regenerated D1 seed after each verified seed/schedule audit update.

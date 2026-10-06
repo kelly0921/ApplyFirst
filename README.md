@@ -45,7 +45,7 @@ The first version focuses on:
 - Clear eligibility, timing, program context, and official-source links so students can decide what to pursue.
 - A future path toward an Opportunity Signal Tracker.
 
-This version is a private-beta public prototype with a landing page, Turnstile-protected waitlist and student update capture, an invite-code gate, beta watch setup, and the full app behind the gate. The app can show the product direction, curated seed set, student My Focus setup, alert readiness model, student submission flow, and a Cloudflare Worker path for checking official source pages, sending high-confidence opening alerts, and holding uncertain changes for review. First-party beta metrics measure discovery, activation, return use, alert usefulness, and whether students report finding a relevant program or applying earlier.
+This version is a private-beta public prototype with a landing page, Turnstile-protected waitlist and student update capture, an invite-code gate, beta alert setup, and the full app behind the gate. The app can show the product direction, curated seed set, student My Focus setup, alert readiness model, student submission flow, and a Cloudflare Worker path for checking official source pages, sending high-confidence opening alerts, and holding uncertain changes for review. First-party beta metrics measure discovery, activation, return use, alert usefulness, and whether students report finding a relevant program or applying earlier.
 
 Recommendation is computed from the Phase 1 rules: underclassmen-fit programs in high-leverage opportunity types become Recommended; relevant programs can also be Recommended when they are useful enough to review, save, or prepare for early; Scholarship / Funding, Conference / Travel Funding, and Community / Prep Program records are treated as Foundation opportunities. Student actions stay separate from these labels: users save programs they care about, while ApplyFirst monitors confirmed sources for future opening signals. Duplicate appearances across older curated lists are useful for verification, but they are not treated as proof that a program is better.
 
@@ -404,17 +404,17 @@ The first Phase 2 slice adds:
 - Trust copy that separates records ready to alert from records that still need confirmation.
 - Public trust policy for Confirmed, Prep Only, and Needs Confirmation records.
 - Endpoint-ready beta notification workflow before accounts or broader outbound alert automation.
-- Endpoint-ready beta watch workflow that can submit My Focus plus saved-program context into the Cloudflare watch queue.
+- Endpoint-ready beta alert workflow that submits My Focus plus optional priority-Watch context into the Cloudflare watch queue.
 - Maintainer Mode toggle for source-review tools, keeping the default view student-facing.
 - A clear split between public prototype behavior, beta high-confidence opening alerts, and future account-backed notifications.
 - Student-facing monitoring workflow explanation: save programs, verify official pages, watch opening signals, then notify only when trustworthy.
-- My Focus watch plan showing bookmarked programs, matching programs, and submitted beta alert receipt without exposing internal dashboard language.
+- My Focus coverage preview showing matching programs, optional priority Watches, and the submitted beta alert receipt without exposing internal dashboard language.
 
-Real accounts and broad unreviewed outbound sending are intentionally still future work. Scheduled page-change monitoring, high-confidence watched-program email alerts, and reviewed fallback delivery now exist as the beta Worker foundation.
+Real accounts and broad unreviewed outbound sending are intentionally still future work. Scheduled page-change monitoring, high-confidence Focus-match email alerts, optional priority Watches, and reviewed fallback delivery now exist as the beta Worker foundation.
 
 ## Phase 2.5 Source Monitoring Foundation
 
-The source-monitoring slice keeps uncertain signals maintainer-controlled while allowing high-confidence watched-program openings to send through the beta Worker.
+The source-monitoring slice keeps uncertain signals maintainer-controlled while allowing fresh, high-confidence openings that match a student's Focus to send through the beta Worker. Explicit Watches remain an optional priority signal.
 
 - Maintainer-only monitoring assistant for pasted official-page text.
 - Local classification of page text into application opened, dates updated, eligibility changed, no material change, or needs follow-up.

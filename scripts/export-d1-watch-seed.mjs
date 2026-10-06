@@ -1,6 +1,8 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import {
+  getMonitorSignal,
   getMonitoringReadiness,
+  getOpportunityTracks,
   getSourceUpdatePlan,
   opportunities,
 } from '../src/opportunities.js';
@@ -13,6 +15,7 @@ const verifiedScheduleOverrides = createVerifiedScheduleOverrides();
 // avoiding one network request per row during remote sync.
 const officialSourceInsertChunkSize = 1;
 const scheduleProfileInsertChunkSize = 1;
+const deliveryCatalogInsertChunkSize = 4;
 
 const sourceRows = opportunities
   .filter((opportunity) => opportunity.url?.startsWith('https://'))
@@ -35,6 +38,7 @@ const sourceRows = opportunities
       enabled: true,
       seededSample: readiness.alertable,
       scheduleProfile: createScheduleProfile(opportunity),
+      deliveryCatalog: createDeliveryCatalogRow(opportunity, readiness),
     };
   });
 
@@ -56,7 +60,11 @@ ${createOfficialSourceStatements(rows)}
 
 ${createScheduleProfileStatements(rows)}
 
+${createDeliveryCatalogStatements(rows)}
+
 ${createRemovedSourceCleanupStatement(rows)}
+
+${createRemovedDeliveryCatalogCleanupStatement(rows)}
 
 update alert_candidates
 set status = 'pending_review',
@@ -68,6 +76,16 @@ where status = 'auto_ready'
     where seeded_sample = 0
   );
 `;
+}
+
+function createRemovedDeliveryCatalogCleanupStatement(rows) {
+  const activeProgramIds = rows.map((row) => sqlValue(row.programId)).join(', ');
+
+  return `update program_delivery_catalog
+set delivery_enabled = 0,
+    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+where program_id not in (${activeProgramIds})
+  and delivery_enabled != 0;`;
 }
 
 function createRemovedSourceCleanupStatement(rows) {
@@ -277,6 +295,107 @@ function createScheduleProfileValueSql(row) {
     sqlValue(row.scheduleProfile.curatedDeadline),
     "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
   ].join(', ')})`;
+}
+
+function createDeliveryCatalogStatements(rows) {
+  return chunkRows(rows, deliveryCatalogInsertChunkSize).map((chunk) => `insert into program_delivery_catalog (
+  program_id,
+  program_name,
+  organization,
+  opportunity_type,
+  class_years_json,
+  role_tracks_json,
+  timing,
+  priority,
+  confidence,
+  current_status,
+  open_date,
+  deadline,
+  short_description,
+  eligibility_summary,
+  official_url,
+  verified,
+  monitoring_ready,
+  delivery_enabled,
+  verified_at,
+  updated_at
+) values
+${chunk.map((row) => createDeliveryCatalogValueSql(row.deliveryCatalog)).join(',\n')}
+on conflict(program_id) do update set
+  program_name = excluded.program_name,
+  organization = excluded.organization,
+  opportunity_type = excluded.opportunity_type,
+  class_years_json = excluded.class_years_json,
+  role_tracks_json = excluded.role_tracks_json,
+  timing = excluded.timing,
+  priority = excluded.priority,
+  confidence = excluded.confidence,
+  current_status = excluded.current_status,
+  open_date = excluded.open_date,
+  deadline = excluded.deadline,
+  short_description = excluded.short_description,
+  eligibility_summary = excluded.eligibility_summary,
+  official_url = excluded.official_url,
+  verified = excluded.verified,
+  monitoring_ready = excluded.monitoring_ready,
+  delivery_enabled = excluded.delivery_enabled,
+  verified_at = excluded.verified_at,
+  updated_at = excluded.updated_at;`).join('\n\n');
+}
+
+function createDeliveryCatalogValueSql(row) {
+  return `  (${[
+    sqlValue(row.programId),
+    sqlValue(row.programName),
+    sqlValue(row.organization),
+    sqlValue(row.opportunityType),
+    sqlValue(JSON.stringify(row.classYears)),
+    sqlValue(JSON.stringify(row.roleTracks)),
+    sqlValue(row.timing),
+    sqlValue(row.priority),
+    sqlValue(row.confidence),
+    sqlValue(row.currentStatus),
+    sqlValue(row.openDate),
+    sqlValue(row.deadline),
+    sqlValue(row.shortDescription),
+    sqlValue(row.eligibilitySummary),
+    sqlValue(row.officialUrl),
+    sqlBoolean(row.verified),
+    sqlBoolean(row.monitoringReady),
+    1,
+    sqlValue(row.verifiedAt),
+    "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+  ].join(', ')})`;
+}
+
+function createDeliveryCatalogRow(opportunity, readiness) {
+  const signal = getMonitorSignal(opportunity);
+  const currentStatus = mapCuratedStatus(opportunity.status) || 'watching';
+  const verifiedAt = opportunity.statusReviewedAt || '';
+
+  return {
+    programId: opportunity.id,
+    programName: opportunity.name,
+    organization: opportunity.organization,
+    opportunityType: opportunity.category,
+    classYears: opportunity.classYears || [],
+    roleTracks: getOpportunityTracks(opportunity),
+    timing: opportunity.timing,
+    priority: signal.priority,
+    confidence: opportunity.confidence,
+    currentStatus,
+    openDate: opportunity.openDate,
+    deadline: opportunity.deadline,
+    shortDescription: opportunity.description,
+    eligibilitySummary: opportunity.eligibilitySummary,
+    officialUrl: opportunity.applicationUrl || opportunity.url,
+    verified:
+      opportunity.confidence === 'high' &&
+      Boolean(verifiedAt) &&
+      currentStatus !== 'needs_review',
+    monitoringReady: readiness.alertable,
+    verifiedAt,
+  };
 }
 
 function chunkRows(rows, chunkSize) {
@@ -1294,6 +1413,146 @@ function createVerifiedScheduleOverrides() {
       sourceVolatility: 'stable',
       scheduleNote:
         'Rolling community membership. Monitor occasionally for member-program and event changes, not urgent opening alerts.',
+    },
+  ],
+  [
+    'jpmorgan-ib-markets-insights',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [9, 10],
+      lastKnownOpenAt: '2026-10-05',
+      activeLeadDays: 75,
+      activeCheckIntervalHours: 12,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 24,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('current_registration', 'site:jpmc.recsolu.com "IB & Markets Insights Program"', 'Find the current JPMorganChase registration route.'),
+        createDiscoveryQuery('official_program_notice', 'site:jpmorganchase.com/careers "IB & Markets Insights" sophomore', 'Confirm a new cycle or eligibility update from JPMorganChase.'),
+      ],
+      scheduleNote:
+        'The 2026 registration deadline is October 15 at noon ET. Check the Yello page frequently through the deadline, then discover a replacement route before next fall.',
+    },
+  ],
+  [
+    'houlihan-lokey-investment-banking-insight-day',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [9, 10],
+      lastKnownOpenAt: '2026-10-01',
+      activeLeadDays: 75,
+      activeCheckIntervalHours: 12,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 24,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_job_page', 'site:hl.wd1.myworkdayjobs.com/Campus "Investment Banking Insight Day"', 'Find the current Houlihan Lokey Insight Day posting.'),
+        createDiscoveryQuery('official_careers_notice', 'site:hl.com/careers "Insight Day" sophomore', 'Confirm future Insight Day cycles from Houlihan Lokey.'),
+      ],
+      scheduleNote:
+        'The 2026 posting closes October 19. Monitor daily through the deadline and search for a new Workday requisition next fall.',
+    },
+  ],
+  [
+    'rothschild-sophomore-leadership-program',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [9, 10, 11],
+      lastKnownOpenAt: '2026-10-05',
+      activeLeadDays: 90,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 24,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_application', 'site:rothschildandco.tal.net "Sophomore Leadership Program"', 'Find the current Rothschild & Co candidate posting.'),
+        createDiscoveryQuery('official_careers_notice', 'site:rothschildandco.com/careers "Sophomore Leadership Program"', 'Confirm future program cycles from Rothschild & Co.'),
+      ],
+      scheduleNote:
+        'The 2027 program application closes November 15, 2026. Keep the source active through the deadline and search for a replacement posting next fall.',
+    },
+  ],
+  [
+    'perella-weinberg-advisory-prep-program',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [9, 10],
+      lastKnownOpenAt: '2026-10-05',
+      activeLeadDays: 75,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 24,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_application', 'site:pwpcareers.tal.net "U.S. Advisory Prep Program"', 'Find the current Perella Weinberg application page.'),
+        createDiscoveryQuery('official_careers_notice', 'site:pwpartners.com "Advisory Prep Program"', 'Confirm a new program cycle from Perella Weinberg Partners.'),
+      ],
+      scheduleNote:
+        'The 2026 application closes October 25. Monitor the candidate page through the deadline and search for a new posting next fall.',
+    },
+  ],
+  [
+    'bain-capital-investors-of-tomorrow',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [9, 10],
+      lastKnownOpenAt: '2026-09-28',
+      activeLeadDays: 75,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 24,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_job_page', 'site:baincapital.wd1.myworkdayjobs.com "Investors of Tomorrow"', 'Find the current Bain Capital registration posting.'),
+        createDiscoveryQuery('official_program_notice', 'site:baincapital.com "Investors of Tomorrow" sophomore', 'Confirm future program dates or eligibility from Bain Capital.'),
+      ],
+      scheduleNote:
+        'The in-person 2026 deadline is October 25, while later registrants can still attend the December 2 virtual panel. Monitor both states without calling the full program closed after October 25.',
+    },
+  ],
+  [
+    'stifel-emerging-leaders',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [9, 10],
+      lastKnownOpenAt: '2026-10-05',
+      activeLeadDays: 45,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 168,
+      dormantCheckIntervalDays: 45,
+      discoveryCheckIntervalHours: 72,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_registration', 'site:stifel.zoom.us/webinar/register "Emerging Leaders"', 'Find an active Stifel-hosted Emerging Leaders registration.'),
+        createDiscoveryQuery('official_careers_notice', 'site:stifel.com/careers "Emerging Leaders" student', 'Confirm eligibility or future program cycles from Stifel.'),
+      ],
+      scheduleNote:
+        'The official registration confirms an October 16, 2026 webinar but not sophomore-only eligibility or a recruiting pipeline. Keep this lower-confidence and do not infer feeder status.',
+    },
+  ],
+  [
+    'weiss-underclassmen-fellowship',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [9, 10, 11],
+      lastKnownOpenAt: '2026-10-05',
+      activeLeadDays: 90,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 24,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_job_page', 'site:job-boards.greenhouse.io/weissassetmanagement "Underclassmen Fellowship"', 'Find the current Weiss fellowship application.'),
+        createDiscoveryQuery('official_company_notice', 'site:weissasset.com "Underclassmen Fellowship"', 'Confirm future fellowship cycles from Weiss Asset Management.'),
+      ],
+      scheduleNote:
+        'The 2027 fellowship application is open without a listed deadline. Check the Greenhouse posting daily while open and search for a replacement requisition next fall.',
     },
   ],
   ]);

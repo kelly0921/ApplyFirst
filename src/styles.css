@@ -4236,6 +4236,21 @@ a {
   line-height: 1.38;
 }
 
+.readiness-item-diagnostics {
+  display: grid;
+  gap: 3px;
+  border-left: 3px solid rgba(187, 82, 59, 0.48);
+  background: rgba(187, 82, 59, 0.06);
+  padding: 7px 9px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.readiness-item-diagnostics strong {
+  color: var(--ink);
+}
+
 .readiness-item-header a {
   border: 1px solid var(--line);
   border-radius: 8px;

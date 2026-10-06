@@ -66,7 +66,7 @@ export function getOpportunityTracks(opportunity) {
 
   const tracks = new Set();
 
-  if (signal.match(/product|pm|lifecycle|prototype|customer/)) {
+  if (signal.match(/\bproduct\b|\bpm\b|lifecycle|prototype|customer/)) {
     tracks.add('Product Management');
   }
 
@@ -1995,14 +1995,14 @@ export const opportunities = [
     category: 'Discovery Program',
     classYears: ['Sophomore'],
     timing: 'Fall',
-    status: 'deadlineSoon',
+    status: 'watching',
     confidence: 'high',
     funding: 'Not listed',
     location: 'New York, Dallas, or Salt Lake City',
     url: 'https://www.goldmansachs.com/careers/students/programs-and-internships/americas/emerging-leaders-series',
     previousUrl: '',
-    openDate: 'Goldman Sachs still labels the 2026 program open, although its direct application route is unavailable',
-    deadline: 'October 4, 2026 at 11:59 PM ET',
+    openDate: 'The 2026 application window has ended; monitoring the official page for the next cycle',
+    deadline: '2026 cycle closed October 4, 2026 at 11:59 PM ET',
     tags: ['Engineering', 'Finance', 'Investment banking', 'Second-year students'],
     description:
       'Goldman Sachs Emerging Leaders Series is an immersive program for second-year undergraduate and master’s students. Participants receive business-specific training, recruiting and interview preparation, networking, and access to senior leaders across finance, operations, risk, research, and engineering tracks.',
@@ -2011,15 +2011,15 @@ export const opportunities = [
     experienceSummary:
       'Track-specific programming in New York, Salt Lake City, or Dallas; the Dallas track is focused on engineering.',
     detailBasis:
-      'The Goldman Sachs program page still shows its October 4 deadline, graduation window, locations, and business tracks, but its Apply Now destination is unavailable and no alternate official application was found.',
+      'The Goldman Sachs program page still shows the prior October 4 deadline, graduation window, locations, and business tracks, but its Apply Now destination is unavailable and no new cycle is posted.',
     why:
       'A current second-year discovery program with a dedicated engineering path and direct exposure to future Goldman Sachs internship recruiting.',
     prep:
-      'Review the official program page before the October 4 deadline; the separate application route may no longer be accessible.',
+      'Save the program if it fits and watch for a future application cycle or replacement application route.',
     sourceNote:
-      'The official Goldman Sachs page still says applications close October 4, 2026 at 11:59 PM ET, but its linked Avature application route is unavailable. ApplyFirst links to the working program page and returns this record to monitoring after the deadline.',
-    lastChecked: '2026-10-04',
-    statusReviewedAt: '2026-10-04T16:04:48.100Z',
+      'The audited 2026 deadline passed on October 4. The official program page remains available, while its prior application route is unavailable, so ApplyFirst is monitoring for the next cycle.',
+    lastChecked: '2026-10-05',
+    statusReviewedAt: '2026-10-05T17:12:30.926Z',
   },
   {
     id: 'goldman-sachs-possibilities-series',
@@ -2925,6 +2925,236 @@ export const opportunities = [
       'Official GHC scholarship pages currently show closed status and interest-list access only. Do not send an opening alert until a new application page and future deadline are posted.',
     lastChecked: '2026-10-04',
     statusReviewedAt: '2026-10-04T14:40:33.036Z',
+  },
+  {
+    id: 'jpmorgan-ib-markets-insights',
+    name: 'IB & Markets Insights Program',
+    organization: 'JPMorganChase',
+    category: 'Discovery Program',
+    classYears: ['Sophomore'],
+    timing: 'Fall',
+    status: 'deadlineSoon',
+    confidence: 'high',
+    funding: 'Travel and accommodations covered for eligible participants',
+    location: 'Chicago, New York, or San Francisco',
+    url: 'https://jpmc.recsolu.com/app/collect/event/PmuqzKf0GsBN1KG_vpKrBA',
+    previousUrl: '',
+    openDate: 'Interest registration and required HireVue screening are open',
+    deadline: 'October 15, 2026 at 12:00 PM ET',
+    tags: ['Investment banking', 'Markets', 'Finance', 'Sophomores', 'Summer Analyst pipeline'],
+    description:
+      'JPMorganChase IB & Markets Insights is a set of in-person December events for sophomores exploring Investment Banking or Markets. The program covers how client-facing teams operate, industry career paths, recruiting and interview preparation, and the 2028 Summer Analyst process.',
+    eligibilitySummary:
+      'Students at a U.S.-based undergraduate institution graduating between December 2028 and June 2029. The page also lists a 3.6 minimum GPA and U.S. work authorization for related internship roles.',
+    experienceSummary:
+      'Investment Banking events take place in Chicago on December 2, New York on December 3, and San Francisco on December 4. The Markets event takes place in New York on December 4. Eligible registrants receive a HireVue assessment, and selected participants receive travel-booking instructions.',
+    detailBasis:
+      'Current official JPMorganChase Yello registration page, reviewed October 5, 2026.',
+    why:
+      'A sophomore-specific finance discovery program with direct recruiting preparation before the 2028 Summer Analyst cycle.',
+    prep:
+      'Complete the candidate profile and attachments before submitting, then finish the HireVue within two days of receiving it for priority consideration.',
+    sourceNote:
+      'The official registration page confirms four December 2026 events, the October 15 deadline, graduation window, 3.6 GPA guidance, and covered travel for selected students. Treat the live registration route as the application source.',
+    lastChecked: '2026-10-05',
+    statusReviewedAt: '2026-10-05T17:12:30.926Z',
+  },
+  {
+    id: 'houlihan-lokey-investment-banking-insight-day',
+    name: 'Investment Banking Insight Day',
+    organization: 'Houlihan Lokey',
+    category: 'Discovery Program',
+    classYears: ['Sophomore'],
+    timing: 'Fall',
+    status: 'deadlineSoon',
+    confidence: 'high',
+    funding: 'Travel and accommodations provided for eligible attendees',
+    location: 'New York, NY or Chicago, IL',
+    url: 'https://hl.wd1.myworkdayjobs.com/Campus/job/New-York-NY-USA/XMLNAME-2026-Houlihan-Lokey-Investment-Banking-Insight-Day_R3628',
+    previousUrl: '',
+    openDate: 'Applications are open for one preferred event location',
+    deadline: 'October 19, 2026',
+    tags: ['Investment banking', 'Finance', 'Sophomores', 'Summer Analyst pipeline'],
+    description:
+      'Houlihan Lokey Investment Banking Insight Day gives sophomores training, networking, and direct exposure to the firm and its Investment Banking team. Select attendees may receive an accelerated interview process for the 2028 Summer Analyst Program.',
+    eligibilitySummary:
+      'Current undergraduate sophomores in the Class of 2029 with demonstrated finance interest, leadership experience, and availability for the selected in-person event.',
+    experienceSummary:
+      'The New York event is November 10, 2026 and the Chicago event is December 3, 2026. Applicants should choose one location; Houlihan Lokey says only the first application will be reviewed if multiple are submitted.',
+    detailBasis:
+      'Current official Houlihan Lokey Workday posting R3628, reviewed October 5, 2026.',
+    why:
+      'A concise sophomore insight program with a stated path to accelerated 2028 Summer Analyst interviews.',
+    prep:
+      'Choose one event location, submit a resume and original short essay, and be ready to explain finance interest and leadership experience.',
+    sourceNote:
+      'The official posting confirms both event dates, the Class of 2029 requirement, covered travel for eligible attendees, and the October 19 deadline.',
+    lastChecked: '2026-10-05',
+    statusReviewedAt: '2026-10-05T17:12:30.926Z',
+  },
+  {
+    id: 'rothschild-sophomore-leadership-program',
+    name: 'Sophomore Leadership Program',
+    organization: 'Rothschild & Co',
+    category: 'Discovery Program',
+    classYears: ['Sophomore'],
+    timing: 'Winter',
+    status: 'open',
+    confidence: 'high',
+    funding: 'Not listed',
+    location: 'New York, NY (virtual and in person)',
+    url: 'https://rothschildandco.tal.net/vx/lang-en-GB/appcentre-1/candidate/postings/553',
+    previousUrl: '',
+    openDate: 'Applications are open for the January 2027 program',
+    deadline: 'November 15, 2026 at 11:55 PM ET',
+    tags: ['Investment banking', 'Financial services', 'Sophomores', 'Summer Analyst pipeline'],
+    description:
+      'Rothschild & Co Sophomore Leadership Program is a two-day finance immersion that combines a virtual session with in-person programming and networking in the New York office throughout January. Participants attend workshops, learn about Global Advisory, and meet Rothschild bankers.',
+    eligibilitySummary:
+      'Current undergraduate students with an anticipated graduation date no later than May 2029 and demonstrated academic excellence.',
+    experienceSummary:
+      'Every participant receives the opportunity to interview for a 2028 Summer Analyst position in Rothschild & Co offices in New York or Santa Monica.',
+    detailBasis:
+      'Current official Rothschild & Co candidate posting 553, reviewed October 5, 2026.',
+    why:
+      'The program pairs early advisory exposure with an explicit interview opportunity for the next Summer Analyst cycle.',
+    prep:
+      'Prepare a finance-interest story, academic examples, and questions about Global Advisory before applying through the official candidate page.',
+    sourceNote:
+      'The official posting confirms the two-day format, January programming, graduation requirement, November 15 deadline, and 2028 Summer Analyst interview opportunity.',
+    lastChecked: '2026-10-05',
+    statusReviewedAt: '2026-10-05T17:12:30.926Z',
+  },
+  {
+    id: 'perella-weinberg-advisory-prep-program',
+    name: 'U.S. Advisory Prep Program',
+    organization: 'Perella Weinberg Partners',
+    category: 'Discovery Program',
+    classYears: ['Sophomore'],
+    timing: 'Fall',
+    status: 'open',
+    confidence: 'high',
+    funding: 'Not listed',
+    location: 'Chicago, Los Angeles, New York, or San Francisco',
+    url: 'https://pwpcareers.tal.net/vx/lang-en-GB/mobile-0/appcentre-1/brand-4/user-413790/xf-3692fcc9b38d/candidate/so/pm/1/pl/1/opp/1117-U-S-Advisory-Prep-Program/en-GB',
+    previousUrl: '',
+    openDate: 'Applications are open for November and December programming',
+    deadline: 'October 25, 2026',
+    tags: ['Investment banking', 'Advisory', 'Sophomores', 'Interview preparation', 'Summer Analyst pipeline'],
+    description:
+      'Perella Weinberg Partners U.S. Advisory Prep Program combines a November 6 virtual skills workshop with an in-person Insight Day in November or December. Students practice pitching themselves and technical interviews, learn about the firm, and network with bankers.',
+    eligibilitySummary:
+      'Undergraduate students from all backgrounds graduating between December 2028 and June 2029.',
+    experienceSummary:
+      'Workshop participants are invited to interview for the 2028 Summer Analyst Program. Candidates who progress after that interview may attend one location-based Insight Day and receive fast-track superday consideration.',
+    detailBasis:
+      'Current official Perella Weinberg candidate posting 1117, reviewed October 5, 2026.',
+    why:
+      'It connects technical and interpersonal preparation to a concrete 2028 Summer Analyst interview pathway.',
+    prep:
+      'Choose a location preference, prepare a concise personal pitch, and review introductory investment-banking technical questions before the virtual workshop.',
+    sourceNote:
+      'The official posting confirms the October 25 deadline, virtual workshop, in-person Insight Days, graduation window, and potential fast-track interview path.',
+    lastChecked: '2026-10-05',
+    statusReviewedAt: '2026-10-05T17:12:30.926Z',
+  },
+  {
+    id: 'bain-capital-investors-of-tomorrow',
+    name: 'Investors of Tomorrow',
+    organization: 'Bain Capital',
+    category: 'Discovery Program',
+    classYears: ['Sophomore'],
+    timing: 'Fall',
+    status: 'open',
+    confidence: 'high',
+    funding: 'Domestic travel and accommodations covered for selected in-person participants',
+    location: 'Boston, MA and virtual',
+    url: 'https://baincapital.wd1.myworkdayjobs.com/en-US/External_Public/job/Bain-Capital-Investors-of-Tomorrow---November-December-2026_REQ_108406',
+    previousUrl: '',
+    openDate: 'Registration is open for the November and December 2026 events',
+    deadline: 'October 25, 2026 at 11:59 PM ET for in-person consideration',
+    tags: ['Investing', 'Private equity', 'Finance', 'Sophomores', 'Virtual option'],
+    description:
+      'Bain Capital Investors of Tomorrow introduces sophomores to investing through a small in-person program at the Boston office on November 19 and a broader virtual panel on December 2. Investment professionals across the Bain Capital platform share their work, backgrounds, and approach.',
+    eligibilitySummary:
+      'Current undergraduate sophomores. Applicants must complete both the Workday registration and the required Predictive Index behavioral and cognitive assessments for in-person consideration.',
+    experienceSummary:
+      'Selected in-person participants receive a half-day of programming and dinner in Boston with sponsored domestic travel and accommodations. Every applicant can attend the December 2 virtual panel, including registrations submitted after the in-person deadline.',
+    detailBasis:
+      'Current official Bain Capital Workday posting REQ_108406, reviewed October 5, 2026.',
+    why:
+      'A direct early look at investing roles with both a selective in-person experience and an accessible virtual component.',
+    prep:
+      'Complete both application steps, reserve uninterrupted time for the timed cognitive assessment, and review the linked practice test first.',
+    sourceNote:
+      'The official posting confirms the November 19 Boston event, December 2 virtual panel, October 25 in-person deadline, assessment requirement, and covered travel for selected students.',
+    lastChecked: '2026-10-05',
+    statusReviewedAt: '2026-10-05T17:12:30.926Z',
+  },
+  {
+    id: 'stifel-emerging-leaders',
+    name: 'Emerging Leaders',
+    organization: 'Stifel',
+    category: 'Discovery Program',
+    classYears: ['All class years'],
+    timing: 'Fall',
+    status: 'open',
+    confidence: 'medium',
+    funding: 'Free webinar',
+    location: 'Virtual',
+    url: 'https://stifel.zoom.us/webinar/register/WN_oQfCtXbuRFyk6q6OMmBCEQ#/registration',
+    previousUrl: '',
+    openDate: 'Registration is open for the October 16 webinar',
+    deadline: 'No registration deadline is listed; event is October 16, 2026 at 11:00 AM ET',
+    tags: ['Finance', 'Investment banking', 'Capital markets', 'Equity research', 'Webinar'],
+    description:
+      'Stifel Emerging Leaders is a virtual information session for students exploring finance opportunities across Investment Banking, Fixed Income Capital Markets, Public Finance, and Equity Research.',
+    eligibilitySummary:
+      'The official registration page asks for school and graduation date but does not state a specific class-year requirement.',
+    experienceSummary:
+      'A live webinar about Stifel, internships, and several finance business areas. The official source does not describe an interview or internship-conversion pathway.',
+    detailBasis:
+      'Current official Stifel Zoom registration page, reviewed October 5, 2026; the social post supplied the lead but not the verified eligibility.',
+    why:
+      'A low-barrier way to learn about several finance paths, useful as discovery context but lighter than the selective in-person programs in this set.',
+    prep:
+      'Register before the event, choose the finance area you most want to understand, and submit a specific question about internship recruiting.',
+    sourceNote:
+      'The official Stifel-hosted registration confirms the October 16 event and topic choices. It does not confirm sophomore-only eligibility or a feeder-program outcome, so this remains medium confidence.',
+    lastChecked: '2026-10-05',
+  },
+  {
+    id: 'weiss-underclassmen-fellowship',
+    name: 'Underclassmen Fellowship',
+    organization: 'Weiss Asset Management',
+    category: 'Fellowship',
+    classYears: ['Freshman', 'Sophomore'],
+    timing: 'Winter',
+    status: 'open',
+    confidence: 'high',
+    funding: 'Transportation and hotel covered',
+    location: 'Boston, MA',
+    url: 'https://job-boards.greenhouse.io/weissassetmanagement/jobs/8831639002',
+    previousUrl: '',
+    openDate: 'Applications are open for the January 7-8, 2027 fellowship',
+    deadline: 'No application deadline is listed',
+    tags: ['Quant / Finance', 'Investment analysis', 'Freshmen', 'Sophomores', 'Python'],
+    description:
+      'Weiss Asset Management Underclassmen Fellowship is a two-day Boston program for freshmen and sophomores interested in finance. Fellows learn about financial markets, risk assessment, investment analysis, and the work of an investment analyst through sessions with analysts and senior leaders.',
+    eligibilitySummary:
+      'Current freshmen and sophomores in the Classes of 2029 and 2030. Applicants may choose a quantitative interview track emphasizing coding, statistics, and game theory or a fundamental track emphasizing research and analysis.',
+    experienceSummary:
+      'The January 7-8 program includes technical learning, mentorship, feedback, networking, and social programming. Transportation and hotel costs are covered, and high-performing fellows may be considered for future internships.',
+    detailBasis:
+      'Current official Weiss Asset Management Greenhouse posting 8831639002, reviewed October 5, 2026.',
+    why:
+      'A funded underclassmen program that exposes students to both quantitative and fundamental investing before internship recruiting.',
+    prep:
+      'Choose the interview track that best represents your strengths and prepare the requested transcript, test-score context, and examples of analytical achievement.',
+    sourceNote:
+      'The official application confirms the two-day January program, freshman and sophomore eligibility, covered travel and hotel, interview tracks, and possible future internship consideration. No deadline is currently listed.',
+    lastChecked: '2026-10-05',
+    statusReviewedAt: '2026-10-05T17:12:30.926Z',
   },
 ];
 

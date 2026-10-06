@@ -117,6 +117,17 @@ function createStatement(query) {
         };
       }
 
+      if (/from proactive_delivery_batches batch/i.test(query) && /batch\.engagement_token_hash/i.test(query)) {
+        return {
+          batchId: 'delivery-batch-1',
+          entrySource: 'personalized_discovery_digest',
+          itemId: 'delivery-item-1',
+          programId: 'example-program',
+          officialUrl: 'https://example.com/program',
+          programName: 'Example Program',
+        };
+      }
+
       if (/select count\(\*\) as total\s+from beta_access_workspaces/i.test(query)) {
         return { total: 12 };
       }
@@ -516,7 +527,51 @@ assert.deepEqual(JSON.parse(insertEventQuery.bindings[6]), {
   status: '',
   resultCount: null,
   queryLength: 18,
+  entrySource: '',
 });
+
+const deliveryEventQueryStart = queries.length;
+const deliveryEventResponse = await watchWorker.fetch(
+  new Request('https://worker.example/analytics/events', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      accessCode: 'AF-TEST-1234',
+      eventName: 'program_saved',
+      programId: 'example-program',
+      context: {
+        view: 'programs',
+        entrySource: 'personalized_discovery_digest',
+        deliveryToken: 'A'.repeat(43),
+      },
+    }),
+  }),
+  env,
+  {},
+);
+assert.equal(deliveryEventResponse.status, 201);
+const deliveryEventInsert = queries.slice(deliveryEventQueryStart)
+  .find((statement) => /insert or ignore into beta_product_events/i.test(statement.query));
+const storedDeliveryContext = JSON.parse(deliveryEventInsert.bindings[6]);
+assert.equal(storedDeliveryContext.entrySource, 'personalized_discovery_digest');
+assert.equal(storedDeliveryContext.deliveryBatchId, 'delivery-batch-1');
+assert.equal('deliveryToken' in storedDeliveryContext, false);
+
+const arbitraryEntrySourceResponse = await watchWorker.fetch(
+  new Request('https://worker.example/analytics/events', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      accessCode: 'AF-TEST-1234',
+      eventName: 'program_saved',
+      programId: 'example-program',
+      context: { entrySource: 'arbitrary_tracker' },
+    }),
+  }),
+  env,
+  {},
+);
+assert.equal(arbitraryEntrySourceResponse.status, 400);
 
 const viewQueryStart = queries.length;
 const viewResponse = await watchWorker.fetch(
@@ -696,6 +751,27 @@ assert.ok(recipientQuery);
 assert.match(recipientQuery.query, /beta_program_watches/i);
 assert.match(recipientQuery.query, /preference\.is_watching = 1/i);
 assert.doesNotMatch(recipientQuery.query, /beta_program_evidence/i);
+
+const targetedPreviewQueryStart = queries.length;
+const targetedAlertPreviewResponse = await watchWorker.fetch(
+  new Request('https://worker.example/watch/candidates/candidate-1/send', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: 'Bearer test-admin-token' },
+    body: JSON.stringify({ dryRun: true, preferredWatchRequestId: 'watch-request-1' }),
+  }),
+  env,
+  {},
+);
+assert.equal(targetedAlertPreviewResponse.status, 200);
+const targetedRecipientQuery = queries.slice(targetedPreviewQueryStart).find((statement) => (
+  /select distinct[\s\S]*from watch_requests[\s\S]*inner join watch_request_programs/i.test(statement.query)
+));
+assert.ok(targetedRecipientQuery);
+assert.match(targetedRecipientQuery.query, /\? = '' or watch_requests\.id = \?/i);
+assert.deepEqual(
+  targetedRecipientQuery.bindings.slice(0, 3),
+  ['example-program', 'watch-request-1', 'watch-request-1'],
+);
 
 const participantResponse = await watchWorker.fetch(
   new Request('https://worker.example/analytics/participants?limit=50', {
@@ -1104,6 +1180,30 @@ const unauthorizedAuditResponse = await watchWorker.fetch(
 );
 assert.equal(unauthorizedAuditResponse.status, 401);
 
+const unauthorizedDeliveryRunResponse = await watchWorker.fetch(
+  new Request('https://worker.example/delivery/run', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ dryRun: true }),
+  }),
+  env,
+  {},
+);
+assert.equal(unauthorizedDeliveryRunResponse.status, 401);
+
+const proactiveFeedbackResponse = await watchWorker.fetch(
+  new Request(
+    `https://worker.example/delivery/engagement?token=${'A'.repeat(43)}&itemId=delivery-item-1&action=useful`,
+  ),
+  env,
+  {},
+);
+const proactiveFeedbackHtml = await proactiveFeedbackResponse.text();
+assert.equal(proactiveFeedbackResponse.status, 200);
+assert.match(proactiveFeedbackHtml, /Thanks For The Feedback/i);
+assert.doesNotMatch(proactiveFeedbackHtml, /classifier|confidence|raw page|maintainer/i);
+assert.ok(queries.some((statement) => /insert into proactive_delivery_engagement_events/i.test(statement.query)));
+
 const engagementResponse = await watchWorker.fetch(
   new Request(
     'https://worker.example/watch/engagement?requestId=request-1&candidateId=candidate-1&token=feedback-token&action=source_clicked',
@@ -1115,6 +1215,18 @@ const engagementResponse = await watchWorker.fetch(
 assert.equal(engagementResponse.status, 302);
 assert.equal(engagementResponse.headers.get('location'), 'https://example.com/program');
 assert.ok(queries.some((statement) => /insert into alert_engagement_events/i.test(statement.query)));
+
+const unsubscribeResponse = await watchWorker.fetch(
+  new Request('https://worker.example/watch/unsubscribe?token=unsubscribe-token'),
+  env,
+  {},
+);
+const unsubscribeHtml = await unsubscribeResponse.text();
+assert.equal(unsubscribeResponse.status, 200);
+assert.match(unsubscribeHtml, /You Are Unsubscribed/i);
+assert.ok(queries.some((statement) => (
+  /update watch_requests/i.test(statement.query) && /where unsubscribe_token = \?/i.test(statement.query)
+)));
 
 assert.equal(isEligibleActivation({ relevance: 'this_cycle', actionState: '' }), true);
 assert.equal(isEligibleActivation({ relevance: 'not_eligible', actionState: '' }), true);

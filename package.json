@@ -23,6 +23,7 @@
     "watch:public-status:test": "node scripts/test-watch-public-status.mjs",
     "watch:analytics:test": "node scripts/test-watch-analytics.mjs",
     "watch:program-candidates:test": "node scripts/test-new-program-candidates.mjs",
+    "watch:delivery:test": "node scripts/test-proactive-delivery.mjs",
     "watch:lifecycle:test": "node scripts/test-student-lifecycle-migration.mjs",
     "frontend:http:test": "node scripts/test-frontend-http.mjs",
     "frontend:workspace:test": "node scripts/test-synced-workspace-contract.mjs",

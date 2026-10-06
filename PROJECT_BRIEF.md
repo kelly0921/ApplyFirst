@@ -2,7 +2,7 @@
 
 ## One-Line Positioning
 
-ApplyFirst is an early-career program monitor that helps underclassmen and emerging technical students discover relevant career-launch opportunities and apply earlier.
+ApplyFirst is an early-career program monitor that helps underclassmen and emerging technical students discover relevant career-launch opportunities, receive trustworthy timing signals, and apply earlier.
 
 ## Core Problem
 
@@ -52,6 +52,8 @@ ApplyFirst has two connected product layers:
 2. **Opportunity Signal Tracker**: the differentiated product engine that tracks official-page changes, seasonality, confidence, and human verification before students are notified.
 
 The library is the front door. The signal tracker is the product moat. They should not be treated as separate projects; ApplyFirst needs both to become useful, trustworthy, and meaningfully different from a normal opportunity list.
+
+The primary ongoing loop is proactive delivery, not habitual browsing. A student should be able to configure Focus once, receive a small number of verified and relevant opportunities at useful moments, go directly to the official source, and act without needing to remember to reopen ApplyFirst every week. Manual search remains useful, but weekly return frequency is a diagnostic rather than the product's north-star outcome.
 
 The wedge:
 
@@ -115,6 +117,8 @@ Duplicate appearances across trusted lists should become a positive signal. If a
 LuisaE/opportunities should be treated as a key audit checklist, not just inspiration. The repo confirms that ApplyFirst should keep watching early CS programs, internship alternatives, CS exploratory programs, CS fellowships, conference funding, sponsor-backed scholarships, mentorship, research, and finance exploratory programs. It also surfaces missing candidates to evaluate carefully, including Google ASDI, Uber STAR, Visa Sophomore, Oracle first-year SWE, Meta University, JPMorganChase Fellowship, Bank of America freshman technology programs, and similar underclassmen-specific pathways. These should only be promoted into the library after official-source verification and scope review.
 
 The October 5, 2026 radar promoted LinkedIn First Play and NVIDIA Ignite after official-source review. It also added Microsoft Discovery Program, Citi Freshman Discovery, Citi Early Identification, and Uber Career Prep. These records begin as monitored or preparation-stage programs; historical cadence never counts as proof that a new application is open.
+
+A second October 5 review added seven current finance discovery leads after resolving their direct application or registration pages: JPMorganChase IB & Markets Insights, Houlihan Lokey Investment Banking Insight Day, Rothschild & Co Sophomore Leadership Program, Perella Weinberg U.S. Advisory Prep, Bain Capital Investors of Tomorrow, Stifel Emerging Leaders, and Weiss Asset Management Underclassmen Fellowship. Six have official application pages with current-cycle eligibility or pipeline details. Stifel is intentionally labeled lower-confidence because its official registration confirms the webinar but not the sophomore-only eligibility or feeder outcome claimed by the social lead.
 
 ## Manual Verification Workflow
 
@@ -227,7 +231,7 @@ Before inviting students, the beta should have:
 - Durable beta watch-request capture through `VITE_WATCH_ENDPOINT`.
 - Cloudflare D1 source-check schema, seeded official-source rows, and seasonal source schedule profiles.
 - Hidden Maintainer Mode review console for discovery candidates, pending alert candidates, dry runs, and reviewed sends.
-- A short user-testing script focused on first impression, program discovery, My Focus, saved programs, email/text watch setup, and feedback submission.
+- A short user-testing script focused on first impression, program discovery, My Focus, saved programs, email alert setup, optional priority Watches, and feedback submission.
 - A manually reviewed set of high-visibility seed records so testers do not immediately hit stale examples.
 - Honest product copy that says ApplyFirst is testing automatic high-confidence opening alerts while uncertain signals stay in review.
 - A deployment checklist confirming the public Cloudflare build is current before sharing the link.
@@ -303,6 +307,9 @@ Ready to show:
 - Hidden Maintainer Mode review console for discovered URL candidates and reviewed alert sends.
 - Tokenized unsubscribe links and one-click unsubscribe headers for beta email alerts.
 - Monitoring-readiness framing for which records are safe to alert on later.
+- Local proactive-delivery iteration with three explainable classes: immediate `act_now` alerts for fresh source-ready Focus matches, one-time `prepare` signals, and a maximum-five-item personalized `discover` digest. Explicit Watches receive priority without being required for broad matching coverage.
+- Lifecycle-aware suppression for same-cycle applications, explicit not-a-fit/not-eligible decisions, future-cycle mismatches, and stopped watches.
+- Delivery-source context and Maintainer metrics for observed email-to-program journeys without claiming causal attribution.
 
 Needs more work before broader production launch:
 
@@ -310,7 +317,7 @@ Needs more work before broader production launch:
 - Broader source-update workflow for changing official URLs.
 - Production deliverability checks, account-level alert preferences, and alert policy guardrails.
 - Privacy and account model if personalized alerts are added.
-- SMS provider setup if text alerts are enabled.
+- SMS provider setup if text alerts are enabled. SMS remains explicitly disabled for the email-first beta.
 - Public copy and trust language.
 
 ## Phase 2 Direction
@@ -337,13 +344,13 @@ The first Phase 2 slice is intentionally local and trust-focused:
 - Keep technical monitoring-readiness details in Maintainer Mode instead of the default public alert surface.
 - Display a public trust policy explaining Confirmed, Prep Only, and Needs Confirmation records, with a hard rule that outbound alerts should not come from unconfirmed records.
 - Use an endpoint-backed waitlist/contact and beta email/text notification workflow before accounts or fully automated outbound alerts.
-- Submit My Focus plus saved-program context to a beta watch endpoint when `VITE_WATCH_ENDPOINT` is configured.
+- Submit My Focus plus optional priority-Watch context to a beta alert endpoint when `VITE_WATCH_ENDPOINT` is configured.
 - Save waitlist intent with email, student context, notes, selected My Focus values, and saved timestamp.
-- Connect saved programs to the My Focus experience so bookmarked records feel like the future reminder list, not a disconnected sidebar.
+- Keep Save as a bookmark, My Focus as broad alert coverage, and Watch as an optional priority signal so the three actions remain understandable.
 - Keep maintainer-only source-review tools behind Maintainer Mode so the default public view stays student-focused.
 - Make it clear that public notifications should not launch until official-source verification and monitoring rules are reliable.
-- Explain the future monitoring workflow in student-facing language: save the programs that matter, verify official pages, watch opening signals, and notify only when records are trustworthy.
-- Keep broad unreviewed outbound sending out of scope, but allow automatic beta emails for high-confidence official opening signals on watched programs.
+- Explain the monitoring workflow in student-facing language: set Focus once, optionally prioritize a few programs, verify official pages, watch opening signals, and notify only when records are trustworthy.
+- Keep broad unreviewed outbound sending out of scope, but allow automatic beta emails for fresh, high-confidence official opening signals that match a student's Focus.
 
 Recommended waitlist fields:
 
@@ -581,7 +588,7 @@ I decided to prioritize underclassmen, exclude generic internships, treat PM and
 - Recommendation and application-status logic.
 - Source-coverage and confidence labeling.
 - Persistent shortlist using `localStorage`.
-- Endpoint-backed beta watch setup from My Focus and saved programs.
+- Endpoint-backed beta alert setup from My Focus and optional priority Watches.
 - Cloudflare D1 schema for watch requests, official sources, source schedules, snapshots, source checks, alert candidates, and delivery logs.
 - Scheduled Cloudflare Worker foundation for seasonal official-page checks, discovery queue surfacing, search-provider candidate URL capture, and candidate review.
 - Responsive dashboard-style interface with detail and next-action panels.

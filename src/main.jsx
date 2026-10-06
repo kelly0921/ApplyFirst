@@ -50,6 +50,17 @@ const onboardingStorageKey = 'applyfirst-onboarding-progress';
 const betaAlertSetupStorageKey = 'applyfirst-beta-alert-setup';
 const betaOutcomeStorageKey = 'applyfirst-beta-outcome';
 const analyticsSessionStorageKey = 'applyfirst-analytics-session';
+const deliveryEntryStorageKey = 'applyfirst-delivery-entry';
+const deliveryEntrySources = new Set([
+  'manual_library',
+  'search',
+  'watched_program_alert',
+  'focus_match_alert',
+  'personalized_discovery_digest',
+  'prepare_alert',
+  'direct_or_shared_link',
+  'unknown',
+]);
 const inviteCodes = ['APPLYFIRST', 'APPLYFIRST2026', 'EARLYACCESS'];
 const betaWorkspaceInviteCodePattern = /^AF-[A-Z0-9][A-Z0-9-]{4,58}[A-Z0-9]$/;
 const phaseOneTarget = 25;
@@ -220,6 +231,53 @@ function getInitialSelectedId() {
   } catch {
     return '';
   }
+}
+
+function getInitialDeliveryEntryContext() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const programId = params.get('program')?.trim() || '';
+    const requestedSource = params.get('entrySource')?.trim().toLowerCase() || '';
+    const deliveryToken = params.get('delivery')?.trim() || '';
+
+    if (programId && requestedSource && deliveryEntrySources.has(requestedSource) && /^[A-Za-z0-9_-]{32,240}$/.test(deliveryToken)) {
+      const context = {
+        programId,
+        entrySource: requestedSource,
+        deliveryToken,
+        capturedAt: new Date().toISOString(),
+        fromUrl: true,
+      };
+      window.sessionStorage.setItem(deliveryEntryStorageKey, JSON.stringify(context));
+      return context;
+    }
+
+    if (programId) {
+      return {
+        programId,
+        entrySource: 'direct_or_shared_link',
+        deliveryToken: '',
+        capturedAt: new Date().toISOString(),
+        fromUrl: false,
+      };
+    }
+
+    const stored = JSON.parse(window.sessionStorage.getItem(deliveryEntryStorageKey) || 'null');
+    const age = Date.now() - Date.parse(stored?.capturedAt || '');
+    if (
+      stored?.programId &&
+      deliveryEntrySources.has(stored.entrySource) &&
+      Number.isFinite(age) &&
+      age >= 0 &&
+      age <= 24 * 60 * 60 * 1000
+    ) {
+      return stored;
+    }
+  } catch {
+    // Delivery context is optional and should not interrupt the product.
+  }
+
+  return null;
 }
 
 function isReviewToolsRequested() {
@@ -924,6 +982,7 @@ function App() {
   const [workspaceRetryKey, setWorkspaceRetryKey] = useState(0);
   const lastWorkspaceSnapshotRef = useRef('');
   const analyticsSessionIdRef = useRef(cleanCaptureMode ? '' : getAnalyticsSessionId());
+  const deliveryEntryContextRef = useRef(cleanCaptureMode ? null : getInitialDeliveryEntryContext());
   const analyticsSessionTrackedRef = useRef(false);
   const viewedProgramIdsRef = useRef(new Set());
   const lastTrackedSearchRef = useRef('');
@@ -957,6 +1016,20 @@ function App() {
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
     };
   }, [activeView, cleanCaptureMode]);
+
+  useEffect(() => {
+    if (!deliveryEntryContextRef.current?.fromUrl) return;
+
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('entrySource');
+      url.searchParams.delete('delivery');
+      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+      deliveryEntryContextRef.current = { ...deliveryEntryContextRef.current, fromUrl: false };
+    } catch {
+      // Leaving the parameters in place is harmless if History API access fails.
+    }
+  }, []);
 
   const opportunityRecords = useMemo(
     () =>
@@ -1143,14 +1216,25 @@ function App() {
   const onboardingComplete = ['browsed', 'saved', 'focused', 'alerted', 'improved'].every((step) => guideProgress[step]);
   const showFirstSessionGuide = !onboardingProgress.dismissed && !onboardingComplete;
   const canSyncWorkspace = hasAccess && isWorkspaceInviteCode(activeAccessCode) && Boolean(getWorkerBaseUrl(activeWatchEndpoint));
-  const trackProductEvent = (eventName, details = {}) =>
-    sendProductEvent(
+  const trackProductEvent = (eventName, details = {}) => {
+    const context = { ...(details.context || {}) };
+    const deliveryContext = deliveryEntryContextRef.current;
+
+    if (details.programId && deliveryContext?.programId === details.programId) {
+      context.entrySource = deliveryContext.entrySource;
+      if (deliveryContext.deliveryToken) context.deliveryToken = deliveryContext.deliveryToken;
+    } else if (details.programId && !context.entrySource) {
+      context.entrySource = query.trim() ? 'search' : 'manual_library';
+    }
+
+    return sendProductEvent(
       getWorkerBaseUrl(activeWatchEndpoint),
       activeAccessCode,
       analyticsSessionIdRef.current,
       eventName,
-      details,
+      { ...details, context },
     );
+  };
 
   const hydrateWorkspaceState = (state = {}) => {
     setSavedIds(normalizeStoredIds(state.savedIds));
@@ -1484,6 +1568,27 @@ function App() {
       setActiveView('monitor');
     }
   }, [activeView, showInternalTools]);
+
+  useEffect(() => {
+    const deliveryContext = deliveryEntryContextRef.current;
+
+    if (
+      cleanCaptureMode ||
+      !deliveryContext?.programId ||
+      selectedOpportunity?.id !== deliveryContext.programId ||
+      !canSyncWorkspace ||
+      !['loaded', 'synced'].includes(workspaceSyncState) ||
+      viewedProgramIdsRef.current.has(deliveryContext.programId)
+    ) {
+      return;
+    }
+
+    viewedProgramIdsRef.current.add(deliveryContext.programId);
+    trackProductEvent('program_viewed', {
+      programId: deliveryContext.programId,
+      context: { view: 'programs', source: 'delivery_deep_link' },
+    });
+  }, [canSyncWorkspace, cleanCaptureMode, selectedOpportunity?.id, workspaceSyncState]);
 
   useEffect(() => {
     if (
@@ -2081,7 +2186,7 @@ function App() {
               <div>
                 <span>My Focus</span>
                 <h1 className="page-hero-title">Choose What ApplyFirst Watches.</h1>
-                <p>Set your focus, save targets, and add contact info so alerts arrive when openings are ready.</p>
+                <p>Set your focus once. ApplyFirst covers matching programs, while Priority Watches remain optional.</p>
               </div>
             </section>
             <AlertSetupPanel
@@ -2095,7 +2200,6 @@ function App() {
               alertStrategy={alertStrategy}
               betaAlertSetup={betaAlertSetup}
               onBetaAlertSetupSave={saveBetaAlertSetup}
-              onAddSuggestedProgram={startAlertsForOpportunity}
               waitlistIntent={waitlistIntent}
               alertEndpoint={activeAlertEndpoint}
               watchEndpoint={activeWatchEndpoint}
@@ -2631,7 +2735,7 @@ function HowItWorksSection() {
     {
       label: '4',
       title: 'Get Alerts',
-      text: 'Receive reviewed opening signals when a watched program is ready.',
+      text: 'Receive reviewed opening signals for programs that match your focus.',
     },
   ];
 
@@ -3658,6 +3762,26 @@ function BetaMetricsPanel({
   const lifecycleApplications = lifecycle.applications ?? {};
   const lifecycleWatches = lifecycle.watches ?? {};
   const lifecyclePersistence = lifecycle.persistentValue ?? {};
+  const proactiveDelivery = metrics.proactiveDelivery ?? {};
+  const proactiveSummary = proactiveDelivery.summary ?? {};
+  const proactiveValue = proactiveDelivery.studentValue ?? {};
+  const proactiveEngagement = Object.fromEntries(
+    (proactiveDelivery.engagement ?? []).map((row) => [
+      `${row.deliveryFormat}:${row.action}`,
+      row,
+    ]),
+  );
+  const proactiveDownstream = proactiveDelivery.downstream ?? [];
+  const proactiveDownstreamStat = (eventName) => proactiveDownstream
+    .filter((row) => row.eventName === eventName && [
+      'watched_program_alert',
+      'personalized_discovery_digest',
+      'prepare_alert',
+    ].includes(row.entrySource))
+    .reduce((total, row) => ({
+      records: total.records + Number(row.events || 0),
+      students: total.students + Number(row.students || 0),
+    }), { records: 0, students: 0 });
   const waitlistPipeline = waitlist.pipeline ?? {};
   const activation = studentValue.eligibleActivation ?? {};
   const discovery = studentValue.newToStudentDiscovery ?? {};
@@ -3764,6 +3888,74 @@ function BetaMetricsPanel({
           {studentValueMetrics.map((metric) => <BetaEvidenceMetric metric={metric} key={metric.label} />)}
         </dl>
         <CohortOutcomeList rows={studentValue.testerSegments} />
+      </BetaMetricSection>
+      <BetaMetricSection
+        title="Proactive Delivery"
+        description="Observed delivery journeys. Entry source is context, not proof that an email caused the action."
+      >
+        <dl className="beta-evidence-grid">
+          <BetaEvidenceMetric metric={{
+            label: 'Delivery Success',
+            value: formatCountOf(proactiveSummary.sent ?? 0, proactiveSummary.attemptedDeliveries ?? 0),
+            detail: `${proactiveSummary.eligibleRecipients ?? 0} eligible · ${proactiveSummary.failed ?? 0} failed · ${proactiveSummary.noMatch ?? 0} no strong match · ${proactiveSummary.duplicateSuppressed ?? 0} duplicate sends blocked · ${proactiveSummary.unsubscribedRecipients ?? 0} unsubscribed`,
+          }} />
+          <BetaEvidenceMetric metric={{
+            label: 'Immediate / Digest',
+            value: `${proactiveSummary.immediate ?? 0} / ${proactiveSummary.digest ?? 0}`,
+            detail: 'Attempted fresh opening alerts versus personalized batches',
+          }} />
+          <BetaEvidenceMetric metric={{
+            label: 'Official-Source Clicks',
+            value: (proactiveEngagement['immediate:source_clicked']?.events ?? 0) +
+              (proactiveEngagement['digest:source_clicked']?.events ?? 0),
+            detail: `${(proactiveEngagement['immediate:source_clicked']?.recipients ?? 0) + (proactiveEngagement['digest:source_clicked']?.recipients ?? 0)} recipient records`,
+          }} />
+          <BetaEvidenceMetric metric={{
+            label: 'Program Opens',
+            value: (proactiveEngagement['immediate:program_opened']?.events ?? 0) +
+              (proactiveEngagement['digest:program_opened']?.events ?? 0),
+            detail: 'ApplyFirst detail views opened from a delivery link',
+          }} />
+          <BetaEvidenceMetric metric={{
+            label: 'Relevant After Delivery',
+            value: formatCountOf(
+              proactiveValue.relevantProgramItems ?? 0,
+              proactiveValue.deliveredProgramItems ?? 0,
+            ),
+            detail: 'Explicit this-cycle or future-cycle judgments only',
+          }} />
+          <BetaEvidenceMetric metric={{
+            label: 'New Relevant Discovery',
+            value: formatCountOf(
+              proactiveValue.newRelevantProgramItems ?? 0,
+              proactiveValue.awarenessAnsweredItems ?? 0,
+            ),
+            detail: 'Relevant programs explicitly reported as new to the student',
+          }} />
+        </dl>
+        <div className="beta-metric-columns">
+          <MetricBreakdownList
+            title="One-Tap Feedback"
+            rows={['useful', 'not_relevant', 'already_knew', 'inaccurate'].map((action) => ({
+              label: formatDisplayLabel(action),
+              students: (proactiveEngagement[`immediate:${action}`]?.recipients ?? 0) +
+                (proactiveEngagement[`digest:${action}`]?.recipients ?? 0),
+              records: (proactiveEngagement[`immediate:${action}`]?.events ?? 0) +
+                (proactiveEngagement[`digest:${action}`]?.events ?? 0),
+            }))}
+            emptyLabel="No proactive-delivery feedback yet."
+          />
+          <MetricBreakdownList
+            title="Observed Next Actions"
+            rows={[
+              { label: 'Saved', ...proactiveDownstreamStat('program_saved') },
+              { label: 'Watched', ...proactiveDownstreamStat('watch_started') },
+              { label: 'Official Source', ...proactiveDownstreamStat('official_source_clicked') },
+              { label: 'Application Attempt', ...proactiveDownstreamStat('application_recorded') },
+            ]}
+            emptyLabel="No downstream delivery-context actions yet."
+          />
+        </div>
       </BetaMetricSection>
       <BetaMetricSection
         title="Program Lifecycle"
@@ -5013,6 +5205,13 @@ function ReadinessItemCard({ item, onCheckSource, onFindUrl, activeAction, loadi
         </a>
       </div>
       <p>{item.action}</p>
+      {item.lastErrorMessage ? (
+        <div className="readiness-item-diagnostics" role="note">
+          <span><strong>Live Check:</strong> {item.lastErrorMessage}</span>
+          <span><strong>Last Verified:</strong> {formatDateTime(item.lastVerifiedAt)}</span>
+          <span><strong>Last Successful Fetch:</strong> {formatDateTime(item.lastSuccessfulCheckAt)}</span>
+        </div>
+      ) : null}
       <div className="readiness-item-footer">
         <dl>
           <div>
@@ -5669,7 +5868,6 @@ function AlertSetupPanel({
   alertStrategy,
   betaAlertSetup,
   onBetaAlertSetupSave,
-  onAddSuggestedProgram,
   waitlistIntent,
   alertEndpoint,
   watchEndpoint,
@@ -5747,7 +5945,6 @@ function AlertSetupPanel({
         watchIntentOpportunities={watchIntentOpportunities}
         betaAlertSetup={betaAlertSetup}
         onSave={onBetaAlertSetupSave}
-        onAddSuggestedProgram={onAddSuggestedProgram}
         waitlistIntent={waitlistIntent}
         captureEndpoint={alertEndpoint}
         watchEndpoint={watchEndpoint}
@@ -5764,7 +5961,6 @@ function BetaAlertSystem({
   watchIntentOpportunities = [],
   betaAlertSetup,
   onSave,
-  onAddSuggestedProgram,
   waitlistIntent,
   captureEndpoint = '',
   watchEndpoint = '',
@@ -5802,15 +5998,13 @@ function BetaAlertSystem({
       ? `${missingSetupFields.slice(0, -1).join(', ')} and ${missingSetupFields.at(-1)}`
       : missingSetupFields[0];
   const alertReadyMatches = matches.filter((item) => getMonitoringReadiness(item).alertable);
+  const coveredMatches = uniqueOpportunitiesById(matches);
+  const coveredPreview = [...coveredMatches]
+    .sort((a, b) => Number(getMonitoringReadiness(b).alertable) - Number(getMonitoringReadiness(a).alertable))
+    .slice(0, 3);
   const watchedPrograms = uniqueOpportunitiesById(watchIntentOpportunities);
-  const watchedPreview = watchedPrograms.slice(0, 6);
-  const watchedProgramIds = new Set(watchedPrograms.map((item) => item.id));
-  const suggestedMatches = hasPreviewFocus
-    ? alertReadyMatches.filter((item) => !watchedProgramIds.has(item.id)).slice(0, 3)
-    : [];
-  const hasWatchedPrograms = watchedPrograms.length > 0;
-  const watchedAlertReadyCount = watchedPrograms.filter((item) => getMonitoringReadiness(item).alertable).length;
-  const watchedNeedsSourceCheck = watchedPrograms.length - watchedAlertReadyCount;
+  const watchedPreview = watchedPrograms.slice(0, 3);
+  const matchingNeedsSourceCheck = Math.max(coveredMatches.length - alertReadyMatches.length, 0);
   const currentWatchSetup = {
     classYear: alertPrefs.classYear,
     roleTrack: alertPrefs.roleTrack,
@@ -5831,8 +6025,6 @@ function BetaAlertSystem({
       ? effectiveContactMethod === 'phone'
         ? 'Add a phone number to receive text alerts.'
         : 'Add an email to receive opening alerts.'
-      : !hasWatchedPrograms
-        ? 'Choose at least one program to watch first.'
       : needsTurnstile
         ? 'Complete the verification before starting alerts.'
       : isSavedWatchSetupCurrent
@@ -5844,17 +6036,17 @@ function BetaAlertSystem({
     submitState === 'submitting'
       ? 'Saving...'
       : isSavedWatchSetupCurrent
-        ? 'Alert Setup Saved'
+        ? 'Matching Alerts Active'
         : betaAlertSetup
-          ? 'Update Alert Setup'
-          : 'Start Alerts';
+          ? 'Update Matching Alerts'
+          : 'Start Alerts For My Matches';
   const setupButtonClassName = isSavedWatchSetupCurrent
     ? 'is-saved'
     : betaAlertSetup && hasUnsavedWatchSetupChanges
       ? 'is-dirty'
       : '';
   const setupButtonDisabled =
-    hasIncompleteSetup || !hasContact || !hasWatchedPrograms || needsTurnstile || submitState === 'submitting' || isSavedWatchSetupCurrent;
+    hasIncompleteSetup || !hasContact || needsTurnstile || submitState === 'submitting' || isSavedWatchSetupCurrent;
   const shouldShowSetupStatus = setupButtonDisabled && !isSavedWatchSetupCurrent;
 
   const createSetupPayload = (captureStatus) => ({
@@ -5866,9 +6058,9 @@ function BetaAlertSystem({
     phoneNumber: phoneNumber.trim(),
     contactMethod: effectiveContactMethod,
     matchCount: matches.length,
-    alertReadyCount: watchedAlertReadyCount,
+    alertReadyCount: alertReadyMatches.length,
     savedCount: savedOpportunities.length,
-    needsSourceCheck: watchedNeedsSourceCheck,
+    needsSourceCheck: matchingNeedsSourceCheck,
     matchingProgramIds: matches.map((item) => item.id),
     alertReadyProgramIds: alertReadyMatches.map((item) => item.id),
     savedProgramIds: savedOpportunities.map((item) => item.id),
@@ -5892,7 +6084,7 @@ function BetaAlertSystem({
     const preferenceSummary = `${payload.classYear} / ${payload.roleTrack} / ${prioritySummary} / ${sendTimingLabels[payload.sendTiming] ?? payload.sendTiming}`;
     const watchedProgramNames = payload.watchedPrograms.map((program) => program.name).filter(Boolean);
     const notificationConsentText =
-      'I agree to receive ApplyFirst beta opening alerts by my selected contact method for programs I choose to watch. Message and data rates may apply for text alerts. I can unsubscribe or opt out.';
+      'I agree to receive ApplyFirst beta alerts for source-confirmed programs that match My Focus. Priority Watches receive extra attention. I can unsubscribe or opt out.';
 
     if (hasRemoteEndpoint) {
       if (captureEndpoint && payload.email && !turnstileToken) {
@@ -5912,7 +6104,7 @@ function BetaAlertSystem({
               classYear: payload.classYear,
               interest: payload.roleTrack,
               school: '',
-              note: `Beta email alert setup. Watching: ${watchedProgramNames.join(', ') || 'No programs yet'}. Alert-ready: ${payload.alertReadyCount}. Needs source check: ${payload.needsSourceCheck}.`,
+              note: `Beta email alert setup. Focus matches: ${payload.matchCount}. Alert-ready: ${payload.alertReadyCount}. Priority Watches: ${watchedProgramNames.join(', ') || 'None'}.`,
               preferenceSummary,
               notificationMode: 'Beta Email Alerts',
               savedAt: new Date().toISOString(),
@@ -5976,7 +6168,7 @@ function BetaAlertSystem({
           <h3>Choose Alert Delivery</h3>
           <p>
             {hasPreviewFocus
-              ? 'Pick how you want to receive reviewed opening alerts.'
+              ? 'Receive reviewed alerts for programs that match your focus.'
               : 'Finish your focus fields first, then add contact info.'}
           </p>
         </div>
@@ -6049,39 +6241,33 @@ function BetaAlertSystem({
 
       {betaAlertSetup ? <WatchSetupReceipt setup={betaAlertSetup} /> : null}
 
-      <section className="alert-preview-panel" aria-label="Alert setup preview">
+      <section className="alert-preview-panel" aria-label="Alert coverage preview">
         <aside className="alert-preview-sidebar">
           <span>Step 3</span>
-          <strong>Review Alert Preview</strong>
-          <p>Confirm setup before ApplyFirst starts watching.</p>
-          <dl className="alert-preview-stats" aria-label="Alert setup summary">
+          <strong>Preview Your Coverage</strong>
+          <p>Matches are covered automatically. Add Priority Watches only for programs you care about most.</p>
+          <dl className="alert-preview-stats" aria-label="Alert coverage summary">
             <div>
-              <dt>Selected</dt>
-              <dd>
-                {watchedPreview.length
-                  ? `${watchedPreview.length} ${watchedPreview.length === 1 ? 'Program' : 'Programs'}`
-                  : hasPreviewFocus
-                    ? 'None Yet'
-                    : 'Pending'}
-              </dd>
+              <dt>Matches</dt>
+              <dd>{hasPreviewFocus ? coveredMatches.length : 'Pending'}</dd>
             </div>
             <div>
-              <dt>Ready</dt>
-              <dd>{hasWatchedPrograms ? `${watchedAlertReadyCount}/${watchedPreview.length}` : 'Pending'}</dd>
+              <dt>Source-Ready</dt>
+              <dd>{hasPreviewFocus ? alertReadyMatches.length : 'Pending'}</dd>
             </div>
             <div>
-              <dt>Window</dt>
-              <dd>{hasPreviewFocus ? alertStrategy.timingLabel : 'Choose Timing'}</dd>
+              <dt>Priority</dt>
+              <dd>{hasPreviewFocus ? watchedPrograms.length : 'Pending'}</dd>
             </div>
           </dl>
         </aside>
         <div className="alert-preview-main">
           <BetaAlertFeed
+            coveredPrograms={coveredPreview}
+            coveredProgramCount={coveredMatches.length}
             watchedPrograms={watchedPreview}
-            suggestedPrograms={suggestedMatches}
             hasSavedSetup={Boolean(betaAlertSetup)}
             hasPreviewFocus={hasPreviewFocus}
-            onAddSuggestedProgram={onAddSuggestedProgram}
           />
         </div>
       </section>
@@ -6096,7 +6282,7 @@ function WatchSetupReceipt({ setup }) {
   return (
     <section className="watch-setup-receipt" aria-label="Saved alert setup receipt">
       <div>
-        <span>Alert Setup</span>
+        <span>Matching Alerts</span>
         <strong>{setup.captureStatus ?? 'Alert Setup Saved'}</strong>
         <p>{contactLabel} / {savedDate}</p>
       </div>
@@ -6129,42 +6315,41 @@ function normalizeWatchSetupForComparison(setup = {}) {
   };
 }
 
-function BetaAlertFeed({ watchedPrograms, suggestedPrograms, hasSavedSetup, hasPreviewFocus, onAddSuggestedProgram }) {
-  const feedItems = watchedPrograms.slice(0, 3).map((program) => {
+function BetaAlertFeed({ coveredPrograms, coveredProgramCount, watchedPrograms, hasSavedSetup, hasPreviewFocus }) {
+  const coveredItems = coveredPrograms.slice(0, 3).map((program) => {
     const readiness = getMonitoringReadiness(program);
 
     return {
       id: program.id,
-      kind: hasSavedSetup ? 'Active' : 'Selected',
       name: program.name,
       organization: program.organization,
-      status: readiness.alertable ? 'Ready' : 'Needs check',
+      status: readiness.alertable ? 'Source-Ready' : 'Source Check',
       timing: program.openDate,
     };
   });
-  const suggestedItems = suggestedPrograms.slice(0, 3).map((program) => ({
+  const priorityItems = watchedPrograms.slice(0, 3).map((program) => ({
     id: program.id,
     name: program.name,
     organization: program.organization,
-    status: 'Suggested',
+    status: hasSavedSetup ? 'Priority' : 'Selected',
     timing: program.openDate,
   }));
 
   return (
-    <section className="beta-alert-feed" aria-label="Selected alert programs">
+    <section className="beta-alert-feed" aria-label="Programs covered by alerts">
       <div className="alert-program-table">
         <div className="alert-program-table-heading">
-          <span>Programs to Watch</span>
+          <span>Alert Coverage</span>
         </div>
         <div className="alert-program-groups">
-          <section className="alert-program-section selected" aria-label="Selected programs for alerts">
+          <section className="alert-program-section selected" aria-label="Programs covered by My Focus">
             <div className="alert-program-section-heading">
-              <span>Selected</span>
-              <strong>{feedItems.length ? `${feedItems.length} ${feedItems.length === 1 ? 'Program' : 'Programs'}` : 'None Yet'}</strong>
+              <span>Covered By My Focus</span>
+              <strong>{hasPreviewFocus ? `${coveredProgramCount} ${coveredProgramCount === 1 ? 'Match' : 'Matches'}` : 'Set Focus First'}</strong>
             </div>
-            {feedItems.length ? (
+            {coveredItems.length ? (
               <div className="alert-program-list" role="list">
-                {feedItems.map((item) => (
+                {coveredItems.map((item) => (
                   <article className="alert-program-row selected" key={item.id} role="listitem">
                     <div>
                       <strong>{item.name}</strong>
@@ -6178,19 +6363,19 @@ function BetaAlertFeed({ watchedPrograms, suggestedPrograms, hasSavedSetup, hasP
             ) : (
               <p className="beta-alert-feed-empty">
                 {hasPreviewFocus
-                  ? 'Save one program to start your watchlist preview.'
-                  : 'Set focus fields to preview alert-ready matches.'}
+                  ? 'No programs currently match these focus settings.'
+                  : 'Set focus fields to preview matching programs.'}
               </p>
             )}
           </section>
-          {suggestedItems.length ? (
-            <section className="alert-program-section suggested" aria-label="Suggested programs to save">
-              <div className="alert-program-section-heading">
-                <span>Suggested Matches</span>
-                <strong>{suggestedItems.length} {suggestedItems.length === 1 ? 'Match' : 'Matches'}</strong>
-              </div>
+          <section className="alert-program-section suggested" aria-label="Priority Watches">
+            <div className="alert-program-section-heading">
+              <span>Priority Watches</span>
+              <strong>{priorityItems.length ? `${watchedPrograms.length} ${watchedPrograms.length === 1 ? 'Program' : 'Programs'}` : 'Optional'}</strong>
+            </div>
+            {priorityItems.length ? (
               <div className="alert-program-list" role="list">
-                {suggestedItems.map((item) => (
+                {priorityItems.map((item) => (
                   <article className="alert-program-row suggested" key={item.id} role="listitem">
                     <div>
                       <strong>{item.name}</strong>
@@ -6198,19 +6383,13 @@ function BetaAlertFeed({ watchedPrograms, suggestedPrograms, hasSavedSetup, hasP
                     </div>
                     <small>{item.timing}</small>
                     <span className="alert-program-status">{item.status}</span>
-                    <button
-                      className="alert-program-add"
-                      type="button"
-                      onClick={() => onAddSuggestedProgram?.(item.id)}
-                      aria-label={`Add ${item.name} to alerts`}
-                    >
-                      Add
-                    </button>
                   </article>
                 ))}
               </div>
-            </section>
-          ) : null}
+            ) : (
+              <p className="beta-alert-feed-empty">Watch a program from the library when you want it prioritized beyond My Focus.</p>
+            )}
+          </section>
         </div>
       </div>
     </section>
@@ -6958,6 +7137,8 @@ function OpportunityDetail({
           type="button"
           onClick={onToggleWatch}
           aria-pressed={watched}
+          aria-label={watched ? 'Remove priority watch' : 'Add priority watch'}
+          title={watched ? 'Remove from priority alerts' : 'Prioritize this program for opening alerts'}
           disabled={watchMutationState === 'saving'}
         >
           {watchMutationState === 'saving' ? 'Saving...' : watched ? 'Watching' : 'Watch'}
@@ -6979,9 +7160,9 @@ function OpportunityDetail({
           <div>
             <span>Saved</span>
             <strong>{watched ? 'Saved and Watching' : 'Saved to Your Library'}</strong>
-            <p>{watched ? 'ApplyFirst will keep monitoring this program.' : 'Watch it separately if you want opening alerts.'}</p>
+            <p>{watched ? 'ApplyFirst will prioritize this program for alerts.' : 'Your Focus still covers matching programs. Watch this one to prioritize it.'}</p>
           </div>
-          {!watched ? <button type="button" onClick={onToggleWatch}>Watch Program</button> : null}
+          {!watched ? <button type="button" onClick={onToggleWatch}>Prioritize</button> : null}
         </section>
       ) : null}
       <ProgramSummaryBar details={programHighlights} />
