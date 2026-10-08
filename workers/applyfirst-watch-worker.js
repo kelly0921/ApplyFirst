@@ -1,6 +1,7 @@
 import {
   buildDeliveryCopyState,
   buildDeliveryDedupeKey,
+  buildFocusDescription,
   buildStudentMatchReason,
   classifyDeliveryCandidate,
   evaluateStudentDelivery,
@@ -6384,7 +6385,7 @@ async function runProactiveDelivery(env, options = {}) {
           deliveryClass: 'act_now',
           deliveryFormat: 'immediate',
           entrySource: 'focus_match_alert',
-          items: [toPublicDeliveryPreview(item)],
+          items: [toPublicDeliveryPreview(item, recipient)],
         });
         continue;
       }
@@ -6446,7 +6447,7 @@ async function runProactiveDelivery(env, options = {}) {
               deliveryClass,
               deliveryFormat: 'digest',
               entrySource,
-              items: items.map(toPublicDeliveryPreview),
+              items: items.map((item) => toPublicDeliveryPreview(item, recipient)),
             });
           } else {
             const prepared = await createProactiveDeliveryBatch(env, {
@@ -7018,7 +7019,7 @@ async function createProactiveDeliveryBatch(env, input) {
       cleanString(item.status, 80),
       cleanString(item.deadline, 240),
       cleanString(item.officialUrl, 500),
-      buildDeliveryNextStep(item),
+      buildDeliveryNextStep(item, input.recipient),
       item.dedupeKey,
       index + 1,
     ).run();
@@ -7068,6 +7069,7 @@ async function sendProactiveImmediateEmail(env, recipient, prepared, item) {
       confidence: 'high',
       currentStatus: proactiveItem.status,
       deadline: proactiveItem.deadline,
+      classYears: proactiveItem.classYears,
       url: proactiveItem.officialUrl,
       verified: proactiveItem.verified,
       statusEvidenceType: proactiveItem.statusEvidenceType,
@@ -7126,7 +7128,7 @@ async function sendProactiveDigestEmail(env, recipient, prepared, items) {
   }
 }
 
-function toPublicDeliveryPreview(item) {
+function toPublicDeliveryPreview(item, recipient = {}) {
   const copyState = buildDeliveryCopyState(item);
   return {
     programId: item.programId,
@@ -7142,16 +7144,22 @@ function toPublicDeliveryPreview(item) {
     trustLine: copyState.trustLine,
     timingLabel: copyState.timingLabel,
     timingValue: copyState.timingValue,
-    nextStep: buildDeliveryNextStep(item),
+    nextStep: buildDeliveryNextStep(item, recipient),
   };
 }
 
-function buildDeliveryNextStep(item) {
+function buildDeliveryNextStep(item, recipient = {}) {
   const copyState = buildDeliveryCopyState(item);
+  const eligibility = buildDeliveryEligibilityState(item, recipient);
 
   if (['current_open', 'current_open_with_deadline'].includes(copyState.stateKey)) {
-    return item.repeatCycle === true
-      ? 'Applications are open again. Review the official requirements and apply again if it fits.'
+    if (item.repeatCycle === true) {
+      return eligibility.hasKnownPartialMatch
+        ? 'Applications are open again. Check the remaining requirements and apply again if it fits.'
+        : 'Applications are open again. Review the official requirements and apply again if it fits.';
+    }
+    return eligibility.hasKnownPartialMatch
+      ? 'Applications are open now. Check the remaining requirements and apply if it fits.'
       : 'Applications are open now. Review the official requirements and apply if it fits.';
   }
   if (copyState.stateKey === 'current_deadline') {
@@ -7177,25 +7185,146 @@ function formatDeliveryPurpose(item = {}) {
 }
 
 function buildDigestFocusSummary(recipient = {}) {
-  const classYear = cleanString(recipient.classYear, 80).toLowerCase();
-  const rawRoleTrack = cleanString(recipient.roleTrack, 120);
-  const roleLabel = /^all(?: role tracks?)?$/i.test(rawRoleTrack) || !rawRoleTrack
-    ? 'all role areas'
-    : formatFocusRoleTrack(rawRoleTrack);
-  const classLabel = /^all(?: class years?)?$/.test(classYear) || !classYear
-    ? 'all class years'
-    : classYear;
-  return `Picked from your ApplyFirst Focus: ${classLabel} + ${roleLabel}.`;
+  const focusDescription = buildFocusDescription(recipient);
+  if (!focusDescription) return 'Picked from your selected preferences.';
+  if (focusDescription.startsWith('students ')) return `Picked for ${focusDescription}.`;
+  return `Picked for ${withIndefiniteArticle(focusDescription)}.`;
 }
 
-function buildDeliveryEligibilityNote(item = {}) {
-  if (item.eligibilityConfirmed === true) {
-    return 'Eligibility confirmed for the information in your Focus.';
+function buildDigestDescription(item = {}) {
+  let description = cleanString(item.shortDescription, 1200).replace(/\s+/g, ' ').trim();
+  if (!description) return '';
+
+  const programName = cleanString(item.programName, 240);
+  const organization = cleanString(item.organization, 240);
+  const removablePrefixes = [
+    organization && programName ? `${organization} ${programName} is ` : '',
+    programName ? `${programName} is ` : '',
+  ].filter(Boolean).sort((left, right) => right.length - left.length);
+
+  const matchingPrefix = removablePrefixes.find((prefix) => (
+    description.toLowerCase().startsWith(prefix.toLowerCase())
+  ));
+  if (matchingPrefix) {
+    description = description.slice(matchingPrefix.length);
+    description = description ? description[0].toUpperCase() + description.slice(1) : '';
   }
-  if (item.eligibilityUnclear === true) {
-    return 'Some eligibility requirements still need confirmation on the official source.';
+
+  const sentences = description.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [];
+  let summary = cleanString(sentences[0], 600).trim();
+  const secondSentence = cleanString(sentences[1], 600).trim();
+  if (summary.length < 80 && secondSentence && `${summary} ${secondSentence}`.length <= 180) {
+    summary = `${summary} ${secondSentence}`;
   }
-  return 'Check the official requirements to confirm eligibility.';
+
+  return shortenDigestDescription(summary, 200);
+}
+
+function shortenDigestDescription(value, limit) {
+  const normalized = cleanString(value, 1200).trim();
+  if (normalized.length <= limit) return normalized;
+
+  const clipped = normalized.slice(0, limit - 1);
+  const clauseBoundary = Math.max(
+    clipped.lastIndexOf(', '),
+    clipped.lastIndexOf('; '),
+    clipped.lastIndexOf(': '),
+  );
+  if (clauseBoundary >= 90) {
+    return `${clipped.slice(0, clauseBoundary).replace(/[,;:]$/, '')}.`;
+  }
+
+  const wordBoundary = clipped.lastIndexOf(' ');
+  return `${clipped.slice(0, wordBoundary > 90 ? wordBoundary : limit - 4).trim()}...`;
+}
+
+function buildDigestMatchLabel(recipient = {}, item = {}) {
+  if (item.isWatching === true) return 'On your watch list';
+
+  const match = matchProgramToFocus(recipient, item);
+  const rawClassYear = cleanString(recipient.classYear, 80);
+  const rawRoleTrack = cleanString(recipient.roleTrack, 120);
+  const classYearIsSpecific = Boolean(rawClassYear) && !/^all(?: class years?)?$/i.test(rawClassYear);
+  const roleTrackIsSpecific = Boolean(rawRoleTrack) && !/^all(?: role tracks?)?$/i.test(rawRoleTrack);
+  const parts = [];
+
+  if (classYearIsSpecific && match.classMatch) parts.push(capitalizeFirst(rawClassYear));
+  if (roleTrackIsSpecific && match.roleMatch) {
+    parts.push(`${capitalizeFirst(formatFocusRoleTrack(rawRoleTrack))} interests`);
+  }
+
+  return parts.length ? parts.join(' · ') : 'Matches your selected preferences';
+}
+
+function withIndefiniteArticle(value) {
+  return `${/^[aeiou]/i.test(value) ? 'an' : 'a'} ${value}`;
+}
+
+function capitalizeFirst(value) {
+  const normalized = cleanString(value, 160);
+  return normalized ? normalized[0].toUpperCase() + normalized.slice(1) : '';
+}
+
+function buildDeliveryEligibilityState(item = {}, recipient = {}) {
+  const classYear = cleanString(recipient.classYear, 80);
+  const hasSpecificClassYear = Boolean(classYear) && !/^all(?: class years?)?$/i.test(classYear);
+  const programClassYears = normalizeDeliveryEligibilityList(item.classYears);
+  const includesAllClassYears = programClassYears.some((value) => (
+    /^all(?: class years?)?$/i.test(value)
+  ));
+  const classYearMatches = hasSpecificClassYear && (
+    includesAllClassYears || programClassYears.some((value) => (
+      value.toLowerCase() === classYear.toLowerCase()
+    ))
+  );
+
+  if (classYearMatches) {
+    return {
+      note: 'Your class year matches. Confirm the remaining requirements on the official source.',
+      hasKnownPartialMatch: true,
+    };
+  }
+
+  return {
+    note: 'Confirm eligibility on the official program page.',
+    hasKnownPartialMatch: false,
+  };
+}
+
+function buildDeliveryEligibilityNote(item = {}, recipient = {}) {
+  return buildDeliveryEligibilityState(item, recipient).note;
+}
+
+function buildDigestEligibilityNote(item = {}, recipient = {}) {
+  return buildDeliveryEligibilityState(item, recipient).hasKnownPartialMatch
+    ? 'Your class year matches'
+    : 'Confirm on the official program page';
+}
+
+function shouldShowDigestEligibility(copyState = {}) {
+  return [
+    'current_open',
+    'current_open_with_deadline',
+    'current_deadline',
+  ].includes(copyState.stateKey);
+}
+
+function normalizeDeliveryEligibilityList(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => cleanString(item, 120)).filter(Boolean);
+  }
+
+  const raw = cleanString(value, 1200);
+  if (!raw) return [];
+
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.map((item) => cleanString(item, 120)).filter(Boolean)
+      : [];
+  } catch {
+    return raw.split(',').map((item) => cleanString(item, 120)).filter(Boolean);
+  }
 }
 
 function getSecondaryDeliveryCtaLabel(item = {}) {
@@ -9239,7 +9368,7 @@ function buildAlertMessage(env, candidate, recipient, proactiveContext = null) {
     alreadyKnew: buildAlertEngagementUrl(env, candidate, recipient, 'already_knew'),
     inaccurate: buildAlertEngagementUrl(env, candidate, recipient, 'inaccurate'),
   };
-  const alertCopy = buildStudentAlertCopy(candidate);
+  const alertCopy = buildStudentAlertCopy(candidate, recipient);
   const matchExplanation = alertCopy.repeatCycle
     ? 'You previously applied to this program and kept it on Watch.'
     : proactiveItem?.matchReason || 'You asked ApplyFirst to watch this program.';
@@ -9323,17 +9452,19 @@ function buildProactiveDigestMessage(env, recipient, prepared, items) {
   const unsubscribeUrl = buildUnsubscribeUrl(env, recipient);
   const textItems = items.flatMap((item, index) => {
     const links = buildProactiveDeliveryLinks(env, prepared, item);
-    const shortDescription = cleanString(item.shortDescription, 220);
+    const shortDescription = buildDigestDescription(item);
     const copyState = buildDeliveryCopyState(item);
-    const eligibilityNote = buildDeliveryEligibilityNote(item);
+    const matchLabel = buildDigestMatchLabel(recipient, item);
+    const eligibilityNote = shouldShowDigestEligibility(copyState)
+      ? buildDigestEligibilityNote(item, recipient)
+      : '';
     return [
       `${index + 1}. ${copyState.purposeLabel}: ${item.programName}${item.organization ? ` — ${item.organization}` : ''}`,
-      shortDescription ? `What it is: ${shortDescription}` : '',
-      `Why you're seeing it: ${item.matchReason}`,
-      `Eligibility: ${eligibilityNote}`,
-      `Trust: ${copyState.trustLine}`,
+      shortDescription,
+      `Why it fits: ${matchLabel}`,
+      eligibilityNote ? `Eligibility: ${eligibilityNote}` : '',
       `${copyState.timingLabel}: ${copyState.timingValue}`,
-      `Next step: ${buildDeliveryNextStep(item)}`,
+      `Next step: ${buildDeliveryNextStep(item, recipient)}`,
       `Official source: ${links.source}`,
       `${getSecondaryDeliveryCtaLabel(item)}: ${links.program}`,
       `Good match? Yes ${links.useful} | No ${links.notRelevant} | Already knew ${links.alreadyKnew}`,
@@ -9345,16 +9476,18 @@ function buildProactiveDigestMessage(env, recipient, prepared, items) {
     subject,
     '',
     focusSummary,
-    'ApplyFirst did the monitoring so you can focus on what is worth your attention.',
     '',
     ...textItems,
     `Unsubscribe from ApplyFirst alerts: ${unsubscribeUrl}`,
   ].join('\n');
   const htmlItems = items.map((item) => {
     const links = buildProactiveDeliveryLinks(env, prepared, item);
-    const shortDescription = cleanString(item.shortDescription, 220);
+    const shortDescription = buildDigestDescription(item);
     const copyState = buildDeliveryCopyState(item);
-    const eligibilityNote = buildDeliveryEligibilityNote(item);
+    const matchLabel = buildDigestMatchLabel(recipient, item);
+    const eligibilityNote = shouldShowDigestEligibility(copyState)
+      ? buildDigestEligibilityNote(item, recipient)
+      : '';
     const secondaryCtaLabel = getSecondaryDeliveryCtaLabel(item);
     return `
       <div style="padding:18px 0;border-top:1px solid #e5e7eb">
@@ -9362,11 +9495,10 @@ function buildProactiveDigestMessage(env, recipient, prepared, items) {
         <h2 style="margin:0 0 4px;color:#111827;font-size:19px;line-height:1.3">${escapeHtml(item.programName)}</h2>
         ${item.organization ? `<p style="margin:0 0 10px;color:#5b6472;font-size:13px">${escapeHtml(item.organization)}</p>` : ''}
         ${shortDescription ? `<p style="margin:0 0 8px;color:#425066;font-size:14px">${escapeHtml(shortDescription)}</p>` : ''}
-        <p style="margin:0 0 5px;color:#425066;font-size:14px"><strong style="color:#17212f">Why you're seeing it:</strong> ${escapeHtml(item.matchReason)}</p>
-        <p style="margin:0 0 8px;color:#5b6472;font-size:13px"><strong style="color:#425066">Eligibility:</strong> ${escapeHtml(eligibilityNote)}</p>
-        <p style="margin:0 0 5px;color:#5b6472;font-size:12px;font-weight:700">${escapeHtml(copyState.trustLine)}</p>
+        <p style="margin:0 0 5px;color:#425066;font-size:14px"><strong style="color:#17212f">Why it fits:</strong> ${escapeHtml(matchLabel)}</p>
+        ${eligibilityNote ? `<p style="margin:0 0 5px;color:#5b6472;font-size:13px"><strong style="color:#425066">Eligibility:</strong> ${escapeHtml(eligibilityNote)}</p>` : ''}
         <p style="margin:0 0 12px;color:#425066;font-size:14px"><strong style="color:#17212f">${escapeHtml(copyState.timingLabel)}:</strong> ${escapeHtml(copyState.timingValue)}</p>
-        <p style="margin:0 0 14px;color:#425066;font-size:14px">${escapeHtml(buildDeliveryNextStep(item))}</p>
+        <p style="margin:0 0 14px;color:#425066;font-size:14px">${escapeHtml(buildDeliveryNextStep(item, recipient))}</p>
         <p style="margin:0 0 12px">
           <a href="${escapeHtml(links.source)}" style="display:inline-block;background:#17212f;color:#ffffff;text-decoration:none;border-radius:8px;padding:10px 15px;font-size:13px;font-weight:800">View Official Source</a>
           <a href="${escapeHtml(links.program)}" style="display:inline-block;margin-left:8px;color:#0f7f96;text-decoration:none;font-size:13px;font-weight:800">${escapeHtml(secondaryCtaLabel)}</a>
@@ -9387,7 +9519,6 @@ function buildProactiveDigestMessage(env, recipient, prepared, items) {
           <p style="margin:0 0 8px;color:#0f7f96;font-size:12px;font-weight:800;text-transform:uppercase">ApplyFirst Weekly Update</p>
           <h1 style="margin:0 0 10px;font-size:24px;line-height:1.22;color:#111827">${escapeHtml(subject)}</h1>
           <p style="margin:0 0 4px;color:#425066;font-size:14px">${escapeHtml(focusSummary)}</p>
-          <p style="margin:0 0 4px;color:#5b6472;font-size:13px">ApplyFirst did the monitoring so you can focus on what is worth your attention.</p>
           ${htmlItems}
           <p style="margin:16px 0 0;color:#6b7280;font-size:12px"><a href="${escapeHtml(unsubscribeUrl)}" style="color:#2563eb">Unsubscribe from ApplyFirst alerts</a>.</p>
         </div>
@@ -9417,7 +9548,7 @@ function buildProactiveDeliveryLinks(env, prepared, item) {
   };
 }
 
-function buildStudentAlertCopy(candidate) {
+function buildStudentAlertCopy(candidate, recipient = {}) {
   const programName = candidate.programName || candidate.title || 'This program';
   const detectedSignal = extractDetectedSignal(candidate.summary || candidate.sourceCheckNote);
   const copyState = buildDeliveryCopyState({
@@ -9468,7 +9599,7 @@ function buildStudentAlertCopy(candidate) {
     timingLabel: copyState.timingLabel,
     timingValue: copyState.timingValue,
     trustLine: copyState.trustLine,
-    eligibilityNote: buildDeliveryEligibilityNote(candidate),
+    eligibilityNote: buildDeliveryEligibilityNote(candidate, recipient),
     repeatCycle,
     betaNote: verifiedOpen
       ? 'Current status verified on the official source. Confirm final eligibility and requirements before applying.'

@@ -139,21 +139,33 @@ function buildStudentMatchReason(focus = {}, program = {}, match = {}) {
   const roleTrack = roleTrackIsBroad ? '' : formatFocusRoleTrack(rawRoleTrack);
 
   if (classYear && roleTrack) {
-    return `Your Focus includes ${classYear} + ${roleTrack}.`;
+    return `You're a ${classYear} interested in ${roleTrack} opportunities.`;
   }
 
   if (roleTrack) {
-    return `Your Focus includes ${roleTrack} across all class years.`;
+    return `You're interested in ${roleTrack} opportunities.`;
   }
 
   if (classYear) {
-    return `Your Focus includes ${classYear} + all role areas.`;
+    return `You're a ${classYear}, and this program includes your class year.`;
   }
 
   const opportunityType = String(program.opportunityType || '').trim().toLowerCase();
   return opportunityType
     ? `This ${opportunityType} fits the broad Focus you asked ApplyFirst to monitor.`
     : 'This program fits the broad Focus you asked ApplyFirst to monitor.';
+}
+
+function buildFocusDescription(focus = {}) {
+  const rawClassYear = String(focus.classYear || '').trim();
+  const rawRoleTrack = String(focus.roleTrack || '').trim();
+  const classYear = isBroadClassYear(rawClassYear) ? '' : rawClassYear.toLowerCase();
+  const roleTrack = isBroadRoleTrack(rawRoleTrack) ? '' : formatFocusRoleTrack(rawRoleTrack);
+
+  if (classYear && roleTrack) return `${classYear} interested in ${roleTrack}`;
+  if (classYear) return classYear;
+  if (roleTrack) return `students interested in ${roleTrack}`;
+  return '';
 }
 
 function buildDeliveryCopyState(item = {}, options = {}) {
@@ -241,7 +253,11 @@ function isCurrentOfficialStatusEvidence(item, now, sourceFetchFailed) {
 }
 
 function isCurrentDeadlineEvidence(item, now, currentStatusVerified, deadlineValue) {
-  if (!deadlineValue || isPastExplicitDate(deadlineValue, now)) return false;
+  if (
+    !deadlineValue ||
+    isUnknownDeadlineValue(deadlineValue) ||
+    isPastExplicitDate(deadlineValue, now)
+  ) return false;
 
   const status = String(item.status || item.currentStatus || '').trim().toLowerCase();
   if (
@@ -264,6 +280,17 @@ function isCurrentDeadlineEvidence(item, now, currentStatusVerified, deadlineVal
       now,
       CURATED_AUDIT_FRESHNESS_DAYS,
     )
+  );
+}
+
+function isUnknownDeadlineValue(value) {
+  const normalized = String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  if (!normalized) return true;
+
+  return (
+    /\bno (?:application |registration )?deadline\b/.test(normalized) ||
+    /\b(?:deadline|close date)\b.{0,48}\b(?:not (?:yet )?(?:confirmed|listed|posted|published|announced|available|provided|known)|has not been (?:confirmed|listed|posted|published|announced)|unknown|tbd|to be announced)\b/.test(normalized) ||
+    /^(?:not confirmed yet|unknown|tbd|to be announced|rolling)$/.test(normalized)
   );
 }
 
@@ -592,8 +619,8 @@ function formatFocusRoleTrack(value) {
     'software engineering': 'software engineering',
     'product management': 'product management',
     design: 'design',
-    'quant / finance': 'quant / finance',
-    'access & prep': 'access & prep',
+    'quant / finance': 'quant and finance',
+    'access & prep': 'access and preparation',
   }[normalized] || normalized || 'all role areas';
 }
 
@@ -638,8 +665,9 @@ export {
   DELIVERY_CLASSES,
   DELIVERY_ENTRY_SOURCES,
   buildDeliveryCopyState,
-  buildStudentMatchReason,
   buildDeliveryDedupeKey,
+  buildFocusDescription,
+  buildStudentMatchReason,
   classifyDeliveryCandidate,
   evaluateStudentDelivery,
   formatFocusRoleTrack,

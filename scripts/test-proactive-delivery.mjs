@@ -133,7 +133,7 @@ assert.equal(
     { opportunityType: 'Discovery Program' },
     matching,
   ),
-  'Your Focus includes sophomore + software engineering.',
+  "You're a sophomore interested in software engineering opportunities.",
 );
 assert.equal(
   buildStudentMatchReason(
@@ -141,9 +141,27 @@ assert.equal(
     { opportunityType: 'Discovery Program' },
     { matches: true },
   ),
-  'Your Focus includes sophomore + product management.',
+  "You're a sophomore interested in product management opportunities.",
 );
+const naturalQuantMatchReason = buildStudentMatchReason(
+  { classYear: 'Freshman', roleTrack: 'Quant / Finance' },
+  { opportunityType: 'Fellowship' },
+  { matches: true },
+);
+assert.equal(
+  naturalQuantMatchReason,
+  "You're a freshman interested in quant and finance opportunities.",
+);
+assert.doesNotMatch(naturalQuantMatchReason, /[+/]/);
+const broadClassMatchReason = buildStudentMatchReason(
+  { classYear: 'All class years', roleTrack: 'Quant / Finance' },
+  { opportunityType: 'Fellowship' },
+  { matches: true },
+);
+assert.equal(broadClassMatchReason, "You're interested in quant and finance opportunities.");
+assert.doesNotMatch(broadClassMatchReason, /\ball\b/i);
 assert.equal(formatFocusRoleTrack('Product Management'), 'product management');
+assert.equal(formatFocusRoleTrack('Quant / Finance'), 'quant and finance');
 assert.equal(matchProgramToFocus(
   { classYear: 'Sophomore', roleTrack: 'Product Management' },
   { classYears: ['Sophomore'], roleTracks: ['Software Engineering'] },
@@ -181,6 +199,38 @@ const openWithDeadlineCopy = buildDeliveryCopyState({
 assert.equal(openWithDeadlineCopy.stateKey, 'current_open_with_deadline');
 assert.equal(openWithDeadlineCopy.timingLabel, 'Deadline');
 assert.equal(openWithDeadlineCopy.timingValue, 'October 18, 2026');
+
+const openWithoutListedDeadlineCopy = buildDeliveryCopyState({
+  status: 'open',
+  confidence: 'high',
+  verified: true,
+  officialUrl: 'https://example.com/open',
+  statusEvidenceType: 'curated_audit',
+  statusEvidenceAt: '2026-10-05T16:00:00.000Z',
+  curatedStatus: 'open',
+  curatedStatusReviewedAt: '2026-10-05T16:00:00.000Z',
+  deadline: 'No application deadline is listed',
+  curatedDeadline: 'No application deadline is listed',
+}, { now: copyNow });
+assert.equal(openWithoutListedDeadlineCopy.stateKey, 'current_open');
+assert.equal(openWithoutListedDeadlineCopy.trustLine, 'Status verified on the official source');
+assert.equal(openWithoutListedDeadlineCopy.timingLabel, 'Deadline');
+assert.equal(openWithoutListedDeadlineCopy.timingValue, 'Not confirmed yet');
+
+const eventDateWithoutRegistrationDeadlineCopy = buildDeliveryCopyState({
+  status: 'open',
+  confidence: 'high',
+  verified: true,
+  officialUrl: 'https://example.com/event',
+  statusEvidenceType: 'curated_audit',
+  statusEvidenceAt: '2026-10-05T16:00:00.000Z',
+  curatedStatus: 'open',
+  curatedStatusReviewedAt: '2026-10-05T16:00:00.000Z',
+  deadline: 'No registration deadline is listed; event is October 16, 2026',
+  curatedDeadline: 'No registration deadline is listed; event is October 16, 2026',
+}, { now: copyNow });
+assert.equal(eventDateWithoutRegistrationDeadlineCopy.stateKey, 'current_open');
+assert.equal(eventDateWithoutRegistrationDeadlineCopy.timingValue, 'Not confirmed yet');
 
 const expectedCycleCopy = buildDeliveryCopyState({
   status: 'opening_soon',
@@ -521,11 +571,58 @@ function createFocusDeliveryEnv({
   priority = 'high',
   openDate = 'October 2026',
   deadline = 'October 30, 2026',
+  enableSending = false,
 }) {
-  return {
+  const recipient = {
+    id: 'focus-request-1',
+    workspaceId,
+    email: 'student@example.com',
+    classYear: 'Freshman',
+    roleTrack: 'Software Engineering',
+    priority: 'all',
+    sendTiming: 'openOnly',
+    unsubscribeToken: 'test-unsubscribe-token',
+    createdAt: subscribedAt,
+  };
+  const program = {
+    programId: 'focus-program',
+    programName: 'Focus Program',
+    organization: 'Example Organization',
+    opportunityType: 'Discovery Program',
+    classYears: JSON.stringify(['Freshman']),
+    roleTracks: JSON.stringify(['Software Engineering']),
+    priority,
+    confidence: 'high',
+    status,
+    openDate,
+    deadline,
+    shortDescription: 'A source-confirmed discovery program.',
+    officialUrl: 'https://example.com/program',
+    verified: 1,
+    verifiedAt: statusChangedAt,
+    statusEvidenceType: 'source_check',
+    statusEvidenceAt: statusChangedAt,
+    statusReviewDecision: status === 'open'
+      ? 'Alert Candidate'
+      : status === 'deadline'
+        ? 'Deadline Candidate'
+        : 'Prep Watch',
+    sourceError: '',
+    statusChangedAt,
+    updatedAt: statusChangedAt,
+  };
+  const testState = {
+    batchesByDedupe: new Map(),
+    batchesById: new Map(),
+    itemsByDedupe: new Map(),
+    sentEmails: [],
+    runs: [],
+  };
+  const env = {
     PROACTIVE_DIGEST_MAX_ITEMS: '5',
     DB: {
       prepare(query) {
+        const normalizedQuery = query.replace(/\s+/g, ' ').trim().toLowerCase();
         return {
           bindings: [],
           bind(...bindings) {
@@ -534,56 +631,165 @@ function createFocusDeliveryEnv({
           },
           async all() {
             if (/from watch_requests request/i.test(query)) {
-              return {
-                results: [{
-                  id: 'focus-request-1',
-                  workspaceId,
-                  email: 'student@example.com',
-                  classYear: 'Freshman',
-                  roleTrack: 'Software Engineering',
-                  priority: 'all',
-                  sendTiming: 'openOnly',
-                  createdAt: subscribedAt,
-                }],
-              };
+              return { results: [recipient] };
             }
             if (/from program_delivery_catalog catalog/i.test(query)) {
+              return { results: [program] };
+            }
+            if (/from proactive_delivery_items item/i.test(query)) {
               return {
-                results: [{
-                  programId: 'focus-program',
-                  programName: 'Focus Program',
-                  organization: 'Example Organization',
-                  opportunityType: 'Discovery Program',
-                  classYears: JSON.stringify(['Freshman']),
-                  roleTracks: JSON.stringify(['Software Engineering']),
-                  priority,
-                  confidence: 'high',
-                  status,
-                  openDate,
-                  deadline,
-                  shortDescription: 'A source-confirmed discovery program.',
-                  officialUrl: 'https://example.com/program',
-                  verified: 1,
-                  verifiedAt: statusChangedAt,
-                  statusEvidenceType: 'source_check',
-                  statusEvidenceAt: statusChangedAt,
-                  statusReviewDecision: status === 'open'
-                    ? 'Alert Candidate'
-                    : status === 'deadline'
-                      ? 'Deadline Candidate'
-                      : 'Prep Watch',
-                  sourceError: '',
-                  statusChangedAt,
-                  updatedAt: statusChangedAt,
-                }],
+                results: [...testState.itemsByDedupe.values()]
+                  .filter((item) => testState.batchesById.get(item.batchId)?.status === 'sent')
+                  .map((item) => {
+                    const batch = testState.batchesById.get(item.batchId);
+                    return {
+                      workspaceId: batch.workspaceId,
+                      watchRequestId: batch.watchRequestId,
+                      programId: item.programId,
+                      cycleKey: item.cycleKey,
+                      deliveryClass: item.deliveryClass,
+                      dedupeKey: item.dedupeKey,
+                      deliveryFormat: batch.deliveryFormat,
+                    };
+                  }),
+              };
+            }
+            if (/select dedupe_key as dedupekey from proactive_delivery_batches/i.test(normalizedQuery)) {
+              return {
+                results: [...testState.batchesById.values()]
+                  .filter((batch) => batch.status === 'sent')
+                  .map((batch) => ({ dedupeKey: batch.dedupeKey })),
               };
             }
             return { results: [] };
+          },
+          async first() {
+            if (/from proactive_delivery_batches/i.test(query)) {
+              return testState.batchesByDedupe.get(this.bindings[0]) || null;
+            }
+            if (/select id from proactive_delivery_items/i.test(query)) {
+              const item = testState.itemsByDedupe.get(this.bindings[0]);
+              return item ? { id: item.id } : null;
+            }
+            return null;
+          },
+          async run() {
+            if (/insert into proactive_delivery_batches/i.test(query)) {
+              const [
+                id,
+                watchRequestId,
+                batchWorkspaceId,
+                deliveryClass,
+                deliveryFormat,
+                entrySource,
+                periodKey,
+                dedupeKey,
+                engagementTokenHash,
+                eligibleItemCount,
+                attemptedAt,
+                updatedAt,
+              ] = this.bindings;
+              const existing = testState.batchesByDedupe.get(dedupeKey);
+              const batch = {
+                ...(existing || {}),
+                id: existing?.id || id,
+                watchRequestId,
+                workspaceId: batchWorkspaceId,
+                deliveryClass,
+                deliveryFormat,
+                entrySource,
+                periodKey,
+                dedupeKey,
+                engagementTokenHash,
+                eligibleItemCount,
+                status: 'planned',
+                attemptedAt,
+                updatedAt,
+              };
+              testState.batchesByDedupe.set(dedupeKey, batch);
+              testState.batchesById.set(batch.id, batch);
+            } else if (/delete from proactive_delivery_items/i.test(query)) {
+              const batchId = this.bindings[0];
+              for (const [dedupeKey, item] of testState.itemsByDedupe) {
+                if (item.batchId === batchId) testState.itemsByDedupe.delete(dedupeKey);
+              }
+            } else if (/insert or ignore into proactive_delivery_items/i.test(query)) {
+              const [
+                id,
+                batchId,
+                programId,
+                deliveryClass,
+                cycleKey,
+                matchReason,
+                matchScore,
+                statusSnapshot,
+                deadlineSnapshot,
+                officialUrl,
+                nextStep,
+                dedupeKey,
+                position,
+              ] = this.bindings;
+              if (!testState.itemsByDedupe.has(dedupeKey)) {
+                testState.itemsByDedupe.set(dedupeKey, {
+                  id,
+                  batchId,
+                  programId,
+                  deliveryClass,
+                  cycleKey,
+                  matchReason,
+                  matchScore,
+                  statusSnapshot,
+                  deadlineSnapshot,
+                  officialUrl,
+                  nextStep,
+                  dedupeKey,
+                  position,
+                });
+              }
+            } else if (/update proactive_delivery_batches/i.test(query)) {
+              const [
+                deliveryStatus,
+                providerMessageId,
+                errorMessage,
+                sentAt,
+                updatedAt,
+                batchId,
+              ] = this.bindings;
+              const batch = testState.batchesById.get(batchId);
+              Object.assign(batch, {
+                status: deliveryStatus,
+                providerMessageId,
+                errorMessage,
+                sentAt,
+                updatedAt,
+              });
+            } else if (/insert into proactive_delivery_runs/i.test(query)) {
+              testState.runs.push([...this.bindings]);
+            }
+            return { success: true };
           },
         };
       },
     },
   };
+
+  if (enableSending) {
+    Object.assign(env, {
+      ALERT_FROM_EMAIL: 'applyfirst@example.com',
+      ALERT_FROM_NAME: 'ApplyFirst',
+      PUBLIC_APP_URL: 'https://applyfirst.example.com',
+      WATCH_WORKER_PUBLIC_URL: 'https://applyfirst-watch.example.workers.dev',
+      EMAIL: {
+        async send(message) {
+          testState.sentEmails.push(message);
+          return { messageId: `test-message-${testState.sentEmails.length}` };
+        },
+      },
+    });
+  }
+
+  env.__testState = testState;
+  return env;
 }
 
 const now = Date.now();
@@ -599,7 +805,7 @@ assert.equal(focusImmediateRun.results[0].deliveryFormat, 'immediate');
 assert.equal(focusImmediateRun.results[0].entrySource, 'focus_match_alert');
 assert.equal(
   focusImmediateRun.results[0].items[0].matchReason,
-  'Your Focus includes freshman + software engineering.',
+  "You're a freshman interested in software engineering opportunities.",
 );
 
 const legacyFocusImmediateRun = await runProactiveDelivery(
@@ -681,6 +887,69 @@ const scheduledExistingOpenRun = await runProactiveDelivery(
 assert.equal(scheduledExistingOpenRun.eligibleRecipients, 0);
 assert.equal(scheduledExistingOpenRun.results[0].status, 'not_due');
 
+const sendingImmediateEnv = createFocusDeliveryEnv({
+  subscribedAt: new Date(now - 4 * 24 * 60 * 60 * 1000).toISOString(),
+  statusChangedAt: new Date(now - 60 * 60 * 1000).toISOString(),
+  enableSending: true,
+});
+const sendingImmediateRun = await runProactiveDelivery(
+  sendingImmediateEnv,
+  { dryRun: false, force: true, watchRequestId: 'focus-request-1' },
+);
+assert.equal(sendingImmediateRun.attemptedDeliveries, 1);
+assert.equal(sendingImmediateRun.sent, 1);
+assert.equal(sendingImmediateRun.failed, 0);
+assert.equal(sendingImmediateEnv.__testState.sentEmails.length, 1);
+assert.equal(sendingImmediateEnv.__testState.sentEmails[0].to, 'student@example.com');
+assert.match(sendingImmediateEnv.__testState.sentEmails[0].subject, /Focus Program/);
+assert.match(
+  sendingImmediateEnv.__testState.sentEmails[0].headers['List-Unsubscribe'],
+  /^<https:\/\//,
+);
+assert.equal(
+  [...sendingImmediateEnv.__testState.batchesById.values()][0].status,
+  'sent',
+  'a successful provider response must persist the delivery batch as sent',
+);
+assert.equal(sendingImmediateEnv.__testState.runs.length, 1);
+
+const repeatedImmediateRun = await runProactiveDelivery(
+  sendingImmediateEnv,
+  { dryRun: false, force: true, watchRequestId: 'focus-request-1' },
+);
+assert.equal(repeatedImmediateRun.sent, 0);
+assert.equal(repeatedImmediateRun.skipped, 1);
+assert.equal(repeatedImmediateRun.results[0].status, 'already_sent');
+assert.equal(
+  sendingImmediateEnv.__testState.sentEmails.length,
+  1,
+  're-running the same delivery must not call the provider twice',
+);
+
+const sendingDigestEnv = createFocusDeliveryEnv({
+  subscribedAt: new Date(now - 4 * 24 * 60 * 60 * 1000).toISOString(),
+  statusChangedAt: new Date(now - 60 * 60 * 1000).toISOString(),
+  status: 'watching',
+  priority: 'high',
+  openDate: '',
+  deadline: '',
+  enableSending: true,
+});
+const sendingDigestRun = await runProactiveDelivery(
+  sendingDigestEnv,
+  { dryRun: false, force: true, watchRequestId: 'focus-request-1' },
+);
+assert.equal(sendingDigestRun.attemptedDeliveries, 1);
+assert.equal(sendingDigestRun.sent, 1);
+assert.equal(sendingDigestRun.results[0].deliveryFormat, 'digest');
+assert.equal(sendingDigestEnv.__testState.sentEmails.length, 1);
+assert.match(sendingDigestEnv.__testState.sentEmails[0].subject, /worth a look this week/);
+assert.equal(
+  [...sendingDigestEnv.__testState.batchesById.values()][0].status,
+  'sent',
+  'a successful digest send must persist the delivery batch as sent',
+);
+
 const emailEnv = {
   PUBLIC_APP_URL: 'https://applyfirst.example.com',
   WATCH_WORKER_PUBLIC_URL: 'https://applyfirst-watch.example.workers.dev',
@@ -722,7 +991,7 @@ assert.match(immediateMessage.text, /Trust: Status verified on the official sour
 assert.match(immediateMessage.text, /Deadline: Not confirmed yet/);
 assert.doesNotMatch(immediateMessage.text, /Timing: Not confirmed yet/);
 assert.match(immediateMessage.text, /Beta alert: Current status verified on the official source\./);
-assert.match(immediateMessage.text, /Check the official requirements to confirm eligibility\./);
+assert.match(immediateMessage.text, /Confirm eligibility on the official program page\./);
 assert.match(immediateMessage.text, /You asked ApplyFirst to watch this program\./);
 assert.match(immediateMessage.text, /Unsubscribe from ApplyFirst alerts:/);
 assert.doesNotMatch(immediateMessage.text, /Unsubscribe from these alerts/);
@@ -797,8 +1066,10 @@ const digestMessage = buildProactiveDigestMessage(
       curatedStatusReviewedAt: copyNow,
       curatedDeadline: 'October 24, 2026',
       officialUrl: 'https://example.com/open-program',
-      shortDescription: 'A current opening.',
-      matchReason: 'Your Focus includes sophomore + product management.',
+      classYears: ['Freshman', 'Sophomore'],
+      roleTracks: ['Product Management'],
+      shortDescription: 'Open Program is a current opportunity for sophomores pursuing product management through a structured cohort experience. Extra full-library detail should remain in ApplyFirst instead of the digest.',
+      matchReason: "You're a sophomore interested in product management opportunities.",
     },
     {
       itemId: 'digest-prepare',
@@ -810,8 +1081,10 @@ const digestMessage = buildProactiveDigestMessage(
       confidence: 'high',
       verified: true,
       officialUrl: 'https://example.com/prepare-program',
+      classYears: ['Sophomore'],
+      roleTracks: ['Product Management'],
       shortDescription: 'An upcoming program.',
-      matchReason: 'Your Focus includes sophomore + product management.',
+      matchReason: "You're a sophomore interested in product management opportunities.",
     },
     {
       itemId: 'digest-discover',
@@ -824,24 +1097,39 @@ const digestMessage = buildProactiveDigestMessage(
       confidence: 'high',
       verified: true,
       officialUrl: 'https://example.com/discover-program',
+      classYears: ['Sophomore'],
+      roleTracks: ['Product Management'],
       shortDescription: 'A newly verified program.',
-      matchReason: 'Your Focus includes sophomore + product management.',
+      matchReason: "You're a sophomore interested in product management opportunities.",
     },
   ],
 );
 assert.equal(digestMessage.subject, '3 opportunities worth a look this week');
-assert.match(digestMessage.text, /Picked from your ApplyFirst Focus: sophomore \+ product management\./);
-assert.match(
-  digestMessage.text,
-  /ApplyFirst did the monitoring so you can focus on what is worth your attention\./,
-);
+assert.match(digestMessage.text, /Picked for a sophomore interested in product management\./);
+assert.doesNotMatch(digestMessage.text, /sophomore \+ product management|product management\//i);
+assert.doesNotMatch(digestMessage.text, /ApplyFirst did the monitoring/);
 assert.match(digestMessage.text, /1\. Open Now: Open Program/);
 assert.match(digestMessage.text, /2\. Prepare: Prepare Program/);
 assert.match(digestMessage.text, /3\. Discover: Discover Program/);
-assert.match(digestMessage.text, /Why you're seeing it: Your Focus includes sophomore \+ product management\./);
+assert.match(digestMessage.text, /Why it fits: Sophomore · Product management interests/);
+assert.doesNotMatch(digestMessage.text, /Why you're seeing it:/);
 assert.doesNotMatch(digestMessage.text, /product (?:interests|roles)/i);
-assert.match(digestMessage.text, /Eligibility: Check the official requirements to confirm eligibility\./);
-assert.match(digestMessage.text, /Applications are open now\. Review the official requirements and apply if it fits\./);
+assert.match(digestMessage.text, /Eligibility: Your class year matches/);
+assert.doesNotMatch(digestMessage.text, /Eligibility:.*remaining requirements/);
+assert.equal(
+  digestMessage.text.match(/^Eligibility:/gm)?.length,
+  1,
+  'PREPARE and DISCOVER cards should omit routine eligibility rows',
+);
+assert.doesNotMatch(digestMessage.text, /You're eligible/i);
+assert.match(digestMessage.text, /Applications are open now\. Check the remaining requirements and apply if it fits\./);
+assert.doesNotMatch(digestMessage.text, /Applications:\s*Open/i);
+assert.doesNotMatch(digestMessage.text, /Trust:|Status verified on the official source/);
+assert.match(
+  digestMessage.text,
+  /A current opportunity for sophomores pursuing product management through a structured cohort experience\./,
+);
+assert.doesNotMatch(digestMessage.text, /Extra full-library detail/);
 assert.match(digestMessage.text, /Expected application cycle: November 2026/);
 assert.match(digestMessage.text, /Watch it in ApplyFirst and we'll keep monitoring for the next verified opening\./);
 assert.match(digestMessage.text, /See whether this is worth following\./);
@@ -858,6 +1146,57 @@ assert.ok(
   digestMessage.html.indexOf('View Official Source') < digestMessage.html.indexOf('View in ApplyFirst'),
   'the digest official-source CTA must remain primary',
 );
+
+const broadFocusMessage = buildProactiveDigestMessage(
+  emailEnv,
+  {
+    ...emailRecipient,
+    classYear: 'All class years',
+    roleTrack: 'All role tracks',
+  },
+  { engagementToken: 'c'.repeat(64) },
+  [{
+    itemId: 'broad-focus-item',
+    programId: 'broad-focus-program',
+    programName: 'Broad Focus Program',
+    deliveryClass: 'discover',
+    status: 'watching',
+    confidence: 'high',
+    verified: true,
+    officialUrl: 'https://example.com/broad-focus',
+    matchReason: buildStudentMatchReason(
+      { classYear: 'All class years', roleTrack: 'All role tracks' },
+      { opportunityType: 'Fellowship' },
+      { matches: true },
+    ),
+  }],
+);
+assert.match(broadFocusMessage.text, /Picked from your selected preferences\./);
+assert.doesNotMatch(broadFocusMessage.text, /all class years|all role areas|all role tracks/i);
+
+const mismatchEligibilityMessage = buildProactiveDigestMessage(
+  emailEnv,
+  emailRecipient,
+  { engagementToken: 'd'.repeat(64) },
+  [{
+    itemId: 'mismatch-item',
+    programId: 'mismatch-program',
+    programName: 'Mismatch Program',
+    deliveryClass: 'discover',
+    status: 'open',
+    confidence: 'high',
+    verified: true,
+    classYears: ['Freshman'],
+    roleTracks: ['Product Management'],
+    officialUrl: 'https://example.com/mismatch',
+    statusEvidenceType: 'source_check',
+    statusEvidenceAt: copyNow,
+    statusReviewDecision: 'Alert Candidate',
+    matchReason: 'Maintainer-only copy test.',
+  }],
+);
+assert.match(mismatchEligibilityMessage.text, /Eligibility: Confirm on the official program page/);
+assert.doesNotMatch(mismatchEligibilityMessage.text, /Your class year matches|You're eligible/i);
 
 const migration = readFileSync(new URL('../cloudflare/d1/017_proactive_delivery.sql', import.meta.url), 'utf8');
 assert.doesNotMatch(
