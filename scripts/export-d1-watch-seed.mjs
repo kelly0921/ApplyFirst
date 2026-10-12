@@ -43,6 +43,7 @@ const sourceRows = opportunities
   });
 
 const sql = createD1SeedSql(sourceRows);
+assertRuntimeSchedulePreservation(sql);
 
 if (writeOutput) {
   await mkdir(new URL('../cloudflare/d1/', import.meta.url), { recursive: true });
@@ -76,6 +77,18 @@ where status = 'auto_ready'
     where seeded_sample = 0
   );
 `;
+}
+
+function assertRuntimeSchedulePreservation(sqlText) {
+  const requiredAssignments = [
+    'current_phase = source_schedule_profiles.current_phase',
+    'next_check_at = source_schedule_profiles.next_check_at',
+    'next_discovery_at = source_schedule_profiles.next_discovery_at',
+  ];
+
+  if (requiredAssignments.some((assignment) => !sqlText.includes(assignment))) {
+    throw new Error('Generated seed SQL must preserve monitor-owned runtime schedule fields.');
+  }
 }
 
 function createRemovedDeliveryCatalogCleanupStatement(rows) {
@@ -201,52 +214,9 @@ on conflict(official_source_id) do update set
   discovery_check_interval_hours = excluded.discovery_check_interval_hours,
   source_volatility = excluded.source_volatility,
   discovery_queries_json = excluded.discovery_queries_json,
-  current_phase = case
-    when source_schedule_profiles.cycle_frequency is not excluded.cycle_frequency
-      or source_schedule_profiles.expected_open_months_json is not excluded.expected_open_months_json
-      or source_schedule_profiles.last_known_open_at is not excluded.last_known_open_at
-      or source_schedule_profiles.active_lead_days is not excluded.active_lead_days
-      or source_schedule_profiles.active_check_interval_hours is not excluded.active_check_interval_hours
-      or source_schedule_profiles.warmup_check_interval_hours is not excluded.warmup_check_interval_hours
-      or source_schedule_profiles.dormant_check_interval_days is not excluded.dormant_check_interval_days
-      or source_schedule_profiles.discovery_check_interval_hours is not excluded.discovery_check_interval_hours
-      or source_schedule_profiles.source_volatility is not excluded.source_volatility
-      or source_schedule_profiles.discovery_queries_json is not excluded.discovery_queries_json
-      or source_schedule_profiles.schedule_note is not excluded.schedule_note
-      then excluded.current_phase
-    when source_schedule_profiles.current_phase = 'uninitialized' then excluded.current_phase
-    else source_schedule_profiles.current_phase
-  end,
-  next_check_at = case
-    when source_schedule_profiles.cycle_frequency is not excluded.cycle_frequency
-      or source_schedule_profiles.expected_open_months_json is not excluded.expected_open_months_json
-      or source_schedule_profiles.last_known_open_at is not excluded.last_known_open_at
-      or source_schedule_profiles.active_lead_days is not excluded.active_lead_days
-      or source_schedule_profiles.active_check_interval_hours is not excluded.active_check_interval_hours
-      or source_schedule_profiles.warmup_check_interval_hours is not excluded.warmup_check_interval_hours
-      or source_schedule_profiles.dormant_check_interval_days is not excluded.dormant_check_interval_days
-      or source_schedule_profiles.discovery_check_interval_hours is not excluded.discovery_check_interval_hours
-      or source_schedule_profiles.source_volatility is not excluded.source_volatility
-      or source_schedule_profiles.discovery_queries_json is not excluded.discovery_queries_json
-      or source_schedule_profiles.schedule_note is not excluded.schedule_note
-      then excluded.next_check_at
-    else source_schedule_profiles.next_check_at
-  end,
-  next_discovery_at = case
-    when source_schedule_profiles.cycle_frequency is not excluded.cycle_frequency
-      or source_schedule_profiles.expected_open_months_json is not excluded.expected_open_months_json
-      or source_schedule_profiles.last_known_open_at is not excluded.last_known_open_at
-      or source_schedule_profiles.active_lead_days is not excluded.active_lead_days
-      or source_schedule_profiles.active_check_interval_hours is not excluded.active_check_interval_hours
-      or source_schedule_profiles.warmup_check_interval_hours is not excluded.warmup_check_interval_hours
-      or source_schedule_profiles.dormant_check_interval_days is not excluded.dormant_check_interval_days
-      or source_schedule_profiles.discovery_check_interval_hours is not excluded.discovery_check_interval_hours
-      or source_schedule_profiles.source_volatility is not excluded.source_volatility
-      or source_schedule_profiles.discovery_queries_json is not excluded.discovery_queries_json
-      or source_schedule_profiles.schedule_note is not excluded.schedule_note
-      then excluded.next_discovery_at
-    else source_schedule_profiles.next_discovery_at
-  end,
+  current_phase = source_schedule_profiles.current_phase,
+  next_check_at = source_schedule_profiles.next_check_at,
+  next_discovery_at = source_schedule_profiles.next_discovery_at,
   schedule_note = excluded.schedule_note,
   curated_status = excluded.curated_status,
   curated_status_reviewed_at = excluded.curated_status_reviewed_at,
@@ -711,6 +681,106 @@ function createVerifiedScheduleOverrides() {
       ],
       scheduleNote:
         'The 2027 Engineering Fellowship is open through January 31, 2027 and reviewed on a rolling basis. Monitor the direct Ashby application daily and search for replacement postings if it moves.',
+    },
+  ],
+  [
+    'contrary-research-fellowship',
+    {
+      cycleFrequency: 'multiple_per_year',
+      expectedOpenMonths: [3, 6, 9, 12],
+      lastKnownOpenAt: '2026-10-12',
+      activeLeadDays: 90,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 21,
+      discoveryCheckIntervalHours: 72,
+      sourceVolatility: 'stable_application_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_program_page', 'site:research.contrary.com/fellowship "Contrary Research Fellowship"', 'Confirm rolling status and the current quarterly deadline.'),
+        createDiscoveryQuery('official_application', 'site:contrarycap.typeform.com/research "Research Fellowship"', 'Confirm the direct application remains available.'),
+      ],
+      scheduleNote:
+        'Applications are rolling and reviewed at the end of each quarter. The current official Q4 deadline is December 9, 2026; monitor daily through that date and require an official update before carrying a quarterly deadline forward.',
+    },
+  ],
+  [
+    'contrary-venture-partner-program',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [8, 9],
+      lastKnownOpenAt: '2026-08-23',
+      activeLeadDays: 75,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 72,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_announcement', 'site:contrary.com/blog "Venture Partner Applications" 2027', 'Find the next official student Venture Partner cycle.'),
+        createDiscoveryQuery('official_application', 'site:contrarycap.typeform.com "Venture Partner" 2027', 'Find the next direct application after Contrary announces it.'),
+      ],
+      scheduleNote:
+        'The 2026 application closed September 13. Begin discovery in August 2027 and never treat the expired 2026 Typeform as proof that a new cycle is open.',
+    },
+  ],
+  [
+    'z-fellows',
+    {
+      cycleFrequency: 'rolling',
+      expectedOpenMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+      lastKnownOpenAt: '2026-10-12',
+      activeLeadDays: 45,
+      activeCheckIntervalHours: 72,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 14,
+      discoveryCheckIntervalHours: 168,
+      sourceVolatility: 'stable_application_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_program_page', 'site:zfellows.com "Applications are reviewed on a rolling basis"', 'Confirm the rolling cohort model remains active.'),
+        createDiscoveryQuery('official_application', 'site:docs.google.com/forms "Z Fellows" "currently accepting applications"', 'Confirm the current application form still names an active cohort year.'),
+      ],
+      scheduleNote:
+        'The official site and form confirm rolling 2026 applications with multiple cohorts each year. Check the stable page every three days and verify the application year when the calendar changes.',
+    },
+  ],
+  [
+    'neo-scholars',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [],
+      lastKnownOpenAt: null,
+      activeLeadDays: 120,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 168,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_program_page', 'site:neo.com/scholars "Neo Scholars" "Apply"', 'Check whether Neo Scholars has opened a new application cycle.'),
+        createDiscoveryQuery('official_application', 'site:portal.neo.com scholars application', 'Find the current Scholars application without confusing it with Neo Residency.'),
+      ],
+      scheduleNote:
+        'The current Neo Scholars deadline has passed. Search weekly for a new Scholars cycle and keep separate Neo Residency dates from changing the Scholars status.',
+    },
+  ],
+  [
+    'recurse-center',
+    {
+      cycleFrequency: 'rolling',
+      expectedOpenMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+      lastKnownOpenAt: '2026-10-12',
+      activeLeadDays: 30,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 14,
+      discoveryCheckIntervalHours: 168,
+      sourceVolatility: 'stable_application_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_application', 'site:recurse.com/apply "deadline to apply on time"', 'Confirm the next rolling batch deadline.'),
+        createDiscoveryQuery('official_batch_schedule', 'site:recurse.com/apply "Accepting applications"', 'Confirm which upcoming Recurse Center batches are accepting applications.'),
+      ],
+      scheduleNote:
+        'Applications remain open year-round while on-time deadlines move about every six weeks. Monitor daily near the current October 18 deadline and refresh the curated deadline after each batch transition.',
     },
   ],
   [

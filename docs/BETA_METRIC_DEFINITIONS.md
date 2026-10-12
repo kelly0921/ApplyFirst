@@ -10,6 +10,8 @@ ApplyFirst evaluates the beta in this order:
 
 Unless stated otherwise, Maintainer Mode reports a rolling 30-day window. Raw counts and denominators are primary because the beta is small. Missing answers are unknown, not negative outcomes.
 
+The dashboard recalculates from D1 on every request and refreshes once per minute while the Beta Metrics view is visible. Product-event windows use the bounded client occurrence timestamp, falling back to the server-created timestamp. Recording a valid event also advances the workspace's last-seen timestamp.
+
 > **Relevance is a judgment. Applying is an event. Watching is an ongoing preference.**
 
 These dimensions are measured independently. A student may apply more than once, remain watched after a non-selection, or identify a program as useful for a future cycle. Save remains a personal bookmark rather than an alert or application state.
@@ -138,6 +140,7 @@ These dimensions are measured independently. A student may apply more than once,
 - Measures: returned after delivery, clicked that program's official source, gave alert feedback, or reported an external action after delivery.
 - N/A: no eligible alert exposure or all exposure windows are still immature.
 - A student with no relevant program change is not a retention failure.
+- Both legacy opening alerts and proactive immediate/digest deliveries are included. A return may be a product event, alert feedback, official-source click, or recorded application attempt after delivery.
 
 ### Setup Completion
 
@@ -182,6 +185,7 @@ These dimensions are measured independently. A student may apply more than once,
 - Numerator: `inaccurate` alert-feedback events.
 - Context: distinct reporting watchers and sent delivery count in the same window.
 - A report is a review signal until confirmed by an audit.
+- Feedback from both legacy alerts and proactive immediate/digest deliveries is included.
 
 ### Detection-to-Notification Latency
 
@@ -201,7 +205,8 @@ These dimensions are measured independently. A student may apply more than once,
 Report:
 
 - enabled programs monitored;
-- active watchers and distinct watched programs;
+- active alert profiles, counted as distinct active My Focus email setups;
+- explicit program watches, reported separately as student-program pairs, students, and programs;
 - automatic versus manual-review alert candidates;
 - failed source checks requiring intervention;
 - delivery failures;
@@ -210,6 +215,8 @@ Report:
 
 Operational time is a lightweight manual estimate, not precise timekeeping. The dashboard shows the seven-day total for current burden and retains a 30-day breakdown.
 If no time entry exists for the period, the dashboard reports `N/A`, not `0h`.
+
+Proactive-delivery evaluation counts are run-level diagnostics and may count the same recipient in multiple scheduled runs. Distinct recipients reached and actual delivery attempts are reported separately so evaluation volume is never presented as unique students.
 
 ## Product Diagnostics
 

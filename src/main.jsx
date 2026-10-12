@@ -3085,6 +3085,53 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
     }
   };
 
+  useEffect(() => {
+    if (!canLoad || activeMaintainerSection !== 'insights') {
+      return undefined;
+    }
+
+    let disposed = false;
+    let refreshInFlight = false;
+
+    const refreshMetrics = async () => {
+      if (refreshInFlight || document.hidden) return;
+      refreshInFlight = true;
+
+      try {
+        const payload = await fetchMaintainerJson({
+          workerBaseUrl,
+          adminToken,
+          path: '/analytics/summary',
+          method: 'GET',
+        });
+        if (!disposed) {
+          setBetaMetrics(payload);
+          setLastRefreshedAt(payload.generatedAt || new Date().toISOString());
+        }
+      } catch (error) {
+        if (!disposed) {
+          setErrorMessage(`Metrics refresh failed: ${error.message}`);
+        }
+      } finally {
+        refreshInFlight = false;
+      }
+    };
+
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') refreshMetrics();
+    };
+
+    refreshMetrics();
+    const timer = window.setInterval(refreshMetrics, 60 * 1000);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [activeMaintainerSection, adminToken, canLoad, workerBaseUrl]);
+
   const loadParticipantPage = async (offset) => {
     setBetaParticipantsLoading(true);
     setErrorMessage('');
@@ -3717,6 +3764,7 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
           {activeMaintainerSection === 'insights' && betaMetrics ? (
             <BetaMetricsPanel
               metrics={betaMetrics}
+              refreshedAt={lastRefreshedAt}
               participants={betaParticipants}
               participantsLoading={betaParticipantsLoading}
               onParticipantPageChange={loadParticipantPage}
@@ -3740,6 +3788,7 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
 
 function BetaMetricsPanel({
   metrics,
+  refreshedAt,
   participants,
   participantsLoading,
   onParticipantPageChange,
@@ -3763,6 +3812,7 @@ function BetaMetricsPanel({
   const lifecycleWatches = lifecycle.watches ?? {};
   const lifecyclePersistence = lifecycle.persistentValue ?? {};
   const proactiveDelivery = metrics.proactiveDelivery ?? {};
+  const metricFreshness = metrics.metricFreshness ?? {};
   const proactiveSummary = proactiveDelivery.summary ?? {};
   const proactiveValue = proactiveDelivery.studentValue ?? {};
   const proactiveEngagement = Object.fromEntries(
@@ -3855,7 +3905,10 @@ function BetaMetricsPanel({
           <span>Beta Metrics</span>
           <h2>What Value Is ApplyFirst Creating?</h2>
         </div>
-        <p>Current invite cohort plus the last {metrics.periodDays ?? 30} days of product evidence. Missing responses remain unknown.</p>
+        <p>
+          Current invite cohort plus the last {metrics.periodDays ?? 30} days of product evidence. Missing responses remain unknown.
+          {' '}Updated {formatDateTime(refreshedAt || metrics.generatedAt)}; refreshes every minute while open.
+        </p>
       </div>
       <BetaMetricSection title="Beta Intake" description="Waitlist interest reconciled with private invitations without storing raw email in analytics.">
         <dl className="beta-evidence-grid">
@@ -3897,7 +3950,15 @@ function BetaMetricsPanel({
           <BetaEvidenceMetric metric={{
             label: 'Delivery Success',
             value: formatCountOf(proactiveSummary.sent ?? 0, proactiveSummary.attemptedDeliveries ?? 0),
-            detail: `${proactiveSummary.eligibleRecipients ?? 0} eligible · ${proactiveSummary.failed ?? 0} failed · ${proactiveSummary.noMatch ?? 0} no strong match · ${proactiveSummary.duplicateSuppressed ?? 0} duplicate sends blocked · ${proactiveSummary.unsubscribedRecipients ?? 0} unsubscribed`,
+            detail: `${proactiveSummary.reachedRecipients ?? 0} distinct recipients reached · ${proactiveSummary.failed ?? 0} failed · ${proactiveSummary.unsubscribedRecipients ?? 0} unsubscribed`,
+          }} />
+          <BetaEvidenceMetric metric={{
+            label: 'Evaluated / Matched',
+            value: formatCountOf(
+              proactiveSummary.eligibleRecipientEvaluations ?? 0,
+              proactiveSummary.consideredRecipientEvaluations ?? 0,
+            ),
+            detail: `${proactiveSummary.noMatch ?? 0} no strong match · ${proactiveSummary.duplicateSuppressed ?? 0} duplicate sends blocked; run-level evaluations may repeat recipients`,
           }} />
           <BetaEvidenceMetric metric={{
             label: 'Immediate / Digest',
@@ -4096,7 +4157,8 @@ function BetaMetricsPanel({
       <BetaMetricSection title="Operational Burden" description="Human work required to keep the beta accurate and useful.">
         <dl className="beta-operations-strip">
           <BetaEvidenceMetric metric={{ label: 'Programs Monitored', value: operations.monitoredPrograms ?? 0, detail: 'Enabled official sources' }} />
-          <BetaEvidenceMetric metric={{ label: 'Active Watchers', value: operations.activeWatchers ?? 0, detail: `${operations.watchedPrograms ?? 0} watched programs` }} />
+          <BetaEvidenceMetric metric={{ label: 'Active Alert Profiles', value: operations.activeAlertProfiles ?? 0, detail: 'Distinct active My Focus email setups' }} />
+          <BetaEvidenceMetric metric={{ label: 'Explicit Watches', value: operations.explicitWatchPairs ?? 0, detail: `${operations.explicitWatchers ?? 0} students · ${operations.explicitlyWatchedPrograms ?? 0} programs` }} />
           <BetaEvidenceMetric metric={{ label: 'Manual Alert Review', value: formatCountOf(reliability.alertCandidates?.manualReview, reliability.alertCandidates?.total), detail: `${reliability.alertCandidates?.automatic ?? 0} automatic · ${reliability.alertCandidates?.total ?? 0} total` }} />
           <BetaEvidenceMetric metric={{ label: 'Failed Checks', value: reliability.failedChecks ?? 0, detail: 'Sources requiring intervention' }} />
           <BetaEvidenceMetric metric={{ label: 'URL Review Queue', value: reliability.pendingDiscoveryReview ?? 0, detail: 'Discovery candidates awaiting review' }} />
@@ -4142,6 +4204,15 @@ function BetaMetricsPanel({
               <div><dt>Alert Marked Useful</dt><dd>{engagement.useful?.events ?? 0}</dd></div>
               <div><dt>Historical: Applied Earlier</dt><dd>{outcomes.applied_earlier ?? 0}</dd></div>
               <div><dt>Waitlist Demand</dt><dd>{metrics.waitlist?.uniqueEmails ?? '-'}</dd></div>
+            </dl>
+          </section>
+          <section>
+            <h3>Data Freshness</h3>
+            <dl>
+              <div><dt>Product Activity</dt><dd>{metricFreshness.latestProductActivityAt ? formatDateTime(metricFreshness.latestProductActivityAt) : 'No data'}</dd></div>
+              <div><dt>Source Check</dt><dd>{metricFreshness.latestSourceCheckAt ? formatDateTime(metricFreshness.latestSourceCheckAt) : 'No data'}</dd></div>
+              <div><dt>Proactive Delivery</dt><dd>{metricFreshness.latestProactiveDeliveryAt ? formatDateTime(metricFreshness.latestProactiveDeliveryAt) : 'No data'}</dd></div>
+              <div><dt>Waitlist Signup</dt><dd>{metricFreshness.latestWaitlistSignupAt ? formatDateTime(metricFreshness.latestWaitlistSignupAt) : 'No data'}</dd></div>
             </dl>
           </section>
         </div>

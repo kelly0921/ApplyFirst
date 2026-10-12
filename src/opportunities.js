@@ -2378,6 +2378,175 @@ export const opportunities = [
     lastChecked: '2026-08-22',
   },
   {
+    id: 'contrary-research-fellowship',
+    name: 'Contrary Research Fellowship',
+    organization: 'Contrary',
+    category: 'Startup / VC Fellowship',
+    classYears: ['All class years'],
+    timing: 'Rolling',
+    status: 'open',
+    confidence: 'high',
+    funding: 'Not listed',
+    location: 'Not specified',
+    url: 'https://research.contrary.com/fellowship',
+    applicationUrl: 'https://contrarycap.typeform.com/research',
+    previousUrl: '',
+    openDate: 'Applications are accepted on a rolling basis and reviewed at the end of each quarter',
+    deadline: 'December 9, 2026 for the Q4 cohort',
+    tags: ['Venture capital', 'Investment research', 'Writing', 'Startups'],
+    description:
+      'The Contrary Research Fellowship is a three-month program for tech-literate researchers and writers who want to study private technology companies, markets, and emerging sectors. Fellows publish company reports, and strong participants may advance to Senior Fellow work with Contrary\'s investment team.',
+    eligibilitySummary:
+      'The official page asks for sharp, tech-literate applicants but does not publish a class-year, location, or degree requirement.',
+    experienceSummary:
+      'Fellows research and write company reports during a three-month cohort; promoted Senior Fellows collaborate on deeper market analysis with the investment team.',
+    detailBasis:
+      'The official Contrary Research page confirms rolling applications, three-month cohorts, quarterly review timing, and the December 9, 2026 Q4 deadline.',
+    why:
+      'A distinctive route into startup research and venture analysis for students who want an alternative to a conventional finance or technology role.',
+    prep:
+      'Prepare concise writing samples and examples of company or market research that show independent judgment.',
+    sourceNote:
+      'Official Contrary Research page confirms rolling applications, three-month cohorts, quarterly review, and the December 9, 2026 Q4 deadline.',
+    lastChecked: '2026-10-12',
+    statusReviewedAt: '2026-10-12T13:00:00.000Z',
+  },
+  {
+    id: 'contrary-venture-partner-program',
+    name: 'Venture Partner Program',
+    organization: 'Contrary',
+    category: 'Startup / VC Fellowship',
+    classYears: ['All class years'],
+    timing: 'Fall',
+    status: 'watching',
+    confidence: 'high',
+    funding: 'Not listed',
+    location: 'Universities across the United States and Canada',
+    url: 'https://contrary.com/blog/venture-partner-apps-2026',
+    applicationUrl: 'https://contrarycap.typeform.com/ContraryVP2026',
+    previousUrl: '',
+    openDate: 'The 2026 application closed; watch late summer for the next student cohort',
+    deadline: 'Closed September 13, 2026 at 11:59 PM PT for the previous cycle',
+    tags: ['Venture capital', 'Finance', 'Startups', 'Founders', 'Campus community', 'Technology'],
+    description:
+      'Contrary Venture Partners are student connectors and investors who find promising founders on campus, research technology markets, and learn how early-stage companies are evaluated and supported. The role is a school-year commitment that continues through graduation.',
+    eligibilitySummary:
+      'Undergraduate and graduate students at universities across the United States and Canada; Contrary generally prefers applicants with more than one year of school remaining.',
+    experienceSummary:
+      'Students source and support founders, study technology and markets, learn venture investing, and join a long-term network of builders and investors.',
+    detailBasis:
+      'Contrary\'s official 2026 announcement confirms the student audience, U.S. and Canada coverage, school-year commitment, selection process, and previous September 13 deadline.',
+    why:
+      'A selective, recurring path into startups and venture work that students are unlikely to find through ordinary internship boards.',
+    prep:
+      'Build a point of view on early-stage technology, prepare examples of founder or campus-community involvement, and be ready to discuss how you identify exceptional builders.',
+    sourceNote:
+      'Official Contrary announcement confirms the 2026 cycle closed September 13, 2026. Monitor the official site for the next student Venture Partner application rather than reusing the expired form.',
+    lastChecked: '2026-10-12',
+    statusReviewedAt: '2026-10-12T13:00:00.000Z',
+  },
+  {
+    id: 'z-fellows',
+    name: 'Z Fellows',
+    organization: 'Z Fellows',
+    category: 'Startup / VC Fellowship',
+    classYears: ['All class years'],
+    timing: 'Rolling',
+    status: 'open',
+    confidence: 'high',
+    funding: 'Optional $10,000 investment',
+    location: 'Mostly virtual; final day in San Francisco or New York City',
+    url: 'https://www.zfellows.com/',
+    applicationUrl: 'https://docs.google.com/forms/d/1z5HG9Pj0hIxS2oZL_wcJS5QqDZlcVbkhYGHp5Kp_IGM/viewform',
+    previousUrl: '',
+    openDate: 'Applications are reviewed on a rolling basis for multiple cohorts each year',
+    deadline: 'No application deadline is listed',
+    tags: ['Founders', 'Startups', 'Technical builders', 'Product', 'Mentorship'],
+    description:
+      'Z Fellows is a one-week founder program for very early technical builders working on side projects or startups. Ten participants meet experienced founders, pressure-test what they are building, and enter a longer-term support network that continues after the cohort.',
+    eligibilitySummary:
+      'Technical builders of any age may apply, including college students. Applicants may be solo, have co-founders, or still be developing the project they want to pursue.',
+    experienceSummary:
+      'Cohorts are mostly virtual, with the final day in San Francisco or New York City. Participants can join without funding or optionally accept a $10,000 investment at a $1 billion valuation cap.',
+    detailBasis:
+      'The official site and current 2026 application confirm the one-week model, rolling review, multiple yearly cohorts, location format, applicant range, and optional investment terms.',
+    why:
+      'One of the clearest founder-first opportunities in ApplyFirst\'s scope and a strong alternative to traditional internship or new-grad recruiting.',
+    prep:
+      'Prepare a concise description of what you are building, the problem it solves, your ability to execute, and links that demonstrate prior technical or entrepreneurial work.',
+    sourceNote:
+      'Official Z Fellows sources confirm 2026 cohorts are accepting applications on a rolling basis with no deadline and that applicants can participate without taking the optional investment.',
+    lastChecked: '2026-10-12',
+    statusReviewedAt: '2026-10-12T13:00:00.000Z',
+  },
+  {
+    id: 'neo-scholars',
+    name: 'Neo Scholars',
+    organization: 'Neo',
+    category: 'Startup / VC Fellowship',
+    classYears: ['All class years'],
+    timing: 'Rolling',
+    status: 'watching',
+    confidence: 'high',
+    funding: 'Optional $40,000 equity-free Residency grant',
+    location: 'Mentorship community with optional San Francisco Residency',
+    url: 'https://neo.com/scholars',
+    previousUrl: '',
+    openDate: 'The current Neo Scholars application deadline has passed; watch for the next cycle',
+    deadline: 'The next Neo Scholars deadline has not been posted',
+    tags: ['Computer science', 'Software engineering', 'Founders', 'Startups', 'Mentorship'],
+    description:
+      'Neo Scholars supports college computer science students who may become startup founders or technical leaders. Scholars receive founder mentorship, startup recruiting introductions, a technical peer community, and the option to build through Neo Residency.',
+    eligibilitySummary:
+      'College students who excel at computer science; future-cycle eligibility and application timing should be reconfirmed when Neo reopens applications.',
+    experienceSummary:
+      'Scholars receive mentorship, direct access to startup leaders, accelerated startup recruiting, and community events. Student teams admitted to the optional three-month Neo Residency can receive a $40,000 equity-free grant and San Francisco workspace.',
+    detailBasis:
+      'The official Neo Scholars page confirms the college CS audience, mentorship and recruiting model, optional Residency support, and that the current Scholars deadline has passed.',
+    why:
+      'A high-signal technical founder path that combines startup access, mentorship, and an alternative route to early career momentum.',
+    prep:
+      'Prepare strong technical project evidence, examples of ambitious building, and a clear explanation of whether you want to join a startup or pursue a founder idea.',
+    sourceNote:
+      'Official Neo page says the current Scholars deadline has passed. Keep this monitored until Neo publishes a new Scholars application and do not substitute the separate Residency cycle.',
+    lastChecked: '2026-10-12',
+    statusReviewedAt: '2026-10-12T13:00:00.000Z',
+  },
+  {
+    id: 'recurse-center',
+    name: 'Recurse Center',
+    organization: 'Recurse Center',
+    category: 'Full-Time Alternative',
+    classYears: ['All class years'],
+    timing: 'Rolling',
+    status: 'deadlineSoon',
+    confidence: 'high',
+    funding: 'Free program',
+    location: 'Brooklyn, NY or remote worldwide',
+    url: 'https://www.recurse.com/apply',
+    applicationUrl: 'https://www.recurse.com/apply/retreat',
+    previousUrl: '',
+    openDate: 'Applications are always open and new batches begin about every six weeks',
+    deadline: 'October 18, 2026 for on-time consideration for the next batch',
+    tags: ['Software engineering', 'Programming', 'Independent learning', 'Community', 'Career transition'],
+    description:
+      'Recurse Center is a free, self-directed programming retreat where participants spend six or twelve full-time weeks becoming better programmers, building projects, learning with peers, and joining a lasting technical community. It is not a bootcamp or conventional job program.',
+    eligibilitySummary:
+      'Programmers at different career and education stages may apply. The application asks for code written from scratch, programming background, learning goals, and availability for a full-time commitment.',
+    experienceSummary:
+      'Participants attend at the Brooklyn hub or remotely worldwide, choose their own technical work, pair with peers, and participate during core weekday hours. Accepted applicants can choose an upcoming batch with available space.',
+    detailBasis:
+      'The official application page confirms rolling applications, six- and twelve-week formats, six-week batch cadence, Brooklyn or remote attendance, and the October 18 on-time deadline for the next batch.',
+    why:
+      'A credible full-time alternative for technical students and recent graduates who want deep programming growth and community outside a traditional corporate role.',
+    prep:
+      'Choose a project or technical area you genuinely want to explore, prepare a small program written from scratch, and explain how full-time participation would differ from learning alone.',
+    sourceNote:
+      'Official Recurse Center page says applications are always open, batches begin every six weeks, and October 18, 2026 is the on-time deadline for the next available batch.',
+    lastChecked: '2026-10-12',
+    statusReviewedAt: '2026-10-12T13:00:00.000Z',
+  },
+  {
     id: 'hrt-women-trading-technology',
     name: 'Women in Trading & Technology (WiTTI)',
     organization: 'Hudson River Trading',

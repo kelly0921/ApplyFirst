@@ -549,6 +549,7 @@ The Cloudflare watch Worker adds the first durable monitoring path:
 - The student UI keeps Text disabled unless `VITE_TEXT_ALERTS_ENABLED=true`, so SMS can be implemented in the Worker without promising live text alerts before provider setup is complete.
 - Cron Triggers run every 30 minutes, but source selection is due-based.
 - Source schedules move between `dormant`, `warmup`, `active`, and `unknown` phases based on expected opening months, current status, and watcher demand.
+- Seed sync updates schedule policy and curated source metadata, but preserves monitor-owned runtime fields (`current_phase`, `next_check_at`, and `next_discovery_at`) for existing programs. Newly inserted programs remain immediately due so the scheduler can initialize them.
 - Dormant records back off to monthly checks, warmup records check weekly or more often, active watched records check daily, and fetch failures back off instead of retrying every cron tick.
 - Source checks save snapshots, compare hashes, classify opening/deadline signals, update `program_alert_states`, update the next due check, and create alert candidates only when the program enters an alert-worthy state.
 

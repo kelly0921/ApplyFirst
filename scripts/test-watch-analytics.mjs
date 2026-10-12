@@ -145,6 +145,46 @@ function createStatement(query) {
         return { total: 12, active7Days: 9, active30Days: 11 };
       }
 
+      if (/as recipientsWithBatch/i.test(query)) {
+        return {
+          recipientsWithBatch: 4,
+          reachedRecipients: 3,
+          attemptedDeliveries: 5,
+          sent: 4,
+          failed: 1,
+          skipped: 0,
+          immediate: 3,
+          digest: 2,
+        };
+      }
+
+      if (/sum\(considered_recipient_count\) as consideredRecipients/i.test(query)) {
+        return {
+          consideredRecipients: 12,
+          eligibleRecipients: 7,
+          noMatch: 3,
+          duplicateSuppressed: 2,
+        };
+      }
+
+      if (/as profiles[\s\S]*from watch_requests/i.test(query)) {
+        return { profiles: 5 };
+      }
+
+      if (/from \([\s\S]*select status, created_at from alert_deliveries/i.test(query)) {
+        return { total: 9, failed: 1, sent: 8 };
+      }
+
+      if (/as latestProductActivityAt/i.test(query)) {
+        return {
+          latestProductActivityAt: '2026-10-04T12:00:00.000Z',
+          latestSourceCheckAt: '2026-10-04T11:00:00.000Z',
+          latestProactiveDeliveryAt: '2026-10-04T10:00:00.000Z',
+          latestStudentEvidenceAt: '2026-10-03T12:00:00.000Z',
+          latestApplicationAttemptAt: '2026-10-02T12:00:00.000Z',
+        };
+      }
+
       if (/having count\(distinct event_name\) = 3/i.test(query)) {
         return { count: 7 };
       }
@@ -185,7 +225,7 @@ function createStatement(query) {
       }
 
       if (/from beta_program_watches/i.test(query) && /as programPairs/i.test(query)) {
-        return { students: 4, programPairs: 6 };
+        return { students: 4, programPairs: 6, programs: 5 };
       }
 
       if (/from beta_invitations invitation/i.test(query)) {
@@ -315,7 +355,7 @@ function createStatement(query) {
         return { results: [{ programId: 'example-program', views: 10, saves: 5, sourceClicks: 3 }] };
       }
 
-      if (/from alert_engagement_events/i.test(query)) {
+      if (/with engagement as/i.test(query) && /group by action/i.test(query)) {
         return { results: [{ action: 'useful', participants: 2, events: 2 }] };
       }
 
@@ -323,7 +363,7 @@ function createStatement(query) {
         return { results: [{ label: 'product_only', students: 3, records: 4 }] };
       }
 
-      if (/workspace\.tester_segment/i.test(query)) {
+      if (/from beta_program_evidence evidence/i.test(query) && /group by testerSegment/i.test(query)) {
         return {
           results: [{
             testerSegment: 'independent_waitlist',
@@ -403,6 +443,21 @@ function createStatement(query) {
               latestOutcome: 'found_relevant_program',
             },
           ],
+        };
+      }
+
+      if (/with delivery_items as/i.test(query)) {
+        return {
+          results: [{
+            deliveryId: 'proactive:delivery-item-1',
+            workspaceId: 'workspace-1',
+            programId: 'example-program',
+            sentAt: '2026-09-01T00:00:00.000Z',
+            returned: 1,
+            sourceClicked: 1,
+            feedbackGiven: 1,
+            externalAction: 1,
+          }],
         };
       }
 
@@ -521,6 +576,7 @@ assert.equal(eventPayload.ok, true);
 const insertEventQuery = queries.find((statement) => /insert or ignore into beta_product_events/i.test(statement.query));
 assert.ok(insertEventQuery);
 assert.equal(insertEventQuery.bindings[3], 'program_saved');
+assert.ok(queries.some((statement) => /update beta_access_workspaces[\s\S]*set last_seen_at/i.test(statement.query)));
 assert.deepEqual(JSON.parse(insertEventQuery.bindings[6]), {
   view: 'programs',
   source: '',
@@ -731,6 +787,17 @@ assert.equal(summary.programLifecycle.watches.programPairs, 6);
 assert.equal(summary.programLifecycle.persistentValue.appliedAndWatching, 3);
 assert.equal(summary.programLifecycle.persistentValue.notSelectedAndWatching, 1);
 assert.equal(summary.programLifecycle.persistentValue.futureCycleAndWatching, 2);
+assert.equal(summary.independentUsability.relevantWindowReturn.returnedStudents, 1);
+assert.equal(summary.reliability.deliveries.total, 9);
+assert.equal(summary.reliability.deliveries.failed, 1);
+assert.equal(summary.operations.activeAlertProfiles, 5);
+assert.equal(summary.operations.explicitWatchPairs, 6);
+assert.equal(summary.operations.explicitlyWatchedPrograms, 5);
+assert.equal(summary.proactiveDelivery.summary.recipientsWithBatch, 4);
+assert.equal(summary.proactiveDelivery.summary.reachedRecipients, 3);
+assert.equal(summary.proactiveDelivery.summary.eligibleRecipientEvaluations, 7);
+assert.equal(summary.proactiveDelivery.summary.consideredRecipientEvaluations, 12);
+assert.equal(summary.metricFreshness.latestProductActivityAt, '2026-10-04T12:00:00.000Z');
 
 const alertPreviewResponse = await watchWorker.fetch(
   new Request('https://worker.example/watch/candidates/candidate-1/send', {

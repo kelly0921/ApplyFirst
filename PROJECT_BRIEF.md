@@ -76,6 +76,16 @@ ApplyFirst should include:
 - Community / Prep Program: career prep programs, technical communities, mentorship, training, courses, and resource hubs.
 - Full-Time Alternative: new grad, recent grad, apprenticeship, bridge, and full-time alternative pathways.
 
+### Selection Standard
+
+ApplyFirst should stay intentionally narrower than a general early-career board. A program belongs in the core library when it fits at least one of these paths:
+
+- An underclassmen discovery or insight program that gives first- or second-year students meaningful access before traditional internship recruiting.
+- A startup, founder, venture, or selective fellowship that provides mentorship, community, funding, startup placement, or direct exposure to company building.
+- A credible new-grad or full-time alternative, such as a residency, retreat, apprenticeship, or fellowship, that offers a materially different path from applying to a normal corporate role.
+
+Being unusual is not enough on its own. The program still needs an official source, a meaningful U.S. path or U.S.-relevant access, clear student value, and enough recurring structure to monitor. Generic internships, conventional new-grad jobs, broad job feeds, and ordinary corporate roles remain out of scope. Corporate apprenticeships should only be included when the program itself is a distinctive career-launch route rather than another entry-level opening.
+
 Detailed distinctions such as externship, training program, placement fellowship, technical community, or special resource should live in tags, descriptions, and source notes rather than as separate public opportunity types.
 
 Role tracks for the current product:

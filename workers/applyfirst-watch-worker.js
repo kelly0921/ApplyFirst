@@ -26,6 +26,7 @@ const DEFAULT_SCHEDULED_DISCOVERY_QUERIES_PER_PROGRAM = 2;
 const DEFAULT_SCHEDULED_DISCOVERY_RESULTS_PER_QUERY = 3;
 const AUTO_SENDABLE_CONFIDENCES = new Set(['high']);
 const BETA_WORKSPACE_CODE_PATTERN = /^AF-[A-Z0-9][A-Z0-9-]{4,58}[A-Z0-9]$/;
+const PRODUCT_EVENT_TIME_SQL = "coalesce(nullif(occurred_at, ''), created_at)";
 const PRODUCT_EVENT_NAMES = new Set([
   'session_started',
   'search_used',
@@ -209,7 +210,7 @@ export default {
       runMonitoring(env, {
         limit: Number(env.WATCH_RUN_LIMIT || DEFAULT_MONITOR_LIMIT),
         trigger: controller.cron || 'scheduled',
-      }),
+      }).catch((error) => logScheduledMonitoringError(error, controller)),
     );
 
     if (shouldRunScheduledDiscoverySearch(env)) {
@@ -227,6 +228,16 @@ export default {
     }
   },
 };
+
+function logScheduledMonitoringError(error, controller) {
+  console.error(
+    JSON.stringify({
+      event: 'scheduled_monitoring_failed',
+      cron: cleanString(controller?.cron, 80),
+      error: cleanString(error?.message || String(error), 500),
+    }),
+  );
+}
 
 async function runScheduledDiscoverySearch(env, controller) {
   return runDiscoverySearch(env, {
@@ -703,6 +714,17 @@ async function recordProductEvent(env, body) {
       JSON.stringify(context),
       occurredAt,
     )
+    .run();
+
+  await env.DB.prepare(
+    `update beta_access_workspaces
+     set last_seen_at = case
+       when last_seen_at is null or last_seen_at < ? then ?
+       else last_seen_at
+     end
+     where id = ?`,
+  )
+    .bind(occurredAt, occurredAt, workspace.id)
     .run();
 
   return {
@@ -1624,13 +1646,27 @@ async function getBetaAnalyticsSummary(env) {
     invitations,
     programLifecycle,
     proactiveDelivery,
+    metricFreshness,
   ] = await Promise.all([
     env.DB.prepare(
       `select
         count(*) as total,
-        count(case when last_seen_at >= ? then 1 end) as active7Days,
-        count(case when last_seen_at >= ? then 1 end) as active30Days
-       from beta_access_workspaces`,
+        count(case when latest_activity_at >= ? then 1 end) as active7Days,
+        count(case when latest_activity_at >= ? then 1 end) as active30Days
+       from (
+         select workspace.id,
+           max(
+             coalesce(workspace.last_seen_at, ''),
+             coalesce(events.latest_event_at, ''),
+             workspace.created_at
+           ) as latest_activity_at
+         from beta_access_workspaces workspace
+         left join (
+           select workspace_id, max(${PRODUCT_EVENT_TIME_SQL}) as latest_event_at
+           from beta_product_events
+           group by workspace_id
+         ) events on events.workspace_id = workspace.id
+       )`,
     )
       .bind(since7Days, since30Days)
       .first(),
@@ -1639,7 +1675,7 @@ async function getBetaAnalyticsSummary(env) {
         count(distinct workspace_id) as participants,
         count(*) as events
        from beta_product_events
-       where created_at >= ?
+       where ${PRODUCT_EVENT_TIME_SQL} >= ?
          and event_name in (${funnelEvents.map(() => '?').join(', ')})
        group by event_name`,
     )
@@ -1650,7 +1686,7 @@ async function getBetaAnalyticsSummary(env) {
        from (
          select workspace_id
          from beta_product_events
-         where created_at >= ?
+         where ${PRODUCT_EVENT_TIME_SQL} >= ?
            and event_name in ('program_saved', 'focus_saved', 'alerts_enabled')
          group by workspace_id
          having count(distinct event_name) = 3
@@ -1663,9 +1699,9 @@ async function getBetaAnalyticsSummary(env) {
        from (
          select workspace_id
          from beta_product_events
-         where created_at >= ?
+         where ${PRODUCT_EVENT_TIME_SQL} >= ?
          group by workspace_id
-         having count(distinct substr(created_at, 1, 10)) >= 2
+         having count(distinct substr(${PRODUCT_EVENT_TIME_SQL}, 1, 10)) >= 2
        )`,
     )
       .bind(since30Days)
@@ -1676,7 +1712,7 @@ async function getBetaAnalyticsSummary(env) {
         count(*) as responses
        from beta_product_events
        where event_name = 'outcome_reported'
-         and created_at >= ?
+         and ${PRODUCT_EVENT_TIME_SQL} >= ?
        group by outcome`,
     )
       .bind(since30Days)
@@ -1685,7 +1721,7 @@ async function getBetaAnalyticsSummary(env) {
       `select count(distinct workspace_id) as count
        from beta_product_events
        where event_name = 'outcome_reported'
-         and created_at >= ?
+         and ${PRODUCT_EVENT_TIME_SQL} >= ?
          and outcome in ('found_relevant_program', 'applied_earlier')`,
     )
       .bind(since30Days)
@@ -1696,7 +1732,7 @@ async function getBetaAnalyticsSummary(env) {
         count(distinct case when event_name = 'program_saved' then workspace_id end) as saves,
         count(distinct case when event_name = 'official_source_clicked' then workspace_id end) as sourceClicks
        from beta_product_events
-       where created_at >= ?
+       where ${PRODUCT_EVENT_TIME_SQL} >= ?
          and program_id is not null
          and program_id != ''
          and event_name in ('program_viewed', 'program_saved', 'official_source_clicked')
@@ -1707,10 +1743,22 @@ async function getBetaAnalyticsSummary(env) {
       .bind(since30Days)
       .all(),
     env.DB.prepare(
-      `select action,
-        count(distinct watch_request_id) as participants,
+      `with engagement as (
+         select action,
+           'watch:' || watch_request_id as participant_id,
+           created_at
+         from alert_engagement_events
+         union all
+         select event.action,
+           'watch:' || batch.watch_request_id as participant_id,
+           event.created_at
+         from proactive_delivery_engagement_events event
+         inner join proactive_delivery_batches batch on batch.id = event.batch_id
+       )
+       select action,
+        count(distinct participant_id) as participants,
         count(*) as events
-       from alert_engagement_events
+       from engagement
        where created_at >= ?
        group by action`,
     )
@@ -1726,11 +1774,13 @@ async function getBetaAnalyticsSummary(env) {
     getBetaInvitationMetrics(env, since30Days),
     getProgramLifecycleMetrics(env, since30Days),
     getProactiveDeliveryMetrics(env, since30Days),
+    getMetricFreshness(env),
   ]);
 
   return {
     ok: true,
     generatedAt: new Date().toISOString(),
+    windowStartedAt: since30Days,
     periodDays: 30,
     workspaces: {
       total: Number(workspaceTotals?.total || 0),
@@ -1758,6 +1808,10 @@ async function getBetaAnalyticsSummary(env) {
     studentValue,
     programLifecycle,
     proactiveDelivery,
+    metricFreshness: {
+      ...metricFreshness,
+      latestWaitlistSignupAt: waitlistTotals.latestSignupAt || null,
+    },
     independentUsability: {
       ...independentUsability,
       setupCompleted30Days: Number(activatedResult?.count || 0),
@@ -1768,11 +1822,31 @@ async function getBetaAnalyticsSummary(env) {
   };
 }
 
+async function getMetricFreshness(env) {
+  const row = await env.DB.prepare(
+    `select
+      (select max(${PRODUCT_EVENT_TIME_SQL}) from beta_product_events) as latestProductActivityAt,
+      (select max(last_checked_at) from official_sources where enabled = 1) as latestSourceCheckAt,
+      (select max(coalesce(sent_at, attempted_at, created_at)) from proactive_delivery_batches) as latestProactiveDeliveryAt,
+      (select max(updated_at) from beta_program_evidence) as latestStudentEvidenceAt,
+      (select max(applied_at) from beta_application_attempts) as latestApplicationAttemptAt`,
+  ).first();
+
+  return {
+    latestProductActivityAt: row?.latestProductActivityAt || null,
+    latestSourceCheckAt: row?.latestSourceCheckAt || null,
+    latestProactiveDeliveryAt: row?.latestProactiveDeliveryAt || null,
+    latestStudentEvidenceAt: row?.latestStudentEvidenceAt || null,
+    latestApplicationAttemptAt: row?.latestApplicationAttemptAt || null,
+  };
+}
+
 async function getProactiveDeliveryMetrics(env, since30Days) {
   const [summaryRow, deliveryRows, engagementRows, downstreamRows, valueRow, unsubscribeRow, runRow] = await Promise.all([
     env.DB.prepare(
       `select
-        count(distinct watch_request_id) as eligibleRecipients,
+        count(distinct watch_request_id) as recipientsWithBatch,
+        count(distinct case when status = 'sent' then watch_request_id end) as reachedRecipients,
         count(*) as attemptedDeliveries,
         count(case when status = 'sent' then 1 end) as sent,
         count(case when status = 'failed' then 1 end) as failed,
@@ -1813,7 +1887,7 @@ async function getProactiveDeliveryMetrics(env, since30Days) {
         count(*) as events,
         count(distinct workspace_id) as students
        from beta_product_events
-       where created_at >= ?
+       where ${PRODUCT_EVENT_TIME_SQL} >= ?
          and json_extract(context_json, '$.entrySource') in (
            'watched_program_alert', 'personalized_discovery_digest', 'prepare_alert',
            'manual_library', 'search', 'direct_or_shared_link'
@@ -1859,6 +1933,7 @@ async function getProactiveDeliveryMetrics(env, since30Days) {
     env.DB.prepare(
       `select
         sum(considered_recipient_count) as consideredRecipients,
+        sum(eligible_recipient_count) as eligibleRecipients,
         sum(no_match_count) as noMatch,
         sum(duplicate_suppressed_count) as duplicateSuppressed
        from proactive_delivery_runs
@@ -1868,13 +1943,15 @@ async function getProactiveDeliveryMetrics(env, since30Days) {
 
   return {
     summary: {
-      eligibleRecipients: Number(summaryRow?.eligibleRecipients || 0),
+      recipientsWithBatch: Number(summaryRow?.recipientsWithBatch || 0),
+      reachedRecipients: Number(summaryRow?.reachedRecipients || 0),
+      eligibleRecipientEvaluations: Number(runRow?.eligibleRecipients || 0),
       attemptedDeliveries: Number(summaryRow?.attemptedDeliveries || 0),
       sent: Number(summaryRow?.sent || 0),
       failed: Number(summaryRow?.failed || 0),
       skipped: Number(summaryRow?.skipped || 0),
       unsubscribedRecipients: Number(unsubscribeRow?.recipients || 0),
-      consideredRecipients: Number(runRow?.consideredRecipients || 0),
+      consideredRecipientEvaluations: Number(runRow?.consideredRecipients || 0),
       noMatch: Number(runRow?.noMatch || 0),
       duplicateSuppressed: Number(runRow?.duplicateSuppressed || 0),
       immediate: Number(summaryRow?.immediate || 0),
@@ -2007,10 +2084,45 @@ async function getBetaParticipantActivity(env, url) {
     env.DB.prepare('select count(*) as total from beta_access_workspaces').first(),
     env.DB.prepare(
       `with workspace_page as (
-        select id, code_label, tester_segment, created_at, last_seen_at
-        from beta_access_workspaces
-        order by coalesce(last_seen_at, created_at) desc
+        select workspace.id, workspace.code_label, workspace.tester_segment,
+          workspace.created_at, workspace.last_seen_at,
+          max(
+            coalesce(workspace.last_seen_at, ''),
+            coalesce((
+              select max(coalesce(nullif(activity.occurred_at, ''), activity.created_at))
+              from beta_product_events activity
+              where activity.workspace_id = workspace.id
+            ), ''),
+            workspace.created_at
+          ) as latest_activity_at
+        from beta_access_workspaces workspace
+        order by latest_activity_at desc
         limit ? offset ?
+      ), relevant_deliveries as (
+        select
+          'legacy' as source_kind,
+          request.workspace_id as workspace_id,
+          candidate.program_id as program_id,
+          delivery.watch_request_id as watch_request_id,
+          delivery.alert_candidate_id as alert_candidate_id,
+          null as item_id,
+          delivery.sent_at as sent_at
+        from alert_deliveries delivery
+        inner join watch_requests request on request.id = delivery.watch_request_id
+        inner join alert_candidates candidate on candidate.id = delivery.alert_candidate_id
+        where delivery.status = 'sent' and request.workspace_id is not null
+        union all
+        select
+          'proactive' as source_kind,
+          batch.workspace_id as workspace_id,
+          item.program_id as program_id,
+          batch.watch_request_id as watch_request_id,
+          item.alert_candidate_id as alert_candidate_id,
+          item.id as item_id,
+          batch.sent_at as sent_at
+        from proactive_delivery_batches batch
+        inner join proactive_delivery_items item on item.batch_id = batch.id
+        where batch.status = 'sent' and batch.workspace_id is not null
       )
        select
         w.id as workspaceId,
@@ -2018,9 +2130,9 @@ async function getBetaParticipantActivity(env, url) {
         w.tester_segment as testerSegment,
         w.created_at as firstSeenAt,
         w.last_seen_at as lastSeenAt,
-        coalesce(max(e.created_at), w.last_seen_at, w.created_at) as latestActivityAt,
+        w.latest_activity_at as latestActivityAt,
         count(distinct e.session_id) as sessions,
-        count(distinct substr(e.created_at, 1, 10)) as activeDays,
+        count(distinct substr(coalesce(nullif(e.occurred_at, ''), e.created_at), 1, 10)) as activeDays,
         count(case when e.event_name = 'program_viewed' then 1 end) as programViews,
         count(distinct case when e.event_name = 'program_saved' then e.program_id end) as programsSaved,
         count(distinct case when e.event_name = 'watch_started' then e.program_id end) as programsWatched,
@@ -2063,33 +2175,57 @@ async function getBetaParticipantActivity(env, url) {
         ) as latestSupportLevel,
         exists(
           select 1
-          from alert_deliveries relevant_delivery
-          inner join watch_requests relevant_request on relevant_request.id = relevant_delivery.watch_request_id
-          where relevant_request.workspace_id = w.id
-            and relevant_delivery.status = 'sent'
-            and relevant_delivery.sent_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-48 hours')
+          from relevant_deliveries delivery
+          where delivery.workspace_id = w.id
+            and delivery.sent_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-48 hours')
         ) as relevantWindowEligible,
         exists(
           select 1
-          from alert_deliveries relevant_delivery
-          inner join watch_requests relevant_request on relevant_request.id = relevant_delivery.watch_request_id
-          inner join beta_product_events return_event on return_event.workspace_id = relevant_request.workspace_id
-          where relevant_request.workspace_id = w.id
-            and relevant_delivery.status = 'sent'
-            and relevant_delivery.sent_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-48 hours')
-            and return_event.created_at > relevant_delivery.sent_at
+          from relevant_deliveries delivery
+          where delivery.workspace_id = w.id
+            and delivery.sent_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-48 hours')
+            and (
+              exists (
+                select 1 from beta_product_events return_event
+                where return_event.workspace_id = w.id
+                  and coalesce(nullif(return_event.occurred_at, ''), return_event.created_at) > delivery.sent_at
+              )
+              or exists (
+                select 1 from beta_application_attempts attempt
+                where attempt.workspace_id = w.id
+                  and attempt.program_id = delivery.program_id
+                  and attempt.applied_at > delivery.sent_at
+              )
+              or (
+                delivery.source_kind = 'legacy'
+                and exists (
+                  select 1 from alert_engagement_events feedback
+                  where feedback.alert_candidate_id = delivery.alert_candidate_id
+                    and feedback.watch_request_id = delivery.watch_request_id
+                    and feedback.created_at > delivery.sent_at
+                )
+              )
+              or (
+                delivery.source_kind = 'proactive'
+                and exists (
+                  select 1 from proactive_delivery_engagement_events feedback
+                  where feedback.item_id = delivery.item_id
+                    and feedback.created_at > delivery.sent_at
+                )
+              )
+            )
         ) as relevantWindowReturned,
         (
           select outcome
           from beta_product_events outcome_event
           where outcome_event.workspace_id = w.id
             and outcome_event.event_name = 'outcome_reported'
-          order by outcome_event.created_at desc
+          order by coalesce(nullif(outcome_event.occurred_at, ''), outcome_event.created_at) desc
           limit 1
         ) as latestOutcome
        from workspace_page w
        left join beta_product_events e on e.workspace_id = w.id
-       group by w.id, w.code_label, w.tester_segment, w.created_at, w.last_seen_at
+       group by w.id, w.code_label, w.tester_segment, w.created_at, w.last_seen_at, w.latest_activity_at
        order by latestActivityAt desc`,
     )
       .bind(limit, offset)
@@ -2145,7 +2281,8 @@ async function getCaptureWaitlistTotals(env) {
     const row = await env.CAPTURE_DB.prepare(
       `select
         count(*) as total,
-        count(distinct lower(trim(email))) as uniqueEmails
+        count(distinct lower(trim(email))) as uniqueEmails,
+        max(created_at) as latestSignupAt
        from waitlist_requests
        where email is not null
          and trim(email) != ''
@@ -2155,6 +2292,7 @@ async function getCaptureWaitlistTotals(env) {
     return {
       total: Number(row?.total || 0),
       uniqueEmails: Number(row?.uniqueEmails || 0),
+      latestSignupAt: row?.latestSignupAt || null,
       available: true,
     };
   } catch (error) {
@@ -2617,36 +2755,80 @@ async function getIndependentUsabilityMetrics(env, since30Days) {
        group by workspace.id`,
     ).bind(since30Days).all(),
     env.DB.prepare(
-      `select
-        delivery.id as deliveryId,
-        request.workspace_id as workspaceId,
-        candidate.program_id as programId,
-        delivery.sent_at as sentAt,
-        max(case when event.created_at > delivery.sent_at then 1 else 0 end) as returned,
-        max(case
-          when event.event_name = 'official_source_clicked'
-            and event.program_id = candidate.program_id
-            and event.created_at > delivery.sent_at
-          then 1 else 0 end) as sourceClicked,
-        max(case when engagement.created_at > delivery.sent_at then 1 else 0 end) as feedbackGiven,
-        max(case
-          when attempt.applied_at > delivery.sent_at
-          then 1 else 0 end) as externalAction
-       from alert_deliveries delivery
-       inner join watch_requests request on request.id = delivery.watch_request_id
-       inner join alert_candidates candidate on candidate.id = delivery.alert_candidate_id
-       left join beta_product_events event on event.workspace_id = request.workspace_id
-       left join alert_engagement_events engagement
-         on engagement.alert_candidate_id = delivery.alert_candidate_id
-        and engagement.watch_request_id = delivery.watch_request_id
+      `with delivery_items as (
+         select
+           'legacy:' || delivery.id as delivery_id,
+           'legacy' as source_kind,
+           request.workspace_id as workspace_id,
+           candidate.program_id as program_id,
+           delivery.watch_request_id as watch_request_id,
+           delivery.alert_candidate_id as alert_candidate_id,
+           null as item_id,
+           delivery.sent_at as sent_at
+         from alert_deliveries delivery
+         inner join watch_requests request on request.id = delivery.watch_request_id
+         inner join alert_candidates candidate on candidate.id = delivery.alert_candidate_id
+         where delivery.status = 'sent'
+           and request.workspace_id is not null
+           and delivery.sent_at >= ?
+         union all
+         select
+           'proactive:' || item.id as delivery_id,
+           'proactive' as source_kind,
+           batch.workspace_id as workspace_id,
+           item.program_id as program_id,
+           batch.watch_request_id as watch_request_id,
+           item.alert_candidate_id as alert_candidate_id,
+           item.id as item_id,
+           batch.sent_at as sent_at
+         from proactive_delivery_batches batch
+         inner join proactive_delivery_items item on item.batch_id = batch.id
+         where batch.status = 'sent'
+           and batch.workspace_id is not null
+           and batch.sent_at >= ?
+       )
+       select
+         delivery.delivery_id as deliveryId,
+         delivery.workspace_id as workspaceId,
+         delivery.program_id as programId,
+         delivery.sent_at as sentAt,
+         max(case
+           when event.id is not null
+             or legacy_feedback.id is not null
+             or proactive_feedback.id is not null
+             or attempt.id is not null
+           then 1 else 0 end) as returned,
+         max(case
+           when (
+             event.event_name = 'official_source_clicked'
+             and event.program_id = delivery.program_id
+           )
+             or legacy_feedback.action = 'source_clicked'
+             or proactive_feedback.action = 'source_clicked'
+           then 1 else 0 end) as sourceClicked,
+         max(case
+           when legacy_feedback.id is not null or proactive_feedback.id is not null
+           then 1 else 0 end) as feedbackGiven,
+         max(case when attempt.id is not null then 1 else 0 end) as externalAction
+       from delivery_items delivery
+       left join beta_product_events event
+         on event.workspace_id = delivery.workspace_id
+        and coalesce(nullif(event.occurred_at, ''), event.created_at) > delivery.sent_at
+       left join alert_engagement_events legacy_feedback
+         on delivery.source_kind = 'legacy'
+        and legacy_feedback.alert_candidate_id = delivery.alert_candidate_id
+        and legacy_feedback.watch_request_id = delivery.watch_request_id
+        and legacy_feedback.created_at > delivery.sent_at
+       left join proactive_delivery_engagement_events proactive_feedback
+         on delivery.source_kind = 'proactive'
+        and proactive_feedback.item_id = delivery.item_id
+        and proactive_feedback.created_at > delivery.sent_at
        left join beta_application_attempts attempt
-         on attempt.workspace_id = request.workspace_id
-        and attempt.program_id = candidate.program_id
-       where delivery.status = 'sent'
-         and request.workspace_id is not null
-         and delivery.sent_at >= ?
-       group by delivery.id`,
-    ).bind(since30Days).all(),
+         on attempt.workspace_id = delivery.workspace_id
+        and attempt.program_id = delivery.program_id
+        and attempt.applied_at > delivery.sent_at
+       group by delivery.delivery_id`,
+    ).bind(since30Days, since30Days).all(),
   ]);
 
   return {
@@ -2685,7 +2867,19 @@ async function getReliabilityMetrics(env, since30Days) {
        where audit_type = 'known_opening' and created_at >= ?`,
     ).bind(since30Days).all(),
     env.DB.prepare(
-      `select candidate.id,
+      `with sent_candidates as (
+         select alert_candidate_id as candidate_id, sent_at
+         from alert_deliveries
+         where status = 'sent' and sent_at >= ?
+         union all
+         select item.alert_candidate_id as candidate_id, batch.sent_at
+         from proactive_delivery_batches batch
+         inner join proactive_delivery_items item on item.batch_id = batch.id
+         where batch.status = 'sent'
+           and batch.sent_at >= ?
+           and item.alert_candidate_id is not null
+       )
+       select candidate.id,
         coalesce(
           (
             select audit.detected_at
@@ -2701,13 +2895,11 @@ async function getReliabilityMetrics(env, since30Days) {
         candidate.created_at as candidateAt,
         min(delivery.sent_at) as sentAt,
         case when candidate.status in ('auto_ready', 'auto_sent') and candidate.reviewed_at is null then 'automatic' else 'manual' end as deliveryPath
-       from alert_candidates candidate
+       from sent_candidates delivery
+       inner join alert_candidates candidate on candidate.id = delivery.candidate_id
        inner join source_checks source_check on source_check.id = candidate.source_check_id
-       inner join alert_deliveries delivery
-         on delivery.alert_candidate_id = candidate.id and delivery.status = 'sent'
-       where candidate.created_at >= ?
        group by candidate.id`,
-    ).bind(since30Days).all(),
+    ).bind(since30Days, since30Days).all(),
     env.DB.prepare(
       `select
         count(*) as total,
@@ -2725,7 +2917,11 @@ async function getReliabilityMetrics(env, since30Days) {
         count(*) as total,
         count(case when status = 'failed' then 1 end) as failed,
         count(case when status = 'sent' then 1 end) as sent
-       from alert_deliveries
+       from (
+         select status, created_at from alert_deliveries
+         union all
+         select status, created_at from proactive_delivery_batches
+       ) deliveries
        where created_at >= ?`,
     ).bind(since30Days).first(),
     env.DB.prepare(
@@ -2768,7 +2964,7 @@ async function getReliabilityMetrics(env, since30Days) {
 }
 
 async function getOperationsMetrics(env, since7Days, since30Days) {
-  const [programs, watchers, time7Days, time30Days] = await Promise.all([
+  const [programs, alertProfiles, explicitWatches, time7Days, time30Days] = await Promise.all([
     env.DB.prepare('select count(*) as count from official_sources where enabled = 1').first(),
     env.DB.prepare(
       `select count(distinct coalesce(
@@ -2779,26 +2975,17 @@ async function getOperationsMetrics(env, since7Days, since30Days) {
           case when watch_requests.phone is not null and watch_requests.phone != ''
             then 'phone:' || watch_requests.phone end,
           'request:' || watch_requests.id
-        )) as students,
-        count(distinct watch_request_programs.program_id) as programs
-       from watch_request_programs
-       inner join watch_requests on watch_requests.id = watch_request_programs.watch_request_id
+        )) as profiles
+       from watch_requests
        where watch_requests.status = 'active'
-         and (watch_requests.unsubscribed_at is null or watch_requests.unsubscribed_at = '')
-         and (
-           watch_requests.workspace_id is null
-           or not exists (
-             select 1 from beta_program_watches preference
-             where preference.workspace_id = watch_requests.workspace_id
-               and preference.program_id = watch_request_programs.program_id
-           )
-           or exists (
-             select 1 from beta_program_watches preference
-             where preference.workspace_id = watch_requests.workspace_id
-               and preference.program_id = watch_request_programs.program_id
-               and preference.is_watching = 1
-           )
-         )`,
+         and (watch_requests.unsubscribed_at is null or watch_requests.unsubscribed_at = '')`,
+    ).first(),
+    env.DB.prepare(
+      `select count(distinct workspace_id) as students,
+        count(*) as programPairs,
+        count(distinct program_id) as programs
+       from beta_program_watches
+       where is_watching = 1`,
     ).first(),
     env.DB.prepare(
       `select category, sum(minutes) as minutes, count(*) as entries
@@ -2812,8 +2999,10 @@ async function getOperationsMetrics(env, since7Days, since30Days) {
 
   return {
     monitoredPrograms: Number(programs?.count || 0),
-    activeWatchers: Number(watchers?.students || 0),
-    watchedPrograms: Number(watchers?.programs || 0),
+    activeAlertProfiles: Number(alertProfiles?.profiles || 0),
+    explicitWatchers: Number(explicitWatches?.students || 0),
+    explicitWatchPairs: Number(explicitWatches?.programPairs || 0),
+    explicitlyWatchedPrograms: Number(explicitWatches?.programs || 0),
     time7Days: normalizeTimeRows(time7Days.results),
     time30Days: normalizeTimeRows(time30Days.results),
   };
