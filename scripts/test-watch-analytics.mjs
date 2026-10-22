@@ -18,6 +18,7 @@ const workspaceAccessCodeHash = (code) => createHash('sha256')
   .digest('hex');
 const existingWorkspaceHash = workspaceAccessCodeHash('AF-TEST-1234');
 const issuedInviteHash = workspaceAccessCodeHash('AF-NEW-5678');
+const initializedWorkspaceIds = new Map([[existingWorkspaceHash, 'workspace-1']]);
 const waitlistEmailHash = (email) => createHash('sha256')
   .update(`applyfirst-waitlist-email:${email.trim().toLowerCase()}`)
   .digest('hex');
@@ -28,6 +29,9 @@ const env = {
       const statement = createStatement(query);
       queries.push(statement);
       return statement;
+    },
+    async batch(statements) {
+      return Promise.all(statements.map((statement) => statement.run()));
     },
   },
   CAPTURE_DB: {
@@ -100,7 +104,8 @@ function createStatement(query) {
       }
 
       if (/select id\s+from beta_access_workspaces/i.test(query)) {
-        return { id: 'workspace-1' };
+        const workspaceId = initializedWorkspaceIds.get(this.bindings[0]);
+        return workspaceId ? { id: workspaceId } : null;
       }
 
       if (/from beta_application_attempts/i.test(query) && /idempotency_key = \?/i.test(query)) {
@@ -248,6 +253,28 @@ function createStatement(query) {
       return {};
     },
     async all() {
+      if (/select id, email, created_at as createdAt[\s\S]*from watch_requests/i.test(query)) {
+        return {
+          results: [{
+            id: 'legacy-watch-request-1',
+            email: 'waitlist-one@example.com',
+            createdAt: '2026-10-02T16:00:52.000Z',
+          }],
+        };
+      }
+
+      if (
+        /invitation\.recipient_email_hash as recipientEmailHash/i.test(query) &&
+        /inner join beta_access_workspaces workspace/i.test(query)
+      ) {
+        return {
+          results: [{
+            recipientEmailHash: waitlistEmailHash('waitlist-one@example.com'),
+            workspaceId: 'workspace-1',
+          }],
+        };
+      }
+
       if (/from beta_client_errors/i.test(query) && /group by operation/i.test(query)) {
         return {
           results: [{
@@ -464,6 +491,19 @@ function createStatement(query) {
       return { results: [] };
     },
     async run() {
+      if (/insert or ignore into beta_access_workspaces/i.test(query)) {
+        const [workspaceId, accessCodeHash] = this.bindings;
+        if (!initializedWorkspaceIds.has(accessCodeHash)) {
+          initializedWorkspaceIds.set(accessCodeHash, workspaceId);
+          return { meta: { changes: 1 } };
+        }
+        return { meta: { changes: 0 } };
+      }
+
+      if (/set status = 'inactive'[\s\S]*id !=/i.test(query)) {
+        return { meta: { changes: 0 } };
+      }
+
       if (/insert or ignore into beta_application_attempts/i.test(query)) {
         const [
           id,
@@ -522,6 +562,90 @@ const issuedInvitePayload = await issuedInviteResponse.json();
 assert.equal(issuedInviteResponse.status, 200);
 assert.equal(issuedInvitePayload.exists, false);
 assert.equal(issuedInvitePayload.invited, true);
+
+const linkedWatchResponse = await watchWorker.fetch(
+  new Request('https://worker.example/watch', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      accessCode: 'AF-TEST-1234',
+      email: 'student@example.com',
+      classYear: 'Freshman',
+      roleTrack: 'Software Engineering',
+      contactMethod: 'email',
+    }),
+  }),
+  env,
+  {},
+);
+const linkedWatchPayload = await linkedWatchResponse.json();
+assert.equal(linkedWatchResponse.status, 201);
+assert.equal(linkedWatchPayload.workspaceLinked, true);
+const linkedWatchInsert = [...queries].reverse().find((statement) => /insert into watch_requests/i.test(statement.query));
+assert.equal(linkedWatchInsert.bindings[1], 'workspace-1');
+const linkedWatchInsertIndex = queries.indexOf(linkedWatchInsert);
+const linkedWatchSupersedeIndex = queries.findIndex((statement, index) => (
+  index > linkedWatchInsertIndex &&
+  /update watch_requests[\s\S]*set status = 'inactive'[\s\S]*id != \?/i.test(statement.query)
+));
+assert.ok(
+  linkedWatchSupersedeIndex > linkedWatchInsertIndex,
+  'an existing alert profile must only be superseded after the replacement is saved',
+);
+
+const initializedWatchResponse = await watchWorker.fetch(
+  new Request('https://worker.example/watch', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      accessCode: 'AF-NEW-5678',
+      email: 'new-student@example.com',
+      classYear: 'Sophomore',
+      roleTrack: 'Product Management',
+      contactMethod: 'email',
+    }),
+  }),
+  env,
+  {},
+);
+const initializedWatchPayload = await initializedWatchResponse.json();
+assert.equal(initializedWatchResponse.status, 201);
+assert.equal(initializedWatchPayload.workspaceLinked, true);
+assert.ok(initializedWorkspaceIds.has(issuedInviteHash));
+
+const reconciliationDryRunResponse = await watchWorker.fetch(
+  new Request('https://worker.example/analytics/watch-requests/reconcile', {
+    method: 'POST',
+    headers: {
+      authorization: 'Bearer test-admin-token',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ dryRun: true }),
+  }),
+  env,
+  {},
+);
+const reconciliationDryRun = await reconciliationDryRunResponse.json();
+assert.equal(reconciliationDryRunResponse.status, 200);
+assert.equal(reconciliationDryRun.eligibleToLink, 1);
+assert.equal(reconciliationDryRun.wouldLink, 1);
+assert.equal(reconciliationDryRun.linked, 0);
+
+const reconciliationApplyResponse = await watchWorker.fetch(
+  new Request('https://worker.example/analytics/watch-requests/reconcile', {
+    method: 'POST',
+    headers: {
+      authorization: 'Bearer test-admin-token',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ dryRun: false }),
+  }),
+  env,
+  {},
+);
+const reconciliationApply = await reconciliationApplyResponse.json();
+assert.equal(reconciliationApplyResponse.status, 200);
+assert.equal(reconciliationApply.linked, 1);
 
 const unknownInviteResponse = await watchWorker.fetch(
   new Request('https://worker.example/workspace?code=AF-FAKE-9999'),

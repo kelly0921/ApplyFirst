@@ -5,15 +5,19 @@ import {
   buildDeliveryCopyState,
   buildStudentMatchReason,
   buildDeliveryDedupeKey,
+  buildDeliverySemanticChangeKey,
   classifyDeliveryCandidate,
+  classifyOnboardingCandidate,
   evaluateStudentDelivery,
   formatFocusRoleTrack,
   getDeliveryBatchDisposition,
+  getDeadlineReminderStage,
   inferProgramCycleKey,
   isFreshActionableForProfile,
   matchProgramToFocus,
   normalizeDeliveryEntrySource,
   selectDigestItems,
+  selectOnboardingItems,
 } from '../workers/proactive-delivery.js';
 import {
   buildAlertMessage,
@@ -89,6 +93,79 @@ assert.equal(classifyDeliveryCandidate({
   verified: true,
   watched: true,
 }), null);
+
+const onboardingNow = '2026-10-19T12:00:00.000Z';
+assert.equal(classifyOnboardingCandidate({
+  status: 'open',
+  confidence: 'high',
+  verified: true,
+  officialUrl: 'https://example.com/onboarding-open',
+  statusEvidenceType: 'source_check',
+  statusEvidenceAt: onboardingNow,
+  statusReviewDecision: 'Alert Candidate',
+}, { now: onboardingNow }), 'act_now');
+assert.equal(classifyOnboardingCandidate({
+  status: 'watching',
+  confidence: 'high',
+  verified: true,
+  officialUrl: 'https://example.com/onboarding-watch',
+}, { now: onboardingNow }), 'discover');
+assert.equal(classifyOnboardingCandidate({
+  status: 'watching',
+  confidence: 'high',
+  verified: true,
+  officialUrl: 'https://example.com/unavailable',
+  sourceError: 'Official source returned HTTP 403.',
+}, { now: onboardingNow }), null);
+
+const onboardingSelection = selectOnboardingItems(
+  Array.from({ length: 8 }, (_, index) => ({
+    eligible: true,
+    deliveryClass: index === 0 ? 'act_now' : 'discover',
+    programId: `onboarding-${index}`,
+    cycleKey: '2027',
+    programName: `Onboarding ${index}`,
+    score: 80 - index,
+  })),
+  { limit: 25 },
+);
+assert.equal(
+  onboardingSelection.length,
+  8,
+  'the initial match digest must not inherit the five-item weekly digest cap',
+);
+
+const deadlineReminderProgram = {
+  status: 'open',
+  confidence: 'high',
+  verified: true,
+  officialUrl: 'https://example.com/deadline',
+  deadline: 'October 24, 2026',
+  curatedStatus: 'open',
+  curatedDeadline: 'October 24, 2026',
+  curatedStatusReviewedAt: onboardingNow,
+  statusEvidenceType: 'curated_audit',
+  statusEvidenceAt: onboardingNow,
+};
+assert.equal(getDeadlineReminderStage(deadlineReminderProgram, {
+  now: onboardingNow,
+  sendTiming: 'openAndDeadline',
+  windowDays: 7,
+}), 'deadline_soon');
+assert.equal(getDeadlineReminderStage(deadlineReminderProgram, {
+  now: onboardingNow,
+  sendTiming: 'openOnly',
+  windowDays: 7,
+}), '', 'open-only subscribers must not receive deadline reminders');
+assert.equal(getDeadlineReminderStage({
+  ...deadlineReminderProgram,
+  deadline: 'November 24, 2026',
+  curatedDeadline: 'November 24, 2026',
+}, {
+  now: onboardingNow,
+  sendTiming: 'openAndDeadline',
+  windowDays: 7,
+}), '', 'deadline reminders must wait until the configured window');
 
 const expiredTemporalState = classifyFetchFailure(
   {
@@ -457,6 +534,30 @@ const nextCycleKey = buildDeliveryDedupeKey({
 assert.equal(firstCycleKey, repeatedFirstCycleKey);
 assert.notEqual(firstCycleKey, nextCycleKey);
 
+const unchangedSemanticState = buildDeliverySemanticChangeKey({
+  status: 'Open',
+  deadline: 'October 30, 2026',
+  officialUrl: 'https://example.com/program?utm_source=linkedin',
+});
+assert.equal(
+  unchangedSemanticState,
+  buildDeliverySemanticChangeKey({
+    status: ' open ',
+    deadline: 'October 30, 2026',
+    officialUrl: 'https://example.com/program',
+  }),
+  'tracking parameters and formatting must not create a new delivery state',
+);
+assert.notEqual(
+  unchangedSemanticState,
+  buildDeliverySemanticChangeKey({
+    status: 'open',
+    deadline: 'November 2, 2026',
+    officialUrl: 'https://example.com/program',
+  }),
+  'a real deadline change must create a new delivery state',
+);
+
 const digestCandidates = [
   ...Array.from({ length: 7 }, (_, index) => ({
     eligible: true,
@@ -571,6 +672,8 @@ function createFocusDeliveryEnv({
   priority = 'high',
   openDate = 'October 2026',
   deadline = 'October 30, 2026',
+  sendTiming = 'openOnly',
+  curatedDeadline = '',
   enableSending = false,
 }) {
   const recipient = {
@@ -580,7 +683,7 @@ function createFocusDeliveryEnv({
     classYear: 'Freshman',
     roleTrack: 'Software Engineering',
     priority: 'all',
-    sendTiming: 'openOnly',
+    sendTiming,
     unsubscribeToken: 'test-unsubscribe-token',
     createdAt: subscribedAt,
   };
@@ -608,6 +711,9 @@ function createFocusDeliveryEnv({
         ? 'Deadline Candidate'
         : 'Prep Watch',
     sourceError: '',
+    curatedStatus: curatedDeadline ? status : '',
+    curatedStatusReviewedAt: curatedDeadline ? statusChangedAt : '',
+    curatedDeadline,
     statusChangedAt,
     updatedAt: statusChangedAt,
   };
@@ -643,16 +749,30 @@ function createFocusDeliveryEnv({
                   .map((item) => {
                     const batch = testState.batchesById.get(item.batchId);
                     return {
-                      workspaceId: batch.workspaceId,
+                      workspaceId: batch.workspaceId || (
+                        batch.watchRequestId === recipient.id ? recipient.workspaceId : null
+                      ),
                       watchRequestId: batch.watchRequestId,
                       programId: item.programId,
                       cycleKey: item.cycleKey,
                       deliveryClass: item.deliveryClass,
                       dedupeKey: item.dedupeKey,
+                      statusSnapshot: item.statusSnapshot,
+                      deadlineSnapshot: item.deadlineSnapshot,
+                      officialUrl: item.officialUrl,
                       deliveryFormat: batch.deliveryFormat,
+                      entrySource: batch.entrySource,
                     };
                   }),
               };
+            }
+            if (/julianday\(batch\.sent_at\)/i.test(query)) {
+              const sentCount = [...testState.batchesById.values()].filter((batch) => (
+                batch.status === 'sent' && batch.deliveryFormat === 'immediate'
+              )).length;
+              return sentCount
+                ? { results: [{ recipientKey: recipient.workspaceId || recipient.id, sentCount }] }
+                : { results: [] };
             }
             if (/select dedupe_key as dedupekey from proactive_delivery_batches/i.test(normalizedQuery)) {
               return {
@@ -789,6 +909,7 @@ function createFocusDeliveryEnv({
   }
 
   env.__testState = testState;
+  env.__testProgram = program;
   return env;
 }
 
@@ -887,6 +1008,86 @@ const scheduledExistingOpenRun = await runProactiveDelivery(
 assert.equal(scheduledExistingOpenRun.eligibleRecipients, 0);
 assert.equal(scheduledExistingOpenRun.results[0].status, 'not_due');
 
+const onboardingEnv = createFocusDeliveryEnv({
+  subscribedAt: new Date(now).toISOString(),
+  statusChangedAt: new Date(now - 60 * 60 * 1000).toISOString(),
+  enableSending: true,
+});
+const onboardingRun = await runProactiveDelivery(
+  onboardingEnv,
+  {
+    dryRun: false,
+    force: true,
+    onboardingOnly: true,
+    watchRequestId: 'focus-request-1',
+  },
+);
+assert.equal(onboardingRun.sent, 1);
+assert.equal(onboardingRun.results[0].deliveryFormat, 'digest');
+assert.equal(onboardingRun.results[0].entrySource, 'focus_onboarding_digest');
+assert.match(onboardingEnv.__testState.sentEmails[0].subject, /Your ApplyFirst matches/);
+const repeatedOnboardingRun = await runProactiveDelivery(
+  onboardingEnv,
+  {
+    dryRun: false,
+    force: true,
+    onboardingOnly: true,
+    watchRequestId: 'focus-request-1',
+  },
+);
+assert.equal(repeatedOnboardingRun.sent, 0);
+assert.equal(repeatedOnboardingRun.results[0].status, 'already_sent');
+assert.equal(
+  onboardingEnv.__testState.sentEmails.length,
+  1,
+  'the initial focus digest must be sent at most once per stable recipient identity',
+);
+const postOnboardingWeeklyRun = await runProactiveDelivery(
+  onboardingEnv,
+  { dryRun: false, force: true, watchRequestId: 'focus-request-1' },
+);
+assert.equal(postOnboardingWeeklyRun.sent, 0);
+assert.equal(
+  onboardingEnv.__testState.sentEmails.length,
+  1,
+  'an onboarding item must not immediately repeat in the weekly digest',
+);
+
+const deadlineReminderEnv = createFocusDeliveryEnv({
+  subscribedAt: new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString(),
+  statusChangedAt: new Date(now - 24 * 60 * 60 * 1000).toISOString(),
+  deadline: new Date(now + 3 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }),
+  sendTiming: 'openAndDeadline',
+  enableSending: true,
+});
+deadlineReminderEnv.__testProgram.curatedStatus = 'open';
+deadlineReminderEnv.__testProgram.curatedDeadline = deadlineReminderEnv.__testProgram.deadline;
+deadlineReminderEnv.__testProgram.curatedStatusReviewedAt = new Date(now).toISOString();
+deadlineReminderEnv.__testProgram.statusEvidenceType = 'curated_audit';
+deadlineReminderEnv.__testProgram.statusEvidenceAt = new Date(now).toISOString();
+const deadlineReminderRun = await runProactiveDelivery(
+  deadlineReminderEnv,
+  { dryRun: false, force: true, watchRequestId: 'focus-request-1' },
+);
+assert.equal(deadlineReminderRun.sent, 1);
+assert.equal(deadlineReminderRun.results[0].deliveryFormat, 'immediate');
+assert.match(deadlineReminderEnv.__testState.sentEmails[0].subject, /deadline is approaching/);
+const repeatedDeadlineReminderRun = await runProactiveDelivery(
+  deadlineReminderEnv,
+  { dryRun: false, force: true, watchRequestId: 'focus-request-1' },
+);
+assert.equal(repeatedDeadlineReminderRun.sent, 0);
+assert.equal(
+  deadlineReminderEnv.__testState.sentEmails.length,
+  1,
+  'an unchanged deadline must produce only one approaching-deadline reminder',
+);
+
 const sendingImmediateEnv = createFocusDeliveryEnv({
   subscribedAt: new Date(now - 4 * 24 * 60 * 60 * 1000).toISOString(),
   statusChangedAt: new Date(now - 60 * 60 * 1000).toISOString(),
@@ -926,6 +1127,40 @@ assert.equal(
   're-running the same delivery must not call the provider twice',
 );
 
+for (const batch of sendingImmediateEnv.__testState.batchesById.values()) {
+  batch.workspaceId = null;
+}
+for (const item of sendingImmediateEnv.__testState.itemsByDedupe.values()) {
+  item.dedupeKey = `${item.dedupeKey}:legacy-verification-timestamp`;
+}
+
+sendingImmediateEnv.__testProgram.statusChangedAt = new Date(now).toISOString();
+sendingImmediateEnv.__testProgram.statusEvidenceAt = new Date(now).toISOString();
+sendingImmediateEnv.__testProgram.verifiedAt = new Date(now).toISOString();
+sendingImmediateEnv.__testProgram.updatedAt = new Date(now).toISOString();
+const timestampOnlyRefreshRun = await runProactiveDelivery(
+  sendingImmediateEnv,
+  { dryRun: false, force: true, watchRequestId: 'focus-request-1' },
+);
+assert.equal(timestampOnlyRefreshRun.sent, 0);
+assert.equal(
+  sendingImmediateEnv.__testState.sentEmails.length,
+  1,
+  'workspace reconciliation and routine verification timestamps must not resend an unchanged opening',
+);
+
+sendingImmediateEnv.__testProgram.deadline = 'November 2, 2026';
+const changedDeadlineRun = await runProactiveDelivery(
+  sendingImmediateEnv,
+  { dryRun: false, force: true, watchRequestId: 'focus-request-1' },
+);
+assert.equal(changedDeadlineRun.sent, 1);
+assert.equal(
+  sendingImmediateEnv.__testState.sentEmails.length,
+  2,
+  'a materially changed deadline should allow a new alert',
+);
+
 const sendingDigestEnv = createFocusDeliveryEnv({
   subscribedAt: new Date(now - 4 * 24 * 60 * 60 * 1000).toISOString(),
   statusChangedAt: new Date(now - 60 * 60 * 1000).toISOString(),
@@ -954,6 +1189,7 @@ const emailEnv = {
   PUBLIC_APP_URL: 'https://applyfirst.example.com',
   WATCH_WORKER_PUBLIC_URL: 'https://applyfirst-watch.example.workers.dev',
 };
+const freshEvidenceAt = new Date().toISOString();
 const emailRecipient = {
   id: 'email-preview-recipient',
   classYear: 'Sophomore',
@@ -971,7 +1207,7 @@ const immediateMessage = buildAlertMessage(
     currentStatus: 'open',
     url: 'https://example.com/open-program',
     statusEvidenceType: 'source_check',
-    statusEvidenceAt: copyNow,
+    statusEvidenceAt: freshEvidenceAt,
     statusReviewDecision: 'Alert Candidate',
     summary: 'Detected signal: Applications are now open.',
   },
@@ -1031,7 +1267,7 @@ const repeatCycleMessage = buildAlertMessage(
     currentStatus: 'open',
     url: 'https://example.com/repeat-cycle',
     statusEvidenceType: 'source_check',
-    statusEvidenceAt: copyNow,
+    statusEvidenceAt: freshEvidenceAt,
     statusReviewDecision: 'Alert Candidate',
     repeatCycle: true,
   },
@@ -1060,7 +1296,7 @@ const digestMessage = buildProactiveDigestMessage(
       confidence: 'high',
       verified: true,
       statusEvidenceType: 'source_check',
-      statusEvidenceAt: copyNow,
+      statusEvidenceAt: freshEvidenceAt,
       statusReviewDecision: 'Alert Candidate',
       curatedStatus: 'open',
       curatedStatusReviewedAt: copyNow,
@@ -1190,7 +1426,7 @@ const mismatchEligibilityMessage = buildProactiveDigestMessage(
     roleTracks: ['Product Management'],
     officialUrl: 'https://example.com/mismatch',
     statusEvidenceType: 'source_check',
-    statusEvidenceAt: copyNow,
+    statusEvidenceAt: freshEvidenceAt,
     statusReviewDecision: 'Alert Candidate',
     matchReason: 'Maintainer-only copy test.',
   }],

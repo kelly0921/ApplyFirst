@@ -6,6 +6,7 @@ import {
   getSourceUpdatePlan,
   opportunities,
 } from '../src/opportunities.js';
+import { detectOfficialSourceType } from '../workers/source-adapters.js';
 
 const args = new Set(process.argv.slice(2));
 const writeOutput = args.has('--write');
@@ -30,7 +31,7 @@ const sourceRows = opportunities
       organization: opportunity.organization,
       url: opportunity.monitorUrl || opportunity.url,
       previousUrl: opportunity.previousUrl || (opportunity.monitorUrl ? opportunity.url : null),
-      sourceType: 'official_program_page',
+      sourceType: detectOfficialSourceType(opportunity.monitorUrl || opportunity.url),
       checkCadence: plan.checkCadence,
       nextCheck: plan.nextCheck,
       alertTrigger: plan.alertTrigger,

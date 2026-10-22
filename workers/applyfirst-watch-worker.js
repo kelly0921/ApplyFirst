@@ -1,19 +1,29 @@
 import {
   buildDeliveryCopyState,
   buildDeliveryDedupeKey,
+  buildDeliverySemanticChangeKey,
   buildFocusDescription,
   buildStudentMatchReason,
   classifyDeliveryCandidate,
+  classifyOnboardingCandidate,
   evaluateStudentDelivery,
   formatFocusRoleTrack,
   getDeliveryBatchDisposition,
+  getDeadlineReminderStage,
   hasPriorApplicationInDifferentCycle,
   inferProgramCycleKey,
   isFreshActionableForProfile,
   matchProgramToFocus,
   normalizeDeliveryEntrySource,
   selectDigestItems,
+  selectOnboardingItems,
 } from './proactive-delivery.js';
+import {
+  buildStructuredSourceRequest,
+  buildUnpublishedPostingText,
+  extractStructuredJobPostingText,
+  formatStructuredSourcePayload,
+} from './source-adapters.js';
 
 const MAX_SOURCE_BYTES = 250_000;
 const MAX_STORED_TEXT = 80_000;
@@ -248,8 +258,13 @@ async function runScheduledDiscoverySearch(env, controller) {
     maxResultsPerQuery:
       env.AUTO_DISCOVERY_RESULTS_PER_QUERY || DEFAULT_SCHEDULED_DISCOVERY_RESULTS_PER_QUERY,
     dryRun: env.AUTO_DISCOVERY_SEARCH_DRY_RUN === 'true',
+    programIds: parseConfiguredProgramIds(env.AUTO_DISCOVERY_PROGRAM_IDS),
     scheduledCron: controller?.cron || '',
   });
+}
+
+function parseConfiguredProgramIds(value) {
+  return uniqueStrings(String(value || '').split(','));
 }
 
 function shouldRunScheduledDiscoverySearch(env) {
@@ -383,6 +398,12 @@ async function handleRequest(request, env, ctx) {
       await requireAdminToken(request, env);
       const body = await readJson(request, {});
       return jsonResponse(env, await syncBetaInvitations(env, body));
+    }
+
+    if (request.method === 'POST' && url.pathname === '/analytics/watch-requests/reconcile') {
+      await requireAdminToken(request, env);
+      const body = await readJson(request, {});
+      return jsonResponse(env, await reconcileWatchRequestWorkspaces(env, body));
     }
 
     if (request.method === 'POST' && url.pathname === '/analytics/monitoring-audits') {
@@ -1410,6 +1431,59 @@ async function findWorkspaceByAccessCode(env, value) {
   return workspace;
 }
 
+async function ensureBetaWorkspaceForAlertSetup(env, value) {
+  const accessCode = normalizeAccessCode(value);
+  const accessCodeHash = await hashAccessCode(accessCode);
+  const existing = await env.DB.prepare(
+    `select id
+     from beta_access_workspaces
+     where access_code_hash = ?
+     limit 1`,
+  )
+    .bind(accessCodeHash)
+    .first();
+
+  if (existing?.id) return existing.id;
+
+  const invitation = await findBetaInvitationByHash(env, accessCodeHash);
+  if (!ACTIVE_BETA_INVITATION_STATUS_VALUES.has(invitation?.status)) {
+    throw httpError(403, 'This beta access code is not active.');
+  }
+
+  const workspaceId = crypto.randomUUID();
+  const now = new Date().toISOString();
+  await env.DB.prepare(
+    `insert or ignore into beta_access_workspaces (
+      id, access_code_hash, code_label, state_json, tester_segment, last_seen_at, updated_at
+    ) values (?, ?, ?, ?, ?, ?, ?)`,
+  )
+    .bind(
+      workspaceId,
+      accessCodeHash,
+      createAccessCodeLabel(accessCode),
+      JSON.stringify(normalizeWorkspaceState({})),
+      invitation.testerSegment || 'unknown',
+      now,
+      now,
+    )
+    .run();
+
+  const created = await env.DB.prepare(
+    `select id
+     from beta_access_workspaces
+     where access_code_hash = ?
+     limit 1`,
+  )
+    .bind(accessCodeHash)
+    .first();
+
+  if (!created?.id) {
+    throw httpError(500, 'Beta workspace could not be initialized.');
+  }
+
+  return created.id;
+}
+
 async function saveMonitoringAudit(env, body) {
   const programId = cleanString(body.programId, 160);
   const auditType = normalizeRequiredEnum(body.auditType, MONITORING_AUDIT_TYPES, 'audit type');
@@ -1609,6 +1683,128 @@ async function syncBetaInvitations(env, body) {
     emailLinked: normalized.filter((invitation) => invitation.recipientEmailHash).length,
     removed: Number(deleteResult?.meta?.changes || 0),
     savedAt: now,
+  };
+}
+
+async function reconcileWatchRequestWorkspaces(env, body = {}) {
+  const dryRun = body.dryRun !== false;
+  const [requestsResult, invitationWorkspacesResult] = await Promise.all([
+    env.DB.prepare(
+      `select id, email, created_at as createdAt
+       from watch_requests
+       where status = 'active'
+         and (workspace_id is null or workspace_id = '')
+         and email is not null
+         and trim(email) != ''
+         and (unsubscribed_at is null or unsubscribed_at = '')
+       order by created_at desc
+       limit 500`,
+    ).all(),
+    env.DB.prepare(
+      `select
+        invitation.recipient_email_hash as recipientEmailHash,
+        workspace.id as workspaceId
+       from beta_invitations invitation
+       inner join beta_access_workspaces workspace
+         on workspace.access_code_hash = invitation.access_code_hash
+       where invitation.status in ('sent', 'active')
+         and invitation.recipient_email_hash is not null
+         and invitation.recipient_email_hash != ''`,
+    ).all(),
+  ]);
+
+  const workspacesByEmailHash = new Map();
+  for (const row of invitationWorkspacesResult.results || []) {
+    const emailHash = cleanString(row.recipientEmailHash, 64).toLowerCase();
+    const workspaceId = cleanString(row.workspaceId, 120);
+    if (!emailHash || !workspaceId) continue;
+    if (!workspacesByEmailHash.has(emailHash)) workspacesByEmailHash.set(emailHash, new Set());
+    workspacesByEmailHash.get(emailHash).add(workspaceId);
+  }
+
+  const planned = [];
+  let noInvitationMatch = 0;
+  let ambiguousMatches = 0;
+  for (const request of requestsResult.results || []) {
+    const emailHash = await hashRecipientEmail(request.email);
+    const workspaceIds = [...(workspacesByEmailHash.get(emailHash) || [])];
+    if (!workspaceIds.length) {
+      noInvitationMatch += 1;
+      continue;
+    }
+    if (workspaceIds.length !== 1) {
+      ambiguousMatches += 1;
+      continue;
+    }
+    planned.push({
+      watchRequestId: request.id,
+      workspaceId: workspaceIds[0],
+      createdAt: request.createdAt,
+    });
+  }
+
+  let linked = 0;
+  let superseded = 0;
+  if (!dryRun && planned.length) {
+    const now = new Date().toISOString();
+    for (let index = 0; index < planned.length; index += 100) {
+      const chunk = planned.slice(index, index + 100);
+      const updateResults = await env.DB.batch(chunk.map((item) => env.DB.prepare(
+        `update watch_requests
+         set workspace_id = ?
+         where id = ? and (workspace_id is null or workspace_id = '')`,
+      ).bind(item.workspaceId, item.watchRequestId)));
+      linked += updateResults.reduce(
+        (total, result) => total + Number(result?.meta?.changes || 0),
+        0,
+      );
+    }
+
+    const workspaceIds = uniqueStrings(planned.map((item) => item.workspaceId));
+    if (workspaceIds.length) {
+      const result = await env.DB.prepare(
+        `update watch_requests as existing
+         set status = 'inactive'
+         where existing.status = 'active'
+           and existing.workspace_id in (${workspaceIds.map(() => '?').join(', ')})
+           and exists (
+             select 1
+             from watch_requests newer
+             where newer.workspace_id = existing.workspace_id
+               and newer.status = 'active'
+               and (newer.unsubscribed_at is null or newer.unsubscribed_at = '')
+               and (
+                 newer.created_at > existing.created_at
+                 or (newer.created_at = existing.created_at and newer.id > existing.id)
+               )
+           )`,
+      )
+        .bind(...workspaceIds)
+        .run();
+      superseded = Number(result?.meta?.changes || 0);
+    }
+
+    console.log(JSON.stringify({
+      event: 'watch_request_workspace_reconciliation',
+      linked,
+      superseded,
+      noInvitationMatch,
+      ambiguousMatches,
+      reconciledAt: now,
+    }));
+  }
+
+  return {
+    ok: true,
+    dryRun,
+    unlinkedActiveProfiles: (requestsResult.results || []).length,
+    eligibleToLink: planned.length,
+    linked: dryRun ? 0 : linked,
+    wouldLink: dryRun ? planned.length : 0,
+    superseded,
+    noInvitationMatch,
+    ambiguousMatches,
+    generatedAt: new Date().toISOString(),
   };
 }
 
@@ -3187,13 +3383,7 @@ async function saveWatchRequest(request, env, ctx) {
   let workspaceId = null;
 
   if (BETA_WORKSPACE_CODE_PATTERN.test(accessCode)) {
-    const accessCodeHash = await hashAccessCode(accessCode);
-    const workspace = await env.DB.prepare(
-      'select id from beta_access_workspaces where access_code_hash = ? limit 1',
-    )
-      .bind(accessCodeHash)
-      .first();
-    workspaceId = workspace?.id || null;
+    workspaceId = await ensureBetaWorkspaceForAlertSetup(env, accessCode);
   }
   const watchedPrograms = normalizeWatchedPrograms(body.watchedPrograms);
   const watchedProgramIds = uniqueStrings([
@@ -3317,13 +3507,30 @@ async function saveWatchRequest(request, env, ctx) {
         ).bind(crypto.randomUUID(), workspaceId, programId, now, now)),
       );
     }
+
+    await env.DB.prepare(
+      `update watch_requests
+       set status = 'inactive'
+       where workspace_id = ?
+         and id != ?
+         and status = 'active'
+         and (unsubscribed_at is null or unsubscribed_at = '')`,
+    )
+      .bind(workspaceId, id)
+      .run();
   }
 
-  if (shouldAutoAlertExistingOpenOnWatch(env) && watchedProgramIds.length) {
-    const alreadyOpenAlertTask = alertExistingOpenProgramsForWatchRequest(env, id, watchedProgramIds).catch((error) => {
+  if (shouldRunScheduledProactiveDelivery(env) && email) {
+    const onboardingTask = runProactiveDelivery(env, {
+      trigger: 'watch_setup',
+      dryRun: false,
+      force: true,
+      onboardingOnly: true,
+      watchRequestId: id,
+    }).catch((error) => {
       console.error(
         JSON.stringify({
-          event: 'already_open_alert_failed',
+          event: 'focus_onboarding_delivery_failed',
           watchRequestId: id,
           error: error.message,
         }),
@@ -3331,9 +3538,9 @@ async function saveWatchRequest(request, env, ctx) {
     });
 
     if (ctx && typeof ctx.waitUntil === 'function') {
-      ctx.waitUntil(alreadyOpenAlertTask);
+      ctx.waitUntil(onboardingTask);
     } else {
-      await alreadyOpenAlertTask;
+      await onboardingTask;
     }
   }
 
@@ -3341,6 +3548,7 @@ async function saveWatchRequest(request, env, ctx) {
     ok: true,
     id,
     status: 'active',
+    workspaceLinked: Boolean(workspaceId),
     programCount: programRows.length,
     message: 'Focus alerts saved. ApplyFirst will email high-confidence signals for matching programs and prioritize explicit Watches.',
   };
@@ -3494,38 +3702,14 @@ async function checkOfficialSource(env, source, options = {}) {
   let normalizedText = '';
   let contentHash = '';
   let errorMessage = '';
-  let timeoutId = null;
 
   try {
-    const abortController = new AbortController();
-    timeoutId = setTimeout(
-      () => abortController.abort('Official source fetch timed out.'),
-      Number(env.WATCH_FETCH_TIMEOUT_MS || 12_000),
-    );
-    const response = await fetch(source.url, {
-      headers: {
-        'user-agent': 'ApplyFirstBetaWatcher/0.1 (+https://applyfirst-careers.pages.dev)',
-        accept: 'text/html,application/xhtml+xml,text/plain;q=0.8,*/*;q=0.5',
-      },
-      signal: abortController.signal,
-    });
-
-    httpStatus = response.status;
-
-    if (!response.ok) {
-      throw new Error(`Official source returned HTTP ${response.status}.`);
-    }
-
-    rawText = await readTextWithLimit(response, MAX_SOURCE_BYTES);
-    normalizedText = normalizePageText(rawText).slice(0, MAX_STORED_TEXT);
+    const fetchedSource = await fetchOfficialSourceDocument(source, env);
+    httpStatus = fetchedSource.httpStatus;
+    rawText = fetchedSource.rawText;
+    normalizedText = fetchedSource.normalizedText.slice(0, MAX_STORED_TEXT);
     contentHash = await sha256Hex(normalizedText);
-    clearTimeout(timeoutId);
-    timeoutId = null;
   } catch (error) {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
-
     errorMessage = cleanString(error.message, 500);
     normalizedText = errorMessage;
     contentHash = await sha256Hex(`${source.url}:${errorMessage}`);
@@ -3828,7 +4012,8 @@ async function getDiscoveryQueue(env, url) {
   const now = new Date().toISOString();
   const conditions = [
     'official_sources.enabled = 1',
-    "source_schedule_profiles.source_volatility = 'moving_cycle_page'",
+    `(source_schedule_profiles.source_volatility = 'moving_cycle_page'
+      or coalesce(official_sources.last_error_message, '') != '')`,
     "source_schedule_profiles.current_phase in ('warmup', 'active', 'unknown')",
   ];
   const bindings = [];
@@ -3851,16 +4036,19 @@ async function getDiscoveryQueue(env, url) {
 
   const rows = await env.DB.prepare(
     `select
+      official_sources.id as officialSourceId,
       official_sources.program_id as programId,
       official_sources.program_name as programName,
       official_sources.organization,
       official_sources.url,
       official_sources.previous_url as previousUrl,
+      official_sources.last_error_message as sourceError,
       source_schedule_profiles.cycle_frequency as cycleFrequency,
       source_schedule_profiles.expected_open_months_json as expectedOpenMonthsJson,
       source_schedule_profiles.source_volatility as sourceVolatility,
       source_schedule_profiles.current_phase as currentPhase,
       source_schedule_profiles.next_discovery_at as nextDiscoveryAt,
+      source_schedule_profiles.discovery_check_interval_hours as discoveryCheckIntervalHours,
       source_schedule_profiles.discovery_queries_json as discoveryQueriesJson,
       source_schedule_profiles.schedule_note as scheduleNote,
       coalesce(candidates.pending_candidate_count, 0) as pendingCandidateCount,
@@ -3905,6 +4093,7 @@ async function getDiscoveryQueue(env, url) {
     where ${conditions.join('\n      and ')}
     order by
       coalesce(watched.active_watch_count, 0) desc,
+      case when coalesce(official_sources.last_error_message, '') != '' then 0 else 1 end,
       source_schedule_profiles.next_discovery_at asc,
       official_sources.program_name asc
     limit ?`,
@@ -3927,10 +4116,12 @@ function formatDiscoveryQueueItem(row) {
   const priorityScore =
     activeWatchCount * 30 +
     (row.currentPhase === 'active' ? 28 : row.currentPhase === 'warmup' ? 18 : 10) +
+    (cleanString(row.sourceError, 500) ? 24 : 0) +
     (row.sourceVolatility === 'moving_cycle_page' ? 12 : 0) -
     Math.min(pendingCandidateCount * 8, 24);
 
   return {
+    officialSourceId: row.officialSourceId,
     programId: row.programId,
     programName: row.programName,
     organization: row.organization,
@@ -3941,8 +4132,10 @@ function formatDiscoveryQueueItem(row) {
     sourceVolatility: row.sourceVolatility,
     currentPhase: row.currentPhase,
     nextDiscoveryAt: row.nextDiscoveryAt,
+    discoveryCheckIntervalHours: positiveNumber(row.discoveryCheckIntervalHours, 72),
     activeWatchCount,
     pendingCandidateCount,
+    sourceError: cleanString(row.sourceError, 500),
     priorityScore,
     priorityLabel: priorityScore >= 50 ? 'Review First' : priorityScore >= 28 ? 'Review Soon' : 'Backlog',
     reason: buildDiscoveryReason(row, expectedOpenMonths, activeWatchCount, pendingCandidateCount),
@@ -3956,6 +4149,10 @@ function buildDiscoveryReason(row, expectedOpenMonths, activeWatchCount, pending
 
   if (activeWatchCount > 0) {
     pieces.push(`${activeWatchCount} active watcher${activeWatchCount === 1 ? '' : 's'}`);
+  }
+
+  if (cleanString(row.sourceError, 500)) {
+    pieces.push('official source fetch needs a search fallback');
   }
 
   pieces.push(`${row.currentPhase || 'unknown'} phase`);
@@ -4030,6 +4227,26 @@ async function runDiscoverySearch(env, body = {}) {
 
   const queue = await getDiscoveryQueue(env, queueUrl);
   const discoveryItems = queue.discoveryItems || [];
+
+  if (!discoveryItems.length) {
+    return {
+      ok: true,
+      runId,
+      status: 'no_due_sources',
+      provider,
+      trigger,
+      dryRun,
+      force,
+      generatedAt,
+      searchedPrograms: 0,
+      searchedQueries: 0,
+      foundResults: 0,
+      savedCandidates: 0,
+      updatedCandidates: 0,
+      errorCount: 0,
+      results: [],
+    };
+  }
 
   if (!apiKey) {
     const response = {
@@ -4162,6 +4379,10 @@ async function runDiscoverySearch(env, body = {}) {
       }
     }
 
+    if (!dryRun) {
+      await advanceDiscoverySchedule(env, item, generatedAt, programSummary.queries.some((query) => query.error));
+    }
+
     results.push(programSummary);
   }
 
@@ -4198,6 +4419,32 @@ async function runDiscoverySearch(env, body = {}) {
   });
 
   return response;
+}
+
+async function advanceDiscoverySchedule(env, item, searchedAt, hadError) {
+  const nextDiscoveryAt = calculateNextDiscoverySearchAt(
+    searchedAt,
+    item.discoveryCheckIntervalHours,
+    hadError,
+  );
+
+  await env.DB.prepare(
+    `update source_schedule_profiles
+     set next_discovery_at = ?,
+         updated_at = ?
+     where official_source_id = ?`,
+  )
+    .bind(nextDiscoveryAt, searchedAt, item.officialSourceId)
+    .run();
+
+  item.nextDiscoveryAt = nextDiscoveryAt;
+  return nextDiscoveryAt;
+}
+
+function calculateNextDiscoverySearchAt(searchedAt, configuredIntervalHours, hadError = false) {
+  const normalIntervalHours = positiveNumber(configuredIntervalHours, 72);
+  const intervalHours = hadError ? Math.min(normalIntervalHours, 6) : normalIntervalHours;
+  return addHours(new Date(searchedAt), intervalHours).toISOString();
 }
 
 function normalizeDiscoverySearchProvider(value) {
@@ -6434,6 +6681,7 @@ async function getPendingCandidates(env) {
 async function runProactiveDelivery(env, options = {}) {
   const dryRun = options.dryRun !== false;
   const force = Boolean(options.force);
+  const onboardingOnly = Boolean(options.onboardingOnly);
   const generatedAt = new Date().toISOString();
   const periodKey = getIsoWeekKey(new Date(generatedAt));
   const digestDue = !options.scheduled || force || isWeeklyDeliveryWindow(env, new Date(generatedAt));
@@ -6458,7 +6706,13 @@ async function runProactiveDelivery(env, options = {}) {
   let eligibleRecipients = 0;
 
   for (const recipient of inputs.recipients) {
+    const recipientKey = recipient.workspaceId || recipient.id;
+    const onboardingBatchDedupeKey = `onboarding:${recipientKey}`;
+    const onboardingRequested = shouldCreateFocusOnboardingDigest(env, recipient, options);
+    const onboardingAlreadySent = inputs.sentBatchDedupeKeys.has(onboardingBatchDedupeKey);
+    const onboardingDue = onboardingRequested && !onboardingAlreadySent;
     const relationshipByProgram = buildDeliveryRelationshipMap(recipient, inputs);
+    const onboardingCandidates = [];
     const immediateCandidates = [];
     const digestCandidates = [];
     let suppressedPreviouslySent = false;
@@ -6475,12 +6729,71 @@ async function runProactiveDelivery(env, options = {}) {
       const cycleKey = inferProgramCycleKey(program);
       const copyState = buildDeliveryCopyState(program, { now: generatedAt });
       const newlyVerified = isNewlyAvailableForProfile(program, recipient, generatedAt);
+
+      if (onboardingDue) {
+        const onboardingDeliveryClass = classifyOnboardingCandidate(program, { now: generatedAt });
+        if (onboardingDeliveryClass) {
+          const onboardingEligibility = evaluateStudentDelivery({
+            deliveryClass: onboardingDeliveryClass,
+            relationship,
+            programCycleKey: cycleKey,
+            isFutureCycle: isProgramCycleInFuture(cycleKey, generatedAt),
+            watchSpecific: false,
+          });
+          const onboardingChangeKey = buildDeliverySemanticChangeKey({
+            status: program.status,
+            deadline: program.deadline,
+            officialUrl: program.officialUrl,
+          });
+          const onboardingDedupeKey = buildDeliveryDedupeKey({
+            watchRequestId: recipientKey,
+            programId: program.programId,
+            cycleKey,
+            deliveryClass: onboardingDeliveryClass,
+            changeKey: onboardingChangeKey,
+          });
+
+          if (
+            onboardingEligibility.eligible &&
+            !inputs.sentItemDedupeKeys.has(onboardingDedupeKey) &&
+            !inputs.sentSemanticItemDedupeKeys.has(onboardingDedupeKey)
+          ) {
+            onboardingCandidates.push({
+              ...program,
+              deliveryClass: onboardingDeliveryClass,
+              newlyVerified,
+              cycleKey,
+              dedupeKey: onboardingDedupeKey,
+              eligible: true,
+              score: match.score + (watched ? 25 : 0),
+              isWatching: watched,
+              matchReason: watched
+                ? 'You asked ApplyFirst to watch this program.'
+                : buildStudentMatchReason(recipient, program, match),
+              eligibilityUnclear: onboardingEligibility.eligibilityUnclear,
+              currentOfficialStatus: copyState.currentStatusVerified,
+              repeatCycle: watched && hasPriorApplicationInDifferentCycle(
+                relationship.applicationAttempts,
+                cycleKey,
+              ),
+            });
+          }
+        }
+      }
+
+      if (onboardingDue || onboardingOnly) continue;
+
       const freshActionable = !watched && match.matches && isFreshActionableForProfile(
         program,
         recipient,
         generatedAt,
       );
-      const deliveryClass = classifyDeliveryCandidate({
+      const deadlineReminderStage = getDeadlineReminderStage(program, {
+        now: generatedAt,
+        sendTiming: recipient.sendTiming,
+        windowDays: Number(env.PROACTIVE_DEADLINE_REMINDER_DAYS || 7),
+      });
+      const deliveryClass = deadlineReminderStage ? 'act_now' : classifyDeliveryCandidate({
         status: program.status,
         confidence: program.confidence,
         verified: program.verified,
@@ -6494,7 +6807,7 @@ async function runProactiveDelivery(env, options = {}) {
       });
 
       // Watched act-now alerts keep using the existing immediate alert path.
-      if (!deliveryClass || (deliveryClass === 'act_now' && watched)) continue;
+      if (!deliveryClass || (deliveryClass === 'act_now' && watched && !deadlineReminderStage)) continue;
 
       const eligibility = evaluateStudentDelivery({
         deliveryClass,
@@ -6506,10 +6819,11 @@ async function runProactiveDelivery(env, options = {}) {
 
       if (!eligibility.eligible) continue;
 
-      const changeKey = cleanString(
-        program.statusChangedAt || program.verifiedAt || program.updatedAt || 'verified',
-        120,
-      );
+      const changeKey = buildDeliverySemanticChangeKey({
+        status: program.status,
+        deadline: program.deadline,
+        officialUrl: program.officialUrl,
+      }) + (deadlineReminderStage ? `|${deadlineReminderStage}` : '');
       const dedupeKey = buildDeliveryDedupeKey({
         watchRequestId: recipient.workspaceId || recipient.id,
         programId: program.programId,
@@ -6519,7 +6833,10 @@ async function runProactiveDelivery(env, options = {}) {
       });
       const programCycle = `${program.programId}:${cycleKey || 'unspecified'}`;
 
-      if (inputs.sentItemDedupeKeys.has(dedupeKey)) {
+      if (
+        inputs.sentItemDedupeKeys.has(dedupeKey) ||
+        inputs.sentSemanticItemDedupeKeys.has(dedupeKey)
+      ) {
         suppressedPreviouslySent = true;
         continue;
       }
@@ -6542,6 +6859,7 @@ async function runProactiveDelivery(env, options = {}) {
           relationship.applicationAttempts,
           cycleKey,
         ),
+        deliveryIntent: deadlineReminderStage || '',
         programCycle,
       };
 
@@ -6552,7 +6870,88 @@ async function runProactiveDelivery(env, options = {}) {
       }
     }
 
-    const immediateLimit = Math.max(1, Math.min(Number(env.PROACTIVE_IMMEDIATE_MAX_PER_RUN || 3), 5));
+    if (onboardingDue) {
+      const items = selectOnboardingItems(onboardingCandidates, {
+        limit: Number(env.PROACTIVE_ONBOARDING_MAX_ITEMS || 25),
+      });
+
+      if (items.length) {
+        recipientHasEligibleDelivery = true;
+        recipientProducedResult = true;
+
+        if (dryRun) {
+          results.push({
+            watchRequestId: recipient.id,
+            status: 'ready',
+            deliveryClass: 'discover',
+            deliveryFormat: 'digest',
+            entrySource: 'focus_onboarding_digest',
+            items: items.map((item) => toPublicDeliveryPreview(item, recipient)),
+          });
+        } else {
+          const prepared = await createProactiveDeliveryBatch(env, {
+            recipient,
+            deliveryClass: 'discover',
+            deliveryFormat: 'digest',
+            entrySource: 'focus_onboarding_digest',
+            periodKey: 'initial',
+            dedupeKey: onboardingBatchDedupeKey,
+            items,
+          });
+
+          if (prepared.status === 'already_sent') {
+            results.push({ watchRequestId: recipient.id, status: 'already_sent', items: [] });
+          } else {
+            const delivery = await sendProactiveDigestEmail(env, recipient, prepared, items);
+            await updateProactiveDeliveryBatch(env, prepared.batchId, delivery);
+            if (delivery.status === 'sent') {
+              inputs.sentBatchDedupeKeys.add(onboardingBatchDedupeKey);
+              for (const item of items) {
+                inputs.sentItemDedupeKeys.add(item.dedupeKey);
+                inputs.sentSemanticItemDedupeKeys.add(item.dedupeKey);
+              }
+            }
+            results.push({
+              watchRequestId: recipient.id,
+              status: delivery.status,
+              deliveryClass: 'discover',
+              deliveryFormat: 'digest',
+              entrySource: 'focus_onboarding_digest',
+              itemCount: items.length,
+              batchId: prepared.batchId,
+            });
+          }
+        }
+      }
+
+      if (recipientHasEligibleDelivery) eligibleRecipients += 1;
+      if (!recipientProducedResult) {
+        results.push({ watchRequestId: recipient.id, status: 'no_match', items: [] });
+      }
+      continue;
+    }
+
+    if (onboardingOnly) {
+      results.push({
+        watchRequestId: recipient.id,
+        status: onboardingAlreadySent ? 'already_sent' : 'no_match',
+        items: [],
+      });
+      continue;
+    }
+
+    const immediateDailyCap = Math.max(
+      1,
+      Math.min(Number(env.PROACTIVE_IMMEDIATE_DAILY_CAP || 2), 5),
+    );
+    const immediateSentLast24Hours = Number(
+      inputs.immediateSentLast24HoursByRecipient.get(recipientKey) || 0,
+    );
+    const immediateLimit = Math.max(0, Math.min(
+      Number(env.PROACTIVE_IMMEDIATE_MAX_PER_RUN || 3),
+      5,
+      immediateDailyCap - immediateSentLast24Hours,
+    ));
     const rankedImmediateCandidates = [...immediateCandidates]
       .sort((left, right) => Number(right.score || 0) - Number(left.score || 0))
       .slice(0, immediateLimit);
@@ -6598,6 +6997,7 @@ async function runProactiveDelivery(env, options = {}) {
       await updateProactiveDeliveryBatch(env, prepared.batchId, delivery);
       if (delivery.status === 'sent') {
         inputs.sentItemDedupeKeys.add(item.dedupeKey);
+        inputs.sentSemanticItemDedupeKeys.add(item.dedupeKey);
         inputs.sentBatchDedupeKeys.add(batchDedupeKey);
       }
       results.push({
@@ -6613,7 +7013,7 @@ async function runProactiveDelivery(env, options = {}) {
     if (digestDue) {
       const items = selectDigestItems(digestCandidates, {
         limit: Number(env.PROACTIVE_DIGEST_MAX_ITEMS || 5),
-        immediateProgramCycles: inputs.immediateProgramCyclesByRecipient.get(
+        immediateProgramCycles: inputs.digestSuppressedProgramCyclesByRecipient.get(
           recipient.workspaceId || recipient.id,
         ) || [],
       });
@@ -6841,7 +7241,23 @@ async function getProactiveDeliveryInputs(env, preferredWatchRequestId = '') {
       request.priority,
       request.send_timing as sendTiming,
       request.unsubscribe_token as unsubscribeToken,
-      request.created_at as createdAt
+      request.created_at as createdAt,
+      coalesce(
+        case
+          when request.workspace_id is not null and request.workspace_id != '' then (
+            select min(history.created_at)
+            from watch_requests history
+            where history.workspace_id = request.workspace_id
+          )
+          else (
+            select min(history.created_at)
+            from watch_requests history
+            where (history.workspace_id is null or history.workspace_id = '')
+              and lower(trim(history.email)) = lower(trim(request.email))
+          )
+        end,
+        request.created_at
+      ) as firstProfileCreatedAt
      from watch_requests request
      where request.status = 'active'
        and request.email is not null
@@ -6890,6 +7306,7 @@ async function getProactiveDeliveryInputs(env, preferredWatchRequestId = '') {
     attemptsResult,
     sentItemsResult,
     sentBatchesResult,
+    sentImmediateLast24HoursResult,
     legacyImmediateResult,
   ] = await Promise.all([
     preferredWatchRequestId
@@ -6977,21 +7394,37 @@ async function getProactiveDeliveryInputs(env, preferredWatchRequestId = '') {
     ).all(),
     env.DB.prepare(
       `select
-        batch.workspace_id as workspaceId,
+        coalesce(nullif(batch.workspace_id, ''), nullif(delivery_request.workspace_id, '')) as workspaceId,
         batch.watch_request_id as watchRequestId,
         item.program_id as programId,
         item.cycle_key as cycleKey,
         item.delivery_class as deliveryClass,
         item.dedupe_key as dedupeKey,
-        batch.delivery_format as deliveryFormat
+        item.status_snapshot as statusSnapshot,
+        item.deadline_snapshot as deadlineSnapshot,
+        item.official_url as officialUrl,
+        batch.delivery_format as deliveryFormat,
+        batch.entry_source as entrySource
        from proactive_delivery_items item
        inner join proactive_delivery_batches batch on batch.id = item.batch_id
+       left join watch_requests delivery_request on delivery_request.id = batch.watch_request_id
        where batch.status = 'sent'`,
     ).all(),
     env.DB.prepare(
       `select dedupe_key as dedupeKey
        from proactive_delivery_batches
        where status = 'sent'`,
+    ).all(),
+    env.DB.prepare(
+      `select
+        coalesce(nullif(batch.workspace_id, ''), nullif(request.workspace_id, ''), batch.watch_request_id) as recipientKey,
+        count(*) as sentCount
+       from proactive_delivery_batches batch
+       left join watch_requests request on request.id = batch.watch_request_id
+       where batch.status = 'sent'
+         and batch.delivery_format = 'immediate'
+         and julianday(batch.sent_at) >= julianday('now', '-24 hours')
+       group by coalesce(nullif(batch.workspace_id, ''), nullif(request.workspace_id, ''), batch.watch_request_id)`,
     ).all(),
     env.DB.prepare(
       `select
@@ -7005,7 +7438,15 @@ async function getProactiveDeliveryInputs(env, preferredWatchRequestId = '') {
     ).all(),
   ]);
 
-  const immediateProgramCyclesByRecipient = new Map();
+  const digestSuppressedProgramCyclesByRecipient = new Map();
+  const immediateSentLast24HoursByRecipient = new Map(
+    (sentImmediateLast24HoursResult.results || []).map((row) => [
+      row.recipientKey,
+      Number(row.sentCount || 0),
+    ]),
+  );
+  const sentItemDedupeKeys = new Set();
+  const sentSemanticItemDedupeKeys = new Set();
   const programs = (programsResult.results || []).map((row) => ({
     ...row,
     classYears: parseJsonArray(row.classYears),
@@ -7014,12 +7455,37 @@ async function getProactiveDeliveryInputs(env, preferredWatchRequestId = '') {
   }));
   const programById = new Map(programs.map((program) => [program.programId, program]));
   for (const row of sentItemsResult.results || []) {
-    if (row.deliveryFormat !== 'immediate') continue;
-    const recipientKey = row.workspaceId || row.watchRequestId;
-    if (!immediateProgramCyclesByRecipient.has(recipientKey)) {
-      immediateProgramCyclesByRecipient.set(recipientKey, new Set());
+    sentItemDedupeKeys.add(row.dedupeKey);
+    if (row.workspaceId && row.watchRequestId && row.dedupeKey) {
+      const legacyPrefix = `${encodeURIComponent(row.watchRequestId)}:`;
+      if (row.dedupeKey.startsWith(legacyPrefix)) {
+        sentItemDedupeKeys.add(
+          `${encodeURIComponent(row.workspaceId)}:${row.dedupeKey.slice(legacyPrefix.length)}`,
+        );
+      }
     }
-    immediateProgramCyclesByRecipient.get(recipientKey).add(
+
+    sentSemanticItemDedupeKeys.add(buildDeliveryDedupeKey({
+      watchRequestId: row.workspaceId || row.watchRequestId,
+      programId: row.programId,
+      cycleKey: row.cycleKey,
+      deliveryClass: row.deliveryClass,
+      changeKey: buildDeliverySemanticChangeKey({
+        status: row.statusSnapshot,
+        deadline: row.deadlineSnapshot,
+        officialUrl: row.officialUrl,
+      }),
+    }));
+
+    if (
+      row.deliveryFormat !== 'immediate' &&
+      row.entrySource !== 'focus_onboarding_digest'
+    ) continue;
+    const recipientKey = row.workspaceId || row.watchRequestId;
+    if (!digestSuppressedProgramCyclesByRecipient.has(recipientKey)) {
+      digestSuppressedProgramCyclesByRecipient.set(recipientKey, new Set());
+    }
+    digestSuppressedProgramCyclesByRecipient.get(recipientKey).add(
       `${row.programId}:${cleanString(row.cycleKey, 80) || 'unspecified'}`,
     );
   }
@@ -7027,10 +7493,10 @@ async function getProactiveDeliveryInputs(env, preferredWatchRequestId = '') {
   for (const row of legacyImmediateResult.results || []) {
     const recipientKey = row.workspaceId || row.watchRequestId;
     const cycleKey = inferProgramCycleKey(programById.get(row.programId) || {});
-    if (!immediateProgramCyclesByRecipient.has(recipientKey)) {
-      immediateProgramCyclesByRecipient.set(recipientKey, new Set());
+    if (!digestSuppressedProgramCyclesByRecipient.has(recipientKey)) {
+      digestSuppressedProgramCyclesByRecipient.set(recipientKey, new Set());
     }
-    immediateProgramCyclesByRecipient.get(recipientKey).add(
+    digestSuppressedProgramCyclesByRecipient.get(recipientKey).add(
       `${row.programId}:${cycleKey || 'unspecified'}`,
     );
   }
@@ -7057,9 +7523,11 @@ async function getProactiveDeliveryInputs(env, preferredWatchRequestId = '') {
     evidence: evidenceResult.results || [],
     watches: watchesResult.results || [],
     attempts: attemptsResult.results || [],
-    sentItemDedupeKeys: new Set((sentItemsResult.results || []).map((row) => row.dedupeKey)),
+    sentItemDedupeKeys,
+    sentSemanticItemDedupeKeys,
     sentBatchDedupeKeys: new Set((sentBatchesResult.results || []).map((row) => row.dedupeKey)),
-    immediateProgramCyclesByRecipient,
+    digestSuppressedProgramCyclesByRecipient,
+    immediateSentLast24HoursByRecipient,
   };
 }
 
@@ -7113,6 +7581,21 @@ function isNewlyAvailableForProfile(program, recipient, nowIso) {
   return (
     (Number.isFinite(verifiedAt) && now - verifiedAt <= discoveryWindowMs) ||
     (Number.isFinite(requestCreatedAt) && now - requestCreatedAt <= newProfileWindowMs)
+  );
+}
+
+function shouldCreateFocusOnboardingDigest(env, recipient, options = {}) {
+  if (options.onboardingOnly === true) return true;
+  if (options.scheduled !== true) return false;
+
+  const rolloutAt = Date.parse(env.PROACTIVE_ONBOARDING_START_AT || '');
+  const firstProfileCreatedAt = Date.parse(
+    recipient.firstProfileCreatedAt || recipient.createdAt || '',
+  );
+  return Boolean(
+    Number.isFinite(rolloutAt) &&
+    Number.isFinite(firstProfileCreatedAt) &&
+    firstProfileCreatedAt >= rolloutAt
   );
 }
 
@@ -7218,7 +7701,13 @@ async function createProactiveDeliveryBatch(env, input) {
     itemRows.push({ ...item, itemId: savedItem?.id || itemId });
   }
 
-  return { status: 'planned', batchId, engagementToken, items: itemRows };
+  return {
+    status: 'planned',
+    batchId,
+    engagementToken,
+    entrySource: input.entrySource,
+    items: itemRows,
+  };
 }
 
 async function updateProactiveDeliveryBatch(env, batchId, delivery) {
@@ -7269,6 +7758,7 @@ async function sendProactiveImmediateEmail(env, recipient, prepared, item) {
       curatedStatusReviewedAt: proactiveItem.curatedStatusReviewedAt,
       curatedDeadline: proactiveItem.curatedDeadline,
       repeatCycle: proactiveItem.repeatCycle === true,
+      deliveryIntent: proactiveItem.deliveryIntent || '',
       summary: `Source-confirmed update for a program that ${proactiveItem.matchReason || 'matches My Focus'}.`,
     },
     recipient,
@@ -7324,6 +7814,7 @@ function toPublicDeliveryPreview(item, recipient = {}) {
     programName: item.programName,
     organization: item.organization,
     deliveryClass: item.deliveryClass,
+    deliveryIntent: item.deliveryIntent || '',
     status: item.status,
     deadline: item.deadline,
     matchReason: item.matchReason,
@@ -7340,6 +7831,10 @@ function toPublicDeliveryPreview(item, recipient = {}) {
 function buildDeliveryNextStep(item, recipient = {}) {
   const copyState = buildDeliveryCopyState(item);
   const eligibility = buildDeliveryEligibilityState(item, recipient);
+
+  if (item.deliveryIntent === 'deadline_soon' && copyState.deadlineVerified) {
+    return 'Review the official requirements and submit before the verified deadline.';
+  }
 
   if (['current_open', 'current_open_with_deadline'].includes(copyState.stateKey)) {
     if (item.repeatCycle === true) {
@@ -8167,6 +8662,93 @@ async function readTextWithLimit(response, maxBytes) {
   }
 
   return `${output}${decoder.decode()}`;
+}
+
+async function fetchOfficialSourceDocument(source, env) {
+  const structuredRequest = buildStructuredSourceRequest(source);
+
+  if (structuredRequest) {
+    try {
+      const response = await fetchWithSourceTimeout(
+        structuredRequest.endpoint,
+        env,
+        'application/json,text/plain;q=0.8,*/*;q=0.5',
+      );
+
+      if (response.status === 404 && structuredRequest.isDirectPosting) {
+        const normalizedText = buildUnpublishedPostingText(source);
+        return {
+          httpStatus: response.status,
+          rawText: normalizedText,
+          normalizedText,
+        };
+      }
+
+      if (response.ok) {
+        const rawText = await readTextWithLimit(response, MAX_SOURCE_BYTES);
+        const payload = JSON.parse(rawText);
+        const normalizedText = formatStructuredSourcePayload(structuredRequest, payload, source);
+
+        if (normalizedText) {
+          return {
+            httpStatus: response.status,
+            rawText,
+            normalizedText,
+          };
+        }
+      }
+    } catch (error) {
+      console.warn(
+        JSON.stringify({
+          event: 'structured_source_adapter_fallback',
+          programId: cleanString(source.program_id, 120),
+          adapter: structuredRequest.adapter,
+          error: cleanString(error?.message || String(error), 300),
+        }),
+      );
+    }
+  }
+
+  const response = await fetchWithSourceTimeout(
+    source.url,
+    env,
+    'text/html,application/xhtml+xml,text/plain;q=0.8,*/*;q=0.5',
+  );
+
+  if (!response.ok) {
+    throw new Error(`Official source returned HTTP ${response.status}.`);
+  }
+
+  const rawText = await readTextWithLimit(response, MAX_SOURCE_BYTES);
+  const structuredText = extractStructuredJobPostingText(rawText, new Date(), source);
+  const pageText = normalizePageText(rawText);
+  const normalizedText = [structuredText, pageText].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+
+  return {
+    httpStatus: response.status,
+    rawText,
+    normalizedText,
+  };
+}
+
+async function fetchWithSourceTimeout(url, env, accept) {
+  const abortController = new AbortController();
+  const timeoutId = setTimeout(
+    () => abortController.abort('Official source fetch timed out.'),
+    Number(env.WATCH_FETCH_TIMEOUT_MS || 12_000),
+  );
+
+  try {
+    return await fetch(url, {
+      headers: {
+        'user-agent': 'ApplyFirstBetaWatcher/0.1 (+https://applyfirst-careers.pages.dev)',
+        accept,
+      },
+      signal: abortController.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 function extractSourceStatusSignals(sourceText, referenceDate = new Date()) {
@@ -9079,6 +9661,10 @@ async function hashAccessCode(value) {
   return sha256Hex(`applyfirst-beta-workspace:${normalizeAccessCode(value)}`);
 }
 
+async function hashRecipientEmail(value) {
+  return sha256Hex(`applyfirst-waitlist-email:${cleanString(value, 320).trim().toLowerCase()}`);
+}
+
 function createAccessCodeLabel(value) {
   const accessCode = normalizeAccessCode(value);
 
@@ -9636,7 +10222,11 @@ function buildAlertMessage(env, candidate, recipient, proactiveContext = null) {
 }
 
 function buildProactiveDigestMessage(env, recipient, prepared, items) {
-  const subject = `${items.length} ${items.length === 1 ? 'opportunity' : 'opportunities'} worth a look this week`;
+  const isOnboarding = prepared.entrySource === 'focus_onboarding_digest';
+  const subject = isOnboarding
+    ? `Your ApplyFirst matches: ${items.length} ${items.length === 1 ? 'opportunity' : 'opportunities'}`
+    : `${items.length} ${items.length === 1 ? 'opportunity' : 'opportunities'} worth a look this week`;
+  const headerLabel = isOnboarding ? 'ApplyFirst Matches' : 'ApplyFirst Weekly Update';
   const focusSummary = buildDigestFocusSummary(recipient);
   const unsubscribeUrl = buildUnsubscribeUrl(env, recipient);
   const textItems = items.flatMap((item, index) => {
@@ -9705,7 +10295,7 @@ function buildProactiveDigestMessage(env, recipient, prepared, items) {
     <div style="margin:0;padding:0;background:#f6f8fb">
       <div style="max-width:620px;margin:0 auto;padding:28px 18px;font-family:Inter,Arial,sans-serif;color:#17212f;line-height:1.55">
         <div style="background:#ffffff;border:1px solid #dce5ee;border-radius:14px;padding:24px;box-shadow:0 12px 30px rgba(23,33,47,0.06)">
-          <p style="margin:0 0 8px;color:#0f7f96;font-size:12px;font-weight:800;text-transform:uppercase">ApplyFirst Weekly Update</p>
+          <p style="margin:0 0 8px;color:#0f7f96;font-size:12px;font-weight:800;text-transform:uppercase">${escapeHtml(headerLabel)}</p>
           <h1 style="margin:0 0 10px;font-size:24px;line-height:1.22;color:#111827">${escapeHtml(subject)}</h1>
           <p style="margin:0 0 4px;color:#425066;font-size:14px">${escapeHtml(focusSummary)}</p>
           ${htmlItems}
@@ -9749,23 +10339,36 @@ function buildStudentAlertCopy(candidate, recipient = {}) {
   });
   const verifiedOpen = ['current_open', 'current_open_with_deadline'].includes(copyState.stateKey);
   const verifiedDeadline = copyState.stateKey === 'current_deadline';
+  const deadlineReminder = candidate.deliveryIntent === 'deadline_soon' && copyState.deadlineVerified;
   const repeatCycle = candidate.repeatCycle === true && verifiedOpen;
-  const label = verifiedOpen ? 'Opening Signal' : verifiedDeadline ? 'Deadline Signal' : 'Monitoring Update';
-  const headline = repeatCycle
+  const label = deadlineReminder
+    ? 'Deadline Reminder'
+    : verifiedOpen
+      ? 'Opening Signal'
+      : verifiedDeadline
+        ? 'Deadline Signal'
+        : 'Monitoring Update';
+  const headline = deadlineReminder
+    ? `${programName} deadline is approaching`
+    : repeatCycle
     ? `${programName} applications are open again`
     : verifiedOpen
       ? `${programName} is now open`
       : verifiedDeadline
         ? `${programName} has a verified deadline`
         : `${programName} has a monitoring update`;
-  const headlineSuffix = repeatCycle
+  const headlineSuffix = deadlineReminder
+    ? 'deadline is approaching'
+    : repeatCycle
     ? 'applications are open again'
     : verifiedOpen
       ? 'is now open'
       : verifiedDeadline
         ? 'has a verified deadline'
         : 'has a monitoring update';
-  const summary = repeatCycle
+  const summary = deadlineReminder
+    ? 'The verified application deadline is approaching. Review the official requirements and submit before it closes.'
+    : repeatCycle
     ? 'A new application cycle is now open. ApplyFirst detected the current opening on the official source.'
     : verifiedOpen
       ? 'Applications are now open. ApplyFirst detected the current opening on the official source.'
@@ -9790,7 +10393,9 @@ function buildStudentAlertCopy(candidate, recipient = {}) {
     trustLine: copyState.trustLine,
     eligibilityNote: buildDeliveryEligibilityNote(candidate, recipient),
     repeatCycle,
-    betaNote: verifiedOpen
+    betaNote: deadlineReminder
+      ? 'Deadline verified on the official source. Confirm final eligibility and submission requirements before applying.'
+      : verifiedOpen
       ? 'Current status verified on the official source. Confirm final eligibility and requirements before applying.'
       : verifiedDeadline
         ? 'Current deadline verified on the official source. Confirm application status and eligibility before applying.'
@@ -9983,6 +10588,7 @@ export {
   buildAlertMessage,
   buildReadinessItem,
   buildProactiveDigestMessage,
+  calculateNextDiscoverySearchAt,
   calculateAccuracyCoverage,
   calculateKnownOpeningCoverage,
   calculateNotificationLatency,
@@ -9992,6 +10598,7 @@ export {
   classifySourceText,
   getCuratedTemporalExpiry,
   isEligibleActivation,
+  parseConfiguredProgramIds,
   runProactiveDelivery,
   shouldRunScheduledProactiveDelivery,
 };

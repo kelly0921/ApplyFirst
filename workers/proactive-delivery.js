@@ -4,6 +4,7 @@ const DELIVERY_ENTRY_SOURCES = new Set([
   'search',
   'watched_program_alert',
   'focus_match_alert',
+  'focus_onboarding_digest',
   'personalized_discovery_digest',
   'prepare_alert',
   'direct_or_shared_link',
@@ -80,6 +81,29 @@ function classifyDeliveryCandidate(input = {}) {
     return 'discover';
   }
 
+  return null;
+}
+
+function classifyOnboardingCandidate(item = {}, options = {}) {
+  const status = String(item.status || '').trim().toLowerCase();
+  const confidence = String(item.confidence || '').trim().toLowerCase();
+  const copyState = buildDeliveryCopyState(item, options);
+
+  if (
+    item.verified !== true ||
+    confidence !== 'high' ||
+    status === 'needs_review' ||
+    ['source_unavailable', 'source_confirmation_pending'].includes(copyState.stateKey)
+  ) {
+    return null;
+  }
+
+  if (['current_open', 'current_open_with_deadline', 'current_deadline'].includes(copyState.stateKey)) {
+    return 'act_now';
+  }
+
+  if (copyState.stateKey === 'expected_cycle') return 'prepare';
+  if (copyState.sourceConfirmed && DISCOVERABLE_STATUSES.has(status)) return 'discover';
   return null;
 }
 
@@ -351,6 +375,15 @@ function isPastExplicitDate(value, now) {
   return parsed < startOfToday.getTime();
 }
 
+function parseExplicitDeadlineTimestamp(value) {
+  const text = String(value || '').trim();
+  const match = text.match(
+    /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2}),?\s+(20\d{2})\b/i,
+  );
+  if (!match) return Number.NaN;
+  return Date.parse(`${match[1]} ${match[2]}, ${match[3]} UTC`);
+}
+
 function toTimestamp(value) {
   if (value instanceof Date) return value.getTime();
   if (typeof value === 'number') return value;
@@ -441,6 +474,48 @@ function selectDigestItems(candidates = [], options = {}) {
   return selected;
 }
 
+function selectOnboardingItems(candidates = [], options = {}) {
+  const limit = Math.max(1, Math.min(Number(options.limit) || 25, 50));
+  const selected = [];
+  const seen = new Set();
+
+  for (const candidate of [...candidates].sort(compareDigestCandidates)) {
+    if (!candidate?.eligible || !DELIVERY_CLASSES.has(candidate.deliveryClass)) continue;
+
+    const programCycle = `${candidate.programId}:${normalizeCycleKey(candidate.cycleKey) || 'unspecified'}`;
+    if (seen.has(programCycle)) continue;
+
+    seen.add(programCycle);
+    selected.push(candidate);
+    if (selected.length >= limit) break;
+  }
+
+  return selected;
+}
+
+function getDeadlineReminderStage(item = {}, options = {}) {
+  const sendTiming = String(options.sendTiming || '').trim();
+  if (!['openAndDeadline', 'prepOpenDeadline'].includes(sendTiming)) return '';
+
+  const now = toTimestamp(options.now || new Date().toISOString());
+  const windowDays = Math.max(1, Math.min(Number(options.windowDays) || 7, 30));
+  const copyState = buildDeliveryCopyState(item, { now });
+  if (
+    !copyState.deadlineVerified ||
+    !['current_open_with_deadline', 'current_deadline'].includes(copyState.stateKey)
+  ) {
+    return '';
+  }
+
+  const deadlineAt = parseExplicitDeadlineTimestamp(item.deadline || copyState.timingValue);
+  if (!Number.isFinite(now) || !Number.isFinite(deadlineAt)) return '';
+
+  const endOfDeadlineDay = deadlineAt + 24 * 60 * 60 * 1000 - 1;
+  const remainingMs = endOfDeadlineDay - now;
+  if (remainingMs < 0 || remainingMs > windowDays * 24 * 60 * 60 * 1000) return '';
+  return 'deadline_soon';
+}
+
 function getDigestAttentionReason(candidate = {}) {
   const copyState = buildDeliveryCopyState(candidate);
   if (
@@ -526,6 +601,14 @@ function buildDeliveryDedupeKey(input = {}) {
   ];
 
   return parts.map((part) => encodeURIComponent(String(part || '').trim())).join(':');
+}
+
+function buildDeliverySemanticChangeKey(input = {}) {
+  return [
+    normalizeSemanticValue(input.status) || 'unknown',
+    normalizeSemanticValue(input.deadline) || 'no-deadline',
+    normalizeOfficialUrl(input.officialUrl) || 'no-url',
+  ].join('|');
 }
 
 function getDeliveryBatchDisposition(existing = null, nowValue = Date.now()) {
@@ -651,6 +734,29 @@ function includesCaseInsensitive(values, target) {
   return values.some((value) => value.toLowerCase() === normalizedTarget);
 }
 
+function normalizeSemanticValue(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function normalizeOfficialUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+
+  try {
+    const url = new URL(raw);
+    url.hash = '';
+    for (const key of [...url.searchParams.keys()]) {
+      if (/^(?:utm_.+|source|ref)$/i.test(key)) {
+        url.searchParams.delete(key);
+      }
+    }
+    url.searchParams.sort();
+    return url.toString().replace(/\/$/, '');
+  } catch {
+    return normalizeSemanticValue(raw).replace(/\/$/, '');
+  }
+}
+
 function suppress(suppressionReason) {
   return { eligible: false, suppressionReason, relevanceKnown: false, eligibilityUnclear: false };
 }
@@ -666,12 +772,15 @@ export {
   DELIVERY_ENTRY_SOURCES,
   buildDeliveryCopyState,
   buildDeliveryDedupeKey,
+  buildDeliverySemanticChangeKey,
   buildFocusDescription,
   buildStudentMatchReason,
   classifyDeliveryCandidate,
+  classifyOnboardingCandidate,
   evaluateStudentDelivery,
   formatFocusRoleTrack,
   getDeliveryBatchDisposition,
+  getDeadlineReminderStage,
   getDigestAttentionReason,
   hasPriorApplicationInDifferentCycle,
   inferProgramCycleKey,
@@ -681,4 +790,5 @@ export {
   normalizeDeliveryClass,
   normalizeDeliveryEntrySource,
   selectDigestItems,
+  selectOnboardingItems,
 };

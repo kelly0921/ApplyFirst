@@ -232,7 +232,8 @@ Use a sender such as `alerts@yourdomain.com` for `ALERT_FROM_EMAIL`. Optional Wo
 - `SMS_WEBHOOK_TOKEN` if the custom webhook needs a bearer token
 - `WATCH_RUN_LIMIT=25` to cap each scheduled run
 - `AUTO_SEND_WATCHED_OPEN_ALERTS=true` to send high-confidence opening transitions automatically by the student's selected contact method
-- `AUTO_ALERT_EXISTING_OPEN_ON_WATCH=true` to notify a new watcher when a followed program is already open
+- `AUTO_ALERT_EXISTING_OPEN_ON_WATCH=false` because a new alert setup receives one consolidated Focus-match digest instead of separate already-open emails
+- `PROACTIVE_ONBOARDING_START_AT`, `PROACTIVE_ONBOARDING_MAX_ITEMS=25`, `PROACTIVE_DEADLINE_REMINDER_DAYS=7`, and `PROACTIVE_IMMEDIATE_DAILY_CAP=2` to control first-run matching, one-time deadline reminders, and burst safety
 - `DISCOVERY_SEARCH_PROVIDER=brave` or `tavily` for current-cycle URL discovery search
 - `DISCOVERY_SEARCH_COUNTRY=US` for search localization
 - `DISCOVERY_SEARCH_LIMIT=5`, `DISCOVERY_SEARCH_QUERIES_PER_PROGRAM=3`, and `DISCOVERY_SEARCH_RESULTS_PER_QUERY=5` to cap discovery search cost and noise
