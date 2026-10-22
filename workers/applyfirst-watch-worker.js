@@ -6706,7 +6706,7 @@ async function runProactiveDelivery(env, options = {}) {
   let eligibleRecipients = 0;
 
   for (const recipient of inputs.recipients) {
-    const recipientKey = recipient.workspaceId || recipient.id;
+    const recipientKey = recipient.deliveryRecipientKey || recipient.workspaceId || recipient.id;
     const onboardingBatchDedupeKey = `onboarding:${recipientKey}`;
     const onboardingRequested = shouldCreateFocusOnboardingDigest(env, recipient, options);
     const onboardingAlreadySent = inputs.sentBatchDedupeKeys.has(onboardingBatchDedupeKey);
@@ -6825,7 +6825,7 @@ async function runProactiveDelivery(env, options = {}) {
         officialUrl: program.officialUrl,
       }) + (deadlineReminderStage ? `|${deadlineReminderStage}` : '');
       const dedupeKey = buildDeliveryDedupeKey({
-        watchRequestId: recipient.workspaceId || recipient.id,
+        watchRequestId: recipientKey,
         programId: program.programId,
         cycleKey,
         deliveryClass,
@@ -7014,14 +7014,14 @@ async function runProactiveDelivery(env, options = {}) {
       const items = selectDigestItems(digestCandidates, {
         limit: Number(env.PROACTIVE_DIGEST_MAX_ITEMS || 5),
         immediateProgramCycles: inputs.digestSuppressedProgramCyclesByRecipient.get(
-          recipient.workspaceId || recipient.id,
+          recipientKey,
         ) || [],
       });
 
       if (items.length) {
         const deliveryClass = items.every((item) => item.deliveryClass === 'prepare') ? 'prepare' : 'discover';
         const entrySource = deliveryClass === 'prepare' ? 'prepare_alert' : 'personalized_discovery_digest';
-        const batchDedupeKey = `weekly:${recipient.workspaceId || recipient.id}:${periodKey}`;
+        const batchDedupeKey = `weekly:${recipientKey}:${periodKey}`;
 
         if (inputs.sentBatchDedupeKeys.has(batchDedupeKey)) {
           suppressedPreviouslySent = true;
@@ -7184,8 +7184,9 @@ async function evaluateImmediateAlertEligibility(env, candidate, recipient) {
 async function prepareImmediateDeliveryBatch(env, candidate, recipient) {
   const cycleKey = inferProgramCycleKey(candidate);
   const detectedSignal = extractDetectedSignal(candidate.summary);
+  const recipientKey = await getDeliveryRecipientKey(recipient);
   const itemDedupeKey = buildDeliveryDedupeKey({
-    watchRequestId: recipient.workspaceId || recipient.id,
+    watchRequestId: recipientKey,
     programId: candidate.programId,
     cycleKey,
     deliveryClass: 'act_now',
@@ -7396,6 +7397,7 @@ async function getProactiveDeliveryInputs(env, preferredWatchRequestId = '') {
       `select
         coalesce(nullif(batch.workspace_id, ''), nullif(delivery_request.workspace_id, '')) as workspaceId,
         batch.watch_request_id as watchRequestId,
+        delivery_request.email,
         item.program_id as programId,
         item.cycle_key as cycleKey,
         item.delivery_class as deliveryClass,
@@ -7411,25 +7413,35 @@ async function getProactiveDeliveryInputs(env, preferredWatchRequestId = '') {
        where batch.status = 'sent'`,
     ).all(),
     env.DB.prepare(
-      `select dedupe_key as dedupeKey
-       from proactive_delivery_batches
-       where status = 'sent'`,
+      `select
+         batch.dedupe_key as dedupeKey,
+         batch.watch_request_id as watchRequestId,
+         coalesce(nullif(batch.workspace_id, ''), nullif(request.workspace_id, '')) as workspaceId,
+         request.email,
+         batch.entry_source as entrySource,
+         batch.delivery_format as deliveryFormat,
+         batch.period_key as periodKey
+       from proactive_delivery_batches batch
+       left join watch_requests request on request.id = batch.watch_request_id
+       where batch.status = 'sent'`,
     ).all(),
     env.DB.prepare(
       `select
-        coalesce(nullif(batch.workspace_id, ''), nullif(request.workspace_id, ''), batch.watch_request_id) as recipientKey,
-        count(*) as sentCount
+        coalesce(nullif(batch.workspace_id, ''), nullif(request.workspace_id, '')) as workspaceId,
+        batch.watch_request_id as watchRequestId,
+        request.email
        from proactive_delivery_batches batch
        left join watch_requests request on request.id = batch.watch_request_id
        where batch.status = 'sent'
          and batch.delivery_format = 'immediate'
          and julianday(batch.sent_at) >= julianday('now', '-24 hours')
-       group by coalesce(nullif(batch.workspace_id, ''), nullif(request.workspace_id, ''), batch.watch_request_id)`,
+      `,
     ).all(),
     env.DB.prepare(
       `select
         request.workspace_id as workspaceId,
         delivery.watch_request_id as watchRequestId,
+        request.email,
         candidate.program_id as programId
        from alert_deliveries delivery
        inner join alert_candidates candidate on candidate.id = delivery.alert_candidate_id
@@ -7439,14 +7451,10 @@ async function getProactiveDeliveryInputs(env, preferredWatchRequestId = '') {
   ]);
 
   const digestSuppressedProgramCyclesByRecipient = new Map();
-  const immediateSentLast24HoursByRecipient = new Map(
-    (sentImmediateLast24HoursResult.results || []).map((row) => [
-      row.recipientKey,
-      Number(row.sentCount || 0),
-    ]),
-  );
+  const immediateSentLast24HoursByRecipient = new Map();
   const sentItemDedupeKeys = new Set();
   const sentSemanticItemDedupeKeys = new Set();
+  const sentBatchDedupeKeys = new Set();
   const programs = (programsResult.results || []).map((row) => ({
     ...row,
     classYears: parseJsonArray(row.classYears),
@@ -7455,18 +7463,23 @@ async function getProactiveDeliveryInputs(env, preferredWatchRequestId = '') {
   }));
   const programById = new Map(programs.map((program) => [program.programId, program]));
   for (const row of sentItemsResult.results || []) {
+    const recipientKey = await getDeliveryRecipientKey({
+      id: row.watchRequestId,
+      workspaceId: row.workspaceId,
+      email: row.email,
+    });
     sentItemDedupeKeys.add(row.dedupeKey);
-    if (row.workspaceId && row.watchRequestId && row.dedupeKey) {
+    if (recipientKey && row.watchRequestId && row.dedupeKey) {
       const legacyPrefix = `${encodeURIComponent(row.watchRequestId)}:`;
       if (row.dedupeKey.startsWith(legacyPrefix)) {
         sentItemDedupeKeys.add(
-          `${encodeURIComponent(row.workspaceId)}:${row.dedupeKey.slice(legacyPrefix.length)}`,
+          `${encodeURIComponent(recipientKey)}:${row.dedupeKey.slice(legacyPrefix.length)}`,
         );
       }
     }
 
     sentSemanticItemDedupeKeys.add(buildDeliveryDedupeKey({
-      watchRequestId: row.workspaceId || row.watchRequestId,
+      watchRequestId: recipientKey,
       programId: row.programId,
       cycleKey: row.cycleKey,
       deliveryClass: row.deliveryClass,
@@ -7481,7 +7494,6 @@ async function getProactiveDeliveryInputs(env, preferredWatchRequestId = '') {
       row.deliveryFormat !== 'immediate' &&
       row.entrySource !== 'focus_onboarding_digest'
     ) continue;
-    const recipientKey = row.workspaceId || row.watchRequestId;
     if (!digestSuppressedProgramCyclesByRecipient.has(recipientKey)) {
       digestSuppressedProgramCyclesByRecipient.set(recipientKey, new Set());
     }
@@ -7490,8 +7502,38 @@ async function getProactiveDeliveryInputs(env, preferredWatchRequestId = '') {
     );
   }
 
+  for (const row of sentBatchesResult.results || []) {
+    sentBatchDedupeKeys.add(row.dedupeKey);
+    const recipientKey = await getDeliveryRecipientKey({
+      id: row.watchRequestId,
+      workspaceId: row.workspaceId,
+      email: row.email,
+    });
+    if (row.entrySource === 'focus_onboarding_digest') {
+      sentBatchDedupeKeys.add(`onboarding:${recipientKey}`);
+    } else if (row.deliveryFormat === 'digest' && row.periodKey) {
+      sentBatchDedupeKeys.add(`weekly:${recipientKey}:${row.periodKey}`);
+    }
+  }
+
+  for (const row of sentImmediateLast24HoursResult.results || []) {
+    const recipientKey = await getDeliveryRecipientKey({
+      id: row.watchRequestId,
+      workspaceId: row.workspaceId,
+      email: row.email,
+    });
+    immediateSentLast24HoursByRecipient.set(
+      recipientKey,
+      Number(immediateSentLast24HoursByRecipient.get(recipientKey) || 0) + 1,
+    );
+  }
+
   for (const row of legacyImmediateResult.results || []) {
-    const recipientKey = row.workspaceId || row.watchRequestId;
+    const recipientKey = await getDeliveryRecipientKey({
+      id: row.watchRequestId,
+      workspaceId: row.workspaceId,
+      email: row.email,
+    });
     const cycleKey = inferProgramCycleKey(programById.get(row.programId) || {});
     if (!digestSuppressedProgramCyclesByRecipient.has(recipientKey)) {
       digestSuppressedProgramCyclesByRecipient.set(recipientKey, new Set());
@@ -7517,18 +7559,31 @@ async function getProactiveDeliveryInputs(env, preferredWatchRequestId = '') {
     }
   }
 
+  const recipients = await Promise.all(
+    [...recipientByEmail.values()].map(async (recipient) => ({
+      ...recipient,
+      deliveryRecipientKey: await getDeliveryRecipientKey(recipient),
+    })),
+  );
+
   return {
-    recipients: [...recipientByEmail.values()],
+    recipients,
     programs,
     evidence: evidenceResult.results || [],
     watches: watchesResult.results || [],
     attempts: attemptsResult.results || [],
     sentItemDedupeKeys,
     sentSemanticItemDedupeKeys,
-    sentBatchDedupeKeys: new Set((sentBatchesResult.results || []).map((row) => row.dedupeKey)),
+    sentBatchDedupeKeys,
     digestSuppressedProgramCyclesByRecipient,
     immediateSentLast24HoursByRecipient,
   };
+}
+
+async function getDeliveryRecipientKey(recipient = {}) {
+  const email = cleanString(recipient.email, 320).trim().toLowerCase();
+  if (email) return `email:${await sha256Hex(email)}`;
+  return cleanString(recipient.workspaceId || recipient.id, 180);
 }
 
 function buildDeliveryRelationshipMap(recipient, inputs) {

@@ -753,6 +753,7 @@ function createFocusDeliveryEnv({
                         batch.watchRequestId === recipient.id ? recipient.workspaceId : null
                       ),
                       watchRequestId: batch.watchRequestId,
+                      email: recipient.email,
                       programId: item.programId,
                       cycleKey: item.cycleKey,
                       deliveryClass: item.deliveryClass,
@@ -767,18 +768,32 @@ function createFocusDeliveryEnv({
               };
             }
             if (/julianday\(batch\.sent_at\)/i.test(query)) {
-              const sentCount = [...testState.batchesById.values()].filter((batch) => (
-                batch.status === 'sent' && batch.deliveryFormat === 'immediate'
-              )).length;
-              return sentCount
-                ? { results: [{ recipientKey: recipient.workspaceId || recipient.id, sentCount }] }
-                : { results: [] };
+              return {
+                results: [...testState.batchesById.values()]
+                  .filter((batch) => batch.status === 'sent' && batch.deliveryFormat === 'immediate')
+                  .map((batch) => ({
+                    workspaceId: batch.workspaceId,
+                    watchRequestId: batch.watchRequestId,
+                    email: recipient.email,
+                  })),
+              };
             }
-            if (/select dedupe_key as dedupekey from proactive_delivery_batches/i.test(normalizedQuery)) {
+            if (
+              /from proactive_delivery_batches batch/i.test(query) &&
+              /where batch\.status = 'sent'/i.test(query)
+            ) {
               return {
                 results: [...testState.batchesById.values()]
                   .filter((batch) => batch.status === 'sent')
-                  .map((batch) => ({ dedupeKey: batch.dedupeKey })),
+                  .map((batch) => ({
+                    dedupeKey: batch.dedupeKey,
+                    watchRequestId: batch.watchRequestId,
+                    workspaceId: batch.workspaceId,
+                    email: recipient.email,
+                    entrySource: batch.entrySource,
+                    deliveryFormat: batch.deliveryFormat,
+                    periodKey: batch.periodKey,
+                  })),
               };
             }
             return { results: [] };
@@ -910,6 +925,7 @@ function createFocusDeliveryEnv({
 
   env.__testState = testState;
   env.__testProgram = program;
+  env.__testRecipient = recipient;
   return env;
 }
 
@@ -1041,6 +1057,40 @@ assert.equal(
   onboardingEnv.__testState.sentEmails.length,
   1,
   'the initial focus digest must be sent at most once per stable recipient identity',
+);
+const noWorkspaceOnboardingEnv = createFocusDeliveryEnv({
+  subscribedAt: new Date(now).toISOString(),
+  statusChangedAt: new Date(now - 60 * 60 * 1000).toISOString(),
+  workspaceId: null,
+  enableSending: true,
+});
+const noWorkspaceOnboardingRun = await runProactiveDelivery(
+  noWorkspaceOnboardingEnv,
+  {
+    dryRun: false,
+    force: true,
+    onboardingOnly: true,
+    watchRequestId: 'focus-request-1',
+  },
+);
+assert.equal(noWorkspaceOnboardingRun.sent, 1);
+noWorkspaceOnboardingEnv.__testRecipient.id = 'focus-request-2';
+noWorkspaceOnboardingEnv.__testRecipient.createdAt = new Date(now + 60_000).toISOString();
+const repeatedNoWorkspaceOnboardingRun = await runProactiveDelivery(
+  noWorkspaceOnboardingEnv,
+  {
+    dryRun: false,
+    force: true,
+    onboardingOnly: true,
+    watchRequestId: 'focus-request-2',
+  },
+);
+assert.equal(repeatedNoWorkspaceOnboardingRun.sent, 0);
+assert.equal(repeatedNoWorkspaceOnboardingRun.results[0].status, 'already_sent');
+assert.equal(
+  noWorkspaceOnboardingEnv.__testState.sentEmails.length,
+  1,
+  're-saving an unlinked profile with the same email must not send another onboarding digest',
 );
 const postOnboardingWeeklyRun = await runProactiveDelivery(
   onboardingEnv,
