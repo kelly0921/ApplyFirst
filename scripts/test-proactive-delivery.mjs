@@ -11,11 +11,14 @@ import {
   evaluateStudentDelivery,
   formatFocusRoleTrack,
   getDeliveryBatchDisposition,
+  getDeadlineDaysRemaining,
   getDeadlineReminderStage,
+  getPriorityAlertReason,
   inferProgramCycleKey,
   isFreshActionableForProfile,
   matchProgramToFocus,
   normalizeDeliveryEntrySource,
+  selectActionRoundupItems,
   selectDigestItems,
   selectOnboardingItems,
 } from '../workers/proactive-delivery.js';
@@ -134,6 +137,20 @@ assert.equal(
   8,
   'the initial match digest must not inherit the five-item weekly digest cap',
 );
+assert.equal(
+  selectOnboardingItems(
+    Array.from({ length: 15 }, (_, index) => ({
+      eligible: true,
+      deliveryClass: 'discover',
+      programId: `capped-onboarding-${index}`,
+      cycleKey: '2027',
+      score: 100 - index,
+    })),
+    { limit: 12 },
+  ).length,
+  12,
+  'the onboarding digest should cap the initial strongest-match list at twelve',
+);
 
 const deadlineReminderProgram = {
   status: 'open',
@@ -166,6 +183,23 @@ assert.equal(getDeadlineReminderStage({
   sendTiming: 'openAndDeadline',
   windowDays: 7,
 }), '', 'deadline reminders must wait until the configured window');
+assert.ok(getDeadlineDaysRemaining(deadlineReminderProgram, { now: onboardingNow }) < 6);
+assert.equal(getPriorityAlertReason({
+  ...deadlineReminderProgram,
+  deliveryIntent: 'deadline_soon',
+}, {
+  now: '2026-10-22T12:00:00.000Z',
+  priorityDeadlineDays: 3,
+}), 'urgent_deadline');
+assert.equal(getPriorityAlertReason({
+  status: 'open',
+  isWatching: true,
+  watchFresh: true,
+}, { now: onboardingNow }), 'watched_opening');
+assert.equal(selectActionRoundupItems([
+  { eligible: true, deliveryClass: 'act_now', programId: 'a', cycleKey: '2027', score: 90 },
+  { eligible: true, deliveryClass: 'act_now', programId: 'b', cycleKey: '2027', score: 80 },
+], { limit: 1 }).length, 1);
 
 const expiredTemporalState = classifyFetchFailure(
   {
@@ -674,6 +708,8 @@ function createFocusDeliveryEnv({
   deadline = 'October 30, 2026',
   sendTiming = 'openOnly',
   curatedDeadline = '',
+  watched = false,
+  watchStartedAt = '',
   enableSending = false,
 }) {
   const recipient = {
@@ -723,6 +759,7 @@ function createFocusDeliveryEnv({
     itemsByDedupe: new Map(),
     sentEmails: [],
     runs: [],
+    autoCandidateUpdates: [],
   };
   const env = {
     PROACTIVE_DIGEST_MAX_ITEMS: '5',
@@ -741,6 +778,30 @@ function createFocusDeliveryEnv({
             }
             if (/from program_delivery_catalog catalog/i.test(query)) {
               return { results: [program] };
+            }
+            if (/from beta_program_watches/i.test(query)) {
+              return {
+                results: watched && workspaceId
+                  ? [{
+                      workspaceId,
+                      programId: program.programId,
+                      isWatching: 1,
+                      startedAt: watchStartedAt || subscribedAt,
+                    }]
+                  : [],
+              };
+            }
+            if (/from watch_request_programs relation/i.test(query)) {
+              return {
+                results: watched && !workspaceId
+                  ? [{
+                      watchRequestId: recipient.id,
+                      programId: program.programId,
+                      isWatching: 1,
+                      startedAt: watchStartedAt || subscribedAt,
+                    }]
+                  : [],
+              };
             }
             if (/from proactive_delivery_items item/i.test(query)) {
               return {
@@ -763,6 +824,7 @@ function createFocusDeliveryEnv({
                       officialUrl: item.officialUrl,
                       deliveryFormat: batch.deliveryFormat,
                       entrySource: batch.entrySource,
+                      sentAt: batch.sentAt,
                     };
                   }),
               };
@@ -770,7 +832,11 @@ function createFocusDeliveryEnv({
             if (/julianday\(batch\.sent_at\)/i.test(query)) {
               return {
                 results: [...testState.batchesById.values()]
-                  .filter((batch) => batch.status === 'sent' && batch.deliveryFormat === 'immediate')
+                  .filter((batch) => (
+                    batch.status === 'sent' &&
+                    batch.deliveryFormat === 'immediate' &&
+                    Date.now() - Date.parse(batch.sentAt || '') <= 24 * 60 * 60 * 1000
+                  ))
                   .map((batch) => ({
                     workspaceId: batch.workspaceId,
                     watchRequestId: batch.watchRequestId,
@@ -793,6 +859,7 @@ function createFocusDeliveryEnv({
                     entrySource: batch.entrySource,
                     deliveryFormat: batch.deliveryFormat,
                     periodKey: batch.periodKey,
+                    sentAt: batch.sentAt,
                   })),
               };
             }
@@ -853,6 +920,7 @@ function createFocusDeliveryEnv({
                 id,
                 batchId,
                 programId,
+                alertCandidateId,
                 deliveryClass,
                 cycleKey,
                 matchReason,
@@ -869,6 +937,7 @@ function createFocusDeliveryEnv({
                   id,
                   batchId,
                   programId,
+                  alertCandidateId,
                   deliveryClass,
                   cycleKey,
                   matchReason,
@@ -900,6 +969,8 @@ function createFocusDeliveryEnv({
               });
             } else if (/insert into proactive_delivery_runs/i.test(query)) {
               testState.runs.push([...this.bindings]);
+            } else if (/update alert_candidates/i.test(query)) {
+              testState.autoCandidateUpdates.push([...this.bindings]);
             }
             return { success: true };
           },
@@ -938,8 +1009,8 @@ const focusImmediateRun = await runProactiveDelivery(
   { dryRun: true, force: true, watchRequestId: 'focus-request-1' },
 );
 assert.equal(focusImmediateRun.eligibleRecipients, 1);
-assert.equal(focusImmediateRun.results[0].deliveryFormat, 'immediate');
-assert.equal(focusImmediateRun.results[0].entrySource, 'focus_match_alert');
+assert.equal(focusImmediateRun.results[0].deliveryFormat, 'digest');
+assert.equal(focusImmediateRun.results[0].entrySource, 'action_roundup');
 assert.equal(
   focusImmediateRun.results[0].items[0].matchReason,
   "You're a freshman interested in software engineering opportunities.",
@@ -954,7 +1025,7 @@ const legacyFocusImmediateRun = await runProactiveDelivery(
   { dryRun: true, force: true, watchRequestId: 'focus-request-1' },
 );
 assert.equal(legacyFocusImmediateRun.eligibleRecipients, 1);
-assert.equal(legacyFocusImmediateRun.results[0].entrySource, 'focus_match_alert');
+assert.equal(legacyFocusImmediateRun.results[0].entrySource, 'action_roundup');
 
 const scheduledFocusEnv = createFocusDeliveryEnv({
   subscribedAt: new Date(now - 4 * 24 * 60 * 60 * 1000).toISOString(),
@@ -962,14 +1033,43 @@ const scheduledFocusEnv = createFocusDeliveryEnv({
 });
 scheduledFocusEnv.PROACTIVE_DELIVERY_ENABLED = 'true';
 scheduledFocusEnv.PROACTIVE_DIGEST_WEEKDAY_UTC = String((new Date().getUTCDay() + 1) % 7);
+scheduledFocusEnv.PROACTIVE_ACTION_ROUNDUP_HOUR_UTC = String(new Date().getUTCHours());
 const scheduledFocusImmediateRun = await runProactiveDelivery(
   scheduledFocusEnv,
   { dryRun: true, scheduled: true, watchRequestId: 'focus-request-1' },
 );
 assert.equal(
   scheduledFocusImmediateRun.results[0].deliveryFormat,
-  'immediate',
-  'fresh Focus openings should not wait for the weekly digest window',
+  'digest',
+  'fresh Focus openings should use the daily action roundup instead of separate emails',
+);
+assert.equal(scheduledFocusImmediateRun.results[0].entrySource, 'action_roundup');
+
+const watchedPriorityRun = await runProactiveDelivery(
+  createFocusDeliveryEnv({
+    subscribedAt: new Date(now - 4 * 24 * 60 * 60 * 1000).toISOString(),
+    statusChangedAt: new Date(now - 60 * 60 * 1000).toISOString(),
+    watched: true,
+    watchStartedAt: new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString(),
+  }),
+  { dryRun: true, force: true, watchRequestId: 'focus-request-1' },
+);
+assert.equal(watchedPriorityRun.results[0].deliveryFormat, 'immediate');
+assert.equal(watchedPriorityRun.results[0].entrySource, 'watched_program_alert');
+
+const existingOpenWatchRun = await runProactiveDelivery(
+  createFocusDeliveryEnv({
+    subscribedAt: new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    statusChangedAt: new Date(now - 20 * 24 * 60 * 60 * 1000).toISOString(),
+    watched: true,
+    watchStartedAt: new Date(now - 60 * 60 * 1000).toISOString(),
+  }),
+  { dryRun: true, force: true, watchRequestId: 'focus-request-1' },
+);
+assert.equal(
+  existingOpenWatchRun.results.some((result) => result.deliveryFormat === 'immediate'),
+  false,
+  'watching an already-open program must not manufacture a new priority opening alert',
 );
 
 const existingOpenFocusRun = await runProactiveDelivery(
@@ -1106,7 +1206,7 @@ assert.equal(
 const deadlineReminderEnv = createFocusDeliveryEnv({
   subscribedAt: new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString(),
   statusChangedAt: new Date(now - 24 * 60 * 60 * 1000).toISOString(),
-  deadline: new Date(now + 3 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', {
+  deadline: new Date(now + 2 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', {
     month: 'long',
     day: 'numeric',
     year: 'numeric',
@@ -1138,11 +1238,134 @@ assert.equal(
   'an unchanged deadline must produce only one approaching-deadline reminder',
 );
 
+const introductionGraceEnv = createFocusDeliveryEnv({
+  subscribedAt: new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString(),
+  statusChangedAt: new Date(now - 24 * 60 * 60 * 1000).toISOString(),
+  deadline: new Date(now + 5 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }),
+  sendTiming: 'openAndDeadline',
+});
+introductionGraceEnv.__testProgram.curatedStatus = 'open';
+introductionGraceEnv.__testProgram.curatedDeadline = introductionGraceEnv.__testProgram.deadline;
+introductionGraceEnv.__testProgram.curatedStatusReviewedAt = new Date(now).toISOString();
+introductionGraceEnv.__testProgram.statusEvidenceType = 'curated_audit';
+introductionGraceEnv.__testProgram.statusEvidenceAt = new Date(now).toISOString();
+const introBatch = {
+  id: 'intro-batch',
+  watchRequestId: 'focus-request-1',
+  workspaceId: 'workspace-1',
+  deliveryClass: 'discover',
+  deliveryFormat: 'digest',
+  entrySource: 'focus_onboarding_digest',
+  periodKey: 'initial',
+  dedupeKey: 'intro-batch-dedupe',
+  status: 'sent',
+  sentAt: new Date(now - 24 * 60 * 60 * 1000).toISOString(),
+};
+introductionGraceEnv.__testState.batchesById.set(introBatch.id, introBatch);
+introductionGraceEnv.__testState.batchesByDedupe.set(introBatch.dedupeKey, introBatch);
+introductionGraceEnv.__testState.itemsByDedupe.set('intro-item-dedupe', {
+  id: 'intro-item',
+  batchId: introBatch.id,
+  programId: 'focus-program',
+  cycleKey: String(new Date().getUTCFullYear()),
+  deliveryClass: 'discover',
+  dedupeKey: 'intro-item-dedupe',
+  statusSnapshot: 'open',
+  deadlineSnapshot: introductionGraceEnv.__testProgram.deadline,
+  officialUrl: introductionGraceEnv.__testProgram.officialUrl,
+});
+const introductionGraceRun = await runProactiveDelivery(
+  introductionGraceEnv,
+  { dryRun: true, force: true, watchRequestId: 'focus-request-1' },
+);
+assert.equal(
+  introductionGraceRun.results[0]?.status,
+  'already_sent',
+  'a non-urgent deadline should not repeat the same program state within 72 hours of introduction',
+);
+
+const rollingCapEnv = createFocusDeliveryEnv({
+  subscribedAt: new Date(now - 4 * 24 * 60 * 60 * 1000).toISOString(),
+  statusChangedAt: new Date(now - 60 * 60 * 1000).toISOString(),
+});
+for (let index = 0; index < 3; index += 1) {
+  const batch = {
+    id: `cap-batch-${index}`,
+    watchRequestId: 'focus-request-1',
+    workspaceId: 'workspace-1',
+    deliveryClass: 'discover',
+    deliveryFormat: 'digest',
+    entrySource: 'personalized_discovery_digest',
+    periodKey: `cap-${index}`,
+    dedupeKey: `cap-dedupe-${index}`,
+    status: 'sent',
+    sentAt: new Date(now - (index + 2) * 24 * 60 * 60 * 1000).toISOString(),
+  };
+  rollingCapEnv.__testState.batchesById.set(batch.id, batch);
+  rollingCapEnv.__testState.batchesByDedupe.set(batch.dedupeKey, batch);
+}
+const rollingCapRun = await runProactiveDelivery(
+  rollingCapEnv,
+  { dryRun: true, force: true, watchRequestId: 'focus-request-1' },
+);
+assert.equal(rollingCapRun.results[0].status, 'frequency_capped');
+assert.equal(rollingCapRun.eligibleRecipients, 0);
+
+const cycleCapEnv = createFocusDeliveryEnv({
+  subscribedAt: new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString(),
+  statusChangedAt: new Date(now - 60 * 60 * 1000).toISOString(),
+});
+for (let index = 0; index < 3; index += 1) {
+  const batch = {
+    id: `cycle-cap-batch-${index}`,
+    watchRequestId: 'focus-request-1',
+    workspaceId: 'workspace-1',
+    deliveryClass: 'discover',
+    deliveryFormat: 'digest',
+    entrySource: index === 0 ? 'focus_onboarding_digest' : 'personalized_discovery_digest',
+    periodKey: `old-cycle-${index}`,
+    dedupeKey: `cycle-cap-batch-dedupe-${index}`,
+    status: 'sent',
+    sentAt: new Date(now - (10 + index) * 24 * 60 * 60 * 1000).toISOString(),
+  };
+  cycleCapEnv.__testState.batchesById.set(batch.id, batch);
+  cycleCapEnv.__testState.batchesByDedupe.set(batch.dedupeKey, batch);
+  cycleCapEnv.__testState.itemsByDedupe.set(`cycle-cap-item-${index}`, {
+    id: `cycle-cap-item-id-${index}`,
+    batchId: batch.id,
+    programId: 'focus-program',
+    cycleKey: String(new Date().getUTCFullYear()),
+    deliveryClass: 'discover',
+    dedupeKey: `cycle-cap-item-${index}`,
+    statusSnapshot: index === 0 ? 'watching' : 'opening_soon',
+    deadlineSnapshot: `Prior material state ${index}`,
+    officialUrl: `https://example.com/program?state=${index}`,
+  });
+}
+const cycleCapRun = await runProactiveDelivery(
+  cycleCapEnv,
+  { dryRun: true, force: true, watchRequestId: 'focus-request-1' },
+);
+assert.equal(cycleCapRun.results[0].status, 'already_sent');
+assert.equal(
+  cycleCapRun.eligibleRecipients,
+  0,
+  'a program cycle must stop after three prior student-facing appearances',
+);
+
 const sendingImmediateEnv = createFocusDeliveryEnv({
   subscribedAt: new Date(now - 4 * 24 * 60 * 60 * 1000).toISOString(),
   statusChangedAt: new Date(now - 60 * 60 * 1000).toISOString(),
+  watched: true,
+  watchStartedAt: new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString(),
   enableSending: true,
 });
+sendingImmediateEnv.__testProgram.alertCandidateId = 'auto-ready-candidate-1';
 const sendingImmediateRun = await runProactiveDelivery(
   sendingImmediateEnv,
   { dryRun: false, force: true, watchRequestId: 'focus-request-1' },
@@ -1163,6 +1386,11 @@ assert.equal(
   'a successful provider response must persist the delivery batch as sent',
 );
 assert.equal(sendingImmediateEnv.__testState.runs.length, 1);
+assert.equal(
+  sendingImmediateEnv.__testState.autoCandidateUpdates.length,
+  1,
+  'a successfully delivered proactive opening should mark its linked candidate auto-sent',
+);
 
 const repeatedImmediateRun = await runProactiveDelivery(
   sendingImmediateEnv,
@@ -1204,11 +1432,12 @@ const changedDeadlineRun = await runProactiveDelivery(
   sendingImmediateEnv,
   { dryRun: false, force: true, watchRequestId: 'focus-request-1' },
 );
-assert.equal(changedDeadlineRun.sent, 1);
+assert.equal(changedDeadlineRun.sent, 0);
+assert.equal(changedDeadlineRun.results[0].status, 'frequency_capped');
 assert.equal(
   sendingImmediateEnv.__testState.sentEmails.length,
-  2,
-  'a materially changed deadline should allow a new alert',
+  1,
+  'a materially changed deadline must not bypass the one-priority-email-per-day cap',
 );
 
 const sendingDigestEnv = createFocusDeliveryEnv({
@@ -1433,6 +1662,47 @@ assert.ok(
   'the digest official-source CTA must remain primary',
 );
 
+const actionRoundupMessage = buildProactiveDigestMessage(
+  emailEnv,
+  emailRecipient,
+  { engagementToken: 'e'.repeat(64), entrySource: 'action_roundup' },
+  [{
+    itemId: 'roundup-item',
+    programId: 'roundup-program',
+    programName: 'Roundup Program',
+    deliveryClass: 'act_now',
+    status: 'open',
+    confidence: 'high',
+    verified: true,
+    officialUrl: 'https://example.com/roundup',
+    statusEvidenceType: 'source_check',
+    statusEvidenceAt: freshEvidenceAt,
+    statusReviewDecision: 'Alert Candidate',
+    matchReason: "You're a sophomore interested in product management opportunities.",
+  }],
+);
+assert.equal(actionRoundupMessage.subject, '1 opportunity to act on now');
+assert.match(actionRoundupMessage.html, /ApplyFirst Action Roundup/);
+
+const onboardingMessage = buildProactiveDigestMessage(
+  emailEnv,
+  emailRecipient,
+  { engagementToken: 'f'.repeat(64), entrySource: 'focus_onboarding_digest' },
+  [{
+    itemId: 'onboarding-item',
+    programId: 'onboarding-program',
+    programName: 'Onboarding Program',
+    deliveryClass: 'discover',
+    status: 'watching',
+    confidence: 'high',
+    verified: true,
+    officialUrl: 'https://example.com/onboarding',
+    matchReason: "You're a sophomore interested in product management opportunities.",
+  }],
+);
+assert.match(onboardingMessage.text, /Browse all matching programs: https:\/\/applyfirst\.example\.com/);
+assert.match(onboardingMessage.html, /Browse Full Library/);
+
 const broadFocusMessage = buildProactiveDigestMessage(
   emailEnv,
   {
@@ -1493,6 +1763,7 @@ assert.doesNotMatch(
 
 assert.equal(normalizeDeliveryEntrySource('watched_program_alert'), 'watched_program_alert');
 assert.equal(normalizeDeliveryEntrySource('focus_match_alert'), 'focus_match_alert');
+assert.equal(normalizeDeliveryEntrySource('action_roundup'), 'action_roundup');
 assert.equal(normalizeDeliveryEntrySource('arbitrary_tracker', ''), '');
 
 console.log('Proactive delivery classification, state, dedupe, digest, cycle, and attribution rules passed.');

@@ -5,6 +5,7 @@ const DELIVERY_ENTRY_SOURCES = new Set([
   'watched_program_alert',
   'focus_match_alert',
   'focus_onboarding_digest',
+  'action_roundup',
   'personalized_discovery_digest',
   'prepare_alert',
   'direct_or_shared_link',
@@ -475,7 +476,7 @@ function selectDigestItems(candidates = [], options = {}) {
 }
 
 function selectOnboardingItems(candidates = [], options = {}) {
-  const limit = Math.max(1, Math.min(Number(options.limit) || 25, 50));
+  const limit = Math.max(1, Math.min(Number(options.limit) || 12, 20));
   const selected = [];
   const seen = new Set();
 
@@ -484,6 +485,26 @@ function selectOnboardingItems(candidates = [], options = {}) {
 
     const programCycle = `${candidate.programId}:${normalizeCycleKey(candidate.cycleKey) || 'unspecified'}`;
     if (seen.has(programCycle)) continue;
+
+    seen.add(programCycle);
+    selected.push(candidate);
+    if (selected.length >= limit) break;
+  }
+
+  return selected;
+}
+
+function selectActionRoundupItems(candidates = [], options = {}) {
+  const limit = Math.max(1, Math.min(Number(options.limit) || 5, 5));
+  const excludedProgramCycles = new Set(options.excludedProgramCycles || []);
+  const selected = [];
+  const seen = new Set();
+
+  for (const candidate of [...candidates].sort(compareActionCandidates)) {
+    if (!candidate?.eligible || candidate.deliveryClass !== 'act_now') continue;
+
+    const programCycle = `${candidate.programId}:${normalizeCycleKey(candidate.cycleKey) || 'unspecified'}`;
+    if (excludedProgramCycles.has(programCycle) || seen.has(programCycle)) continue;
 
     seen.add(programCycle);
     selected.push(candidate);
@@ -514,6 +535,53 @@ function getDeadlineReminderStage(item = {}, options = {}) {
   const remainingMs = endOfDeadlineDay - now;
   if (remainingMs < 0 || remainingMs > windowDays * 24 * 60 * 60 * 1000) return '';
   return 'deadline_soon';
+}
+
+function getDeadlineDaysRemaining(item = {}, options = {}) {
+  const now = toTimestamp(options.now || new Date().toISOString());
+  const copyState = buildDeliveryCopyState(item, { now });
+  if (
+    !copyState.deadlineVerified ||
+    !['current_open_with_deadline', 'current_deadline'].includes(copyState.stateKey)
+  ) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  const deadlineAt = parseExplicitDeadlineTimestamp(item.deadline || copyState.timingValue);
+  if (!Number.isFinite(now) || !Number.isFinite(deadlineAt)) return Number.POSITIVE_INFINITY;
+
+  const endOfDeadlineDay = deadlineAt + 24 * 60 * 60 * 1000 - 1;
+  return Math.max(0, (endOfDeadlineDay - now) / (24 * 60 * 60 * 1000));
+}
+
+function getPriorityAlertReason(candidate = {}, options = {}) {
+  const deadlineDays = getDeadlineDaysRemaining(candidate, options);
+  const priorityDeadlineDays = Math.max(
+    1,
+    Math.min(Number(options.priorityDeadlineDays) || 3, 7),
+  );
+
+  if (candidate.deliveryIntent === 'deadline_soon' && deadlineDays <= priorityDeadlineDays) {
+    return 'urgent_deadline';
+  }
+
+  if (candidate.isWatching === true && candidate.watchFresh === true) {
+    return 'watched_opening';
+  }
+
+  const rolling = /\brolling\b/i.test(
+    [candidate.deadline, candidate.timing, candidate.openDate].filter(Boolean).join(' '),
+  );
+  if (
+    candidate.status === 'open' &&
+    candidate.currentOfficialStatus === true &&
+    candidate.freshActionable === true &&
+    rolling
+  ) {
+    return 'rolling_opening';
+  }
+
+  return '';
 }
 
 function getDigestAttentionReason(candidate = {}) {
@@ -683,6 +751,22 @@ function compareDigestCandidates(left, right) {
   );
 }
 
+function compareActionCandidates(left, right) {
+  const intentWeight = (candidate) => {
+    if (candidate.priorityReason === 'urgent_deadline') return 5;
+    if (candidate.isWatching === true) return 4;
+    if (candidate.deliveryIntent === 'deadline_soon') return 3;
+    if (candidate.status === 'open') return 2;
+    return 1;
+  };
+
+  return (
+    intentWeight(right) - intentWeight(left) ||
+    Number(right.score || 0) - Number(left.score || 0) ||
+    String(left.programName || '').localeCompare(String(right.programName || ''))
+  );
+}
+
 function normalizePreference(value) {
   const normalized = String(value || '').trim();
   return normalized;
@@ -780,8 +864,10 @@ export {
   evaluateStudentDelivery,
   formatFocusRoleTrack,
   getDeliveryBatchDisposition,
+  getDeadlineDaysRemaining,
   getDeadlineReminderStage,
   getDigestAttentionReason,
+  getPriorityAlertReason,
   hasPriorApplicationInDifferentCycle,
   inferProgramCycleKey,
   isFreshActionableForProfile,
@@ -790,5 +876,6 @@ export {
   normalizeDeliveryClass,
   normalizeDeliveryEntrySource,
   selectDigestItems,
+  selectActionRoundupItems,
   selectOnboardingItems,
 };

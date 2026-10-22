@@ -9,12 +9,15 @@ import {
   evaluateStudentDelivery,
   formatFocusRoleTrack,
   getDeliveryBatchDisposition,
+  getDeadlineDaysRemaining,
   getDeadlineReminderStage,
+  getPriorityAlertReason,
   hasPriorApplicationInDifferentCycle,
   inferProgramCycleKey,
   isFreshActionableForProfile,
   matchProgramToFocus,
   normalizeDeliveryEntrySource,
+  selectActionRoundupItems,
   selectDigestItems,
   selectOnboardingItems,
 } from './proactive-delivery.js';
@@ -3810,6 +3813,7 @@ async function checkOfficialSource(env, source, options = {}) {
     .run();
 
   if (shouldCreateAlertCandidate) {
+    const proactiveDeliveryOwnsAutomaticSend = shouldRunScheduledProactiveDelivery(env);
     candidateId = await createAlertCandidate(env, {
       source,
       sourceCheckId,
@@ -3817,7 +3821,11 @@ async function checkOfficialSource(env, source, options = {}) {
       status: openTransition && shouldAutoSendWatchedOpenAlerts(env) ? 'auto_ready' : 'pending_review',
     });
 
-    if (openTransition && shouldAutoSendWatchedOpenAlerts(env)) {
+    if (
+      openTransition &&
+      shouldAutoSendWatchedOpenAlerts(env) &&
+      !proactiveDeliveryOwnsAutomaticSend
+    ) {
       autoSendResult = await sendCandidateNotifications(env, candidateId, { trigger: 'auto' });
     }
   }
@@ -6683,8 +6691,14 @@ async function runProactiveDelivery(env, options = {}) {
   const force = Boolean(options.force);
   const onboardingOnly = Boolean(options.onboardingOnly);
   const generatedAt = new Date().toISOString();
-  const periodKey = getIsoWeekKey(new Date(generatedAt));
-  const digestDue = !options.scheduled || force || isWeeklyDeliveryWindow(env, new Date(generatedAt));
+  const generatedDate = new Date(generatedAt);
+  const periodKey = getIsoWeekKey(generatedDate);
+  const dayKey = generatedAt.slice(0, 10);
+  const digestDue = !options.scheduled || force || isWeeklyDeliveryWindow(env, generatedDate);
+  const actionRoundupDue = !options.scheduled || force || isActionRoundupDeliveryWindow(
+    env,
+    generatedDate,
+  );
 
   if (options.scheduled && !shouldRunScheduledProactiveDelivery(env)) {
     return {
@@ -6788,16 +6802,36 @@ async function runProactiveDelivery(env, options = {}) {
         recipient,
         generatedAt,
       );
-      const deadlineReminderStage = getDeadlineReminderStage(program, {
+      const watchedFresh = watched && isFreshActionableForProfile(
+        program,
+        { createdAt: relationship.watchStartedAt || recipient.createdAt },
+        generatedAt,
+      );
+      const programCycle = `${program.programId}:${cycleKey || 'unspecified'}`;
+      let deadlineReminderStage = getDeadlineReminderStage(program, {
         now: generatedAt,
         sendTiming: recipient.sendTiming,
         windowDays: Number(env.PROACTIVE_DEADLINE_REMINDER_DAYS || 7),
       });
+      const introducedAt = inputs.recentIntroductionAtByRecipientProgramCycle
+        .get(recipientKey)?.get(programCycle);
+      const introductionGraceHours = Math.max(
+        1,
+        Math.min(Number(env.PROACTIVE_DEADLINE_INTRO_GRACE_HOURS || 72), 168),
+      );
+      if (
+        deadlineReminderStage &&
+        introducedAt &&
+        Date.parse(generatedAt) - Date.parse(introducedAt) < introductionGraceHours * 60 * 60 * 1000 &&
+        getDeadlineDaysRemaining(program, { now: generatedAt }) > 2
+      ) {
+        deadlineReminderStage = '';
+      }
       const deliveryClass = deadlineReminderStage ? 'act_now' : classifyDeliveryCandidate({
         status: program.status,
         confidence: program.confidence,
         verified: program.verified,
-        watched,
+        watched: watched && watchedFresh,
         focusMatch: match.matches,
         freshActionable,
         currentOfficialStatus: copyState.currentStatusVerified,
@@ -6806,8 +6840,7 @@ async function runProactiveDelivery(env, options = {}) {
           recipient.sendTiming === 'prepOpenDeadline' && Boolean(program.openDate || program.deadline),
       });
 
-      // Watched act-now alerts keep using the existing immediate alert path.
-      if (!deliveryClass || (deliveryClass === 'act_now' && watched && !deadlineReminderStage)) continue;
+      if (!deliveryClass) continue;
 
       const eligibility = evaluateStudentDelivery({
         deliveryClass,
@@ -6831,11 +6864,24 @@ async function runProactiveDelivery(env, options = {}) {
         deliveryClass,
         changeKey,
       });
-      const programCycle = `${program.programId}:${cycleKey || 'unspecified'}`;
-
+      const crossClassDedupeKey = buildDeliveryDedupeKey({
+        watchRequestId: recipientKey,
+        programId: program.programId,
+        cycleKey,
+        deliveryClass: 'discover',
+        changeKey,
+      });
+      const priorCycleDeliveryCount = Number(
+        inputs.deliveryCountByRecipientProgramCycle.get(recipientKey)?.get(programCycle) || 0,
+      );
+      if (priorCycleDeliveryCount >= 3) {
+        suppressedPreviouslySent = true;
+        continue;
+      }
       if (
         inputs.sentItemDedupeKeys.has(dedupeKey) ||
-        inputs.sentSemanticItemDedupeKeys.has(dedupeKey)
+        inputs.sentSemanticItemDedupeKeys.has(dedupeKey) ||
+        inputs.sentCrossClassSemanticKeys.has(crossClassDedupeKey)
       ) {
         suppressedPreviouslySent = true;
         continue;
@@ -6847,9 +6893,12 @@ async function runProactiveDelivery(env, options = {}) {
         newlyVerified,
         cycleKey,
         dedupeKey,
+        crossClassDedupeKey,
         eligible: true,
         score: match.score + (watched ? 25 : 0),
         isWatching: watched,
+        watchFresh: watchedFresh,
+        freshActionable,
         matchReason: watched
           ? 'You asked ApplyFirst to watch this program.'
           : buildStudentMatchReason(recipient, program, match),
@@ -6863,6 +6912,11 @@ async function runProactiveDelivery(env, options = {}) {
         programCycle,
       };
 
+      candidate.priorityReason = getPriorityAlertReason(candidate, {
+        now: generatedAt,
+        priorityDeadlineDays: Number(env.PROACTIVE_PRIORITY_DEADLINE_DAYS || 3),
+      });
+
       if (deliveryClass === 'act_now') {
         immediateCandidates.push(candidate);
       } else {
@@ -6872,7 +6926,7 @@ async function runProactiveDelivery(env, options = {}) {
 
     if (onboardingDue) {
       const items = selectOnboardingItems(onboardingCandidates, {
-        limit: Number(env.PROACTIVE_ONBOARDING_MAX_ITEMS || 25),
+        limit: Number(env.PROACTIVE_ONBOARDING_MAX_ITEMS || 12),
       });
 
       if (items.length) {
@@ -6940,77 +6994,171 @@ async function runProactiveDelivery(env, options = {}) {
       continue;
     }
 
-    const immediateDailyCap = Math.max(
+    const rollingEmailCap = Math.max(
       1,
-      Math.min(Number(env.PROACTIVE_IMMEDIATE_DAILY_CAP || 2), 5),
+      Math.min(Number(env.PROACTIVE_EMAIL_CAP_7_DAYS || 3), 14),
     );
-    const immediateSentLast24Hours = Number(
+    const emailsSentLast7Days = Number(
+      inputs.emailsSentLast7DaysByRecipient.get(recipientKey) || 0,
+    );
+    const priorityDailyCap = Math.max(
+      1,
+      Math.min(Number(env.PROACTIVE_IMMEDIATE_DAILY_CAP || 1), 3),
+    );
+    const prioritySentLast24Hours = Number(
       inputs.immediateSentLast24HoursByRecipient.get(recipientKey) || 0,
     );
-    const immediateLimit = Math.max(0, Math.min(
-      Number(env.PROACTIVE_IMMEDIATE_MAX_PER_RUN || 3),
-      5,
-      immediateDailyCap - immediateSentLast24Hours,
-    ));
-    const rankedImmediateCandidates = [...immediateCandidates]
-      .sort((left, right) => Number(right.score || 0) - Number(left.score || 0))
-      .slice(0, immediateLimit);
+    const routineSentLast24Hours = Number(
+      inputs.routineSentLast24HoursByRecipient.get(recipientKey) || 0,
+    );
+    let remainingEmailSlots = Math.max(0, rollingEmailCap - emailsSentLast7Days);
+    let frequencyCapped = remainingEmailSlots === 0;
+    let priorityPlanned = false;
+    let routinePlanned = false;
+    const priorityItem = [...immediateCandidates]
+      .filter((candidate) => Boolean(candidate.priorityReason))
+      .sort((left, right) => (
+        Number(right.priorityReason === 'urgent_deadline') -
+          Number(left.priorityReason === 'urgent_deadline') ||
+        Number(right.score || 0) - Number(left.score || 0)
+      ))[0];
 
-    for (const item of rankedImmediateCandidates) {
+    if (
+      priorityItem &&
+      remainingEmailSlots > 0 &&
+      prioritySentLast24Hours < priorityDailyCap
+    ) {
+      const item = priorityItem;
       const batchDedupeKey = `immediate:${item.dedupeKey}`;
       if (inputs.sentBatchDedupeKeys.has(batchDedupeKey)) {
         suppressedPreviouslySent = true;
-        continue;
+      } else {
+        recipientHasEligibleDelivery = true;
+        recipientProducedResult = true;
+        priorityPlanned = true;
+        remainingEmailSlots -= 1;
+
+        if (dryRun) {
+          results.push({
+            watchRequestId: recipient.id,
+            status: 'ready',
+            deliveryClass: 'act_now',
+            deliveryFormat: 'immediate',
+            entrySource: item.isWatching ? 'watched_program_alert' : 'focus_match_alert',
+            items: [toPublicDeliveryPreview(item, recipient)],
+          });
+        } else {
+          const prepared = await createProactiveDeliveryBatch(env, {
+            recipient,
+            deliveryClass: 'act_now',
+            deliveryFormat: 'immediate',
+            entrySource: item.isWatching ? 'watched_program_alert' : 'focus_match_alert',
+            periodKey: item.cycleKey || periodKey,
+            dedupeKey: batchDedupeKey,
+            items: [item],
+          });
+
+          if (prepared.status === 'already_sent') {
+            results.push({ watchRequestId: recipient.id, status: 'already_sent', items: [] });
+          } else {
+            const delivery = await sendProactiveImmediateEmail(env, recipient, prepared, item);
+            await updateProactiveDeliveryBatch(env, prepared.batchId, delivery);
+            if (delivery.status === 'sent') {
+              inputs.sentItemDedupeKeys.add(item.dedupeKey);
+              inputs.sentSemanticItemDedupeKeys.add(item.dedupeKey);
+              inputs.sentBatchDedupeKeys.add(batchDedupeKey);
+            }
+            results.push({
+              watchRequestId: recipient.id,
+              status: delivery.status,
+              deliveryClass: 'act_now',
+              deliveryFormat: 'immediate',
+              itemCount: 1,
+              batchId: prepared.batchId,
+            });
+          }
+        }
       }
-
-      recipientHasEligibleDelivery = true;
-      recipientProducedResult = true;
-
-      if (dryRun) {
-        results.push({
-          watchRequestId: recipient.id,
-          status: 'ready',
-          deliveryClass: 'act_now',
-          deliveryFormat: 'immediate',
-          entrySource: 'focus_match_alert',
-          items: [toPublicDeliveryPreview(item, recipient)],
-        });
-        continue;
-      }
-
-      const prepared = await createProactiveDeliveryBatch(env, {
-        recipient,
-        deliveryClass: 'act_now',
-        deliveryFormat: 'immediate',
-        entrySource: 'focus_match_alert',
-        periodKey: item.cycleKey || periodKey,
-        dedupeKey: batchDedupeKey,
-        items: [item],
-      });
-
-      if (prepared.status === 'already_sent') {
-        results.push({ watchRequestId: recipient.id, status: 'already_sent', items: [] });
-        continue;
-      }
-
-      const delivery = await sendProactiveImmediateEmail(env, recipient, prepared, item);
-      await updateProactiveDeliveryBatch(env, prepared.batchId, delivery);
-      if (delivery.status === 'sent') {
-        inputs.sentItemDedupeKeys.add(item.dedupeKey);
-        inputs.sentSemanticItemDedupeKeys.add(item.dedupeKey);
-        inputs.sentBatchDedupeKeys.add(batchDedupeKey);
-      }
-      results.push({
-        watchRequestId: recipient.id,
-        status: delivery.status,
-        deliveryClass: 'act_now',
-        deliveryFormat: 'immediate',
-        itemCount: 1,
-        batchId: prepared.batchId,
-      });
+    } else if (priorityItem) {
+      frequencyCapped = true;
     }
 
-    if (digestDue) {
+    if (
+      !priorityPlanned &&
+      actionRoundupDue &&
+      remainingEmailSlots > 0 &&
+      prioritySentLast24Hours === 0 &&
+      routineSentLast24Hours === 0
+    ) {
+      const items = selectActionRoundupItems(immediateCandidates, {
+        limit: Number(env.PROACTIVE_ACTION_ROUNDUP_MAX_ITEMS || 5),
+      });
+      const batchDedupeKey = `action:${recipientKey}:${dayKey}`;
+
+      if (items.length && !inputs.sentBatchDedupeKeys.has(batchDedupeKey)) {
+        recipientHasEligibleDelivery = true;
+        recipientProducedResult = true;
+        routinePlanned = true;
+        remainingEmailSlots -= 1;
+
+        if (dryRun) {
+          results.push({
+            watchRequestId: recipient.id,
+            status: 'ready',
+            deliveryClass: 'act_now',
+            deliveryFormat: 'digest',
+            entrySource: 'action_roundup',
+            items: items.map((item) => toPublicDeliveryPreview(item, recipient)),
+          });
+        } else {
+          const prepared = await createProactiveDeliveryBatch(env, {
+            recipient,
+            deliveryClass: 'act_now',
+            deliveryFormat: 'digest',
+            entrySource: 'action_roundup',
+            periodKey: dayKey,
+            dedupeKey: batchDedupeKey,
+            items,
+          });
+          if (prepared.status === 'already_sent') {
+            results.push({ watchRequestId: recipient.id, status: 'already_sent', items: [] });
+          } else {
+            const delivery = await sendProactiveDigestEmail(env, recipient, prepared, items);
+            await updateProactiveDeliveryBatch(env, prepared.batchId, delivery);
+            if (delivery.status === 'sent') {
+              inputs.sentBatchDedupeKeys.add(batchDedupeKey);
+              for (const item of items) {
+                inputs.sentItemDedupeKeys.add(item.dedupeKey);
+                inputs.sentSemanticItemDedupeKeys.add(item.dedupeKey);
+              }
+            }
+            results.push({
+              watchRequestId: recipient.id,
+              status: delivery.status,
+              deliveryClass: 'act_now',
+              deliveryFormat: 'digest',
+              entrySource: 'action_roundup',
+              itemCount: items.length,
+              batchId: prepared.batchId,
+            });
+          }
+        }
+      } else if (items.length) {
+        suppressedPreviouslySent = true;
+      }
+    } else if (immediateCandidates.length && !priorityPlanned) {
+      frequencyCapped = frequencyCapped || prioritySentLast24Hours > 0 || routineSentLast24Hours > 0;
+    }
+
+    if (
+      !priorityPlanned &&
+      !routinePlanned &&
+      immediateCandidates.length === 0 &&
+      digestDue &&
+      remainingEmailSlots > 0 &&
+      prioritySentLast24Hours === 0 &&
+      routineSentLast24Hours === 0
+    ) {
       const items = selectDigestItems(digestCandidates, {
         limit: Number(env.PROACTIVE_DIGEST_MAX_ITEMS || 5),
         immediateProgramCycles: inputs.digestSuppressedProgramCyclesByRecipient.get(
@@ -7028,6 +7176,8 @@ async function runProactiveDelivery(env, options = {}) {
         } else {
           recipientHasEligibleDelivery = true;
           recipientProducedResult = true;
+          routinePlanned = true;
+          remainingEmailSlots -= 1;
 
           if (dryRun) {
             results.push({
@@ -7054,6 +7204,13 @@ async function runProactiveDelivery(env, options = {}) {
             } else {
               const delivery = await sendProactiveDigestEmail(env, recipient, prepared, items);
               await updateProactiveDeliveryBatch(env, prepared.batchId, delivery);
+              if (delivery.status === 'sent') {
+                inputs.sentBatchDedupeKeys.add(batchDedupeKey);
+                for (const item of items) {
+                  inputs.sentItemDedupeKeys.add(item.dedupeKey);
+                  inputs.sentSemanticItemDedupeKeys.add(item.dedupeKey);
+                }
+              }
               results.push({
                 watchRequestId: recipient.id,
                 status: delivery.status,
@@ -7075,7 +7232,9 @@ async function runProactiveDelivery(env, options = {}) {
         watchRequestId: recipient.id,
         status: suppressedPreviouslySent
           ? 'already_sent'
-          : !digestDue && digestCandidates.length
+          : frequencyCapped && (immediateCandidates.length || digestCandidates.length)
+            ? 'frequency_capped'
+          : (!actionRoundupDue && immediateCandidates.length) || (!digestDue && digestCandidates.length)
             ? 'not_due'
             : 'no_match',
         items: [],
@@ -7090,10 +7249,21 @@ async function runProactiveDelivery(env, options = {}) {
     periodKey,
     generatedAt,
     eligibleRecipients,
-    attemptedDeliveries: results.filter((result) => !['no_match', 'not_due', 'already_sent', 'ready'].includes(result.status)).length,
+    attemptedDeliveries: results.filter((result) => ![
+      'no_match',
+      'not_due',
+      'already_sent',
+      'frequency_capped',
+      'ready',
+    ].includes(result.status)).length,
     sent: results.filter((result) => result.status === 'sent').length,
     failed: results.filter((result) => result.status === 'failed').length,
-    skipped: results.filter((result) => ['no_match', 'not_due', 'already_sent'].includes(result.status)).length,
+    skipped: results.filter((result) => [
+      'no_match',
+      'not_due',
+      'already_sent',
+      'frequency_capped',
+    ].includes(result.status)).length,
     results,
   };
 
@@ -7304,6 +7474,7 @@ async function getProactiveDeliveryInputs(env, preferredWatchRequestId = '') {
     programsResult,
     evidenceResult,
     watchesResult,
+    legacyWatchesResult,
     attemptsResult,
     sentItemsResult,
     sentBatchesResult,
@@ -7366,7 +7537,15 @@ async function getProactiveDeliveryInputs(env, preferredWatchRequestId = '') {
             then coalesce(state.last_changed_at, state.last_checked_at)
           else catalog.verified_at
         end as statusChangedAt,
-        catalog.updated_at as updatedAt
+        catalog.updated_at as updatedAt,
+        (
+          select candidate.id
+          from alert_candidates candidate
+          where candidate.program_id = catalog.program_id
+            and candidate.status = 'auto_ready'
+          order by candidate.created_at desc
+          limit 1
+        ) as alertCandidateId
        from program_delivery_catalog catalog
        inner join official_sources source
          on source.program_id = catalog.program_id and source.enabled = 1
@@ -7384,8 +7563,19 @@ async function getProactiveDeliveryInputs(env, preferredWatchRequestId = '') {
        from beta_program_evidence`,
     ).all(),
     env.DB.prepare(
-      `select workspace_id as workspaceId, program_id as programId, is_watching as isWatching
+      `select workspace_id as workspaceId, program_id as programId, is_watching as isWatching,
+        started_at as startedAt
        from beta_program_watches`,
+    ).all(),
+    env.DB.prepare(
+      `select lower(trim(request.email)) as emailKey, relation.program_id as programId,
+        1 as isWatching, min(request.created_at) as startedAt
+       from watch_request_programs relation
+       inner join watch_requests request on request.id = relation.watch_request_id
+       where request.status = 'active'
+         and (request.workspace_id is null or request.workspace_id = '')
+         and request.email is not null and request.email != ''
+       group by lower(trim(request.email)), relation.program_id`,
     ).all(),
     env.DB.prepare(
       `select workspace_id as workspaceId, program_id as programId,
@@ -7406,7 +7596,8 @@ async function getProactiveDeliveryInputs(env, preferredWatchRequestId = '') {
         item.deadline_snapshot as deadlineSnapshot,
         item.official_url as officialUrl,
         batch.delivery_format as deliveryFormat,
-        batch.entry_source as entrySource
+        batch.entry_source as entrySource,
+        batch.sent_at as sentAt
        from proactive_delivery_items item
        inner join proactive_delivery_batches batch on batch.id = item.batch_id
        left join watch_requests delivery_request on delivery_request.id = batch.watch_request_id
@@ -7420,7 +7611,8 @@ async function getProactiveDeliveryInputs(env, preferredWatchRequestId = '') {
          request.email,
          batch.entry_source as entrySource,
          batch.delivery_format as deliveryFormat,
-         batch.period_key as periodKey
+         batch.period_key as periodKey,
+         batch.sent_at as sentAt
        from proactive_delivery_batches batch
        left join watch_requests request on request.id = batch.watch_request_id
        where batch.status = 'sent'`,
@@ -7452,8 +7644,13 @@ async function getProactiveDeliveryInputs(env, preferredWatchRequestId = '') {
 
   const digestSuppressedProgramCyclesByRecipient = new Map();
   const immediateSentLast24HoursByRecipient = new Map();
+  const routineSentLast24HoursByRecipient = new Map();
+  const emailsSentLast7DaysByRecipient = new Map();
+  const recentIntroductionAtByRecipientProgramCycle = new Map();
+  const deliveryCountByRecipientProgramCycle = new Map();
   const sentItemDedupeKeys = new Set();
   const sentSemanticItemDedupeKeys = new Set();
+  const sentCrossClassSemanticKeys = new Set();
   const sentBatchDedupeKeys = new Set();
   const programs = (programsResult.results || []).map((row) => ({
     ...row,
@@ -7489,10 +7686,40 @@ async function getProactiveDeliveryInputs(env, preferredWatchRequestId = '') {
         officialUrl: row.officialUrl,
       }),
     }));
+    sentCrossClassSemanticKeys.add(buildDeliveryDedupeKey({
+      watchRequestId: recipientKey,
+      programId: row.programId,
+      cycleKey: row.cycleKey,
+      deliveryClass: 'discover',
+      changeKey: `${buildDeliverySemanticChangeKey({
+        status: row.statusSnapshot,
+        deadline: row.deadlineSnapshot,
+        officialUrl: row.officialUrl,
+      })}${/deadline_soon/i.test(row.dedupeKey || '') ? '|deadline_soon' : ''}`,
+    }));
+
+    if (row.sentAt && !/deadline_soon/i.test(row.dedupeKey || '')) {
+      if (!recentIntroductionAtByRecipientProgramCycle.has(recipientKey)) {
+        recentIntroductionAtByRecipientProgramCycle.set(recipientKey, new Map());
+      }
+      const programCycle = `${row.programId}:${cleanString(row.cycleKey, 80) || 'unspecified'}`;
+      const existingAt = recentIntroductionAtByRecipientProgramCycle
+        .get(recipientKey).get(programCycle);
+      if (!existingAt || Date.parse(row.sentAt) > Date.parse(existingAt)) {
+        recentIntroductionAtByRecipientProgramCycle.get(recipientKey).set(programCycle, row.sentAt);
+      }
+    }
+
+    if (!deliveryCountByRecipientProgramCycle.has(recipientKey)) {
+      deliveryCountByRecipientProgramCycle.set(recipientKey, new Map());
+    }
+    const programCycle = `${row.programId}:${cleanString(row.cycleKey, 80) || 'unspecified'}`;
+    const counts = deliveryCountByRecipientProgramCycle.get(recipientKey);
+    counts.set(programCycle, Number(counts.get(programCycle) || 0) + 1);
 
     if (
       row.deliveryFormat !== 'immediate' &&
-      row.entrySource !== 'focus_onboarding_digest'
+      !['focus_onboarding_digest', 'action_roundup'].includes(row.entrySource)
     ) continue;
     if (!digestSuppressedProgramCyclesByRecipient.has(recipientKey)) {
       digestSuppressedProgramCyclesByRecipient.set(recipientKey, new Set());
@@ -7511,8 +7738,34 @@ async function getProactiveDeliveryInputs(env, preferredWatchRequestId = '') {
     });
     if (row.entrySource === 'focus_onboarding_digest') {
       sentBatchDedupeKeys.add(`onboarding:${recipientKey}`);
+    } else if (row.entrySource === 'action_roundup' && row.periodKey) {
+      sentBatchDedupeKeys.add(`action:${recipientKey}:${row.periodKey}`);
     } else if (row.deliveryFormat === 'digest' && row.periodKey) {
       sentBatchDedupeKeys.add(`weekly:${recipientKey}:${row.periodKey}`);
+    }
+
+    const sentAt = Date.parse(row.sentAt || '');
+    const now = Date.now();
+    if (
+      row.entrySource !== 'focus_onboarding_digest' &&
+      Number.isFinite(sentAt) &&
+      now - sentAt <= 7 * 24 * 60 * 60 * 1000
+    ) {
+      emailsSentLast7DaysByRecipient.set(
+        recipientKey,
+        Number(emailsSentLast7DaysByRecipient.get(recipientKey) || 0) + 1,
+      );
+    }
+    if (
+      row.entrySource !== 'focus_onboarding_digest' &&
+      row.deliveryFormat === 'digest' &&
+      Number.isFinite(sentAt) &&
+      now - sentAt <= 24 * 60 * 60 * 1000
+    ) {
+      routineSentLast24HoursByRecipient.set(
+        recipientKey,
+        Number(routineSentLast24HoursByRecipient.get(recipientKey) || 0) + 1,
+      );
     }
   }
 
@@ -7570,13 +7823,21 @@ async function getProactiveDeliveryInputs(env, preferredWatchRequestId = '') {
     recipients,
     programs,
     evidence: evidenceResult.results || [],
-    watches: watchesResult.results || [],
     attempts: attemptsResult.results || [],
     sentItemDedupeKeys,
     sentSemanticItemDedupeKeys,
+    sentCrossClassSemanticKeys,
     sentBatchDedupeKeys,
     digestSuppressedProgramCyclesByRecipient,
     immediateSentLast24HoursByRecipient,
+    routineSentLast24HoursByRecipient,
+    emailsSentLast7DaysByRecipient,
+    recentIntroductionAtByRecipientProgramCycle,
+    deliveryCountByRecipientProgramCycle,
+    watches: [
+      ...(watchesResult.results || []),
+      ...(legacyWatchesResult.results || []),
+    ],
   };
 }
 
@@ -7588,7 +7849,6 @@ async function getDeliveryRecipientKey(recipient = {}) {
 
 function buildDeliveryRelationshipMap(recipient, inputs) {
   const relationships = new Map();
-  if (!recipient.workspaceId) return relationships;
 
   const ensure = (programId) => {
     if (!relationships.has(programId)) relationships.set(programId, createEmptyDeliveryRelationship());
@@ -7596,6 +7856,7 @@ function buildDeliveryRelationshipMap(recipient, inputs) {
   };
 
   for (const evidence of inputs.evidence) {
+    if (!recipient.workspaceId) continue;
     if (evidence.workspaceId !== recipient.workspaceId) continue;
     Object.assign(ensure(evidence.programId), {
       relevance: evidence.relevance,
@@ -7605,11 +7866,26 @@ function buildDeliveryRelationshipMap(recipient, inputs) {
   }
 
   for (const watch of inputs.watches) {
-    if (watch.workspaceId !== recipient.workspaceId) continue;
-    ensure(watch.programId).isWatching = Boolean(watch.isWatching);
+    const matchesWorkspace = Boolean(
+      recipient.workspaceId && watch.workspaceId === recipient.workspaceId,
+    );
+    const matchesLegacyRequest = Boolean(
+      watch.watchRequestId && watch.watchRequestId === recipient.id,
+    );
+    const matchesLegacyEmail = Boolean(
+      !recipient.workspaceId &&
+      watch.emailKey &&
+      watch.emailKey === cleanString(recipient.email, 320).trim().toLowerCase(),
+    );
+    if (!matchesWorkspace && !matchesLegacyRequest && !matchesLegacyEmail) continue;
+    Object.assign(ensure(watch.programId), {
+      isWatching: Boolean(watch.isWatching),
+      watchStartedAt: watch.startedAt || recipient.createdAt || '',
+    });
   }
 
   for (const attempt of inputs.attempts) {
+    if (!recipient.workspaceId) continue;
     if (attempt.workspaceId !== recipient.workspaceId) continue;
     ensure(attempt.programId).applicationAttempts.push(attempt);
   }
@@ -7623,6 +7899,7 @@ function createEmptyDeliveryRelationship() {
     relevanceSource: '',
     priorAwareness: '',
     isWatching: false,
+    watchStartedAt: '',
     applicationAttempts: [],
   };
 }
@@ -7664,6 +7941,14 @@ function isWeeklyDeliveryWindow(env, date) {
   const weekday = Math.max(0, Math.min(Number(env.PROACTIVE_DIGEST_WEEKDAY_UTC ?? 1), 6));
   const hour = Math.max(0, Math.min(Number(env.PROACTIVE_DIGEST_HOUR_UTC ?? 16), 23));
   return date.getUTCDay() === weekday && date.getUTCHours() === hour;
+}
+
+function isActionRoundupDeliveryWindow(env, date) {
+  const hour = Math.max(
+    0,
+    Math.min(Number(env.PROACTIVE_ACTION_ROUNDUP_HOUR_UTC ?? 21), 23),
+  );
+  return date.getUTCHours() === hour;
 }
 
 function getIsoWeekKey(date) {
@@ -7731,14 +8016,15 @@ async function createProactiveDeliveryBatch(env, input) {
     const itemId = crypto.randomUUID();
     await env.DB.prepare(
       `insert or ignore into proactive_delivery_items (
-        id, batch_id, program_id, delivery_class, cycle_key, match_reason,
+        id, batch_id, program_id, alert_candidate_id, delivery_class, cycle_key, match_reason,
         match_score, status_snapshot, deadline_snapshot, official_url,
         next_step, dedupe_key, position
-      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(
       itemId,
       batchId,
       item.programId,
+      item.alertCandidateId || null,
       item.deliveryClass,
       item.cycleKey || null,
       cleanString(item.matchReason, 240),
@@ -7780,6 +8066,19 @@ async function updateProactiveDeliveryBatch(env, batchId, delivery) {
     now,
     batchId,
   ).run();
+
+  if (delivery.status === 'sent') {
+    await env.DB.prepare(
+      `update alert_candidates
+       set status = 'auto_sent', updated_at = ?
+       where status = 'auto_ready'
+         and id in (
+           select alert_candidate_id
+           from proactive_delivery_items
+           where batch_id = ? and alert_candidate_id is not null
+         )`,
+    ).bind(now, batchId).run();
+  }
 }
 
 async function sendProactiveImmediateEmail(env, recipient, prepared, item) {
@@ -10278,11 +10577,19 @@ function buildAlertMessage(env, candidate, recipient, proactiveContext = null) {
 
 function buildProactiveDigestMessage(env, recipient, prepared, items) {
   const isOnboarding = prepared.entrySource === 'focus_onboarding_digest';
+  const isActionRoundup = prepared.entrySource === 'action_roundup';
   const subject = isOnboarding
     ? `Your ApplyFirst matches: ${items.length} ${items.length === 1 ? 'opportunity' : 'opportunities'}`
-    : `${items.length} ${items.length === 1 ? 'opportunity' : 'opportunities'} worth a look this week`;
-  const headerLabel = isOnboarding ? 'ApplyFirst Matches' : 'ApplyFirst Weekly Update';
+    : isActionRoundup
+      ? `${items.length} ${items.length === 1 ? 'opportunity' : 'opportunities'} to act on now`
+      : `${items.length} ${items.length === 1 ? 'opportunity' : 'opportunities'} worth a look this week`;
+  const headerLabel = isOnboarding
+    ? 'ApplyFirst Matches'
+    : isActionRoundup
+      ? 'ApplyFirst Action Roundup'
+      : 'ApplyFirst Weekly Update';
   const focusSummary = buildDigestFocusSummary(recipient);
+  const libraryUrl = publicAppUrl(env);
   const unsubscribeUrl = buildUnsubscribeUrl(env, recipient);
   const textItems = items.flatMap((item, index) => {
     const links = buildProactiveDeliveryLinks(env, prepared, item);
@@ -10312,6 +10619,7 @@ function buildProactiveDigestMessage(env, recipient, prepared, items) {
     focusSummary,
     '',
     ...textItems,
+    ...(isOnboarding ? [`Browse all matching programs: ${libraryUrl}`, ''] : []),
     `Unsubscribe from ApplyFirst alerts: ${unsubscribeUrl}`,
   ].join('\n');
   const htmlItems = items.map((item) => {
@@ -10354,6 +10662,7 @@ function buildProactiveDigestMessage(env, recipient, prepared, items) {
           <h1 style="margin:0 0 10px;font-size:24px;line-height:1.22;color:#111827">${escapeHtml(subject)}</h1>
           <p style="margin:0 0 4px;color:#425066;font-size:14px">${escapeHtml(focusSummary)}</p>
           ${htmlItems}
+          ${isOnboarding ? `<p style="margin:16px 0 0"><a href="${escapeHtml(libraryUrl)}" style="display:inline-block;background:#0f7f96;color:#ffffff;text-decoration:none;border-radius:8px;padding:10px 15px;font-size:13px;font-weight:800">Browse Full Library</a></p>` : ''}
           <p style="margin:16px 0 0;color:#6b7280;font-size:12px"><a href="${escapeHtml(unsubscribeUrl)}" style="color:#2563eb">Unsubscribe from ApplyFirst alerts</a>.</p>
         </div>
       </div>
