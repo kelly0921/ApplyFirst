@@ -6753,6 +6753,13 @@ function WaitlistPanel({
       [field]: value,
     }));
   };
+  const updateReferralSource = (value) => {
+    setDraft((currentDraft) => ({
+      ...currentDraft,
+      referralSource: value,
+      referralDetail: '',
+    }));
+  };
   const saveDraft = async (event) => {
     event.preventDefault();
     const payload = {
@@ -6884,7 +6891,7 @@ function WaitlistPanel({
             <span>How did you hear about this? (optional)</span>
             <select
               value={draft.referralSource}
-              onChange={(event) => updateDraft('referralSource', event.target.value)}
+              onChange={(event) => updateReferralSource(event.target.value)}
             >
               <option value="">Select an option</option>
               <option value="APIA Scholars">APIA Scholars</option>
@@ -6893,6 +6900,21 @@ function WaitlistPanel({
               <option value="Other">Other</option>
             </select>
           </label>
+          {draft.referralSource === 'Friend or classmate' || draft.referralSource === 'Other' ? (
+            <label>
+              <span>
+                {draft.referralSource === 'Friend or classmate'
+                  ? 'Who can we thank? (optional)'
+                  : 'Where did you hear about ApplyFirst? (optional)'}
+              </span>
+              <input
+                value={draft.referralDetail}
+                onChange={(event) => updateDraft('referralDetail', event.target.value)}
+                placeholder={draft.referralSource === 'Friend or classmate' ? 'First name or referral code' : ''}
+                maxLength={160}
+              />
+            </label>
+          ) : null}
           <label className="waitlist-note">
             <span>{isLandingContext ? 'Anything specific to watch?' : 'What should ApplyFirst watch for you?'}</span>
             <textarea
@@ -6931,6 +6953,7 @@ function createWaitlistDraft(alertPrefs) {
     interest: '',
     school: '',
     referralSource: '',
+    referralDetail: '',
     note: '',
   };
 }

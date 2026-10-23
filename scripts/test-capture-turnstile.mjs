@@ -25,7 +25,7 @@ const env = {
   },
 };
 
-function waitlistRequest(token = '') {
+function waitlistRequest(token = '', overrides = {}) {
   return new Request('https://applyfirst-capture.example/waitlist', {
     method: 'POST',
     headers: {
@@ -36,8 +36,10 @@ function waitlistRequest(token = '') {
     body: JSON.stringify({
       source: 'turnstile-test',
       email: 'student@example.com',
-      referralSource: 'APIA Scholars',
+      referralSource: 'Other',
+      referralDetail: 'Campus newsletter',
       turnstileToken: token,
+      ...overrides,
     }),
   });
 }
@@ -69,7 +71,7 @@ async function run() {
   globalThis.fetch = async () => {
     verificationCount += 1;
     return Response.json(
-      verificationCount === 1
+      verificationCount <= 2
         ? { success: true, action: 'waitlist', hostname: 'applyfirst-careers.pages.dev' }
         : { success: false, 'error-codes': ['timeout-or-duplicate'] },
     );
@@ -79,11 +81,22 @@ async function run() {
   assert.equal(response.status, 200, 'a valid token should allow the existing handler');
   assert.equal(savedRows.length, 1, 'a valid request should write exactly once');
   assert.ok(savedRows[0].sql.includes('referral_source'), 'referral attribution must be persisted');
-  assert.equal(savedRows[0].values[1], 'APIA Scholars', 'self-reported referral must reach D1 separately from technical source');
+  assert.ok(savedRows[0].sql.includes('referral_detail'), 'conditional referral detail must be persisted');
+  assert.equal(savedRows[0].values[1], 'Other', 'self-reported referral must reach D1 separately from technical source');
+  assert.equal(savedRows[0].values[2], 'Campus newsletter', 'conditional referral detail must reach D1');
+
+  response = await captureWorker.fetch(waitlistRequest('valid-without-detail', {
+    referralSource: 'APIA Scholars',
+    referralDetail: 'must not be retained',
+  }), env);
+  assert.equal(response.status, 200, 'a valid referral without a follow-up field should be accepted');
+  assert.equal(savedRows.length, 2, 'the second valid request should write exactly once');
+  assert.equal(savedRows[1].values[1], 'APIA Scholars');
+  assert.equal(savedRows[1].values[2], null, 'hidden referral detail must not be stored for unrelated choices');
 
   response = await captureWorker.fetch(waitlistRequest('single-use-token'), env);
   assert.equal(response.status, 403, 'replayed tokens must be rejected');
-  assert.equal(savedRows.length, 1, 'a replay must not create another row');
+  assert.equal(savedRows.length, 2, 'a replay must not create another row');
 
   console.log('Capture Worker Turnstile checks passed.');
 }
