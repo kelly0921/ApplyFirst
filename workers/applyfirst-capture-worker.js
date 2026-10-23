@@ -163,6 +163,9 @@ async function saveWaitlistRequest(env, payload) {
 
   const row = {
     source: cleanString(payload.source, 80) || 'applyfirst-waitlist',
+    referralSource: ['APIA Scholars', 'Kelly’s LinkedIn', 'Friend or classmate', 'Other'].includes(payload.referralSource)
+      ? payload.referralSource
+      : null,
     email: cleanEmail(payload.email),
     classYear: cleanString(payload.classYear ?? payload.class_year, 120),
     interest: cleanString(payload.interest, 160),
@@ -182,6 +185,7 @@ async function saveWaitlistRequest(env, payload) {
   const result = await env.DB.prepare(
     `INSERT INTO waitlist_requests (
       source,
+      referral_source,
       email,
       class_year,
       interest,
@@ -190,10 +194,11 @@ async function saveWaitlistRequest(env, payload) {
       preference_summary,
       notification_mode,
       saved_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       row.source,
+      row.referralSource,
       row.email,
       row.classYear,
       row.interest,
@@ -295,6 +300,7 @@ async function sendOwnerWaitlistNotification(env, row) {
     `Signup Type: ${row.notificationMode || signupType}`,
     `Submitted: ${submittedAt}`,
     `Source: ${row.source}`,
+    `Referral: ${row.referralSource || 'Not provided'}`,
     '',
     'Student Note:',
     studentNote,
@@ -316,6 +322,7 @@ async function sendOwnerWaitlistNotification(env, row) {
         ${emailRow('Signup Type', row.notificationMode || signupType)}
         ${emailRow('Submitted', submittedAt)}
         ${emailRow('Source', row.source)}
+        ${emailRow('Referral', row.referralSource || 'Not provided')}
       </table>
       <div style="margin-top: 20px; padding: 14px 16px; border: 1px solid #dce8e4; border-radius: 12px; background: #fbfdfc;">
         <h3 style="margin: 0 0 8px; font-size: 14px; line-height: 1.3; color: #52645d; text-transform: uppercase; letter-spacing: 0.03em;">Student Note</h3>

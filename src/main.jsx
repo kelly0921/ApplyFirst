@@ -6880,6 +6880,19 @@ function WaitlistPanel({
               </label>
             </>
           ) : null}
+          <label>
+            <span>How did you hear about this? (optional)</span>
+            <select
+              value={draft.referralSource}
+              onChange={(event) => updateDraft('referralSource', event.target.value)}
+            >
+              <option value="">Select an option</option>
+              <option value="APIA Scholars">APIA Scholars</option>
+              <option value="Kelly’s LinkedIn">Kelly’s LinkedIn</option>
+              <option value="Friend or classmate">Friend or classmate</option>
+              <option value="Other">Other</option>
+            </select>
+          </label>
           <label className="waitlist-note">
             <span>{isLandingContext ? 'Anything specific to watch?' : 'What should ApplyFirst watch for you?'}</span>
             <textarea
@@ -6917,6 +6930,7 @@ function createWaitlistDraft(alertPrefs) {
     classYear: '',
     interest: '',
     school: '',
+    referralSource: '',
     note: '',
   };
 }

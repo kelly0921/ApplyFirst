@@ -150,6 +150,10 @@ npm run capture:smoke
 
 ## Cloudflare Capture Worker
 
+Waitlist signups include an optional “How did you hear about this?” choice, including APIA Scholars. The answer is stored in `waitlist_requests.referral_source`, separately from the technical `source`, and included in existing owner notifications. Blank or unsupported answers remain NULL; historical attribution is not inferred.
+
+For the referral-field rollout, apply capture migration `002_waitlist_referral_source.sql` **before** deploying the capture Worker, then deploy the frontend. Existing clients may omit the optional field. No changes to signup eligibility or delivery consent are required.
+
 The waitlist and Suggest Updates capture slice lives in `workers/applyfirst-capture-worker.js` and uses the existing `applyfirst_beta` D1 database.
 
 Apply the capture schema:
