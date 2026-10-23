@@ -161,11 +161,17 @@ function forbiddenVerificationError() {
 async function saveWaitlistRequest(env, payload) {
   assertDatabase(env);
 
+  const requestedReferralSource = payload.referralSource ?? payload.referral_source;
+  const referralSource = ['APIA Scholars', 'Kelly’s LinkedIn', 'Friend or classmate', 'Other'].includes(requestedReferralSource)
+    ? requestedReferralSource
+    : null;
+  const referralDetail = ['Friend or classmate', 'Other'].includes(referralSource)
+    ? cleanString(payload.referralDetail ?? payload.referral_detail, 160)
+    : null;
   const row = {
     source: cleanString(payload.source, 80) || 'applyfirst-waitlist',
-    referralSource: ['APIA Scholars', 'Kelly’s LinkedIn', 'Friend or classmate', 'Other'].includes(payload.referralSource)
-      ? payload.referralSource
-      : null,
+    referralSource,
+    referralDetail,
     email: cleanEmail(payload.email),
     classYear: cleanString(payload.classYear ?? payload.class_year, 120),
     interest: cleanString(payload.interest, 160),
@@ -186,6 +192,7 @@ async function saveWaitlistRequest(env, payload) {
     `INSERT INTO waitlist_requests (
       source,
       referral_source,
+      referral_detail,
       email,
       class_year,
       interest,
@@ -194,11 +201,12 @@ async function saveWaitlistRequest(env, payload) {
       preference_summary,
       notification_mode,
       saved_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       row.source,
       row.referralSource,
+      row.referralDetail,
       row.email,
       row.classYear,
       row.interest,
@@ -301,6 +309,7 @@ async function sendOwnerWaitlistNotification(env, row) {
     `Submitted: ${submittedAt}`,
     `Source: ${row.source}`,
     `Referral: ${row.referralSource || 'Not provided'}`,
+    ...(row.referralDetail ? [`Referral Detail: ${row.referralDetail}`] : []),
     '',
     'Student Note:',
     studentNote,
@@ -323,6 +332,7 @@ async function sendOwnerWaitlistNotification(env, row) {
         ${emailRow('Submitted', submittedAt)}
         ${emailRow('Source', row.source)}
         ${emailRow('Referral', row.referralSource || 'Not provided')}
+        ${row.referralDetail ? emailRow('Referral Detail', row.referralDetail) : ''}
       </table>
       <div style="margin-top: 20px; padding: 14px 16px; border: 1px solid #dce8e4; border-radius: 12px; background: #fbfdfc;">
         <h3 style="margin: 0 0 8px; font-size: 14px; line-height: 1.3; color: #52645d; text-transform: uppercase; letter-spacing: 0.03em;">Student Note</h3>

@@ -150,7 +150,7 @@ npm run capture:smoke
 
 ## Cloudflare Capture Worker
 
-Waitlist signups include an optional “How did you hear about this?” choice, including APIA Scholars. The answer is stored in `waitlist_requests.referral_source`, separately from the technical `source`, and included in existing owner notifications. Blank or unsupported answers remain NULL; historical attribution is not inferred.
+Waitlist signups include an optional “How did you hear about this?” choice, including APIA Scholars. Friend/classmate and Other selections reveal one optional follow-up field. Answers are stored in `waitlist_requests.referral_source` and `waitlist_requests.referral_detail`, separately from the technical `source`, and included in existing owner notifications. Blank or unsupported answers remain NULL; detail is only retained for the two choices that request it, and historical attribution is not inferred.
 
 For the referral-field rollout, apply capture migration `002_waitlist_referral_source.sql` **before** deploying the capture Worker, then deploy the frontend. Existing clients may omit the optional field. No changes to signup eligibility or delivery consent are required.
 
