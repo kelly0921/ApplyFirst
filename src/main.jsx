@@ -6904,13 +6904,13 @@ function WaitlistPanel({
             <label>
               <span>
                 {draft.referralSource === 'Friend or classmate'
-                  ? 'Who can we thank? (optional)'
+                  ? 'Who referred you? (optional)'
                   : 'Where did you hear about ApplyFirst? (optional)'}
               </span>
               <input
                 value={draft.referralDetail}
                 onChange={(event) => updateDraft('referralDetail', event.target.value)}
-                placeholder={draft.referralSource === 'Friend or classmate' ? 'First name or referral code' : ''}
+                placeholder={draft.referralSource === 'Friend or classmate' ? 'Their full name' : ''}
                 maxLength={160}
               />
             </label>
