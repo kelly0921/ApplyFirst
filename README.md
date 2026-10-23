@@ -152,7 +152,7 @@ npm run capture:smoke
 
 Waitlist signups include an optional “How did you hear about this?” choice, including APIA Scholars. Friend/classmate and Other selections reveal one optional follow-up field. Answers are stored in `waitlist_requests.referral_source` and `waitlist_requests.referral_detail`, separately from the technical `source`, and included in existing owner notifications. Blank or unsupported answers remain NULL; detail is only retained for the two choices that request it, and historical attribution is not inferred.
 
-For the referral-field rollout, apply capture migration `002_waitlist_referral_source.sql` **before** deploying the capture Worker, then deploy the frontend. Existing clients may omit the optional field. No changes to signup eligibility or delivery consent are required.
+For the referral-field rollout, apply the pending capture migrations (`002_waitlist_referral_source.sql` and `003_waitlist_referral_detail.sql`) **before** deploying the capture Worker, then deploy the frontend. Existing clients may omit the optional fields. No changes to signup eligibility or delivery consent are required.
 
 The waitlist and Suggest Updates capture slice lives in `workers/applyfirst-capture-worker.js` and uses the existing `applyfirst_beta` D1 database.
 
