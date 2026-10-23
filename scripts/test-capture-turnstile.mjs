@@ -36,6 +36,7 @@ function waitlistRequest(token = '') {
     body: JSON.stringify({
       source: 'turnstile-test',
       email: 'student@example.com',
+      referralSource: 'APIA Scholars',
       turnstileToken: token,
     }),
   });
@@ -77,6 +78,8 @@ async function run() {
   response = await captureWorker.fetch(waitlistRequest('single-use-token'), env);
   assert.equal(response.status, 200, 'a valid token should allow the existing handler');
   assert.equal(savedRows.length, 1, 'a valid request should write exactly once');
+  assert.ok(savedRows[0].sql.includes('referral_source'), 'referral attribution must be persisted');
+  assert.equal(savedRows[0].values[1], 'APIA Scholars', 'self-reported referral must reach D1 separately from technical source');
 
   response = await captureWorker.fetch(waitlistRequest('single-use-token'), env);
   assert.equal(response.status, 403, 'replayed tokens must be rejected');

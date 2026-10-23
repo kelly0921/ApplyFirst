@@ -2865,6 +2865,7 @@ a {
 }
 
 .waitlist-form input,
+.waitlist-form select,
 .waitlist-form textarea {
   width: 100%;
   min-height: 40px;
@@ -2876,6 +2877,7 @@ a {
 }
 
 .waitlist-form input:focus,
+.waitlist-form select:focus,
 .waitlist-form textarea:focus {
   outline: 2px solid rgba(15, 127, 150, 0.2);
   outline-offset: 1px;
