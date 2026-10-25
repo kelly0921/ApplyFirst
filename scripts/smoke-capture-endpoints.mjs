@@ -12,6 +12,8 @@ const samples = [
     endpoint: waitlistEndpoint,
     body: {
       source: 'applyfirst-waitlist-smoke',
+      firstName: 'ApplyFirst',
+      lastName: 'Smoke Test',
       email: 'applyfirst-smoke@example.com',
       classYear: 'Freshman',
       interest: 'Software Engineering',
@@ -19,6 +21,8 @@ const samples = [
       note: 'Smoke test for beta waitlist capture.',
       preferenceSummary: 'Freshman / Software Engineering / Recommended / Openings & Deadlines',
       notificationMode: 'Smoke test',
+      emailConsentAt: new Date().toISOString(),
+      emailConsentText: 'Smoke test consent for ApplyFirst beta email updates.',
       savedAt: new Date().toISOString(),
       captureStatus: 'Smoke test',
       turnstileToken: waitlistTurnstileToken,

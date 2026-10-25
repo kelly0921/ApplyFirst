@@ -2479,9 +2479,19 @@ async function getCaptureWaitlistTotals(env) {
   try {
     const row = await env.CAPTURE_DB.prepare(
       `select
-        count(*) as total,
-        count(distinct lower(trim(email))) as uniqueEmails,
-        max(created_at) as latestSignupAt
+        count(case when email_confirmation_required = 0 or email_confirmed_at is not null then 1 end) as total,
+        count(distinct case
+          when email_confirmation_required = 0 or email_confirmed_at is not null
+          then lower(trim(email))
+        end) as uniqueEmails,
+        count(distinct case
+          when email_confirmation_required = 1 and email_confirmed_at is null
+          then lower(trim(email))
+        end) as pendingConfirmation,
+        max(case
+          when email_confirmation_required = 0 or email_confirmed_at is not null
+          then created_at
+        end) as latestSignupAt
        from waitlist_requests
        where email is not null
          and trim(email) != ''
@@ -2491,6 +2501,7 @@ async function getCaptureWaitlistTotals(env) {
     return {
       total: Number(row?.total || 0),
       uniqueEmails: Number(row?.uniqueEmails || 0),
+      pendingConfirmation: Number(row?.pendingConfirmation || 0),
       latestSignupAt: row?.latestSignupAt || null,
       available: true,
     };
@@ -2519,6 +2530,7 @@ async function getCaptureWaitlistPipeline(env) {
          where email is not null
            and trim(email) != ''
            and source = 'applyfirst-waitlist'
+           and (email_confirmation_required = 0 or email_confirmed_at is not null)
          group by lower(trim(email))`,
       ).all(),
       env.DB.prepare(
@@ -2576,6 +2588,7 @@ async function getCaptureWaitlistSegments(env) {
           where email is not null
             and trim(email) != ''
             and source = 'applyfirst-waitlist'
+            and (email_confirmation_required = 0 or email_confirmed_at is not null)
         )
          select coalesce(nullif(trim(class_year), ''), 'Not provided') as label,
           count(distinct lower(email)) as students
@@ -2596,6 +2609,7 @@ async function getCaptureWaitlistSegments(env) {
           where email is not null
             and trim(email) != ''
             and source = 'applyfirst-waitlist'
+            and (email_confirmation_required = 0 or email_confirmed_at is not null)
         )
          select coalesce(nullif(trim(interest), ''), 'Not provided') as label,
           count(distinct lower(email)) as students

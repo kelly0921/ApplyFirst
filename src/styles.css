@@ -375,6 +375,105 @@ a {
   padding: 6px 0 48px;
 }
 
+.landing-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  border-top: 1px solid var(--line);
+  padding: 18px 0 24px;
+  color: var(--quiet);
+  font-size: 0.76rem;
+  font-weight: 720;
+}
+
+.landing-footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.landing-footer a,
+.waitlist-consent a,
+.privacy-main a {
+  color: var(--brand-accent-strong);
+  font-weight: 800;
+  text-decoration: underline;
+  text-decoration-color: rgba(15, 127, 150, 0.3);
+  text-underline-offset: 3px;
+}
+
+.privacy-shell {
+  min-height: 100vh;
+  background: #ffffff;
+}
+
+.privacy-nav {
+  border-bottom: 1px solid var(--line);
+}
+
+.privacy-back-link {
+  color: var(--brand-accent-strong);
+  font-size: 0.82rem;
+  font-weight: 820;
+  text-decoration: none;
+}
+
+.privacy-main {
+  width: min(940px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: clamp(30px, 6vw, 68px) 0 64px;
+}
+
+.privacy-heading {
+  max-width: none;
+  padding-bottom: 26px;
+  border-bottom: 1px solid var(--line);
+}
+
+.privacy-heading > span {
+  color: var(--brand-accent);
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.privacy-heading h1 {
+  margin: 8px 0 10px;
+  color: var(--ink);
+  font-size: 3rem;
+  letter-spacing: 0;
+  line-height: 1.03;
+  white-space: nowrap;
+}
+
+.privacy-heading p,
+.privacy-grid p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.62;
+}
+
+.privacy-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 42px;
+}
+
+.privacy-grid article {
+  padding: 26px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.privacy-grid h2 {
+  margin: 0 0 8px;
+  color: var(--ink);
+  font-size: 1rem;
+}
+
 .landing-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(280px, 0.42fr);
@@ -2904,6 +3003,23 @@ a {
   font-weight: 830;
 }
 
+.waitlist-consent {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--quiet);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.waitlist-confirmation-message {
+  max-width: 360px;
+  margin-top: 8px !important;
+}
+
+.waitlist-confirmation-message.error {
+  color: var(--danger);
+}
+
 .landing-main > .waitlist-panel .waitlist-form button {
   min-height: 46px;
   border: 0;
@@ -2918,6 +3034,23 @@ a {
   border-radius: 7px;
   background: rgba(255, 255, 255, 0.78);
   padding: 9px;
+}
+
+.waitlist-saved.pending {
+  border-color: rgba(184, 132, 24, 0.26);
+  background: #fffcf4;
+}
+
+.waitlist-saved.confirmed {
+  border-color: rgba(18, 130, 98, 0.28);
+  background: #f5fbf8;
+}
+
+.waitlist-return-link {
+  justify-self: start;
+  color: var(--brand-accent-strong);
+  font-size: 0.78rem;
+  font-weight: 820;
 }
 
 .waitlist-saved strong {
@@ -7846,6 +7979,25 @@ a {
   .landing-nav {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .landing-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .privacy-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .privacy-heading h1 {
+    font-size: 2rem;
+    white-space: normal;
+  }
+
+  .privacy-nav {
+    align-items: center;
+    flex-direction: row;
   }
 
   .maintainer-access-card {

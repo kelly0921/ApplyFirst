@@ -171,11 +171,19 @@ function inferRoleTrackPreference(value = '') {
     return 'Quant / Finance';
   }
 
+  if (normalizedValue.match(/design|ux|ui/)) {
+    return 'Design';
+  }
+
   if (normalizedValue.match(/fellowship|scholarship|conference|funding|community|access|prep/)) {
     return 'Access & Prep';
   }
 
-  return 'Software Engineering';
+  if (normalizedValue.match(/software|engineering|\bswe\b|developer|coding/)) {
+    return 'Software Engineering';
+  }
+
+  return '';
 }
 
 function createAlertPrefsFromIntent(intent, basePrefs = defaultAlertPrefs) {
@@ -183,10 +191,12 @@ function createAlertPrefsFromIntent(intent, basePrefs = defaultAlertPrefs) {
     return basePrefs;
   }
 
+  const inferredRoleTrack = intent.interest ? inferRoleTrackPreference(intent.interest) : '';
+
   return {
     ...basePrefs,
     classYear: intent.classYear ? inferClassYearPreference(intent.classYear) : basePrefs.classYear,
-    roleTrack: intent.interest ? inferRoleTrackPreference(intent.interest) : basePrefs.roleTrack,
+    roleTrack: inferredRoleTrack || basePrefs.roleTrack,
   };
 }
 
@@ -294,6 +304,23 @@ function isCleanCaptureMode() {
     return new URLSearchParams(window.location.search).get('capture') === 'clean';
   } catch {
     return false;
+  }
+}
+
+function isPrivacyViewRequested() {
+  try {
+    return new URLSearchParams(window.location.search).get('view') === 'privacy';
+  } catch {
+    return false;
+  }
+}
+
+function getWaitlistConfirmationState() {
+  try {
+    const state = new URLSearchParams(window.location.search).get('waitlist');
+    return ['confirmed', 'expired', 'invalid'].includes(state) ? state : '';
+  } catch {
+    return '';
   }
 }
 
@@ -808,6 +835,8 @@ function getLiveOpportunityUpdate(opportunity, liveStatus) {
 
 function App() {
   const cleanCaptureMode = isCleanCaptureMode();
+  const privacyViewRequested = isPrivacyViewRequested();
+  const waitlistConfirmationState = getWaitlistConfirmationState();
   const activeWaitlistEndpoint = cleanCaptureMode ? '' : waitlistEndpoint;
   const activeContributionEndpoint = cleanCaptureMode ? '' : contributionEndpoint;
   const activeAlertEndpoint = cleanCaptureMode ? '' : alertEndpoint;
@@ -2137,6 +2166,10 @@ function App() {
     setActiveView('monitor');
   };
 
+  if (privacyViewRequested) {
+    return <PrivacyDataUsePage />;
+  }
+
   if (!hasAccess) {
     return (
       <LandingPage
@@ -2148,6 +2181,7 @@ function App() {
         onWaitlistSave={saveWaitlistIntent}
         onWaitlistReset={resetWaitlistIntent}
         onGrantAccess={grantAccess}
+        waitlistConfirmationState={waitlistConfirmationState}
       />
     );
   }
@@ -2465,6 +2499,7 @@ function LandingPage({
   onWaitlistSave,
   onWaitlistReset,
   onGrantAccess,
+  waitlistConfirmationState,
 }) {
   const [inviteCode, setInviteCode] = useState('');
   const [accessError, setAccessError] = useState('');
@@ -2594,8 +2629,95 @@ function LandingPage({
           captureEndpoint={waitlistEndpoint}
           onSave={onWaitlistSave}
           onReset={onWaitlistReset}
+          confirmationState={waitlistConfirmationState}
         />
       </main>
+      <LandingFooter />
+    </div>
+  );
+}
+
+function LandingFooter() {
+  return (
+    <footer className="landing-footer">
+      <span>ApplyFirst private beta</span>
+      <nav aria-label="ApplyFirst policies and contact">
+        <a href="?view=privacy">Privacy &amp; Data Use</a>
+        <a href="mailto:applyfirst@kellychen.dev">Contact</a>
+      </nav>
+    </footer>
+  );
+}
+
+function PrivacyDataUsePage() {
+  return (
+    <div className="privacy-shell">
+      <header className="landing-nav privacy-nav">
+        <a className="brand" href="/" aria-label="Return to ApplyFirst">
+          <ApplyFirstMark />
+          <span className="brand-copy">
+            <strong>ApplyFirst</strong>
+            <em>Find Early. Apply First.</em>
+          </span>
+        </a>
+        <a className="privacy-back-link" href="/">Back to ApplyFirst</a>
+      </header>
+      <main className="privacy-main">
+        <section className="privacy-heading">
+          <span>Privacy &amp; Data Use</span>
+          <h1>What ApplyFirst Collects and Why.</h1>
+          <p>Last updated October 25, 2026</p>
+        </section>
+
+        <section className="privacy-grid">
+          <article>
+            <h2>Information You Provide</h2>
+            <p>
+              The waitlist collects your first and last name, email, class year, and primary interest. School,
+              referral details, and notes are optional. If you receive beta access, ApplyFirst may also store the
+              programs you save, watch, or mark as applied and the alert preferences you choose.
+            </p>
+          </article>
+          <article>
+            <h2>How It Is Used</h2>
+            <p>
+              We use this information to confirm waitlist requests, issue beta invitations, personalize opportunity
+              matching and alerts, understand whether ApplyFirst is useful, and protect the service from abuse.
+            </p>
+          </article>
+          <article>
+            <h2>Email and Your Choices</h2>
+            <p>
+              New waitlist requests must confirm their email before they count as active. Opportunity emails include
+              an unsubscribe link. Optional waitlist fields may be left blank, and you can request correction or
+              deletion at any time.
+            </p>
+          </article>
+          <article>
+            <h2>Service Providers</h2>
+            <p>
+              ApplyFirst uses Cloudflare for hosting, database storage, abuse verification, and transactional email.
+              We do not sell personal information or share the waitlist with advertisers.
+            </p>
+          </article>
+          <article>
+            <h2>Retention and Security</h2>
+            <p>
+              Records are kept only as long as needed to operate and evaluate the beta, support student alerts, and
+              address security or legal obligations. Confirmation tokens are stored only as cryptographic hashes and
+              expire after 48 hours.
+            </p>
+          </article>
+          <article>
+            <h2>Questions or Requests</h2>
+            <p>
+              Email <a href="mailto:applyfirst@kellychen.dev">applyfirst@kellychen.dev</a> to ask what information is
+              associated with your email, correct it, or request deletion.
+            </p>
+          </article>
+        </section>
+      </main>
+      <LandingFooter />
     </div>
   );
 }
@@ -3920,6 +4042,11 @@ function BetaMetricsPanel({
               : 'Capture database is unavailable',
           }} />
           <BetaEvidenceMetric metric={{
+            label: 'Pending Email Confirmation',
+            value: waitlist.available ? waitlist.pendingConfirmation ?? 0 : 'N/A',
+            detail: 'Excluded from demand and invitation metrics until confirmed',
+          }} />
+          <BetaEvidenceMetric metric={{
             label: 'Invited From Waitlist',
             value: waitlistPipeline.available ? waitlistPipeline.invitedFromWaitlist : 'N/A',
             detail: `${invitations.invited ?? 0} total beta invite${invitations.invited === 1 ? '' : 's'} across all cohorts`,
@@ -4204,6 +4331,7 @@ function BetaMetricsPanel({
               <div><dt>Alert Marked Useful</dt><dd>{engagement.useful?.events ?? 0}</dd></div>
               <div><dt>Historical: Applied Earlier</dt><dd>{outcomes.applied_earlier ?? 0}</dd></div>
               <div><dt>Waitlist Demand</dt><dd>{metrics.waitlist?.uniqueEmails ?? '-'}</dd></div>
+              <div><dt>Pending Confirmation</dt><dd>{metrics.waitlist?.pendingConfirmation ?? '-'}</dd></div>
             </dl>
           </section>
           <section>
@@ -6719,6 +6847,7 @@ function WaitlistPanel({
   captureEndpoint = '',
   onSave,
   onReset,
+  confirmationState = '',
 }) {
   const [draft, setDraft] = useState(() => createWaitlistDraft(alertPrefs));
   const [submitState, setSubmitState] = useState('idle');
@@ -6726,12 +6855,27 @@ function WaitlistPanel({
   const [turnstileResetKey, setTurnstileResetKey] = useState(0);
   const isLandingContext = context === 'landing';
   const isSetupContext = !isLandingContext;
+  const emailConsentText = isLandingContext
+    ? 'By joining, you agree to receive ApplyFirst beta access and opportunity updates by email. Unsubscribe anytime.'
+    : 'By saving, you agree to receive ApplyFirst beta access and opportunity updates by email. Unsubscribe anytime.';
+  const confirmationPending = waitlistIntent?.captureStatus === 'Confirmation Email Sent';
+  const confirmationComplete = isLandingContext && confirmationState === 'confirmed';
+  const showSavedState = Boolean(waitlistIntent) || confirmationComplete;
 
   useEffect(() => {
     if (!waitlistIntent) {
       setDraft(createWaitlistDraft(alertPrefs));
     }
   }, [alertPrefs, waitlistIntent]);
+
+  useEffect(() => {
+    if (confirmationComplete && waitlistIntent && waitlistIntent.captureStatus !== 'Email Confirmed') {
+      onSave({
+        ...waitlistIntent,
+        captureStatus: 'Email Confirmed',
+      });
+    }
+  }, [confirmationComplete, onSave, waitlistIntent]);
 
   const preferenceSummary = [
     isPreferenceUnset(alertPrefs.classYear)
@@ -6766,6 +6910,8 @@ function WaitlistPanel({
       ...draft,
       preferenceSummary,
       notificationMode: alertStrategy.modeLabel,
+      emailConsentAt: new Date().toISOString(),
+      emailConsentText,
     };
 
     if (captureEndpoint) {
@@ -6780,25 +6926,30 @@ function WaitlistPanel({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            source: 'applyfirst-waitlist',
+            source: isLandingContext ? 'applyfirst-waitlist' : 'applyfirst-contact-preference',
             ...payload,
             turnstileToken,
           }),
         });
 
+        const result = await response.json().catch(() => ({}));
         if (!response.ok) {
           throw new Error('Waitlist endpoint returned an error.');
         }
 
         onSave({
           ...payload,
-          captureStatus: 'Submitted to Waitlist Endpoint',
+          captureStatus: result.confirmationRequired ? 'Confirmation Email Sent' : 'Submitted to Waitlist Endpoint',
         });
         setTurnstileResetKey((current) => current + 1);
-        setSubmitState('submitted');
+        setSubmitState(result.confirmationRequired ? 'confirmationPending' : 'submitted');
         return;
       } catch {
         setTurnstileResetKey((current) => current + 1);
+        if (isLandingContext) {
+          setSubmitState('submissionError');
+          return;
+        }
         onSave({
           ...payload,
           captureStatus: 'Saved Locally After Endpoint Issue',
@@ -6824,7 +6975,11 @@ function WaitlistPanel({
       <div className="waitlist-copy">
         <span>{isLandingContext ? 'Early Access' : 'Optional Contact'}</span>
         <h3>
-          {waitlistIntent
+          {confirmationComplete
+            ? 'Email Confirmed'
+            : confirmationPending
+              ? 'Confirm Your Email'
+              : waitlistIntent
             ? isLandingContext
               ? 'You Are on the List'
               : 'Your Contact Preference Is Saved'
@@ -6832,6 +6987,16 @@ function WaitlistPanel({
               ? 'Join the ApplyFirst Waitlist'
               : 'Get Beta Follow-Up'}
         </h3>
+        {isLandingContext && confirmationState === 'expired' ? (
+          <p className="waitlist-confirmation-message error">
+            This confirmation link expired. Submit the form again for a new link.
+          </p>
+        ) : null}
+        {isLandingContext && confirmationState === 'invalid' ? (
+          <p className="waitlist-confirmation-message error">
+            This confirmation link is not valid. Submit the form again if you still want to join.
+          </p>
+        ) : null}
         {!isLandingContext ? (
           <p>
             This is optional. Add an email only if you want ApplyFirst to reach out when live reminders or beta testing
@@ -6839,50 +7004,125 @@ function WaitlistPanel({
           </p>
         ) : null}
       </div>
-      {waitlistIntent ? (
-        <div className="waitlist-saved">
-          <strong>{waitlistIntent.email || 'No Email Added'}</strong>
-          <span>{waitlistIntent.savedAt ? `Saved ${waitlistIntent.savedAt.slice(0, 10)}` : 'Saved Locally'}</span>
-          <em>{waitlistIntent.captureStatus ?? 'Saved Locally'}</em>
-          <p>{waitlistIntent.note || 'No Notes Added.'}</p>
-          <button type="button" onClick={onReset}>Reset My Focus</button>
+      {showSavedState ? (
+        <div className={`waitlist-saved ${confirmationComplete ? 'confirmed' : confirmationPending ? 'pending' : ''}`}>
+          <strong>
+            {confirmationComplete
+              ? 'Your email is confirmed'
+              : [waitlistIntent?.firstName, waitlistIntent?.lastName].filter(Boolean).join(' ')
+                || waitlistIntent?.email
+                || 'Contact Saved'}
+          </strong>
+          {waitlistIntent?.email ? <span>{waitlistIntent.email}</span> : null}
+          {confirmationComplete ? (
+            <p>You are on the ApplyFirst waitlist. We will email you when beta access is available.</p>
+          ) : confirmationPending ? (
+            <p>Open the confirmation link we sent to finish joining the waitlist. The link expires in 48 hours.</p>
+          ) : (
+            <>
+              <span>{waitlistIntent?.savedAt ? `Saved ${waitlistIntent.savedAt.slice(0, 10)}` : 'Saved Locally'}</span>
+              <em>{waitlistIntent?.captureStatus ?? 'Saved Locally'}</em>
+              <p>{waitlistIntent?.note || 'No Notes Added.'}</p>
+            </>
+          )}
+          {confirmationComplete ? (
+            <a className="waitlist-return-link" href="/">Return to ApplyFirst</a>
+          ) : (
+            <button type="button" onClick={onReset}>
+              {isLandingContext ? 'Use a Different Email' : 'Edit Contact Preference'}
+            </button>
+          )}
         </div>
       ) : (
         <form className="waitlist-form" onSubmit={saveDraft}>
           <label>
-            <span>{isLandingContext ? 'Email for future updates' : 'Email'}</span>
+            <span>
+              First name <span className="preference-required-mark" aria-label="required field">*</span>
+            </span>
+            <input
+              autoComplete="given-name"
+              value={draft.firstName}
+              onChange={(event) => updateDraft('firstName', event.target.value)}
+              placeholder="First name"
+              maxLength={80}
+              required
+            />
+          </label>
+          <label>
+            <span>
+              Last name <span className="preference-required-mark" aria-label="required field">*</span>
+            </span>
+            <input
+              autoComplete="family-name"
+              value={draft.lastName}
+              onChange={(event) => updateDraft('lastName', event.target.value)}
+              placeholder="Last name"
+              maxLength={80}
+              required
+            />
+          </label>
+          <label>
+            <span>
+              {isLandingContext ? 'Email for future updates' : 'Email'}{' '}
+              <span className="preference-required-mark" aria-label="required field">*</span>
+            </span>
             <input
               type="email"
+              autoComplete="email"
               value={draft.email}
               onChange={(event) => updateDraft('email', event.target.value)}
               placeholder="you@example.com"
-              required={isLandingContext}
+              required
             />
           </label>
           {isLandingContext ? (
             <>
               <label>
-                <span>Class year</span>
-                <input
+                <span>
+                  Class year <span className="preference-required-mark" aria-label="required field">*</span>
+                </span>
+                <select
                   value={draft.classYear}
                   onChange={(event) => updateDraft('classYear', event.target.value)}
-                  placeholder="Freshman, sophomore, junior..."
-                />
+                  required
+                >
+                  <option value="">Select class year</option>
+                  <option value="High school">High school</option>
+                  <option value="Freshman">Freshman</option>
+                  <option value="Sophomore">Sophomore</option>
+                  <option value="Junior">Junior</option>
+                  <option value="Senior">Senior</option>
+                  <option value="Graduate student">Graduate student</option>
+                  <option value="Recent graduate">Recent graduate</option>
+                  <option value="Other / not sure">Other / not sure</option>
+                </select>
               </label>
               <label>
-                <span>Primary interest</span>
-                <input
+                <span>
+                  Primary interest <span className="preference-required-mark" aria-label="required field">*</span>
+                </span>
+                <select
                   value={draft.interest}
                   onChange={(event) => updateDraft('interest', event.target.value)}
-                  placeholder="SWE, PM, quant, fellowships..."
-                />
+                  required
+                >
+                  <option value="">Select primary interest</option>
+                  <option value="Software Engineering">Software Engineering</option>
+                  <option value="Product Management">Product Management</option>
+                  <option value="Design">Design</option>
+                  <option value="Quant / Finance">Quant / Finance</option>
+                  <option value="Access & Prep">Fellowships, funding, and prep</option>
+                  <option value="Not sure yet">Not sure yet</option>
+                </select>
               </label>
               <label>
-                <span>School</span>
+                <span>School (optional)</span>
                 <input
+                  autoComplete="organization"
                   value={draft.school}
                   onChange={(event) => updateDraft('school', event.target.value)}
-                  placeholder="Optional"
+                  placeholder="College or university"
+                  maxLength={160}
                 />
               </label>
             </>
@@ -6916,7 +7156,11 @@ function WaitlistPanel({
             </label>
           ) : null}
           <label className="waitlist-note">
-            <span>{isLandingContext ? 'Anything specific to watch?' : 'What should ApplyFirst watch for you?'}</span>
+            <span>
+              {isLandingContext
+                ? 'Anything specific to watch? (optional)'
+                : 'What should ApplyFirst watch for you? (optional)'}
+            </span>
             <textarea
               value={draft.note}
               onChange={(event) => updateDraft('note', event.target.value)}
@@ -6929,11 +7173,20 @@ function WaitlistPanel({
           <button type="submit" disabled={submitState === 'submitting' || (captureEndpoint && !turnstileToken)}>
             {submitState === 'submitting' ? 'Saving...' : isLandingContext ? 'Join Waitlist' : 'Save Contact Preference'}
           </button>
+          <p className="waitlist-consent">
+            {emailConsentText}{' '}
+            <a href="?view=privacy">Privacy &amp; Data Use</a>.
+          </p>
           {submitState === 'localFallback' ? (
             <p className="form-helper">Saved here for now. We may ask you to submit again later.</p>
           ) : null}
           {submitState === 'verificationRequired' ? (
             <p className="form-helper form-error">Complete the verification before joining.</p>
+          ) : null}
+          {submitState === 'submissionError' ? (
+            <p className="form-helper form-error">
+              We could not submit your request or send the confirmation email. Please try again.
+            </p>
           ) : null}
           {!captureEndpoint ? (
             <p className="form-helper">
@@ -6948,6 +7201,8 @@ function WaitlistPanel({
 
 function createWaitlistDraft(alertPrefs) {
   return {
+    firstName: '',
+    lastName: '',
     email: '',
     classYear: '',
     interest: '',

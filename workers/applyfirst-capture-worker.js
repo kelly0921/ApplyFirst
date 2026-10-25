@@ -3,6 +3,27 @@ const DEFAULT_CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type',
   Vary: 'Origin',
 };
+const PUBLIC_WAITLIST_CLASS_YEARS = new Set([
+  'High school',
+  'Freshman',
+  'Sophomore',
+  'Junior',
+  'Senior',
+  'Graduate student',
+  'Recent graduate',
+  'Other / not sure',
+]);
+const PUBLIC_WAITLIST_INTERESTS = new Set([
+  'Software Engineering',
+  'Product Management',
+  'Design',
+  'Quant / Finance',
+  'Access & Prep',
+  'Not sure yet',
+]);
+const PUBLIC_WAITLIST_CONSENT_TEXT =
+  'By joining, you agree to receive ApplyFirst beta access and opportunity updates by email. Unsubscribe anytime.';
+const WAITLIST_CONFIRMATION_TTL_MS = 48 * 60 * 60 * 1000;
 
 export default {
   async fetch(request, env) {
@@ -23,10 +44,33 @@ export default {
         });
       }
 
+      if (request.method === 'GET' && url.pathname === '/waitlist/confirm') {
+        const confirmation = await confirmWaitlistEmail(env, url.searchParams.get('token'));
+        return waitlistConfirmationRedirect(env, confirmation.state);
+      }
+
       if (request.method === 'POST' && url.pathname === '/waitlist') {
         const payload = await readJson(request);
         await verifyTurnstile(request, env, payload.turnstileToken, 'waitlist');
-        const row = await saveWaitlistRequest(env, payload);
+        const confirmationRequired = shouldRequireWaitlistEmailConfirmation(env, payload);
+        if (confirmationRequired) {
+          assertWaitlistConfirmationConfigured(env);
+        }
+        const confirmation = confirmationRequired ? await createWaitlistConfirmation() : null;
+        const row = await saveWaitlistRequest(env, payload, confirmation);
+
+        if (confirmationRequired) {
+          await sendWaitlistConfirmationEmail(env, request, row, confirmation.token);
+          await markWaitlistConfirmationSent(env, row.id);
+          console.log(JSON.stringify({ event: 'waitlist_confirmation_sent', waitlistRequestId: row.id }));
+
+          return jsonResponse(request, env, {
+            ok: true,
+            id: row.id,
+            confirmationRequired: true,
+          });
+        }
+
         const ownerNotification = await sendOwnerWaitlistNotification(env, row);
 
         return jsonResponse(request, env, {
@@ -158,9 +202,10 @@ function forbiddenVerificationError() {
   return error;
 }
 
-async function saveWaitlistRequest(env, payload) {
+async function saveWaitlistRequest(env, payload, confirmation = null) {
   assertDatabase(env);
 
+  const source = cleanString(payload.source, 80) || 'applyfirst-waitlist';
   const requestedReferralSource = payload.referralSource ?? payload.referral_source;
   const referralSource = ['APIA Scholars', 'Kelly’s LinkedIn', 'Friend or classmate', 'Other'].includes(requestedReferralSource)
     ? requestedReferralSource
@@ -169,9 +214,11 @@ async function saveWaitlistRequest(env, payload) {
     ? cleanString(payload.referralDetail ?? payload.referral_detail, 160)
     : null;
   const row = {
-    source: cleanString(payload.source, 80) || 'applyfirst-waitlist',
+    source,
     referralSource,
     referralDetail,
+    firstName: cleanString(payload.firstName ?? payload.first_name, 80),
+    lastName: cleanString(payload.lastName ?? payload.last_name, 80),
     email: cleanEmail(payload.email),
     classYear: cleanString(payload.classYear ?? payload.class_year, 120),
     interest: cleanString(payload.interest, 160),
@@ -179,6 +226,15 @@ async function saveWaitlistRequest(env, payload) {
     note: cleanString(payload.note, 2000),
     preferenceSummary: cleanString(payload.preferenceSummary ?? payload.preference_summary, 500),
     notificationMode: cleanString(payload.notificationMode ?? payload.notification_mode, 120),
+    emailConsentAt: source === 'applyfirst-waitlist'
+      ? new Date().toISOString()
+      : cleanString(payload.emailConsentAt ?? payload.email_consent_at, 80),
+    emailConsentText: source === 'applyfirst-waitlist'
+      ? PUBLIC_WAITLIST_CONSENT_TEXT
+      : cleanString(payload.emailConsentText ?? payload.email_consent_text, 500),
+    emailConfirmationRequired: confirmation ? 1 : 0,
+    emailConfirmationTokenHash: confirmation?.tokenHash || null,
+    emailConfirmationExpiresAt: confirmation?.expiresAt || null,
     savedAt: cleanString(payload.savedAt ?? payload.saved_at, 80) || new Date().toISOString(),
   };
 
@@ -188,11 +244,28 @@ async function saveWaitlistRequest(env, payload) {
     throw error;
   }
 
+  if (row.source === 'applyfirst-waitlist' && (!row.firstName || !row.lastName)) {
+    const error = new Error('First and last name are required for waitlist requests.');
+    error.status = 400;
+    throw error;
+  }
+
+  if (
+    row.source === 'applyfirst-waitlist' &&
+    (!PUBLIC_WAITLIST_CLASS_YEARS.has(row.classYear) || !PUBLIC_WAITLIST_INTERESTS.has(row.interest))
+  ) {
+    const error = new Error('Select a valid class year and primary interest.');
+    error.status = 400;
+    throw error;
+  }
+
   const result = await env.DB.prepare(
     `INSERT INTO waitlist_requests (
       source,
       referral_source,
       referral_detail,
+      first_name,
+      last_name,
       email,
       class_year,
       interest,
@@ -200,13 +273,20 @@ async function saveWaitlistRequest(env, payload) {
       note,
       preference_summary,
       notification_mode,
+      email_consent_at,
+      email_consent_text,
+      email_confirmation_required,
+      email_confirmation_token_hash,
+      email_confirmation_expires_at,
       saved_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       row.source,
       row.referralSource,
       row.referralDetail,
+      row.firstName,
+      row.lastName,
       row.email,
       row.classYear,
       row.interest,
@@ -214,6 +294,11 @@ async function saveWaitlistRequest(env, payload) {
       row.note,
       row.preferenceSummary,
       row.notificationMode,
+      row.emailConsentAt,
+      row.emailConsentText,
+      row.emailConfirmationRequired,
+      row.emailConfirmationTokenHash,
+      row.emailConfirmationExpiresAt,
       row.savedAt,
     )
     .run();
@@ -223,6 +308,215 @@ async function saveWaitlistRequest(env, payload) {
     id: result.meta?.last_row_id ?? null,
     createdAt: new Date().toISOString(),
   };
+}
+
+function shouldRequireWaitlistEmailConfirmation(env, payload) {
+  const source = cleanString(payload.source, 80) || 'applyfirst-waitlist';
+  return source === 'applyfirst-waitlist' && env.ENABLE_WAITLIST_EMAIL_CONFIRMATION === 'true';
+}
+
+function assertWaitlistConfirmationConfigured(env) {
+  if (!env.EMAIL || !env.CAPTURE_FROM_EMAIL) {
+    const error = new Error('Waitlist email confirmation is temporarily unavailable.');
+    error.status = 503;
+    throw error;
+  }
+}
+
+async function createWaitlistConfirmation() {
+  const token = createSecureToken();
+  return {
+    token,
+    tokenHash: await sha256Hex(token),
+    expiresAt: new Date(Date.now() + WAITLIST_CONFIRMATION_TTL_MS).toISOString(),
+  };
+}
+
+async function markWaitlistConfirmationSent(env, waitlistRequestId) {
+  await env.DB.prepare(
+    `UPDATE waitlist_requests
+     SET email_confirmation_sent_at = ?
+     WHERE id = ?`,
+  )
+    .bind(new Date().toISOString(), waitlistRequestId)
+    .run();
+}
+
+async function confirmWaitlistEmail(env, tokenValue) {
+  assertDatabase(env);
+  const token = cleanString(tokenValue, 160);
+  if (!/^[a-f0-9]{64}$/i.test(token)) {
+    return { state: 'invalid' };
+  }
+
+  const tokenHash = await sha256Hex(token);
+  const row = await env.DB.prepare(
+    `SELECT
+      id,
+      source,
+      referral_source AS referralSource,
+      referral_detail AS referralDetail,
+      first_name AS firstName,
+      last_name AS lastName,
+      email,
+      class_year AS classYear,
+      interest,
+      school,
+      note,
+      preference_summary AS preferenceSummary,
+      notification_mode AS notificationMode,
+      email_confirmation_expires_at AS emailConfirmationExpiresAt,
+      email_confirmed_at AS emailConfirmedAt,
+      saved_at AS savedAt,
+      created_at AS createdAt
+     FROM waitlist_requests
+     WHERE email_confirmation_required = 1
+       AND email_confirmation_token_hash = ?
+     LIMIT 1`,
+  )
+    .bind(tokenHash)
+    .first();
+
+  if (!row) {
+    return { state: 'invalid' };
+  }
+
+  if (row.emailConfirmedAt) {
+    return { state: 'confirmed' };
+  }
+
+  if (!row.emailConfirmationExpiresAt || Date.parse(row.emailConfirmationExpiresAt) <= Date.now()) {
+    return { state: 'expired' };
+  }
+
+  const confirmedAt = new Date().toISOString();
+  const result = await env.DB.prepare(
+    `UPDATE waitlist_requests
+     SET email_confirmed_at = ?
+     WHERE id = ?
+       AND email_confirmed_at IS NULL
+       AND email_confirmation_token_hash = ?`,
+  )
+    .bind(confirmedAt, row.id, tokenHash)
+    .run();
+
+  if (Number(result.meta?.changes || 0) > 0) {
+    const ownerNotification = await sendOwnerWaitlistNotification(env, {
+      ...row,
+      emailConfirmedAt: confirmedAt,
+    });
+    if (ownerNotification.status === 'failed') {
+      console.error(JSON.stringify({
+        event: 'confirmed_waitlist_owner_notification_failed',
+        waitlistRequestId: row.id,
+        error: ownerNotification.errorMessage,
+      }));
+    }
+    console.log(JSON.stringify({ event: 'waitlist_email_confirmed', waitlistRequestId: row.id }));
+  }
+
+  return { state: 'confirmed' };
+}
+
+function waitlistConfirmationRedirect(env, state) {
+  const target = getPublicAppUrl(env);
+  target.searchParams.set('waitlist', state);
+  target.hash = 'waitlist';
+
+  return new Response(null, {
+    status: 303,
+    headers: {
+      Location: target.toString(),
+      'Cache-Control': 'no-store',
+      'Referrer-Policy': 'no-referrer',
+    },
+  });
+}
+
+async function sendWaitlistConfirmationEmail(env, request, row, token) {
+  const workerUrl = new URL(request.url);
+  workerUrl.pathname = '/waitlist/confirm';
+  workerUrl.search = '';
+  workerUrl.hash = '';
+  workerUrl.searchParams.set('token', token);
+
+  const privacyUrl = getPublicAppUrl(env);
+  privacyUrl.search = '';
+  privacyUrl.searchParams.set('view', 'privacy');
+  privacyUrl.hash = '';
+
+  const studentName = row.firstName || 'there';
+  const subject = 'Confirm your ApplyFirst waitlist email';
+  const text = [
+    `Hi ${studentName},`,
+    '',
+    'Confirm your email to finish joining the ApplyFirst waitlist.',
+    '',
+    workerUrl.toString(),
+    '',
+    'This link expires in 48 hours. If you did not request ApplyFirst access, you can ignore this email.',
+    '',
+    `Privacy & Data Use: ${privacyUrl.toString()}`,
+  ].join('\n');
+  const html = `
+    <div style="font-family: Arial, sans-serif; color: #18201d; line-height: 1.5; max-width: 620px;">
+      <div style="display: inline-block; margin-bottom: 12px; padding: 4px 10px; border-radius: 999px; background: #e9f6f2; color: #176b5a; font-size: 12px; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase;">
+        ApplyFirst Waitlist
+      </div>
+      <h1 style="margin: 0 0 10px; font-size: 24px; line-height: 1.25;">Confirm your email</h1>
+      <p style="margin: 0 0 18px; color: #52645d;">Hi ${escapeHtml(studentName)}, confirm your email to finish joining the ApplyFirst waitlist.</p>
+      <p style="margin: 0 0 20px;">
+        <a href="${escapeHtml(workerUrl.toString())}" style="display: inline-block; border-radius: 8px; background: #0f7f96; color: #ffffff; padding: 11px 18px; font-weight: 700; text-decoration: none;">Confirm Email</a>
+      </p>
+      <p style="margin: 0 0 8px; color: #52645d; font-size: 13px;">This link expires in 48 hours. If you did not request ApplyFirst access, you can ignore this email.</p>
+      <p style="margin: 0; font-size: 13px;"><a href="${escapeHtml(privacyUrl.toString())}" style="color: #0f6577;">Privacy &amp; Data Use</a></p>
+    </div>
+  `;
+
+  try {
+    return await env.EMAIL.send({
+      to: row.email,
+      from: {
+        email: env.CAPTURE_FROM_EMAIL,
+        name: env.CAPTURE_FROM_NAME || 'ApplyFirst',
+      },
+      replyTo: env.CAPTURE_REPLY_TO || env.CAPTURE_FROM_EMAIL,
+      subject,
+      text,
+      html,
+    });
+  } catch (error) {
+    console.error(JSON.stringify({
+      event: 'waitlist_confirmation_email_failed',
+      waitlistRequestId: row.id,
+      error: error.message,
+    }));
+    const serviceError = new Error('We could not send the confirmation email. Please try again.');
+    serviceError.status = 503;
+    throw serviceError;
+  }
+}
+
+function getPublicAppUrl(env) {
+  try {
+    const url = new URL(env.PUBLIC_APP_URL || 'https://applyfirst-careers.pages.dev');
+    if (!['http:', 'https:'].includes(url.protocol)) {
+      throw new Error('Unsupported protocol.');
+    }
+    return url;
+  } catch {
+    return new URL('https://applyfirst-careers.pages.dev');
+  }
+}
+
+function createSecureToken() {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function sha256Hex(value) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 async function saveContributionRequest(env, payload) {
@@ -296,10 +590,12 @@ async function sendOwnerWaitlistNotification(env, row) {
   const signupType = getSignupType(row);
   const submittedAt = row.savedAt || row.createdAt || 'Unknown';
   const studentNote = row.note || 'No note provided.';
-  const subject = `New ApplyFirst Signup: ${row.email}`;
+  const studentName = [row.firstName, row.lastName].filter(Boolean).join(' ');
+  const subject = `New ApplyFirst Signup: ${studentName || row.email}`;
   const text = [
     `New ApplyFirst ${signupType}`,
     '',
+    `Name: ${studentName || 'Not provided'}`,
     `Email: ${row.email}`,
     `Class Year: ${row.classYear || 'Not provided'}`,
     `Interest: ${row.interest || 'Not provided'}`,
@@ -323,6 +619,7 @@ async function sendOwnerWaitlistNotification(env, row) {
       <h2 style="margin: 0 0 4px; font-size: 22px; line-height: 1.25;">New ApplyFirst signup</h2>
       <p style="margin: 0 0 18px; color: #52645d;">A student submitted interest through the beta capture flow.</p>
       <table style="border-collapse: collapse; width: 100%; max-width: 640px; border-top: 1px solid #dce8e4;">
+        ${emailRow('Name', studentName || 'Not provided')}
         ${emailRow('Email', row.email)}
         ${emailRow('Class Year', row.classYear || 'Not provided')}
         ${emailRow('Interest', row.interest || 'Not provided')}

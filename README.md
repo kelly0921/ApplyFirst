@@ -150,9 +150,13 @@ npm run capture:smoke
 
 ## Cloudflare Capture Worker
 
-Waitlist signups include an optional “How did you hear about this?” choice, including APIA Scholars. Friend/classmate and Other selections reveal one optional follow-up field. Answers are stored in `waitlist_requests.referral_source` and `waitlist_requests.referral_detail`, separately from the technical `source`, and included in existing owner notifications. Blank or unsupported answers remain NULL; detail is only retained for the two choices that request it, and historical attribution is not inferred.
+Public waitlist signups require first name, last name, email, class year, and one primary interest. Class year and interest use product-aligned choices so intake analytics and My Focus prefills do not depend on free-text spelling. School, the program note, and referral attribution remain optional. Friend/classmate and Other referrals reveal one optional follow-up field. Historical rows remain valid without inferred names or referral data.
 
-For the referral-field rollout, apply the pending capture migrations (`002_waitlist_referral_source.sql` and `003_waitlist_referral_detail.sql`) **before** deploying the capture Worker, then deploy the frontend. Existing clients may omit the optional fields. No changes to signup eligibility or delivery consent are required.
+New public waitlist signups use double opt-in. The capture Worker stores only a SHA-256 confirmation-token hash, sends a 48-hour confirmation link, and notifies the owner only after the address is confirmed. Unconfirmed rows are excluded from waitlist demand, segmentation, and invitation-pipeline metrics. Historical rows remain eligible through `email_confirmation_required = 0`.
+
+The public `?view=privacy` page explains the beta's data use, Cloudflare processing, email choices, retention approach, and correction/deletion contact. Keep its wording aligned with actual product behavior whenever collection or delivery changes.
+
+For capture-form changes, apply pending D1 migrations before deploying the capture Worker. Deploy the frontend before a Worker version that enforces newly required public fields, so the previous frontend is never rejected during rollout. Alert-setup captures may continue to omit student names because they are not public waitlist requests.
 
 The waitlist and Suggest Updates capture slice lives in `workers/applyfirst-capture-worker.js` and uses the existing `applyfirst_beta` D1 database.
 
@@ -185,7 +189,7 @@ VITE_CONTRIBUTION_ENDPOINT=https://applyfirst-capture.kellychenmeiyi.workers.dev
 VITE_TURNSTILE_SITE_KEY=YOUR_PUBLIC_SITE_KEY
 ```
 
-After a waitlist submission, check D1 and your owner inbox. If the owner email fails, the request still stays saved in D1.
+After a public waitlist submission, confirm the address from the student email. The browser returns to `?waitlist=confirmed#waitlist`, the row receives `email_confirmed_at`, and the owner notification is sent once. If the owner email fails, the confirmed request remains stored in D1 and the failure is logged without exposing the student email or confirmation token.
 
 ## Cloudflare Watch Worker
 

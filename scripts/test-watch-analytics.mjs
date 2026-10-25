@@ -37,7 +37,7 @@ const env = {
   CAPTURE_DB: {
     prepare(query) {
       return {
-        first: async () => ({ total: 18, uniqueEmails: 15 }),
+        first: async () => ({ total: 18, uniqueEmails: 15, pendingConfirmation: 2 }),
         all: async () => {
           if (/select lower\(trim\(email\)\) as email/i.test(query)) {
             return {
@@ -882,6 +882,7 @@ const summary = await summaryResponse.json();
 
 assert.equal(summaryResponse.status, 200);
 assert.equal(summary.waitlist.uniqueEmails, 15);
+assert.equal(summary.waitlist.pendingConfirmation, 2);
 assert.equal(summary.waitlist.pipeline.interested, 3);
 assert.equal(summary.waitlist.pipeline.invitedFromWaitlist, 2);
 assert.equal(summary.waitlist.pipeline.openedFromWaitlist, 1);

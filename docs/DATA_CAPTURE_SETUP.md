@@ -44,9 +44,10 @@ Routes:
 
 - `GET /health`
 - `POST /waitlist`
+- `GET /waitlist/confirm?token=...`
 - `POST /contribution`
 
-The `/waitlist` route stores the request in `waitlist_requests` and, when configured, sends an owner notification email. If the owner notification fails, the waitlist request still succeeds and remains stored in D1.
+The `/waitlist` route stores public waitlist requests as pending and sends a 48-hour confirmation link. The raw token appears only in the email link; D1 stores its SHA-256 hash. The confirmation route atomically activates the row and sends the owner notification only on the first successful confirmation. Alert/contact receipts using other capture sources retain their existing immediate-save behavior.
 
 Apply the schema:
 
@@ -79,13 +80,21 @@ https://applyfirst-capture.kellychenmeiyi.workers.dev/waitlist
 https://applyfirst-capture.kellychenmeiyi.workers.dev/contribution
 ```
 
-After deploying, submit one waitlist request from the site and verify:
+After deploying, submit one waitlist request from the site, open its confirmation email, and verify:
 
 ```bash
-npx wrangler d1 execute applyfirst_beta --remote --command "SELECT id,source,email,class_year,interest,school,created_at FROM waitlist_requests ORDER BY id DESC LIMIT 5;"
+npx wrangler d1 execute applyfirst_beta --remote --command "SELECT id,source,first_name,last_name,email,class_year,interest,email_confirmation_required,email_confirmation_sent_at,email_confirmed_at,created_at FROM waitlist_requests ORDER BY id DESC LIMIT 5;"
 ```
 
-You should also receive an owner email with the student's email, class year, interest, school, preference summary, and note.
+You should receive the student confirmation email first. After confirmation, you should receive an owner email with the student's name, email, class year, interest, school, preference summary, referral attribution, and note.
+
+Confirmation rollout order:
+
+1. Deploy the frontend containing the required structured waitlist fields and confirmation states.
+2. Apply capture migrations 004 and 005.
+3. Deploy the capture Worker with `ENABLE_WAITLIST_EMAIL_CONFIRMATION=true`.
+4. Deploy the watch Worker so analytics exclude new unconfirmed rows.
+5. Complete one live confirmation and verify both email messages and D1 timestamps.
 
 ## Turnstile Abuse Protection
 
@@ -109,6 +118,8 @@ The Worker fails closed before D1 or email work. It requires a successful Siteve
 Waitlist/contact requests should capture:
 
 - `source`
+- `firstName`
+- `lastName`
 - `email`
 - `classYear`
 - `interest`
@@ -116,8 +127,15 @@ Waitlist/contact requests should capture:
 - `note`
 - `preferenceSummary`
 - `notificationMode`
+- `emailConsentAt`
+- `emailConsentText`
+- `emailConfirmationRequired`
+- `emailConfirmationSentAt`
+- `emailConfirmedAt`
 - `savedAt`
 - `captureStatus`
+
+The public waitlist requires first name, last name, email, class year, primary interest, and email confirmation. School, notes, and referral attribution are optional. Non-waitlist capture sources, such as an alert setup receipt, may omit names and do not enter the public waitlist confirmation flow.
 
 Contribution submissions should capture:
 
