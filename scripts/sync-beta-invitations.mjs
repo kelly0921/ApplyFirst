@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const args = new Set(process.argv.slice(2));
 const dryRun = args.has('--dry-run');
+const prune = args.has('--prune');
 const registryPath = path.resolve(
   process.cwd(),
   process.env.INVITE_REGISTRY_PATH || 'docs/private/INVITE_CODES.csv',
@@ -41,10 +42,10 @@ if (dryRun) {
 }
 
 if (!adminToken) {
-  await syncDirectlyWithWrangler(invitations);
+  await syncDirectlyWithWrangler(invitations, { prune });
   console.log(
     `Synced ${invitations.length} privacy-safe invite records directly to D1 ` +
-    `(${invited} invited, ${emailLinked} email-linked).`,
+    `(${invited} invited, ${emailLinked} email-linked, prune ${prune ? 'enabled' : 'disabled'}).`,
   );
   process.exit(0);
 }
@@ -55,7 +56,7 @@ const response = await fetch(`${workerUrl}/analytics/invitations/sync`, {
     authorization: `Bearer ${adminToken}`,
     'content-type': 'application/json',
   },
-  body: JSON.stringify({ invitations }),
+  body: JSON.stringify({ invitations, prune }),
 });
 const payload = await response.json().catch(() => ({}));
 
@@ -65,15 +66,16 @@ if (!response.ok) {
 
 console.log(
   `Synced ${payload.synced} privacy-safe invite records ` +
-  `(${payload.invited} invited, ${payload.emailLinked} email-linked, ${payload.removed} stale removed).`,
+  `(${payload.invited} invited, ${payload.emailLinked} email-linked, ` +
+  `${payload.removed} stale removed, prune ${payload.prune ? 'enabled' : 'disabled'}).`,
 );
 
-async function syncDirectlyWithWrangler(records) {
+async function syncDirectlyWithWrangler(records, options = {}) {
   const temporaryDirectory = await mkdtemp(path.join(tmpdir(), 'applyfirst-invites-'));
   const sqlPath = path.join(temporaryDirectory, 'invite-sync.sql');
 
   try {
-    await writeFile(sqlPath, buildDirectSyncSql(records), 'utf8');
+    await writeFile(sqlPath, buildDirectSyncSql(records, options), 'utf8');
     const wranglerScript = path.join(projectRoot, 'node_modules', 'wrangler', 'bin', 'wrangler.js');
     const result = spawnSync(
       process.execPath,
@@ -112,7 +114,7 @@ async function syncDirectlyWithWrangler(records) {
   }
 }
 
-function buildDirectSyncSql(records) {
+function buildDirectSyncSql(records, { prune = false } = {}) {
   const now = new Date().toISOString();
   const statements = [];
 
@@ -149,10 +151,12 @@ function buildDirectSyncSql(records) {
     }
   }
 
-  statements.push(
-    `delete from beta_invitations where access_code_hash not in (` +
-    `${records.map((invitation) => sqlValue(invitation.accessCodeHash)).join(', ')})`,
-  );
+  if (prune) {
+    statements.push(
+      `delete from beta_invitations where access_code_hash not in (` +
+      `${records.map((invitation) => sqlValue(invitation.accessCodeHash)).join(', ')})`,
+    );
+  }
 
   return `${statements.join(';\n')};\n`;
 }

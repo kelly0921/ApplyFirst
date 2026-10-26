@@ -54,6 +54,7 @@ const env = {
                 { email: 'waitlist-one@example.com' },
                 { email: 'waitlist-two@example.com' },
                 { email: 'waitlist-three@example.com' },
+                { email: 'owner@example.com' },
               ],
             };
           }
@@ -110,7 +111,7 @@ function createStatement(query) {
         };
       }
 
-      if (/select id\s+from beta_access_workspaces/i.test(query)) {
+      if (/^\s*select id\s+from beta_access_workspaces/i.test(query)) {
         const workspaceId = initializedWorkspaceIds.get(this.bindings[0]);
         return workspaceId ? { id: workspaceId } : null;
       }
@@ -153,7 +154,7 @@ function createStatement(query) {
         };
       }
 
-      if (/from beta_access_workspaces/i.test(query)) {
+      if (/select\s+count\(\*\) as total,[\s\S]*latest_activity_at/i.test(query)) {
         return { total: 12, active7Days: 9, active30Days: 11 };
       }
 
@@ -333,11 +334,19 @@ function createStatement(query) {
             {
               recipientEmailHash: waitlistEmailHash('waitlist-one@example.com'),
               status: 'sent',
+              testerSegment: 'independent_waitlist',
               workspaceId: 'workspace-1',
             },
             {
               recipientEmailHash: waitlistEmailHash('waitlist-two@example.com'),
               status: 'sent',
+              testerSegment: 'independent_waitlist',
+              workspaceId: null,
+            },
+            {
+              recipientEmailHash: waitlistEmailHash('owner@example.com'),
+              status: 'paused',
+              testerSegment: 'other',
               workspaceId: null,
             },
           ],
@@ -990,6 +999,13 @@ assert.equal(summary.proactiveDelivery.summary.reachedRecipients, 3);
 assert.equal(summary.proactiveDelivery.summary.eligibleRecipientEvaluations, 7);
 assert.equal(summary.proactiveDelivery.summary.consideredRecipientEvaluations, 12);
 assert.equal(summary.metricFreshness.latestProductActivityAt, '2026-10-04T12:00:00.000Z');
+const workspaceTotalsQuery = queries.find((statement) => /latest_activity_at/i.test(statement.query));
+const invitationMetricsQuery = queries.find((statement) => /as internalRegistered/i.test(statement.query));
+const proactiveSummaryQuery = queries.find((statement) => /as recipientsWithBatch/i.test(statement.query));
+assert.match(workspaceTotalsQuery.query, /tester_segment[\s\S]*!= 'other'/i);
+assert.match(studentValueSummaryQuery.query, /workspace_id in[\s\S]*tester_segment[\s\S]*!= 'other'/i);
+assert.match(invitationMetricsQuery.query, /tester_segment[\s\S]*!= 'other'/i);
+assert.match(proactiveSummaryQuery.query, /workspace_id in[\s\S]*tester_segment[\s\S]*!= 'other'/i);
 
 const alertPreviewResponse = await watchWorker.fetch(
   new Request('https://worker.example/watch/candidates/candidate-1/send', {
@@ -1083,6 +1099,7 @@ const unauthorizedInvitationSync = await watchWorker.fetch(
 assert.equal(unauthorizedInvitationSync.status, 401);
 
 const invitationHash = 'a'.repeat(64);
+const invitationSyncQueryStart = queries.length;
 const invitationSync = await watchWorker.fetch(
   new Request('https://worker.example/analytics/invitations/sync', {
     method: 'POST',
@@ -1102,11 +1119,45 @@ const invitationSync = await watchWorker.fetch(
   {},
 );
 assert.equal(invitationSync.status, 200);
+const invitationSyncPayload = await invitationSync.json();
+assert.equal(invitationSyncPayload.removed, 0);
+assert.equal(invitationSyncPayload.prune, false);
+const invitationSyncQueries = queries.slice(invitationSyncQueryStart);
 const invitationInsert = queries.find((statement) => /insert into beta_invitations/i.test(statement.query));
 assert.ok(invitationInsert);
 assert.ok(invitationInsert.bindings.includes(invitationHash));
 assert.ok(invitationInsert.bindings.includes(waitlistEmailHash('waitlist-one@example.com')));
 assert.ok(!invitationInsert.bindings.some((value) => String(value).includes('AF-')));
+assert.ok(!invitationSyncQueries.some((statement) => /delete from beta_invitations/i.test(statement.query)));
+
+const prunedInvitationSyncQueryStart = queries.length;
+const prunedInvitationSync = await watchWorker.fetch(
+  new Request('https://worker.example/analytics/invitations/sync', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: 'Bearer test-admin-token' },
+    body: JSON.stringify({
+      prune: true,
+      invitations: [{
+        accessCodeHash: invitationHash,
+        recipientEmailHash: waitlistEmailHash('waitlist-one@example.com'),
+        codeLabel: '...1234',
+        testerSegment: 'independent_waitlist',
+        status: 'sent',
+        invitedAt: '2026-09-01T00:00:00.000Z',
+      }],
+    }),
+  }),
+  env,
+  {},
+);
+assert.equal(prunedInvitationSync.status, 200);
+const prunedInvitationSyncPayload = await prunedInvitationSync.json();
+assert.equal(prunedInvitationSyncPayload.prune, true);
+assert.equal(prunedInvitationSyncPayload.removed, 1);
+assert.ok(
+  queries.slice(prunedInvitationSyncQueryStart)
+    .some((statement) => /delete from beta_invitations/i.test(statement.query)),
+);
 
 const segmentResponse = await watchWorker.fetch(
   new Request('https://worker.example/analytics/participants/segment', {

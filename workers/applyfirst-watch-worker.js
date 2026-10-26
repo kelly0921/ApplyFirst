@@ -40,6 +40,8 @@ const DEFAULT_SCHEDULED_DISCOVERY_RESULTS_PER_QUERY = 3;
 const AUTO_SENDABLE_CONFIDENCES = new Set(['high']);
 const BETA_WORKSPACE_CODE_PATTERN = /^AF-[A-Z0-9][A-Z0-9-]{4,58}[A-Z0-9]$/;
 const PRODUCT_EVENT_TIME_SQL = "coalesce(nullif(occurred_at, ''), created_at)";
+const STUDENT_WORKSPACE_IDS_SQL = `select id from beta_access_workspaces
+  where coalesce(nullif(tester_segment, ''), 'unknown') != 'other'`;
 const PRODUCT_EVENT_NAMES = new Set([
   'session_started',
   'search_used',
@@ -1604,6 +1606,7 @@ async function updateBetaWorkspaceSegment(env, body) {
 
 async function syncBetaInvitations(env, body) {
   const invitations = Array.isArray(body.invitations) ? body.invitations.slice(0, 500) : [];
+  const prune = body.prune === true;
 
   if (!invitations.length) {
     throw httpError(400, 'Add at least one invitation record.');
@@ -1677,20 +1680,26 @@ async function syncBetaInvitations(env, body) {
     }
   }
 
-  const currentHashes = normalized.map((invitation) => invitation.accessCodeHash);
-  const deleteResult = await env.DB.prepare(
-    `delete from beta_invitations
-     where access_code_hash not in (${currentHashes.map(() => '?').join(', ')})`,
-  )
-    .bind(...currentHashes)
-    .run();
+  let removed = 0;
+
+  if (prune) {
+    const currentHashes = normalized.map((invitation) => invitation.accessCodeHash);
+    const deleteResult = await env.DB.prepare(
+      `delete from beta_invitations
+       where access_code_hash not in (${currentHashes.map(() => '?').join(', ')})`,
+    )
+      .bind(...currentHashes)
+      .run();
+    removed = Number(deleteResult?.meta?.changes || 0);
+  }
 
   return {
     ok: true,
     synced: normalized.length,
     invited: normalized.filter((invitation) => ['sent', 'active'].includes(invitation.status)).length,
     emailLinked: normalized.filter((invitation) => invitation.recipientEmailHash).length,
-    removed: Number(deleteResult?.meta?.changes || 0),
+    removed,
+    prune,
     savedAt: now,
   };
 }
@@ -1871,6 +1880,7 @@ async function getBetaAnalyticsSummary(env) {
            from beta_product_events
            group by workspace_id
          ) events on events.workspace_id = workspace.id
+         where coalesce(nullif(workspace.tester_segment, ''), 'unknown') != 'other'
        )`,
     )
       .bind(since7Days, since30Days)
@@ -1881,6 +1891,7 @@ async function getBetaAnalyticsSummary(env) {
         count(*) as events
        from beta_product_events
        where ${PRODUCT_EVENT_TIME_SQL} >= ?
+         and workspace_id in (${STUDENT_WORKSPACE_IDS_SQL})
          and event_name in (${funnelEvents.map(() => '?').join(', ')})
        group by event_name`,
     )
@@ -1892,6 +1903,7 @@ async function getBetaAnalyticsSummary(env) {
          select workspace_id
          from beta_product_events
          where ${PRODUCT_EVENT_TIME_SQL} >= ?
+           and workspace_id in (${STUDENT_WORKSPACE_IDS_SQL})
            and event_name in ('program_saved', 'focus_saved', 'alerts_enabled')
          group by workspace_id
          having count(distinct event_name) = 3
@@ -1905,6 +1917,7 @@ async function getBetaAnalyticsSummary(env) {
          select workspace_id
          from beta_product_events
          where ${PRODUCT_EVENT_TIME_SQL} >= ?
+           and workspace_id in (${STUDENT_WORKSPACE_IDS_SQL})
          group by workspace_id
          having count(distinct substr(${PRODUCT_EVENT_TIME_SQL}, 1, 10)) >= 2
        )`,
@@ -1918,6 +1931,7 @@ async function getBetaAnalyticsSummary(env) {
        from beta_product_events
        where event_name = 'outcome_reported'
          and ${PRODUCT_EVENT_TIME_SQL} >= ?
+         and workspace_id in (${STUDENT_WORKSPACE_IDS_SQL})
        group by outcome`,
     )
       .bind(since30Days)
@@ -1927,6 +1941,7 @@ async function getBetaAnalyticsSummary(env) {
        from beta_product_events
        where event_name = 'outcome_reported'
          and ${PRODUCT_EVENT_TIME_SQL} >= ?
+         and workspace_id in (${STUDENT_WORKSPACE_IDS_SQL})
          and outcome in ('found_relevant_program', 'applied_earlier')`,
     )
       .bind(since30Days)
@@ -1938,6 +1953,7 @@ async function getBetaAnalyticsSummary(env) {
         count(distinct case when event_name = 'official_source_clicked' then workspace_id end) as sourceClicks
        from beta_product_events
        where ${PRODUCT_EVENT_TIME_SQL} >= ?
+         and workspace_id in (${STUDENT_WORKSPACE_IDS_SQL})
          and program_id is not null
          and program_id != ''
          and event_name in ('program_viewed', 'program_saved', 'official_source_clicked')
@@ -2030,11 +2046,14 @@ async function getBetaAnalyticsSummary(env) {
 async function getMetricFreshness(env) {
   const row = await env.DB.prepare(
     `select
-      (select max(${PRODUCT_EVENT_TIME_SQL}) from beta_product_events) as latestProductActivityAt,
+      (select max(${PRODUCT_EVENT_TIME_SQL}) from beta_product_events
+       where workspace_id in (${STUDENT_WORKSPACE_IDS_SQL})) as latestProductActivityAt,
       (select max(last_checked_at) from official_sources where enabled = 1) as latestSourceCheckAt,
       (select max(coalesce(sent_at, attempted_at, created_at)) from proactive_delivery_batches) as latestProactiveDeliveryAt,
-      (select max(updated_at) from beta_program_evidence) as latestStudentEvidenceAt,
-      (select max(applied_at) from beta_application_attempts) as latestApplicationAttemptAt`,
+      (select max(updated_at) from beta_program_evidence
+       where workspace_id in (${STUDENT_WORKSPACE_IDS_SQL})) as latestStudentEvidenceAt,
+      (select max(applied_at) from beta_application_attempts
+       where workspace_id in (${STUDENT_WORKSPACE_IDS_SQL})) as latestApplicationAttemptAt`,
   ).first();
 
   return {
@@ -2058,8 +2077,9 @@ async function getProactiveDeliveryMetrics(env, since30Days) {
         count(case when status in ('skipped', 'unsubscribed') then 1 end) as skipped,
         count(case when delivery_format = 'immediate' then 1 end) as immediate,
         count(case when delivery_format = 'digest' then 1 end) as digest
-       from proactive_delivery_batches
-       where created_at >= ?`,
+       from proactive_delivery_batches batch
+       where batch.created_at >= ?
+         and batch.workspace_id in (${STUDENT_WORKSPACE_IDS_SQL})`,
     ).bind(since30Days).first(),
     env.DB.prepare(
       `select
@@ -2068,8 +2088,9 @@ async function getProactiveDeliveryMetrics(env, since30Days) {
         status,
         count(*) as deliveries,
         count(distinct watch_request_id) as recipients
-       from proactive_delivery_batches
-       where created_at >= ?
+       from proactive_delivery_batches batch
+       where batch.created_at >= ?
+         and batch.workspace_id in (${STUDENT_WORKSPACE_IDS_SQL})
        group by delivery_format, delivery_class, status
        order by delivery_format, delivery_class, status`,
     ).bind(since30Days).all(),
@@ -2082,6 +2103,7 @@ async function getProactiveDeliveryMetrics(env, since30Days) {
        from proactive_delivery_engagement_events event
        inner join proactive_delivery_batches batch on batch.id = event.batch_id
        where event.created_at >= ?
+         and batch.workspace_id in (${STUDENT_WORKSPACE_IDS_SQL})
        group by batch.delivery_format, event.action
        order by batch.delivery_format, event.action`,
     ).bind(since30Days).all(),
@@ -2093,6 +2115,7 @@ async function getProactiveDeliveryMetrics(env, since30Days) {
         count(distinct workspace_id) as students
        from beta_product_events
        where ${PRODUCT_EVENT_TIME_SQL} >= ?
+         and workspace_id in (${STUDENT_WORKSPACE_IDS_SQL})
          and json_extract(context_json, '$.entrySource') in (
            'watched_program_alert', 'personalized_discovery_digest', 'prepare_alert',
            'manual_library', 'search', 'direct_or_shared_link'
@@ -2127,7 +2150,8 @@ async function getProactiveDeliveryMetrics(env, since30Days) {
        left join beta_program_evidence evidence
          on evidence.workspace_id = batch.workspace_id
         and evidence.program_id = item.program_id
-       where batch.sent_at >= ?`,
+       where batch.sent_at >= ?
+         and batch.workspace_id in (${STUDENT_WORKSPACE_IDS_SQL})`,
     ).bind(since30Days).first(),
     env.DB.prepare(
       `select count(distinct id) as recipients
@@ -2199,6 +2223,7 @@ async function getProgramLifecycleMetrics(env, since30Days) {
        from beta_program_evidence
        where relevance_source = 'explicit'
          and relevance_updated_at >= ?
+         and workspace_id in (${STUDENT_WORKSPACE_IDS_SQL})
        group by relevance
        order by programPairs desc`,
     ).bind(since30Days).all(),
@@ -2208,6 +2233,7 @@ async function getProgramLifecycleMetrics(env, since30Days) {
         count(*) as attempts
        from beta_application_attempts
        where applied_at >= ?
+         and workspace_id in (${STUDENT_WORKSPACE_IDS_SQL})
        group by outcome
        order by attempts desc`,
     ).bind(since30Days).all(),
@@ -2220,6 +2246,7 @@ async function getProgramLifecycleMetrics(env, since30Days) {
              when cycle_label is not null and trim(cycle_label) != '' then cycle_label
            end) as namedCycles
          from beta_application_attempts
+         where workspace_id in (${STUDENT_WORKSPACE_IDS_SQL})
          group by workspace_id, program_id
          having count(*) > 1
        )`,
@@ -2228,7 +2255,8 @@ async function getProgramLifecycleMetrics(env, since30Days) {
       `select count(distinct workspace_id) as students,
         count(*) as programPairs
        from beta_program_watches
-       where is_watching = 1`,
+       where is_watching = 1
+         and workspace_id in (${STUDENT_WORKSPACE_IDS_SQL})`,
     ).first(),
     env.DB.prepare(
       `select
@@ -2251,7 +2279,8 @@ async function getProgramLifecycleMetrics(env, since30Days) {
             and evidence.relevance_source = 'explicit'
         ) then 1 end) as futureCycleAndWatching
        from beta_program_watches watch
-       where watch.is_watching = 1`,
+       where watch.is_watching = 1
+         and watch.workspace_id in (${STUDENT_WORKSPACE_IDS_SQL})`,
     ).first(),
   ]);
 
@@ -2542,6 +2571,7 @@ async function getCaptureWaitlistPipeline(env) {
       env.DB.prepare(
         `select invitation.recipient_email_hash as recipientEmailHash,
           invitation.status,
+          invitation.tester_segment as testerSegment,
           workspace.id as workspaceId
          from beta_invitations invitation
          left join beta_access_workspaces workspace
@@ -2555,12 +2585,23 @@ async function getCaptureWaitlistPipeline(env) {
     ));
     const invitedHashes = new Set();
     const openedHashes = new Set();
+    const studentInvitationHashes = new Set();
+    const internalOnlyHashes = new Set();
 
     for (const invitation of invitationResult.results || []) {
       const emailHash = cleanString(invitation.recipientEmailHash, 64).toLowerCase();
+      if (invitation.testerSegment === 'other') {
+        internalOnlyHashes.add(emailHash);
+        continue;
+      }
+      studentInvitationHashes.add(emailHash);
       if (!waitlistHashes.has(emailHash) || !['sent', 'active'].includes(invitation.status)) continue;
       invitedHashes.add(emailHash);
       if (invitation.workspaceId) openedHashes.add(emailHash);
+    }
+
+    for (const emailHash of internalOnlyHashes) {
+      if (!studentInvitationHashes.has(emailHash)) waitlistHashes.delete(emailHash);
     }
 
     return {
@@ -2651,6 +2692,7 @@ async function getBetaInvitationMetrics(env, since30Days) {
   const row = await env.DB.prepare(
     `select
       count(*) as registered,
+      (select count(*) from beta_invitations where tester_segment = 'other') as internalRegistered,
       count(case when invitation.status in ('sent', 'active') then 1 end) as invited,
       count(case
         when invitation.status in ('sent', 'active')
@@ -2670,13 +2712,15 @@ async function getBetaInvitationMetrics(env, since30Days) {
       count(case when invitation.status = 'revoked' then 1 end) as revoked
      from beta_invitations invitation
      left join beta_access_workspaces workspace
-       on workspace.access_code_hash = invitation.access_code_hash`,
+       on workspace.access_code_hash = invitation.access_code_hash
+     where coalesce(nullif(invitation.tester_segment, ''), 'unknown') != 'other'`,
   )
     .bind(since30Days, since30Days)
     .first();
 
   return {
     registered: Number(row?.registered || 0),
+    internalRegistered: Number(row?.internalRegistered || 0),
     invited: Number(row?.invited || 0),
     opened: Number(row?.opened || 0),
     invited30Days: Number(row?.invited30Days || 0),
@@ -2728,6 +2772,7 @@ async function getStudentValueMetrics(env, since30Days) {
         (
           select count(*) from beta_program_watches watch
           where watch.is_watching = 1
+            and watch.workspace_id in (${STUDENT_WORKSPACE_IDS_SQL})
         ) as watchingPairs,
         0 as preparingPairs,
         0 as deliberateSkipPairs,
@@ -2738,7 +2783,8 @@ async function getStudentValueMetrics(env, since30Days) {
           then 1 end) as awarenessUnknownPairs,
         count(case when relevance_source = 'explicit' then 1 end) as evidencePairs
        from beta_program_evidence
-       where updated_at >= ?`,
+       where updated_at >= ?
+         and workspace_id in (${STUDENT_WORKSPACE_IDS_SQL})`,
     ).bind(since30Days).first(),
     env.DB.prepare(
       `select
@@ -2758,6 +2804,7 @@ async function getStudentValueMetrics(env, since30Days) {
         ) as deadlineAt
        from beta_program_evidence
        where updated_at >= ?
+         and workspace_id in (${STUDENT_WORKSPACE_IDS_SQL})
          and relevance_source = 'explicit'
          and relevance in ('this_cycle', 'future_cycle')`,
     ).bind(since30Days).all(),
@@ -2777,7 +2824,8 @@ async function getStudentValueMetrics(env, since30Days) {
           limit 1
         ) as deadlineAt
        from beta_application_attempts attempt
-       where attempt.applied_at >= ?`,
+       where attempt.applied_at >= ?
+         and attempt.workspace_id in (${STUDENT_WORKSPACE_IDS_SQL})`,
     ).bind(since30Days).all(),
     env.DB.prepare(
       `select
@@ -2785,7 +2833,8 @@ async function getStudentValueMetrics(env, since30Days) {
         count(distinct workspace_id || ':' || program_id) as externalActionPairs,
         count(*) as submittedPairs
        from beta_application_attempts
-       where applied_at >= ?`,
+       where applied_at >= ?
+         and workspace_id in (${STUDENT_WORKSPACE_IDS_SQL})`,
     ).bind(since30Days).first(),
     env.DB.prepare(
       `select coalesce(nullif(support_level, ''), 'unknown') as label,
@@ -2793,6 +2842,7 @@ async function getStudentValueMetrics(env, since30Days) {
         count(*) as records
        from beta_program_evidence
        where updated_at >= ?
+         and workspace_id in (${STUDENT_WORKSPACE_IDS_SQL})
          and relevance_source = 'explicit'
        group by label
        order by records desc`,
@@ -2803,6 +2853,7 @@ async function getStudentValueMetrics(env, since30Days) {
         count(*) as records
        from beta_program_evidence
        where updated_at >= ?
+         and workspace_id in (${STUDENT_WORKSPACE_IDS_SQL})
          and friction_category is not null
          and friction_category != ''
        group by friction_category
@@ -2814,6 +2865,7 @@ async function getStudentValueMetrics(env, since30Days) {
         count(*) as records
        from beta_program_evidence
        where updated_at >= ?
+         and workspace_id in (${STUDENT_WORKSPACE_IDS_SQL})
          and (class_year != '' or role_track != '')
        group by class_year, role_track
        order by records desc
@@ -2845,6 +2897,7 @@ async function getStudentValueMetrics(env, since30Days) {
        inner join beta_access_workspaces workspace on workspace.id = evidence.workspace_id
        where evidence.updated_at >= ?
          and evidence.relevance_source = 'explicit'
+         and coalesce(nullif(workspace.tester_segment, ''), 'unknown') != 'other'
        group by testerSegment
        order by students desc`,
     ).bind(since30Days, since30Days).all(),
@@ -2864,6 +2917,7 @@ async function getStudentValueMetrics(env, since30Days) {
           ) then workspace_id end) as externalActionStudents
        from beta_program_evidence
        where updated_at >= ?
+         and workspace_id in (${STUDENT_WORKSPACE_IDS_SQL})
          and relevance_source = 'explicit'
        group by label
        order by records desc`,
@@ -2880,6 +2934,7 @@ async function getStudentValueMetrics(env, since30Days) {
           then workspace_id end) as newDiscoveryStudents
        from beta_program_evidence
        where updated_at >= ?
+         and workspace_id in (${STUDENT_WORKSPACE_IDS_SQL})
          and relevance_source = 'explicit'
        group by program_id
        order by relevantStudents desc, students desc
@@ -2891,6 +2946,7 @@ async function getStudentValueMetrics(env, since30Days) {
         count(*) as submissions
        from beta_application_attempts
        where applied_at >= ?
+         and workspace_id in (${STUDENT_WORKSPACE_IDS_SQL})
        group by program_id`,
     ).bind(since30Days).all(),
   ]);
@@ -2971,6 +3027,7 @@ async function getIndependentUsabilityMetrics(env, since30Days) {
        from beta_access_workspaces workspace
        inner join beta_program_evidence evidence on evidence.workspace_id = workspace.id
        where evidence.first_decision_at >= ?
+         and coalesce(nullif(workspace.tester_segment, ''), 'unknown') != 'other'
        group by workspace.id`,
     ).bind(since30Days).all(),
     env.DB.prepare(
@@ -3046,6 +3103,7 @@ async function getIndependentUsabilityMetrics(env, since30Days) {
          on attempt.workspace_id = delivery.workspace_id
         and attempt.program_id = delivery.program_id
         and attempt.applied_at > delivery.sent_at
+       where delivery.workspace_id in (${STUDENT_WORKSPACE_IDS_SQL})
        group by delivery.delivery_id`,
     ).bind(since30Days, since30Days).all(),
   ]);
