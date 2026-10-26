@@ -629,7 +629,7 @@ function createVerifiedScheduleOverrides() {
     {
       cycleFrequency: 'annual',
       expectedOpenMonths: [9, 10, 11, 12, 1],
-      lastKnownOpenAt: null,
+      lastKnownOpenAt: '2026-10-26',
       activeLeadDays: 120,
       activeCheckIntervalHours: 24,
       warmupCheckIntervalHours: 72,
@@ -641,7 +641,7 @@ function createVerifiedScheduleOverrides() {
         createDiscoveryQuery('official_program_page', 'site:palantir.com "American Tech Fellowship" "2027 cohorts"', 'Confirm Palantir announcements when the next cohort opens.'),
       ],
       scheduleNote:
-        'The Fall 2026 cohort is closed and Palantir says 2027 cohorts will open soon. Monitor the direct Lever page daily in the expected opening window and keep discovery active for a new posting URL.',
+        'The January 2027 cohort is open through December 11, 2026. Monitor the direct Lever posting daily through the deadline and keep discovery active in case the posting URL changes for a later cohort.',
     },
   ],
   [
@@ -1412,7 +1412,27 @@ function createVerifiedScheduleOverrides() {
         createDiscoveryQuery('underclassmen_travel', 'site:nrffoundation.org "Rising Retail Stars" deadline', 'Track the freshman and sophomore travel scholarship.'),
       ],
       scheduleNote:
-        'Several NRF scholarships are open through October 13, 20, or 30, 2026. Monitor the scholarship hub daily through October and return to warmup for the January 2027 Next Generation opening.',
+        'The October 13 and October 20 scholarship windows are closed. Keep the umbrella hub in warmup for January 2027 tuition-scholarship openings; Rising Retail Stars is monitored as its own program through October 30, 2026.',
+    },
+  ],
+  [
+    'nrf-rising-retail-stars-2026',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [9, 10],
+      lastKnownOpenAt: '2026-10-26',
+      activeLeadDays: 60,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 168,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 72,
+      sourceVolatility: 'multi_program_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_scholarship_hub', 'site:nrffoundation.org/retail-scholarships "Rising Retail Stars" "October 30, 2026"', 'Confirm the current Rising Retail Stars nomination status and deadline.'),
+        createDiscoveryQuery('official_nomination', 'site:nrffoundation.org "Rising Retail Stars" nomination', 'Find the current official nomination route if the scholarship hub changes.'),
+      ],
+      scheduleNote:
+        'Rising Retail Stars is open for college-advisor nominations through October 30, 2026. Check the official scholarship hub daily through the deadline and return to dormant monitoring after the window closes.',
     },
   ],
   [

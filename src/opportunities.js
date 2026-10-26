@@ -664,32 +664,32 @@ export const opportunities = [
     organization: 'Palantir',
     category: 'Full-Time Alternative',
     classYears: ['All class years'],
-    timing: 'Fall',
-    status: 'expectedSoon',
+    timing: 'Winter',
+    status: 'open',
     confidence: 'high',
-    funding: 'Free',
+    funding: 'Unpaid training program',
     location: 'Remote',
     url: 'https://jobs.lever.co/palantir/0ccbe620-a3ef-41d1-a5c4-68e56b3c91d0',
     previousUrl: '',
-    openDate: 'Fall 2026 applications are closed; Palantir says 2027 cohorts will open soon',
-    deadline: '2027 application deadline has not been posted',
+    openDate: 'Applications are open for the January 2027 cohort',
+    deadline: 'December 11, 2026',
     tags: ['AI', 'AIP', 'Foundry', 'No degree required', 'Full-Time Alternative'],
     description:
       'Palantir American Tech Fellowship is a 12-week remote training fellowship for builders learning to deploy Palantir Foundry and AIP in enterprise, industrial, and national-infrastructure settings.',
     eligibilitySummary:
       'Official posting requires at least 2 years of hands-on work experience, programming proficiency, and a technical background; no formal degree is required.',
     experienceSummary:
-      'Fellows complete virtual training with Ontologize, attend live evening sessions, build AIP and Foundry deployment skills, and may interview for full-time roles at Palantir or partner companies.',
+      'The 12-week cohort begins January 13, 2027. Fellows attend two live virtual evening sessions each week, spend about 10-15 hours weekly on instruction and project work, build AIP and Foundry deployment skills with Ontologize, and may interview for Palantir or partner-company roles.',
     detailBasis:
-      'Official Palantir Lever posting confirms the program model and says the Fall 2026 cohort is closed while 2027 cohorts will open soon.',
+      'The current Palantir Lever posting confirms that the January 2027 cohort is open through December 11, 2026 and documents the schedule, unpaid format, and experience requirements.',
     why:
       'A useful full-time alternative for builders who may not fit a traditional internship path but already have practical technical experience.',
     prep:
-      'Prepare project evidence across software, data, hardware, automation, robotics, or industrial systems and watch for the 2027 cohort application.',
+      'Prepare project evidence across software, data, hardware, automation, robotics, or industrial systems and apply before December 11, 2026.',
     sourceNote:
-      'Official Palantir Lever posting says Fall 2026 applications are closed and 2027 cohorts will open soon. The page still documents the 12-week remote, unpaid training model and 2+ years of hands-on experience requirement.',
-    lastChecked: '2026-10-04',
-    statusReviewedAt: '2026-10-04T14:40:33.036Z',
+      'Official Palantir Lever posting says applications for the January 2027 cohort are open through December 11, 2026. The remote, unpaid fellowship begins January 13, runs 12 weeks, and requires 2+ years of hands-on technical work experience.',
+    lastChecked: '2026-10-26',
+    statusReviewedAt: '2026-10-26T16:20:00.000Z',
   },
   {
     id: 'jane-street-fttp-watch',
@@ -1109,8 +1109,8 @@ export const opportunities = [
       'Prepare a resume, leadership examples, your target-track rationale, and evidence of commitment to MLT’s mission before the November 1 SWE/Technology priority deadline.',
     sourceNote:
       'Official Career Prep 2029 application says applications are open, SWE/Technology and Corporate Management have a November 1, 2026 priority deadline, and the final deadline is January 15, 2027.',
-    lastChecked: '2026-10-04',
-    statusReviewedAt: '2026-10-04T14:40:33.036Z',
+    lastChecked: '2026-10-26',
+    statusReviewedAt: '2026-10-26T16:20:00.000Z',
   },
   {
     id: 'forage-virtual-experience',
@@ -2850,14 +2850,14 @@ export const opportunities = [
     category: 'Scholarship / Funding',
     classYears: ['All class years'],
     timing: 'Fall',
-    status: 'deadlineSoon',
+    status: 'watching',
     confidence: 'high',
     funding: 'Scholarship',
     location: 'United States',
-    url: 'https://nrffoundation.org/campus/scholarships',
-    previousUrl: '',
-    openDate: 'Five NRF Foundation tuition and travel scholarship paths are currently open',
-    deadline: 'October 13, October 20, or October 30, 2026, depending on the scholarship',
+    url: 'https://nrffoundation.org/retail-scholarships',
+    previousUrl: 'https://nrffoundation.org/campus/scholarships',
+    openDate: 'Tuition scholarships reopen in January 2027; other listed scholarships reopen in fall 2027',
+    deadline: 'No current umbrella deadline; track each live scholarship separately',
     tags: ['Scholarship', 'Retail tech', 'Conference / Travel Funding', 'Leadership'],
     description:
       'NRF Foundation Scholarships collect undergraduate funding opportunities tied to retail leadership, case competitions, student ambassadorship, technology majors, and Student Program travel.',
@@ -2866,15 +2866,48 @@ export const opportunities = [
     experienceSummary:
       'Students can earn tuition scholarships, case competition experience, New York Student Program travel, retail-career exposure, and leadership opportunities.',
     detailBasis:
-      'The official NRF Foundation scholarships page lists open Retail Store Management and Brand Licensing scholarships through October 13, Bright Retail Futures and Ray Greenly scholarships through October 20, and advisor-nominated Rising Retail Stars through October 30.',
+      'The official NRF Foundation page shows the October 13 and October 20 scholarship windows as closed. Rising Retail Stars is tracked separately because it remains open through October 30, 2026.',
     why:
       'Keep as one umbrella record for now: it is useful funding/travel support, but each sub-scholarship only deserves its own record once timing or tech fit becomes strong enough.',
     prep:
-      'Review the specific scholarship fit, especially Ray Greenly for technology/data/supply-chain majors and Rising Stars for freshmen/sophomores.',
+      'Review each scholarship when its own cycle opens; do not rely on the umbrella page as a single application window.',
     sourceNote:
-      'Official NRF Foundation page confirms multiple open 2026 scholarships. Next Generation reopens in January 2027; Student Ambassador is closed for the 2026 term.',
-    lastChecked: '2026-10-04',
-    statusReviewedAt: '2026-10-04T14:40:33.036Z',
+      'Official NRF Foundation page shows most fall 2026 scholarships closed. Rising Retail Stars remains open as a separate advisor-nominated opportunity through October 30, 2026; tuition scholarships reopen in January 2027.',
+    lastChecked: '2026-10-26',
+    statusReviewedAt: '2026-10-26T16:20:00.000Z',
+  },
+  {
+    id: 'nrf-rising-retail-stars-2026',
+    name: 'Rising Retail Stars',
+    organization: 'NRF Foundation',
+    category: 'Conference / Travel Funding',
+    classYears: ['Freshman', 'Sophomore'],
+    timing: 'Winter',
+    status: 'deadlineSoon',
+    confidence: 'high',
+    funding: 'NRF NXT travel scholarship',
+    location: 'New York, NY',
+    url: 'https://nrffoundation.org/retail-scholarships',
+    previousUrl: '',
+    openDate: 'College advisor nominations are open for the 2027 NRF NXT trip',
+    deadline: 'October 30, 2026',
+    tags: ['Conference / Travel Funding', 'Freshman', 'Sophomore', 'Retail careers', 'Advisor nomination'],
+    description:
+      'NRF Foundation Rising Retail Stars is an advisor-nominated travel scholarship for freshmen and sophomores who want early exposure to retail careers. Selected students receive a trip to NRF NXT in New York City, held January 7-10, 2027.',
+    eligibilitySummary:
+      'For college freshmen and sophomores who can be nominated by a college advisor. Students should contact the NRF Student Association advisor at their school to confirm nomination access and eligibility.',
+    experienceSummary:
+      'A funded trip to NRF NXT in New York City with industry exposure, career programming, and opportunities to explore paths across retail.',
+    detailBasis:
+      'The official NRF Foundation scholarship page marks Rising Retail Stars as open, college-advisor nominated, and due October 30, 2026.',
+    why:
+      'A time-sensitive underclassmen opportunity that offers funded access to a major industry event rather than a general scholarship search result.',
+    prep:
+      'Contact your college advisor immediately to confirm whether they can nominate you before October 30, 2026.',
+    sourceNote:
+      'Official NRF Foundation page confirms the advisor-nominated freshman and sophomore opportunity is open through October 30, 2026 for the January 2027 NRF NXT trip.',
+    lastChecked: '2026-10-26',
+    statusReviewedAt: '2026-10-26T16:20:00.000Z',
   },
   {
     id: 'google-scholarships-watch',

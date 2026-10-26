@@ -299,6 +299,7 @@ function logProactiveDeliveryError(error) {
 async function handleRequest(request, env, ctx) {
   const url = new URL(request.url);
   const candidateSendMatch = url.pathname.match(/^\/watch\/candidates\/([^/]+)\/send$/);
+  const candidateReviewMatch = url.pathname.match(/^\/watch\/candidates\/([^/]+)\/review$/);
   const discoveryCandidateReviewMatch = url.pathname.match(/^\/watch\/discovery\/candidates\/([^/]+)\/review$/);
   const newProgramCandidateReviewMatch = url.pathname.match(/^\/watch\/program-candidates\/([^/]+)\/review$/);
   const applicationOutcomeMatch = url.pathname.match(/^\/analytics\/application-attempts\/([^/]+)\/outcome$/);
@@ -500,6 +501,12 @@ async function handleRequest(request, env, ctx) {
       await requireAdminToken(request, env);
       const body = await readJson(request, {});
       return jsonResponse(env, await sendCandidateNotifications(env, candidateSendMatch[1], body));
+    }
+
+    if (request.method === 'POST' && candidateReviewMatch) {
+      await requireAdminToken(request, env);
+      const body = await readJson(request, {});
+      return jsonResponse(env, await reviewAlertCandidate(env, candidateReviewMatch[1], body));
     }
 
     if (request.method === 'POST' && url.pathname === '/watch') {
@@ -8572,6 +8579,62 @@ async function sendCandidateNotifications(env, candidateId, options = {}) {
     dryRun,
     recipients: recipients.results?.length || 0,
     deliveries: deliveryResults,
+  };
+}
+
+async function reviewAlertCandidate(env, candidateId, body = {}) {
+  const decision = cleanString(body.decision, 40).toLowerCase();
+  const reviewedBy = cleanString(body.reviewedBy || 'maintainer', 120);
+
+  if (!['approve', 'dismiss'].includes(decision)) {
+    throw httpError(400, 'Decision must be approve or dismiss.');
+  }
+
+  const candidate = await env.DB.prepare(
+    `select id, status
+     from alert_candidates
+     where id = ?
+     limit 1`,
+  ).bind(candidateId).first();
+
+  if (!candidate) {
+    throw httpError(404, 'Alert candidate not found.');
+  }
+
+  if (candidate.status !== 'pending_review') {
+    return {
+      ok: true,
+      candidateId,
+      status: candidate.status,
+      alreadyReviewed: true,
+    };
+  }
+
+  let preview = null;
+  if (decision === 'approve') {
+    preview = await sendCandidateNotifications(env, candidateId, { dryRun: true });
+    const readyDeliveries = (preview.deliveries || []).filter((delivery) => delivery.status === 'ready');
+
+    if (readyDeliveries.length) {
+      throw httpError(409, 'This alert has eligible recipients. Preview it, then use Send This Alert.');
+    }
+  }
+
+  const now = new Date().toISOString();
+  const status = decision === 'approve' ? 'approved_no_recipients' : 'dismissed';
+  await env.DB.prepare(
+    `update alert_candidates
+     set status = ?, reviewed_by = ?, reviewed_at = ?, updated_at = ?
+     where id = ? and status = 'pending_review'`,
+  ).bind(status, reviewedBy, now, now, candidateId).run();
+
+  return {
+    ok: true,
+    candidateId,
+    decision,
+    status,
+    recipients: preview?.recipients || 0,
+    deliveries: preview?.deliveries || [],
   };
 }
 

@@ -3540,6 +3540,7 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
               ? `${failedCount} delivery ${failedCount === 1 ? 'needs' : 'need'} review.`
               : 'Email delivery was sent or already recorded.',
           deliveries: payload.deliveries ?? [],
+          recipients: payload.recipients ?? 0,
           dryRun,
           generatedAt: new Date().toISOString(),
         },
@@ -3565,6 +3566,43 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
           generatedAt: new Date().toISOString(),
         },
       }));
+    } finally {
+      setAlertActionByCandidateId((currentActions) => {
+        const nextActions = { ...currentActions };
+        delete nextActions[candidate.id];
+        return nextActions;
+      });
+    }
+  };
+
+  const reviewAlertCandidate = async (candidate, decision) => {
+    if (decision === 'dismiss' && !window.confirm(`Dismiss this alert candidate for ${candidate.programName}?`)) {
+      return;
+    }
+
+    setAlertActionByCandidateId((currentActions) => ({
+      ...currentActions,
+      [candidate.id]: decision,
+    }));
+    setErrorMessage('');
+    setActionMessage('');
+
+    try {
+      const payload = await callAdminEndpoint(`/watch/candidates/${candidate.id}/review`, {
+        method: 'POST',
+        body: {
+          decision,
+          reviewedBy: 'applyfirst-maintainer-console',
+        },
+      });
+      setActionMessage(
+        payload.status === 'approved_no_recipients'
+          ? `${candidate.programName} approved; no students were waiting for this alert.`
+          : `${candidate.programName} alert candidate dismissed.`,
+      );
+      await loadQueues({ quiet: true, showLoading: false });
+    } catch (error) {
+      setErrorMessage(error.message);
     } finally {
       setAlertActionByCandidateId((currentActions) => {
         const nextActions = { ...currentActions };
@@ -3730,6 +3768,8 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
                       const actionResult = alertResultByCandidateId[candidate.id];
                       const isDryRunning = activeAction === 'dryRun';
                       const isSending = activeAction === 'send';
+                      const isApproving = activeAction === 'approve';
+                      const isDismissing = activeAction === 'dismiss';
 
                       return (
                         <article className={`maintainer-candidate-card ${activeAction ? 'is-busy' : ''}`} key={candidate.id}>
@@ -3749,6 +3789,14 @@ function MaintainerReviewConsole({ watchEndpoint, adminToken, onAdminTokenChange
                             </button>
                             <button className="maintainer-danger-action" type="button" onClick={() => sendAlertCandidate(candidate, false)} disabled={loading || Boolean(activeAction)}>
                               {isSending ? 'Sending...' : 'Send This Alert'}
+                            </button>
+                            {actionResult?.dryRun && actionResult.recipients === 0 ? (
+                              <button type="button" onClick={() => reviewAlertCandidate(candidate, 'approve')} disabled={loading || Boolean(activeAction)}>
+                                {isApproving ? 'Approving...' : 'Approve, No Recipients'}
+                              </button>
+                            ) : null}
+                            <button className="maintainer-danger-action" type="button" onClick={() => reviewAlertCandidate(candidate, 'dismiss')} disabled={loading || Boolean(activeAction)}>
+                              {isDismissing ? 'Dismissing...' : 'Dismiss Candidate'}
                             </button>
                           </div>
                           {actionResult ? (
