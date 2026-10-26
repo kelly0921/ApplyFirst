@@ -571,6 +571,7 @@ async function getBetaWorkspace(env, url) {
   }
 
   const accessCodeHash = await hashAccessCode(accessCode);
+  await requireActiveBetaInvitation(env, accessCodeHash);
   const row = await env.DB.prepare(
     `select id, code_label, state_json, last_seen_at, updated_at, created_at
      from beta_access_workspaces
@@ -581,12 +582,6 @@ async function getBetaWorkspace(env, url) {
     .first();
 
   if (!row) {
-    const invitation = await findBetaInvitationByHash(env, accessCodeHash);
-
-    if (!ACTIVE_BETA_INVITATION_STATUS_VALUES.has(invitation?.status)) {
-      throw httpError(403, 'Invite code is not active.');
-    }
-
     return {
       ok: true,
       exists: false,
@@ -624,11 +619,7 @@ async function saveBetaWorkspace(env, body) {
   )
     .bind(accessCodeHash)
     .first();
-  const invitation = await findBetaInvitationByHash(env, accessCodeHash);
-
-  if (!existing?.id && !ACTIVE_BETA_INVITATION_STATUS_VALUES.has(invitation?.status)) {
-    throw httpError(403, 'Invite code is not active.');
-  }
+  const invitation = await requireActiveBetaInvitation(env, accessCodeHash);
   const stateJson = JSON.stringify(normalizeWorkspaceState(body.state));
   const codeLabel = createAccessCodeLabel(accessCode);
   const workspaceId = existing?.id || crypto.randomUUID();
@@ -683,6 +674,16 @@ async function findBetaInvitationByHash(env, accessCodeHash) {
     .first();
 }
 
+async function requireActiveBetaInvitation(env, accessCodeHash) {
+  const invitation = await findBetaInvitationByHash(env, accessCodeHash);
+
+  if (!ACTIVE_BETA_INVITATION_STATUS_VALUES.has(invitation?.status)) {
+    throw httpError(403, 'Invite code is not active.');
+  }
+
+  return invitation;
+}
+
 async function recordProductEvent(env, body) {
   const accessCode = normalizeAccessCode(body.accessCode || body.code);
   const eventName = cleanString(body.eventName || body.event, 80).toLowerCase();
@@ -701,6 +702,7 @@ async function recordProductEvent(env, body) {
   }
 
   const accessCodeHash = await hashAccessCode(accessCode);
+  await requireActiveBetaInvitation(env, accessCodeHash);
   const workspace = await env.DB.prepare(
     `select id
      from beta_access_workspaces
@@ -1425,6 +1427,7 @@ async function findWorkspaceByAccessCode(env, value) {
   }
 
   const accessCodeHash = await hashAccessCode(accessCode);
+  await requireActiveBetaInvitation(env, accessCodeHash);
   const workspace = await env.DB.prepare(
     `select id
      from beta_access_workspaces
@@ -1444,6 +1447,7 @@ async function findWorkspaceByAccessCode(env, value) {
 async function ensureBetaWorkspaceForAlertSetup(env, value) {
   const accessCode = normalizeAccessCode(value);
   const accessCodeHash = await hashAccessCode(accessCode);
+  const invitation = await requireActiveBetaInvitation(env, accessCodeHash);
   const existing = await env.DB.prepare(
     `select id
      from beta_access_workspaces
@@ -1454,11 +1458,6 @@ async function ensureBetaWorkspaceForAlertSetup(env, value) {
     .first();
 
   if (existing?.id) return existing.id;
-
-  const invitation = await findBetaInvitationByHash(env, accessCodeHash);
-  if (!ACTIVE_BETA_INVITATION_STATUS_VALUES.has(invitation?.status)) {
-    throw httpError(403, 'This beta access code is not active.');
-  }
 
   const workspaceId = crypto.randomUUID();
   const now = new Date().toISOString();

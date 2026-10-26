@@ -61,7 +61,7 @@ const deliveryEntrySources = new Set([
   'direct_or_shared_link',
   'unknown',
 ]);
-const inviteCodes = ['APPLYFIRST', 'APPLYFIRST2026', 'EARLYACCESS'];
+const inviteCodes = ['EARLYACCESS'];
 const betaWorkspaceInviteCodePattern = /^AF-[A-Z0-9][A-Z0-9-]{4,58}[A-Z0-9]$/;
 const phaseOneTarget = 25;
 const waitlistEndpoint = import.meta.env.VITE_WAITLIST_ENDPOINT ?? '';
@@ -848,7 +848,10 @@ function App() {
         return true;
       }
 
-      return window.localStorage.getItem(accessStorageKey) === 'granted';
+      const storedAccessCode = normalizeInviteCode(window.localStorage.getItem(accessCodeStorageKey));
+      return window.localStorage.getItem(accessStorageKey) === 'granted' && (
+        inviteCodes.includes(storedAccessCode) || isWorkspaceInviteCode(storedAccessCode)
+      );
     } catch {
       return false;
     }
@@ -1410,6 +1413,19 @@ function App() {
       .catch((error) => {
         if (!cancelled) {
           logClientIssue('workspace_load', error, { view: activeView });
+
+          if (error?.status === 403) {
+            try {
+              window.localStorage.removeItem(accessStorageKey);
+              window.localStorage.removeItem(accessCodeStorageKey);
+            } catch {
+              // The current session is still revoked when browser storage is unavailable.
+            }
+            setActiveAccessCode('');
+            setHasAccess(false);
+            setActiveView('about');
+          }
+
           setWorkspaceSyncState('loadError');
           setWorkspaceSyncError(
             error?.status === 403
@@ -2511,7 +2527,7 @@ function LandingPage({
 
     if (inviteCodes.includes(normalizedCode)) {
       setAccessError('');
-      onGrantAccess('');
+      onGrantAccess(normalizedCode);
       return;
     }
 

@@ -18,7 +18,16 @@ const workspaceAccessCodeHash = (code) => createHash('sha256')
   .digest('hex');
 const existingWorkspaceHash = workspaceAccessCodeHash('AF-TEST-1234');
 const issuedInviteHash = workspaceAccessCodeHash('AF-NEW-5678');
-const initializedWorkspaceIds = new Map([[existingWorkspaceHash, 'workspace-1']]);
+const pausedWorkspaceHash = workspaceAccessCodeHash('AF-PAUSED-0001');
+const initializedWorkspaceIds = new Map([
+  [existingWorkspaceHash, 'workspace-1'],
+  [pausedWorkspaceHash, 'workspace-paused'],
+]);
+const invitationsByHash = new Map([
+  [existingWorkspaceHash, { testerSegment: 'independent_waitlist', status: 'sent' }],
+  [issuedInviteHash, { testerSegment: 'independent_waitlist', status: 'sent' }],
+  [pausedWorkspaceHash, { testerSegment: 'other', status: 'paused' }],
+]);
 const waitlistEmailHash = (email) => createHash('sha256')
   .update(`applyfirst-waitlist-email:${email.trim().toLowerCase()}`)
   .digest('hex');
@@ -84,9 +93,7 @@ function createStatement(query) {
       }
 
       if (/select tester_segment as testerSegment, status/i.test(query) && /from beta_invitations/i.test(query)) {
-        return this.bindings[0] === issuedInviteHash
-          ? { testerSegment: 'independent_waitlist', status: 'sent' }
-          : null;
+        return invitationsByHash.get(this.bindings[0]) || null;
       }
 
       if (/from alert_candidates[\s\S]*left join official_sources/i.test(query)) {
@@ -552,6 +559,66 @@ const existingWorkspacePayload = await existingWorkspaceResponse.json();
 assert.equal(existingWorkspaceResponse.status, 200);
 assert.equal(existingWorkspacePayload.exists, true);
 assert.deepEqual(existingWorkspacePayload.state.savedIds, ['example-program']);
+
+const pausedWorkspaceResponse = await watchWorker.fetch(
+  new Request('https://worker.example/workspace?code=AF-PAUSED-0001'),
+  env,
+  {},
+);
+assert.equal(pausedWorkspaceResponse.status, 403);
+
+const pausedWorkspaceSaveResponse = await watchWorker.fetch(
+  new Request('https://worker.example/workspace', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      accessCode: 'AF-PAUSED-0001',
+      state: { savedIds: ['example-program'] },
+    }),
+  }),
+  env,
+  {},
+);
+assert.equal(pausedWorkspaceSaveResponse.status, 403);
+
+const pausedWorkspaceEventResponse = await watchWorker.fetch(
+  new Request('https://worker.example/analytics/events', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      accessCode: 'AF-PAUSED-0001',
+      eventName: 'program_saved',
+      programId: 'example-program',
+    }),
+  }),
+  env,
+  {},
+);
+assert.equal(pausedWorkspaceEventResponse.status, 403);
+
+const pausedWorkspaceEvidenceResponse = await watchWorker.fetch(
+  new Request('https://worker.example/analytics/program-evidence?code=AF-PAUSED-0001'),
+  env,
+  {},
+);
+assert.equal(pausedWorkspaceEvidenceResponse.status, 403);
+
+const pausedWorkspaceWatchResponse = await watchWorker.fetch(
+  new Request('https://worker.example/watch', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      accessCode: 'AF-PAUSED-0001',
+      email: 'paused@example.com',
+      classYear: 'Freshman',
+      roleTrack: 'Software Engineering',
+      contactMethod: 'email',
+    }),
+  }),
+  env,
+  {},
+);
+assert.equal(pausedWorkspaceWatchResponse.status, 403);
 
 const issuedInviteResponse = await watchWorker.fetch(
   new Request('https://worker.example/workspace?code=AF-NEW-5678'),
