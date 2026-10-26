@@ -1626,6 +1626,90 @@ function createVerifiedScheduleOverrides() {
         'The 2027 fellowship application is open without a listed deadline. Check the Greenhouse posting daily while open and search for a replacement requisition next fall.',
     },
   ],
+  [
+    'five-rings-link-2027',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [8, 9, 10],
+      lastKnownOpenAt: '2026-09-01',
+      activeLeadDays: 120,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 24,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_application', 'site:job-boards.greenhouse.io/fiveringsllc "LINK 2027"', 'Confirm the current Five Rings LINK application remains live.'),
+        createDiscoveryQuery('official_careers_page', 'site:fiverings.com/careers "LINK" "Early Engagement"', 'Find a replacement LINK posting or future cycle.'),
+        createDiscoveryQuery('current_cycle_deadline', '"Five Rings LINK" deadline 2027', 'Find an official deadline if Five Rings publishes one.'),
+      ],
+      scheduleNote:
+        'The official 2027 Greenhouse application is live without a listed deadline. Check daily while open and require an official closing signal before changing status.',
+    },
+  ],
+  [
+    'pwc-engineer-your-career',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [],
+      lastKnownOpenAt: null,
+      activeLeadDays: 60,
+      activeCheckIntervalHours: 36,
+      warmupCheckIntervalHours: 168,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 72,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_program_page', 'site:jobs-us.pwc.com/us/en/engineer-your-career "2027 dates"', 'Check the stable PwC program page for 2027 dates.'),
+        createDiscoveryQuery('current_cycle_application', 'site:jobs-us.pwc.com "Engineer Your Career" 2027 apply', 'Find the 2027 application or linked technical internship requisition.'),
+        createDiscoveryQuery('current_cycle_deadline', 'site:jobs-us.pwc.com "Engineer Your Career" deadline 2027', 'Confirm the next official deadline.'),
+      ],
+      scheduleNote:
+        'The official program page confirms the program and eligibility but says 2027 dates will be announced. Search weekly and keep student alerts disabled until a dated application route appears.',
+    },
+  ],
+  [
+    'pg-standout-emerging-leaders',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [1],
+      lastKnownOpenAt: null,
+      activeLeadDays: 90,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 72,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_program_page', 'site:pgcareers.com/us/en/Standout-Emerging-Leaders "Applications Open January 2027"', 'Confirm the current P&G program announcement.'),
+        createDiscoveryQuery('technical_requisition', 'site:pgcareers.com "Standout Emerging Leaders" "Technical Track" 2027', 'Find the 2027 technical-track application.'),
+        createDiscoveryQuery('commercial_requisition', 'site:pgcareers.com "Standout Emerging Leaders" "Commercial Track" 2027', 'Find the 2027 commercial-track application and design eligibility.'),
+      ],
+      scheduleNote:
+        'The official page says applications open in January 2027, but the current landing page omits complete requisition eligibility and a deadline. Keep delivery in review until those details appear.',
+    },
+  ],
+  [
+    'code2040-fellows-program',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [4, 5, 6],
+      lastKnownOpenAt: '2025-04-28',
+      activeLeadDays: 120,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 168,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 72,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_fellows_page', 'site:programs.code2040.org/pages/fellows "2027 Fellows"', 'Check for a new official Code2040 cycle.'),
+        createDiscoveryQuery('official_programs_page', 'site:code2040.org/programs "Fellows Program" 2027', 'Confirm the next program structure and eligibility.'),
+        createDiscoveryQuery('current_cycle_deadline', 'site:programs.code2040.org "2027" "application closes"', 'Find the next official application deadline.'),
+      ],
+      scheduleNote:
+        'The 2026 Fellows cycle is closed and no 2027 cycle is announced. Begin discovery before the prior spring application window and never reuse the 2026 dates.',
+    },
+  ],
   ]);
 }
 

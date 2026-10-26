@@ -48,7 +48,7 @@ export const filterOptions = {
     'Community / Prep Program',
   ],
   classYears: ['Freshman', 'Sophomore', 'All class years'],
-  timing: ['Winter', 'Spring', 'Summer', 'Fall', 'Rolling'],
+  timing: ['Winter', 'Spring', 'Summer', 'Fall', 'Rolling', 'To Be Announced'],
   status: Object.keys(statusLabels),
 };
 
@@ -185,6 +185,7 @@ function hasActionableTimingValue(value) {
     /\bvar(?:y|ies)\b/i,
     /\bclosed\b/i,
     /\bnot (?:yet )?(?:been )?(?:posted|listed|available|live)\b/i,
+    /\bnot (?:yet )?(?:been )?announced\b/i,
     /\bno .*\bdeadline\b/i,
     /\bwill reopen\b/i,
     /\binterest route\b/i,
@@ -3328,6 +3329,138 @@ export const opportunities = [
       'The official application confirms the two-day January program, freshman and sophomore eligibility, covered travel and hotel, interview tracks, and possible future internship consideration. No deadline is currently listed.',
     lastChecked: '2026-10-05',
     statusReviewedAt: '2026-10-05T17:12:30.926Z',
+  },
+  {
+    id: 'five-rings-link-2027',
+    name: 'LINK 2027: Software Development Intensive',
+    organization: 'Five Rings',
+    category: 'Discovery Program',
+    classYears: ['Sophomore'],
+    timing: 'Winter',
+    status: 'open',
+    confidence: 'high',
+    funding: '$2,000 stipend, travel, housing, breakfast, and lunch provided',
+    location: 'New York, NY',
+    url: 'https://job-boards.greenhouse.io/fiveringsllc/jobs/5394515008',
+    previousUrl: 'https://fiverings.com/careers/',
+    openDate: 'Applications are open for January and August 2027 sessions',
+    deadline: 'No application deadline is listed',
+    tags: ['Software Engineering', 'Quant / Finance', 'Trading systems', 'C++', 'Python', 'Sophomores'],
+    description:
+      'Five Rings LINK is a five-day software development intensive for current sophomores who want to understand how automated trading systems are built. Participants work in a C++ and Python environment on Linux and study network protocol stacks, distributed systems, C++23, and trading-system programming with Five Rings developers.',
+    eligibilitySummary:
+      'Current sophomores in their second year of university. The application asks about U.S. work authorization and future sponsorship needs but does not publish a required major or GPA cutoff.',
+    experienceSummary:
+      'Candidates apply once for three possible sessions: January 4-8, January 11-15, or August 9-13, 2027. Selected students receive a $2,000 stipend, travel to New York, housing, breakfast, lunch, and team social activities.',
+    detailBasis:
+      'Current official Five Rings Greenhouse application 5394515008, reviewed October 26, 2026.',
+    why:
+      'A funded sophomore discovery program with unusually concrete exposure to systems engineering and quantitative trading technology.',
+    prep:
+      'Upload a current transcript, identify every session you can attend, and be ready to discuss programming fundamentals, systems interests, and technical work completed in C++, Python, or another language.',
+    sourceNote:
+      'The official application is live and confirms sophomore eligibility, three 2027 sessions, the technical curriculum, stipend, travel, housing, and meals. It does not list an application deadline.',
+    lastChecked: '2026-10-26',
+    statusReviewedAt: '2026-10-26T12:58:56.584Z',
+  },
+  {
+    id: 'pwc-engineer-your-career',
+    name: 'Engineer Your Career',
+    organization: 'PwC',
+    category: 'Discovery Program',
+    classYears: ['Sophomore'],
+    timing: 'To Be Announced',
+    status: 'watching',
+    confidence: 'high',
+    funding: 'Travel and accommodations paid by PwC',
+    location: 'United States; 2027 event location not announced',
+    url: 'https://jobs-us.pwc.com/us/en/engineer-your-career',
+    previousUrl: '',
+    openDate: '2027 program dates and application timing are not posted yet',
+    deadline: 'No 2027 application deadline is posted',
+    tags: ['Software Engineering', 'AI', 'Data Science', 'Human-Computer Interaction', 'Technology consulting', 'Sophomores'],
+    description:
+      'PwC Engineer Your Career is a three-day, in-person technology experience for sophomores. Students explore how PwC applies AI and emerging technology to client problems through interactive sessions, hands-on activities, and conversations with technologists and firm leaders.',
+    eligibilitySummary:
+      'Sophomores in a four-year bachelor\'s program, or juniors in a five-year program, pursuing fields such as computer science, data science, computer engineering, AI, HCI, software engineering, analytics, information systems, mathematics, or statistics. Students must also apply to a 2028 AI Engineering/Data Scientist or Software Engineering internship.',
+    experienceSummary:
+      'The program brings together students from across the country for three days of technical exploration, career context, and networking. PwC pays participant travel and accommodations; 2027 dates and logistics will be announced later.',
+    detailBasis:
+      'Current official PwC program page, reviewed October 26, 2026.',
+    why:
+      'A national sophomore discovery program focused specifically on software, data, AI, HCI, and other technology pathways rather than a general corporate insight event.',
+    prep:
+      'Watch for the 2027 technical internship requisitions, confirm work-authorization requirements for the selected role, and prepare examples of technical curiosity, teamwork, and problem solving.',
+    sourceNote:
+      'The official page confirms the three-day format, sophomore eligibility, qualifying technical majors, paid travel and accommodations, and the linked 2028 internship requirement. It does not yet provide 2027 program dates or an application deadline.',
+    lastChecked: '2026-10-26',
+    statusReviewedAt: '2026-10-26T12:58:56.584Z',
+  },
+  {
+    id: 'pg-standout-emerging-leaders',
+    name: 'Standout Emerging Leaders',
+    organization: 'Procter & Gamble',
+    category: 'Discovery Program',
+    classYears: ['Sophomore'],
+    timing: 'Summer',
+    status: 'expectedSoon',
+    confidence: 'medium',
+    funding: 'All-expenses-paid three-day program',
+    location: 'Cincinnati, OH',
+    url: 'https://www.pgcareers.com/us/en/Standout-Emerging-Leaders',
+    previousUrl: 'https://www.pgcareers.com/us/en/standout',
+    openDate: 'Applications are scheduled to open in January 2027',
+    deadline: 'The 2027 application deadline is not announced',
+    tags: ['Information Technology', 'AI', 'Design', 'Research and Development', 'Engineering', 'Sophomores'],
+    description:
+      'P&G Standout Emerging Leaders is a selective three-day discovery and recruiting program with technical and commercial tracks. Technology-focused students can explore IT, digital products, data, automation, AI, research and development, engineering, or design while completing business challenges and meeting P&G leaders and hiring managers.',
+    eligibilitySummary:
+      'The current landing page describes an early-career national cohort but does not yet publish the complete 2027 requisition criteria. Prior official P&G track pages position Standout for sophomores; confirm the graduation window when applications open.',
+    experienceSummary:
+      'Selected students attend an all-expenses-paid program at P&G headquarters during the first week of August. The experience ends with a final interview, and high-potential participants may receive an internship offer for the following summer.',
+    detailBasis:
+      'Current official P&G Standout landing page, reviewed October 26, 2026; class-year eligibility remains subject to the January 2027 requisition.',
+    why:
+      'A major national discovery program with technical and design pathways plus a direct internship interview outcome.',
+    prep:
+      'Choose the technical or commercial track that fits your goals, prepare examples of leadership and collaborative problem solving, and recheck the official requisition for exact 2027 eligibility before applying.',
+    sourceNote:
+      'The official page confirms January 2027 applications, the August three-day experience, covered expenses, technical and commercial functions, a final interview, and possible internship offers. Keep alerts in review until the 2027 requisition confirms class-year eligibility and a deadline.',
+    lastChecked: '2026-10-26',
+    statusReviewedAt: '2026-10-26T12:58:56.584Z',
+  },
+  {
+    id: 'code2040-fellows-program',
+    name: 'Code2040 Fellows Program',
+    organization: 'Code2040',
+    category: 'Fellowship',
+    classYears: ['All class years'],
+    timing: 'Fall',
+    status: 'watching',
+    confidence: 'high',
+    funding: 'Free program; summit travel and lodging covered in the latest cycle',
+    location: 'Virtual across the United States, with an in-person summit',
+    url: 'https://programs.code2040.org/pages/fellows',
+    previousUrl: 'https://www.code2040.org/programs',
+    openDate: 'The 2027 application cycle is not announced',
+    deadline: 'No 2027 application deadline is posted',
+    tags: ['Software Engineering', 'AI', 'UX/UI', 'Career accelerator', 'Mentorship', 'Black and Latinx students'],
+    description:
+      'The Code2040 Fellows Program is a ten-month career accelerator for Black and Latinx college students pursuing technology opportunities. Fellows receive internship-search support, technical interview resources, racial-equity advocacy education, workshops, mentorship, community programming, and access to a national network of technologists.',
+    eligibilitySummary:
+      'Students attending a U.S. college or university who identify as Black and/or Latinx, have coding experience, seek a technology internship in areas such as software engineering, AI, or UX/UI, and will return to school after the internship summer. Exact eligibility must be refreshed for the next cycle.',
+    experienceSummary:
+      'The latest published cycle ran for ten months with mostly virtual programming, monthly synchronous workshops, asynchronous technical preparation, mentor support, a hackathon, and an in-person summit with travel and lodging covered.',
+    detailBasis:
+      'Official Code2040 Fellows pages for the completed 2026 cycle, reviewed October 26, 2026. No 2027 cycle is announced.',
+    why:
+      'A national, selective technology fellowship that combines discovery, internship access, mentorship, and sustained support for students underrepresented in tech.',
+    prep:
+      'Join the Code2040 student newsletter, keep a resume and code sample current, and wait for a dated 2027 application page before treating the program as open.',
+    sourceNote:
+      'Official Code2040 pages confirm the program structure and latest-cycle eligibility, while the trusted underclassmen opportunity list independently identifies it as a fellowship lead. The 2026 application is closed, so monitor for a new official cycle without reusing prior dates.',
+    lastChecked: '2026-10-26',
+    statusReviewedAt: '2026-10-26T12:58:56.584Z',
   },
 ];
 

@@ -8196,6 +8196,10 @@ function getWatchCadenceText(opportunity) {
     return 'Rolling or multi-cycle; monitor regularly through the year.';
   }
 
+  if (opportunity.timing === 'To Be Announced') {
+    return 'The next cycle timing is not posted; monitor the official source for an announcement.';
+  }
+
   return `Seasonal ${opportunity.timing.toLowerCase()} cycle; monitor in the months before the expected opening.`;
 }
 
