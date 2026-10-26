@@ -2848,6 +2848,7 @@ export const opportunities = [
     name: 'NRF Foundation Scholarships',
     organization: 'NRF Foundation',
     category: 'Scholarship / Funding',
+    monitoringEnabled: false,
     classYears: ['All class years'],
     timing: 'Fall',
     status: 'watching',
@@ -2872,7 +2873,7 @@ export const opportunities = [
     prep:
       'Review each scholarship when its own cycle opens; do not rely on the umbrella page as a single application window.',
     sourceNote:
-      'Official NRF Foundation page shows most fall 2026 scholarships closed. Rising Retail Stars remains open as a separate advisor-nominated opportunity through October 30, 2026; tuition scholarships reopen in January 2027.',
+      'This umbrella record is not monitored as one alert source because the page mixes several scholarship cycles. Rising Retail Stars is tracked separately through October 30, 2026; tuition scholarships reopen in January 2027.',
     lastChecked: '2026-10-26',
     statusReviewedAt: '2026-10-26T16:20:00.000Z',
   },

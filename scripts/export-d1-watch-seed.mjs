@@ -36,7 +36,7 @@ const sourceRows = opportunities
       nextCheck: plan.nextCheck,
       alertTrigger: plan.alertTrigger,
       changeSignals: plan.changeSignals,
-      enabled: true,
+      enabled: opportunity.monitoringEnabled !== false,
       seededSample: readiness.alertable,
       scheduleProfile: createScheduleProfile(opportunity),
       deliveryCatalog: createDeliveryCatalogRow(opportunity, readiness),
