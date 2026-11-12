@@ -692,6 +692,44 @@ export const opportunities = [
     statusReviewedAt: '2026-10-26T16:20:00.000Z',
   },
   {
+    id: 'claude-corps-2027',
+    name: 'Claude Corps',
+    organization: 'Anthropic + CodePath',
+    category: 'Full-Time Alternative',
+    classYears: ['All class years'],
+    timing: 'Summer',
+    status: 'open',
+    confidence: 'high',
+    funding: 'Paid full-time fellowship ($85,000 + benefits)',
+    location: 'United States; host placement may require relocation',
+    programModel: 'cohort',
+    programDuration: '12 Months',
+    weeklyCommitment: 'Full-time',
+    url: 'https://www.anthropic.com/claude-corps/fellow',
+    applicationUrl: 'https://job-boards.greenhouse.io/claudecorps/jobs/4402649009',
+    monitorUrl: 'https://job-boards.greenhouse.io/claudecorps/jobs/4402649009',
+    previousUrl: '',
+    openDate: 'Applications are open for Cohort 3, which starts in late August 2027',
+    deadline: 'January 31, 2027; applications are reviewed on a rolling basis',
+    tags: ['AI', 'Software engineering', 'Product', 'Public interest technology', 'Nonprofits', 'Early career'],
+    description:
+      'Claude Corps is a paid, yearlong fellowship from Anthropic and CodePath that places early-career builders inside mission-driven organizations across the United States. Fellows use Claude to scope and ship practical tools, agents, automations, evaluations, and workflows, then train host teams to maintain what they build.',
+    eligibilitySummary:
+      'Applicants must be at least 18, early in their career, authorized to work in the United States without sponsorship, and willing to relocate for an in-person host placement if needed. No degree or specific technical major is required.',
+    experienceSummary:
+      'Fellows are full-time CodePath employees earning $85,000 plus benefits. The program includes an Anthropic onboarding bootcamp, cohort sessions, technical office hours, relocation support for qualifying placements, and a 12-month project with one host organization.',
+    detailBasis:
+      'The official 2027 Greenhouse posting confirms the Cohort 3 start, rolling review, January 31 deadline, salary, national placement model, and current eligibility requirements.',
+    why:
+      'A distinctive first-job alternative that gives early-career students and recent graduates paid experience applying AI inside public-interest organizations instead of entering a conventional corporate role.',
+    prep:
+      'Prepare examples of something you built and shipped, explain how you use AI tools thoughtfully, and identify community, nonprofit, civic-tech, education, or public-interest work that matters to you.',
+    sourceNote:
+      'The official 2027 Claude Corps posting says Cohort 3 begins in late August 2027, pays $85,000 plus benefits, reviews applications on a rolling basis, and closes January 31, 2027.',
+    lastChecked: '2026-11-09',
+    statusReviewedAt: '2026-11-09T14:30:00.000Z',
+  },
+  {
     id: 'jane-street-fttp-watch',
     name: 'Focus on Trading and Technology',
     organization: 'Jane Street',
@@ -831,6 +869,8 @@ export const opportunities = [
     confidence: 'high',
     funding: 'Stipend',
     location: 'Remote',
+    programModel: 'cohort',
+    weeklyCommitment: '20 hrs/week',
     url: 'https://fellowship.mlh.com/programs/open-source',
     previousUrl: 'https://fellowship.mlh.io/',
     openDate: 'Rolling applications by cohort',
@@ -863,6 +903,8 @@ export const opportunities = [
     confidence: 'high',
     funding: 'Stipend',
     location: 'Remote',
+    programModel: 'cohort',
+    weeklyCommitment: '20 hrs/week',
     url: 'https://fellowship.mlh.com/programs/software-engineering',
     previousUrl: 'https://fellowship.mlh.io/',
     openDate: 'Fall 2026 batch listed for Sep 14-Dec 4, 2026',
@@ -895,6 +937,8 @@ export const opportunities = [
     confidence: 'high',
     funding: 'Stipend',
     location: 'Remote',
+    programModel: 'cohort',
+    weeklyCommitment: '20 hrs/week',
     url: 'https://fellowship.mlh.com/programs/web3-engineering',
     previousUrl: 'https://fellowship.mlh.io/',
     openDate: 'Fall 2026 batch listed for Sep 14-Dec 4, 2026',
@@ -927,6 +971,8 @@ export const opportunities = [
     confidence: 'high',
     funding: 'Stipend',
     location: 'Remote',
+    programModel: 'cohort',
+    weeklyCommitment: '20 hrs/week',
     url: 'https://fellowship.mlh.com/',
     previousUrl: '',
     openDate: 'Fall 2026 batch listed for Sep 14-Dec 4, 2026',
@@ -1025,6 +1071,8 @@ export const opportunities = [
     confidence: 'high',
     funding: 'Free',
     location: 'Virtual',
+    programModel: 'cohort',
+    weeklyCommitment: '2-10 hrs/week',
     url: 'https://www.codepath.org/courses',
     previousUrl: '',
     openDate: 'The official courses page includes Spring waitlist language and course links, but a current-cycle application window is not confirmed',
@@ -1111,6 +1159,41 @@ export const opportunities = [
       'Official Career Prep 2029 application says applications are open, SWE/Technology and Corporate Management have a November 1, 2026 priority deadline, and the final deadline is January 15, 2027.',
     lastChecked: '2026-10-26',
     statusReviewedAt: '2026-10-26T16:20:00.000Z',
+  },
+  {
+    id: 'mlt-ascend-career-accelerator-2027',
+    name: 'Ascend: Career Accelerator',
+    organization: 'Management Leadership for Tomorrow',
+    category: 'Community / Prep Program',
+    classYears: ['Freshman'],
+    timing: 'Winter',
+    status: 'open',
+    confidence: 'high',
+    funding: 'Not listed',
+    location: 'Virtual',
+    programModel: 'cohort',
+    commitmentDetail: 'Monthly sessions',
+    url: 'https://mlt.smapply.org/prog/ascend_scholar/',
+    previousUrl: '',
+    openDate: 'Applications opened November 2, 2026',
+    deadline: 'January 4, 2027 at 11:59 PM ET',
+    tags: ['Access & Prep', 'Technology', 'Business', 'Career coaching', 'First-generation students', 'Freshmen'],
+    description:
+      'MLT Ascend: Career Accelerator is an early-college coaching and career-exploration program for students interested in business or technology. Scholars build a professional toolkit, explore career interests, develop a peer and industry network, and receive structured programming designed to prepare them for later recruiting opportunities.',
+    eligibilitySummary:
+      'Recent high-school graduates enrolled in college and current freshmen graduating by Fall 2029, Spring 2030, or Summer 2030 may apply. Applicants must be U.S. citizens, permanent residents, or DACA participants; attend a four-year accredited institution; hold at least a 3.0 cumulative college GPA; and identify with low-to-moderate-income and/or first-generation experiences or inequitable access to career resources. All majors are accepted.',
+    experienceSummary:
+      'Virtual monthly assignments and required seminars, personalized coaching, peer and industry connections, and career exploration. Successful completion may lead to preferred admission to MLT Career Prep. The program begins January 27, 2027.',
+    detailBasis:
+      'Current official MLT Ascend application page, reviewed November 2, 2026.',
+    why:
+      'A strong freshman-specific bridge into business and technology careers for students who may not yet have access to established professional networks or recruiting preparation.',
+    prep:
+      'Apply before January 4 and prepare a current resume, college transcript, examples of academic performance and initiative, and a clear explanation of your business or technology interests and connection to MLT’s mission.',
+    sourceNote:
+      'The official application confirms freshman and recent-high-school-graduate eligibility, all-major access, virtual monthly requirements, the January 27 start, possible preferred admission to Career Prep, and the January 4 deadline.',
+    lastChecked: '2026-11-02',
+    statusReviewedAt: '2026-11-02T17:24:00.000Z',
   },
   {
     id: 'forage-virtual-experience',
@@ -1871,6 +1954,7 @@ export const opportunities = [
     confidence: 'high',
     funding: 'Paid program',
     location: 'San Francisco, CA',
+    programModel: 'cohort',
     url: 'https://info.codepath.org/futureforce-tech-launchpad',
     previousUrl: '',
     openDate: 'Watch winter for the next application window',
@@ -1903,6 +1987,8 @@ export const opportunities = [
     confidence: 'high',
     funding: 'Free; student grants available',
     location: 'Virtual',
+    programModel: 'cohort',
+    weeklyCommitment: '5-10 hrs/week',
     url: 'https://www.developforgood.org/for-students',
     previousUrl: '',
     openDate: 'Winter 2027 applications closed September 19, 2026; the batch begins October 25-31',
@@ -2199,6 +2285,8 @@ export const opportunities = [
     confidence: 'high',
     funding: 'Paid program',
     location: 'Virtual in the United States',
+    programModel: 'cohort',
+    programDuration: '1 Year',
     url: 'https://www.breakthroughtech.org/programs/',
     previousUrl: 'https://ecornell.cornell.edu/portal/break-through-tech-ai-information/',
     openDate: 'Applications open in early December every year',
@@ -2286,6 +2374,42 @@ export const opportunities = [
     statusReviewedAt: '2026-10-04T14:40:33.036Z',
   },
   {
+    id: 'true-ventures-fellowship-2027',
+    name: 'True Ventures Fellowship',
+    organization: 'True Ventures',
+    category: 'Startup / VC Fellowship',
+    classYears: ['All class years'],
+    timing: 'Summer',
+    status: 'watching',
+    confidence: 'high',
+    funding: '$12,000 compensation; housing support when required',
+    location: 'Hybrid; portfolio-company dependent with a San Francisco kickoff',
+    programModel: 'cohort',
+    programDuration: 'About 10 Weeks',
+    weeklyCommitment: 'Full-time',
+    url: 'https://www.trueventuresfellowship.com/',
+    previousUrl: '',
+    openDate: 'Summer 2027 applications will open in Spring 2027',
+    deadline: 'The Summer 2027 application deadline has not been posted',
+    tags: ['Startups', 'VC', 'AI', 'Software engineering', 'Product', 'Portfolio companies'],
+    description:
+      'The True Ventures Fellowship places rising college seniors in substantive full-time roles at early-stage True Ventures portfolio companies. Fellows build real products and workflows, develop practical AI fluency, learn how seed-stage startups and venture capital work, and join a long-running alumni network.',
+    eligibilitySummary:
+      'Applicants must be rising college seniors with at least one semester remaining after the fellowship and must be eligible to work in the United States without sponsorship.',
+    experienceSummary:
+      'The fellowship runs from early June to mid-August in a hybrid format. Fellows receive $12,000, qualifying housing support, a San Francisco kickoff week, startup work experience, peer programming, and access to True Ventures founders and investors.',
+    detailBasis:
+      'The official fellowship page confirms the Summer 2027 cycle, rising-senior eligibility, compensation, hybrid format, portfolio-company placement model, and spring application timing.',
+    why:
+      'A high-signal startup pathway for students who want meaningful early-stage company experience and founder access rather than another broad internship listing.',
+    prep:
+      'Build evidence of initiative, adaptability, AI fluency, and interest in early-stage companies; sign up for the official notice and prepare before applications open in spring.',
+    sourceNote:
+      'The official True Ventures Fellowship page confirms that Summer 2027 applications will open in Spring 2027. Do not send an opening alert until the official application becomes available.',
+    lastChecked: '2026-11-09',
+    statusReviewedAt: '2026-11-09T14:30:00.000Z',
+  },
+  {
     id: 'bessemer-fellows-watch',
     name: 'Bessemer Fellowship Program',
     organization: 'Bessemer Venture Partners',
@@ -2355,32 +2479,34 @@ export const opportunities = [
     name: 'Thrive Capital Summer Fellowship',
     organization: 'Thrive Capital',
     category: 'Startup / VC Fellowship',
-    classYears: ['Freshman', 'Sophomore'],
+    classYears: ['All class years'],
     timing: 'Summer',
-    status: 'watching',
+    status: 'open',
     confidence: 'high',
-    funding: 'Scholarship',
-    location: 'New York, NY',
+    funding: 'Paid at a $100,000 annualized salary plus a $40,000 education stipend',
+    location: 'New York or San Francisco',
+    programModel: 'cohort',
     url: 'https://fellows.thrivecap.com/',
     previousUrl: '',
-    openDate: '2026 application is closed; watch fall for next cycle',
-    deadline: '2026 deadline was December 1, 2025',
-    tags: ['VC', 'Startups', 'Founders', 'Research'],
+    openDate: 'Summer 2027 applications are open',
+    deadline: 'December 11, 2026',
+    tags: ['VC', 'Startups', 'Founders', 'Research', 'AI', 'Product', 'Technology'],
     description:
-      'Thrive Capital Summer Fellowship is a 10-week paid summer fellowship for college students to work inside Thrive Capital and learn from technology investors and portfolio companies.',
+      'Thrive Capital Summer Fellowship gives college students room to pursue an original technical, product, research, or investment question with support from Thrive and its portfolio. Example projects include building AI tools, developing data infrastructure and products, testing new manufacturing approaches, and researching emerging technology markets.',
     eligibilitySummary:
-      'Current college freshman, sophomore, or junior with U.S. work authorization and deep interest in technology per official 2026 page.',
+      'Current college students with U.S. work authorization who demonstrate exceptional ability, sound judgment, and the ability to contribute meaningfully to Thrive and its portfolio companies.',
     experienceSummary:
-      'Fellows apprentice with a Thrive team, participate in curated events, receive mentorship, and get a grant to offset education costs.',
+      'Fellows pursue self-directed work while contributing to Thrive or its portfolio. The program is based in New York or San Francisco and pays an annualized $100,000 salary plus a $40,000 education stipend.',
     detailBasis:
-      'Official Thrive page lists 2026 fellowship details, eligibility, compensation, grant, and closed status.',
+      'The official 2027 fellowship page confirms that applications are open, lists current eligibility and compensation, and gives a December 11, 2026 deadline.',
     why:
-      'Distinctive VC/startup exposure for students deciding whether they care about founders, investing, research, or company-building.',
+      'A distinctive startup and venture fellowship for students who want to investigate ambitious ideas, build alongside technology companies, or explore company-building outside a conventional internship structure.',
     prep:
-      'Prepare technology thesis examples, startup curiosity, and communication stories for the next cycle.',
+      'Develop a specific technical, product, research, or market question you want to explore and apply before December 11, 2026.',
     sourceNote:
-      'Official Thrive page says applications are closed and lists a 10-week paid fellowship, $40,000 grant, New York location, and U.S. work authorization requirement.',
-    lastChecked: '2026-08-22',
+      'The official Thrive page says Summer 2027 applications are open through December 11, 2026. It lists a $100,000 annualized salary, $40,000 education stipend, New York or San Francisco location, and U.S. work authorization requirement.',
+    lastChecked: '2026-11-09',
+    statusReviewedAt: '2026-11-09T15:30:00.000Z',
   },
   {
     id: 'contrary-research-fellowship',
@@ -2558,32 +2684,33 @@ export const opportunities = [
     category: 'Winternship',
     classYears: ['Freshman', 'Sophomore'],
     timing: 'Winter',
-    status: 'deadlineSoon',
+    status: 'watching',
     confidence: 'high',
     funding: 'Paid program',
     location: 'New York City',
     url: 'https://www.hudsonrivertrading.com/student-opportunities/',
-    applicationUrl: 'https://www.hudsonrivertrading.com/hrt-job/women-in-trading-and-technology-internship-witti-winter-2027/',
-    monitorUrl: 'https://www.hudsonrivertrading.com/hrt-job/women-in-trading-and-technology-internship-witti-winter-2027/',
+    applicationUrl: '',
+    monitorUrl: 'https://www.hudsonrivertrading.com/student-opportunities/',
     previousUrl: '',
-    openDate: 'Applications are open for the January 2027 program',
-    deadline: 'October 16, 2026',
+    openDate: 'January 2027 applications are closed; monitoring for the January 2028 cycle',
+    deadline: 'The January 2028 application deadline has not been posted',
     tags: ['Trading', 'Quant', 'Women in tech', 'Finance'],
     description:
-      'HRT Women in Trading & Technology is a 2-4 week January program introducing students to automated trading, software engineering, and algorithm development. Participants complete independent Python and C++ projects, attend technical talks and seminars, and learn how quantitative researchers and engineers work together at HRT.',
+      'HRT Women in Trading & Technology is a 2-4 week January program introducing students to automated trading, software engineering, and algorithm development. In the latest published cycle, participants completed independent Python and C++ projects, attended technical talks and seminars, and learned how quantitative researchers and engineers work together at HRT.',
     eligibilitySummary:
-      'Full-time undergraduates in a technical or quantitative discipline graduating between Fall 2028 and Summer 2030; HRT describes the program as designed for students without extensive quantitative-trading experience.',
+      'Previous-cycle context: the January 2027 program accepted full-time undergraduates in a technical or quantitative discipline graduating between Fall 2028 and Summer 2030. Confirm the next cycle eligibility when applications reopen.',
     experienceSummary:
       'In-person in New York beginning January 4, 2027, with a flexible two-, three-, or four-week duration based on the student’s winter break.',
     detailBasis:
-      'The official HRT student page and current Winter 2027 posting confirm the program format, technical content, location, and application status; HRT’s official announcement supplies the October 16 deadline and graduation window.',
+      'The official HRT student page confirms that January 2027 applications are closed and directs students to check back for January 2028. Program format and eligibility details are retained as clearly marked previous-cycle context.',
     why:
       'High-signal quant/finance discovery path for underclassmen, especially students exploring trading technology early.',
     prep:
-      'Apply before October 16 and prepare programming, probability, quantitative problem-solving, and technical-curiosity examples.',
+      'Keep programming, probability, quantitative problem-solving, and technical-curiosity examples ready while ApplyFirst watches for the January 2028 application.',
     sourceNote:
-      'Official HRT sources confirm January 2027 applications are open for students graduating Fall 2028-Summer 2030 and close October 16, 2026.',
-    lastChecked: '2026-09-26',
+      'The official HRT student page now says January 2027 applications are closed and asks students to check back for January 2028 applications.',
+    lastChecked: '2026-11-02',
+    statusReviewedAt: '2026-11-02T13:58:25.312Z',
   },
   {
     id: 'hrt-inside-hrt',
@@ -3495,6 +3622,72 @@ export const opportunities = [
       'Official Code2040 pages confirm the program structure and latest-cycle eligibility, while the trusted underclassmen opportunity list independently identifies it as a fellowship lead. The 2026 application is closed, so monitor for a new official cycle without reusing prior dates.',
     lastChecked: '2026-10-26',
     statusReviewedAt: '2026-10-26T12:58:56.584Z',
+  },
+  {
+    id: 'cme-software-engineering-fellowship-2027',
+    name: 'Software Engineering Fellowship',
+    organization: 'CME Group',
+    category: 'Fellowship',
+    classYears: ['Sophomore', 'Junior'],
+    timing: 'Summer',
+    status: 'open',
+    confidence: 'high',
+    funding: 'Paid full-time fellowship',
+    location: 'Chicago, IL',
+    url: 'https://cmegroup.wd1.myworkdayjobs.com/en-US/cme_careers/job/Software-Engineering-Fellowship---Summer-2027_34824',
+    previousUrl: '',
+    openDate: 'Applications are open for Summer 2027',
+    deadline: 'No application deadline is listed',
+    tags: ['Software Engineering', 'FinTech', 'Mentorship', 'Sophomores', 'Juniors', 'First internship'],
+    description:
+      'CME Group’s Software Engineering Fellowship is a paid, full-time program that combines hands-on engineering work with technical learning, career development, and mentorship. Fellows explore software-design fundamentals, work alongside professional mentors, attend technical talks, and learn how engineering teams build technology for global financial markets.',
+    eligibilitySummary:
+      'Undergraduate students at any level may apply, but the program specifically targets rising sophomores and juniors in the Classes of 2028 and 2029 who may not have held a prior software engineering internship.',
+    experienceSummary:
+      'A 10-12 week, full-time summer fellowship in Chicago with engineering work, mentorship, technical enrichment, interview preparation, and a cohort of early-career students.',
+    detailBasis:
+      'Current official CME Group Workday application for Summer 2027, reviewed November 2, 2026.',
+    why:
+      'A strong underclassman pathway for students seeking their first substantive software engineering experience rather than another general internship listing.',
+    prep:
+      'Prepare a current resume and examples from coursework, projects, or technical clubs that demonstrate programming fundamentals, curiosity, and readiness to learn with a mentor.',
+    sourceNote:
+      'The official application confirms the paid 10-12 week format, rising-sophomore and rising-junior focus, first-internship orientation, mentorship, and technical development. No deadline is currently listed.',
+    lastChecked: '2026-11-02',
+    statusReviewedAt: '2026-11-02T13:58:25.312Z',
+  },
+  {
+    id: 'standard-chartered-spring-insight-2027-us',
+    name: 'Spring Insight Programme',
+    organization: 'Standard Chartered',
+    category: 'Discovery Program',
+    classYears: ['Sophomore'],
+    timing: 'Winter',
+    status: 'open',
+    confidence: 'high',
+    funding: 'Unpaid workshop; travel and accommodations reimbursed for students outside New York',
+    location: 'New York, NY',
+    url: 'https://jobs.standardchartered.com/job/Spring-Insight-Programme-2027-US/63952-en_GB',
+    previousUrl: '',
+    openDate: 'Applications opened October 16, 2026',
+    deadline: 'November 15, 2026',
+    tags: ['Quant / Finance', 'Investment Banking', 'Markets', 'Transaction Banking', 'Sophomores', 'All majors'],
+    description:
+      'Standard Chartered’s Spring Insight Programme is a three-day introduction to Corporate and Investment Banking. Students explore Markets, Global Banking, Coverage Banking, and Transaction Banking through business simulations, workshops, job shadowing, conversations with employees, and career coaching.',
+    eligibilitySummary:
+      'Current sophomores from any degree discipline may apply. No prior banking or financial-services experience is required, and Standard Chartered encourages students from groups underrepresented in banking.',
+    experienceSummary:
+      'An in-person program at Standard Chartered’s New York headquarters from February 1-3, 2027. Strong performers receive fast-track consideration for the 2028 Summer Internship Programme, and travel and accommodations are reimbursed for students outside the immediate New York area.',
+    detailBasis:
+      'Current official Standard Chartered requisition 63952, reviewed November 2, 2026.',
+    why:
+      'A nationally accessible sophomore discovery program that lets students explore major finance pathways before they need prior banking experience.',
+    prep:
+      'Apply before November 15 and prepare examples of analytical thinking, teamwork, curiosity about markets, and interest in how international banking supports companies and economies.',
+    sourceNote:
+      'The official requisition confirms all-major sophomore eligibility, the February 1-3 New York program, reimbursed travel and accommodations, fast-track internship consideration, and the November 15 deadline.',
+    lastChecked: '2026-11-02',
+    statusReviewedAt: '2026-11-02T13:58:25.312Z',
   },
 ];
 

@@ -24,7 +24,9 @@ import {
 import {
   buildStructuredSourceRequest,
   buildUnpublishedPostingText,
+  extractFramerSearchIndexUrl,
   extractStructuredJobPostingText,
+  formatFramerSearchIndexPayload,
   formatStructuredSourcePayload,
 } from './source-adapters.js';
 
@@ -78,6 +80,8 @@ const CLIENT_ERROR_OPERATIONS = new Set([
   'application_attempts_load',
   'application_attempt_save',
   'application_outcome_save',
+  'watch_setup_capture',
+  'watch_setup_save',
   'invite_verification',
   'react_render',
   'runtime_error',
@@ -410,6 +414,12 @@ async function handleRequest(request, env, ctx) {
       await requireAdminToken(request, env);
       const body = await readJson(request, {});
       return jsonResponse(env, await reconcileWatchRequestWorkspaces(env, body));
+    }
+
+    if (request.method === 'POST' && url.pathname === '/analytics/captured-watch-setups/reconcile') {
+      await requireAdminToken(request, env);
+      const body = await readJson(request, {});
+      return jsonResponse(env, await reconcileCapturedWatchSetups(env, body));
     }
 
     if (request.method === 'POST' && url.pathname === '/analytics/monitoring-audits') {
@@ -1824,6 +1834,253 @@ async function reconcileWatchRequestWorkspaces(env, body = {}) {
     ambiguousMatches,
     generatedAt: new Date().toISOString(),
   };
+}
+
+async function reconcileCapturedWatchSetups(env, body = {}) {
+  if (!env.CAPTURE_DB) {
+    throw httpError(503, 'Capture database is not configured.');
+  }
+
+  const dryRun = body.dryRun !== false;
+  const [capturedResult, invitationResult, activeRequestResult] = await Promise.all([
+    env.CAPTURE_DB.prepare(
+      `with latest_opt_ins as (
+        select
+          id as captureRequestId,
+          lower(trim(email)) as email,
+          class_year as classYear,
+          interest as roleTrack,
+          preference_summary as preferenceSummary,
+          notification_mode as notificationMode,
+          email_consent_at as emailConsentAt,
+          email_consent_text as emailConsentText,
+          coalesce(nullif(saved_at, ''), created_at) as requestedAt,
+          row_number() over (
+            partition by lower(trim(email))
+            order by datetime(coalesce(nullif(saved_at, ''), created_at)) desc, id desc
+          ) as rowNumber
+        from waitlist_requests
+        where source = 'applyfirst-beta-email-alert'
+          and email is not null
+          and trim(email) != ''
+      )
+      select *
+      from latest_opt_ins
+      where rowNumber = 1
+      order by datetime(requestedAt) asc
+      limit 500`,
+    ).all(),
+    env.DB.prepare(
+      `select
+        invitation.access_code_hash as accessCodeHash,
+        invitation.recipient_email_hash as recipientEmailHash,
+        invitation.code_label as codeLabel,
+        invitation.tester_segment as testerSegment,
+        workspace.id as workspaceId
+       from beta_invitations invitation
+       left join beta_access_workspaces workspace
+         on workspace.access_code_hash = invitation.access_code_hash
+       where invitation.status in ('sent', 'active')
+         and invitation.recipient_email_hash is not null
+         and invitation.recipient_email_hash != ''`,
+    ).all(),
+    env.DB.prepare(
+      `select lower(trim(email)) as email, max(coalesce(nullif(requested_at, ''), created_at)) as requestedAt
+       from watch_requests
+       where status = 'active'
+         and email is not null
+         and trim(email) != ''
+         and (unsubscribed_at is null or unsubscribed_at = '')
+       group by lower(trim(email))`,
+    ).all(),
+  ]);
+
+  const invitationsByEmailHash = new Map();
+  for (const invitation of invitationResult.results || []) {
+    const emailHash = cleanString(invitation.recipientEmailHash, 64).toLowerCase();
+    if (!emailHash) continue;
+    if (!invitationsByEmailHash.has(emailHash)) invitationsByEmailHash.set(emailHash, []);
+    invitationsByEmailHash.get(emailHash).push(invitation);
+  }
+
+  const latestActiveByEmail = new Map(
+    (activeRequestResult.results || []).map((row) => [
+      cleanString(row.email, 180).toLowerCase(),
+      cleanString(row.requestedAt, 80),
+    ]),
+  );
+
+  const planned = [];
+  let alreadyCurrent = 0;
+  let noInvitationMatch = 0;
+  let ambiguousInvitationMatch = 0;
+  let invalidPreferences = 0;
+
+  for (const captured of capturedResult.results || []) {
+    const email = cleanString(captured.email, 180).toLowerCase();
+    const requestedAt = normalizeOptionalTimestamp(captured.requestedAt) || new Date().toISOString();
+    const activeRequestedAt = latestActiveByEmail.get(email);
+    if (activeRequestedAt && Date.parse(activeRequestedAt) >= Date.parse(requestedAt)) {
+      alreadyCurrent += 1;
+      continue;
+    }
+
+    const emailHash = await hashRecipientEmail(email);
+    const invitations = invitationsByEmailHash.get(emailHash) || [];
+    if (!invitations.length) {
+      noInvitationMatch += 1;
+      continue;
+    }
+    if (invitations.length !== 1) {
+      ambiguousInvitationMatch += 1;
+      continue;
+    }
+
+    const preferences = parseCapturedWatchPreferences(captured);
+    if (!preferences) {
+      invalidPreferences += 1;
+      continue;
+    }
+
+    planned.push({
+      ...captured,
+      ...preferences,
+      email,
+      requestedAt,
+      invitation: invitations[0],
+    });
+  }
+
+  let recovered = 0;
+  let createdWorkspaces = 0;
+  let superseded = 0;
+
+  if (!dryRun) {
+    for (const item of planned) {
+      let workspaceId = cleanString(item.invitation.workspaceId, 120);
+      if (!workspaceId) {
+        workspaceId = crypto.randomUUID();
+        const now = new Date().toISOString();
+        const result = await env.DB.prepare(
+          `insert or ignore into beta_access_workspaces (
+            id, access_code_hash, code_label, state_json, tester_segment, last_seen_at, updated_at
+          ) values (?, ?, ?, ?, ?, ?, ?)`,
+        )
+          .bind(
+            workspaceId,
+            item.invitation.accessCodeHash,
+            cleanString(item.invitation.codeLabel, 20),
+            JSON.stringify(normalizeWorkspaceState({})),
+            cleanString(item.invitation.testerSegment, 80) || 'unknown',
+            item.requestedAt,
+            now,
+          )
+          .run();
+        createdWorkspaces += Number(result?.meta?.changes || 0);
+
+        const workspace = await env.DB.prepare(
+          `select id from beta_access_workspaces where access_code_hash = ? limit 1`,
+        )
+          .bind(item.invitation.accessCodeHash)
+          .first();
+        workspaceId = workspace?.id || workspaceId;
+      }
+
+      const id = crypto.randomUUID();
+      const now = new Date().toISOString();
+      await env.DB.prepare(
+        `insert into watch_requests (
+          id, workspace_id, source, email, preferred_contact_method, class_year, role_track,
+          priority, send_timing, preference_summary, notification_mode,
+          notification_consent_at, notification_consent_text, requested_at,
+          unsubscribe_token, status, raw_payload_json
+        ) values (?, ?, ?, ?, 'email', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)`,
+      )
+        .bind(
+          id,
+          workspaceId,
+          'applyfirst-capture-recovery',
+          item.email,
+          item.classYear,
+          item.roleTrack,
+          item.priority,
+          item.sendTiming,
+          cleanString(item.preferenceSummary, 260),
+          cleanString(item.notificationMode, 120) || 'Beta Email Alerts',
+          normalizeOptionalTimestamp(item.emailConsentAt) || item.requestedAt,
+          cleanString(item.emailConsentText, 260) ||
+            'Beta alert opt-in submitted through My Focus before watch synchronization repair.',
+          item.requestedAt,
+          createSecureToken(),
+          JSON.stringify({
+            alertScope: 'focus_matches',
+            recoveredFromCaptureRequestId: item.captureRequestId,
+            recoveredAt: now,
+          }),
+        )
+        .run();
+
+      const result = await env.DB.prepare(
+        `update watch_requests
+         set status = 'inactive'
+         where workspace_id = ?
+           and id != ?
+           and status = 'active'
+           and (unsubscribed_at is null or unsubscribed_at = '')`,
+      )
+        .bind(workspaceId, id)
+        .run();
+      superseded += Number(result?.meta?.changes || 0);
+      recovered += 1;
+    }
+
+    console.log(JSON.stringify({
+      event: 'captured_watch_setup_reconciliation',
+      recovered,
+      createdWorkspaces,
+      superseded,
+      reconciledAt: new Date().toISOString(),
+    }));
+  }
+
+  return {
+    ok: true,
+    dryRun,
+    capturedSetups: (capturedResult.results || []).length,
+    eligibleToRecover: planned.length,
+    wouldRecover: dryRun ? planned.length : 0,
+    recovered: dryRun ? 0 : recovered,
+    wouldCreateWorkspaces: dryRun
+      ? planned.filter((item) => !item.invitation.workspaceId).length
+      : 0,
+    createdWorkspaces,
+    superseded,
+    alreadyCurrent,
+    noInvitationMatch,
+    ambiguousInvitationMatch,
+    invalidPreferences,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+function parseCapturedWatchPreferences(row = {}) {
+  const classYear = cleanString(row.classYear, 80);
+  const roleTrack = cleanString(row.roleTrack, 120);
+  const summary = cleanString(row.preferenceSummary, 500);
+  if (!classYear || !roleTrack || !summary) return null;
+
+  let priority = '';
+  if (/\/\s*All Recommendations\s*\//i.test(summary)) priority = 'all';
+  else if (/\/\s*Prep Resource\s*\//i.test(summary)) priority = 'foundation';
+  else if (/\/\s*Recommended\s*\//i.test(summary)) priority = 'high';
+
+  let sendTiming = '';
+  if (/Prep,\s*Openings\s*&\s*Deadlines/i.test(summary)) sendTiming = 'prepOpenDeadline';
+  else if (/Openings\s*&\s*Deadlines/i.test(summary)) sendTiming = 'openAndDeadline';
+  else if (/Openings Only/i.test(summary)) sendTiming = 'openOnly';
+
+  if (!priority || !sendTiming) return null;
+  return { classYear, roleTrack, priority, sendTiming };
 }
 
 async function getBetaAnalyticsSummary(env) {
@@ -3445,6 +3702,7 @@ async function handleProactiveDeliveryEngagement(env, url) {
 
 async function saveWatchRequest(request, env, ctx) {
   const body = await readJson(request);
+  const source = cleanString(body.source || 'applyfirst-watch-request', 80);
   const email = cleanString(body.email, 180).toLowerCase();
   const phone = normalizePhone(body.phoneNumber || body.phone);
   const preferredContactMethod = normalizeContactMethod(body.contactMethod || body.preferredContactMethod, email, phone);
@@ -3462,6 +3720,10 @@ async function saveWatchRequest(request, env, ctx) {
   const now = new Date().toISOString();
   const accessCode = normalizeAccessCode(body.accessCode || body.code);
   let workspaceId = null;
+
+  if (source === 'applyfirst-watch-request' && !BETA_WORKSPACE_CODE_PATTERN.test(accessCode)) {
+    throw httpError(400, 'A valid beta workspace code is required to activate student alerts.');
+  }
 
   if (BETA_WORKSPACE_CODE_PATTERN.test(accessCode)) {
     workspaceId = await ensureBetaWorkspaceForAlertSetup(env, accessCode);
@@ -3501,7 +3763,7 @@ async function saveWatchRequest(request, env, ctx) {
     .bind(
       id,
       workspaceId,
-      cleanString(body.source || 'applyfirst-watch-request', 80),
+      source,
       email,
       phone,
       preferredContactMethod,
@@ -9209,8 +9471,38 @@ async function fetchOfficialSourceDocument(source, env) {
 
   const rawText = await readTextWithLimit(response, MAX_SOURCE_BYTES);
   const structuredText = extractStructuredJobPostingText(rawText, new Date(), source);
+  const framerSearchIndexUrl = extractFramerSearchIndexUrl(rawText);
+  let framerText = '';
+
+  if (framerSearchIndexUrl) {
+    try {
+      const framerResponse = await fetchWithSourceTimeout(
+        framerSearchIndexUrl,
+        env,
+        'application/json,text/plain;q=0.8,*/*;q=0.5',
+      );
+
+      if (framerResponse.ok) {
+        const framerPayload = JSON.parse(await readTextWithLimit(framerResponse, MAX_SOURCE_BYTES));
+        framerText = formatFramerSearchIndexPayload(framerPayload, source.url);
+      }
+    } catch (error) {
+      console.warn(
+        JSON.stringify({
+          event: 'framer_search_index_fallback',
+          programId: cleanString(source.program_id, 120),
+          error: cleanString(error?.message || String(error), 300),
+        }),
+      );
+    }
+  }
+
   const pageText = normalizePageText(rawText);
-  const normalizedText = [structuredText, pageText].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+  const normalizedText = [structuredText, framerText, pageText]
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 
   return {
     httpStatus: response.status,
@@ -9323,8 +9615,11 @@ function classifySourcePageText(sourceText, source, referenceDate = new Date()) 
     /\b(when|once|if|before|until)\s+applications?\s+(are\s+)?open\b/i.test(normalized) ||
     /\b(first|be first)\s+to\s+know\s+when\s+applications?\s+(are\s+)?open\b/i.test(normalized);
   const saysOpen =
-    /\b(apply now|applications? (is |are )?open|applications? will close|now accepting|currently accepting|accepting applications|submit your application|register now|registration (is )?open|registration has opened|registrations? (are )?open)\b/i.test(
-      normalized,
+    (
+      /\b(apply now|applications? (is |are )?open|applications? will close|now accepting|currently accepting|accepting applications|submit your application|register now|registration (is )?open|registration has opened|registrations? (are )?open)\b/i.test(
+        normalized,
+      ) ||
+      /\b(?:today|now),?[^.!?]{0,60}\bopen(?:ed|ing)?\b[^.!?]{0,120}\bapplications?\b/i.test(normalized)
     ) &&
     !saysNotOpenYet &&
     !hasInformationalOpenMention;

@@ -665,6 +665,26 @@ function createVerifiedScheduleOverrides() {
     },
   ],
   [
+    'mlt-ascend-career-accelerator-2027',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [11, 12, 1],
+      lastKnownOpenAt: '2026-11-02',
+      activeLeadDays: 90,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 72,
+      sourceVolatility: 'stable_application_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_application', 'site:mlt.smapply.org/prog/ascend_scholar "Ascend: Career Accelerator"', 'Verify the current Ascend application and January 4 deadline.'),
+        createDiscoveryQuery('next_cycle_application', 'site:mlt.smapply.org/prog "Ascend: Career Accelerator" 2028', 'Find the next Ascend cycle after the current application closes.'),
+      ],
+      scheduleNote:
+        'The 2027 Ascend application is open through January 4, 2027. Monitor the direct application daily through the deadline, then return to annual discovery without merging this freshman program into Career Prep.',
+    },
+  ],
+  [
     'kleiner-perkins-fellows',
     {
       cycleFrequency: 'annual',
@@ -897,11 +917,11 @@ function createVerifiedScheduleOverrides() {
       discoveryCheckIntervalHours: 24,
       sourceVolatility: 'moving_cycle_page',
       discoveryQueries: [
-        createDiscoveryQuery('official_job_page', 'site:hudsonrivertrading.com/hrt-job "WiTTI" "Winter 2027"', 'Find and verify the direct current-cycle posting.'),
-        createDiscoveryQuery('official_announcement', 'site:linkedin.com/company/hudson-river-trading "WiTTI" "October 16, 2026"', 'Confirm the deadline announced by HRT.'),
+        createDiscoveryQuery('official_students_page', 'site:hudsonrivertrading.com/student-opportunities "Women in Trading & Technology" "January 2028"', 'Check the official student page for the next WiTTI cycle.'),
+        createDiscoveryQuery('official_job_page', 'site:hudsonrivertrading.com/hrt-job "WiTTI" "Winter 2028"', 'Find and verify the next direct application posting.'),
       ],
       scheduleNote:
-        'Winter 2027 applications are open through October 16, 2026. Keep the source active through the deadline.',
+        'January 2027 applications are closed. Monitor the stable official student page and search for a January 2028 posting without reusing prior-cycle eligibility or deadlines.',
     },
   ],
   [
@@ -1728,6 +1748,46 @@ function createVerifiedScheduleOverrides() {
       ],
       scheduleNote:
         'The 2026 Fellows cycle is closed and no 2027 cycle is announced. Begin discovery before the prior spring application window and never reuse the 2026 dates.',
+    },
+  ],
+  [
+    'cme-software-engineering-fellowship-2027',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [9, 10, 11],
+      lastKnownOpenAt: null,
+      activeLeadDays: 120,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 48,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_job_page', 'site:cmegroup.wd1.myworkdayjobs.com "Software Engineering Fellowship" "Summer 2027"', 'Verify the current fellowship application and any added deadline.'),
+        createDiscoveryQuery('next_cycle_application', 'site:cmegroup.wd1.myworkdayjobs.com "Software Engineering Fellowship" "Summer 2028"', 'Find the next fellowship cycle after the current posting closes.'),
+      ],
+      scheduleNote:
+        'The Summer 2027 application is open without a listed deadline. Check the official Workday posting daily while open and search for a replacement requisition next fall.',
+    },
+  ],
+  [
+    'standard-chartered-spring-insight-2027-us',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [10, 11],
+      lastKnownOpenAt: '2026-10-16',
+      activeLeadDays: 90,
+      activeCheckIntervalHours: 12,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 48,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_job_page', 'site:jobs.standardchartered.com "Spring Insight Programme 2027 - US"', 'Verify the current U.S. application and November 15 deadline.'),
+        createDiscoveryQuery('next_cycle_application', 'site:jobs.standardchartered.com "Spring Insight Programme 2028" "US"', 'Find the next U.S. sophomore insight cycle after the current posting closes.'),
+      ],
+      scheduleNote:
+        'The U.S. Spring Insight application is open through November 15, 2026. Keep the official requisition on an active cadence through the deadline, then return to annual discovery.',
     },
   ],
   ]);

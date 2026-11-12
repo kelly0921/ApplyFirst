@@ -47,6 +47,8 @@ const samples = [
     endpoint: alertEndpoint,
     body: {
       source: 'applyfirst-beta-email-alert-smoke',
+      firstName: 'ApplyFirst',
+      lastName: 'Alert Smoke Test',
       email: 'applyfirst-alert-smoke@example.com',
       classYear: 'Freshman',
       interest: 'Software Engineering',

@@ -13,6 +13,7 @@ import {
 
 const queries = [];
 const ordinaryAttempts = new Map();
+let recoveredWatchProfile = null;
 const workspaceAccessCodeHash = (code) => createHash('sha256')
   .update(`applyfirst-beta-workspace:${code.trim().toUpperCase()}`)
   .digest('hex');
@@ -48,6 +49,22 @@ const env = {
       return {
         first: async () => ({ total: 18, uniqueEmails: 15, pendingConfirmation: 2 }),
         all: async () => {
+          if (/with latest_opt_ins/i.test(query)) {
+            return {
+              results: [{
+                captureRequestId: 57,
+                email: 'captured-alert@example.com',
+                classYear: 'Sophomore',
+                roleTrack: 'Software Engineering',
+                preferenceSummary:
+                  'Sophomore / Software Engineering / All Recommendations / Prep, Openings & Deadlines',
+                notificationMode: 'Beta Email Alerts',
+                emailConsentAt: '',
+                emailConsentText: '',
+                requestedAt: '2026-10-27T14:44:22.276Z',
+              }],
+            };
+          }
           if (/select lower\(trim\(email\)\) as email/i.test(query)) {
             return {
               results: [
@@ -261,6 +278,24 @@ function createStatement(query) {
       return {};
     },
     async all() {
+      if (/invitation\.access_code_hash as accessCodeHash/i.test(query)) {
+        return {
+          results: [{
+            accessCodeHash: existingWorkspaceHash,
+            recipientEmailHash: waitlistEmailHash('captured-alert@example.com'),
+            codeLabel: '...1234',
+            testerSegment: 'independent_waitlist',
+            workspaceId: 'workspace-1',
+          }],
+        };
+      }
+
+      if (/max\(coalesce\(nullif\(requested_at/i.test(query)) {
+        return {
+          results: recoveredWatchProfile ? [recoveredWatchProfile] : [],
+        };
+      }
+
       if (/select id, email, created_at as createdAt[\s\S]*from watch_requests/i.test(query)) {
         return {
           results: [{
@@ -554,6 +589,16 @@ function createStatement(query) {
         }
       }
 
+      if (
+        /insert into watch_requests/i.test(query) &&
+        this.bindings[2] === 'applyfirst-capture-recovery'
+      ) {
+        recoveredWatchProfile = {
+          email: this.bindings[3],
+          requestedAt: this.bindings[12],
+        };
+      }
+
       return { meta: { changes: 1 } };
     },
   };
@@ -628,6 +673,23 @@ const pausedWorkspaceWatchResponse = await watchWorker.fetch(
   {},
 );
 assert.equal(pausedWorkspaceWatchResponse.status, 403);
+
+const unlinkedStudentWatchResponse = await watchWorker.fetch(
+  new Request('https://worker.example/watch', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      source: 'applyfirst-watch-request',
+      email: 'unlinked@example.com',
+      classYear: 'Freshman',
+      roleTrack: 'Software Engineering',
+      contactMethod: 'email',
+    }),
+  }),
+  env,
+  {},
+);
+assert.equal(unlinkedStudentWatchResponse.status, 400);
 
 const issuedInviteResponse = await watchWorker.fetch(
   new Request('https://worker.example/workspace?code=AF-NEW-5678'),
@@ -722,6 +784,64 @@ const reconciliationApplyResponse = await watchWorker.fetch(
 const reconciliationApply = await reconciliationApplyResponse.json();
 assert.equal(reconciliationApplyResponse.status, 200);
 assert.equal(reconciliationApply.linked, 1);
+
+const capturedReconciliationDryRunResponse = await watchWorker.fetch(
+  new Request('https://worker.example/analytics/captured-watch-setups/reconcile', {
+    method: 'POST',
+    headers: {
+      authorization: 'Bearer test-admin-token',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ dryRun: true }),
+  }),
+  env,
+  {},
+);
+const capturedReconciliationDryRun = await capturedReconciliationDryRunResponse.json();
+assert.equal(capturedReconciliationDryRunResponse.status, 200);
+assert.equal(capturedReconciliationDryRun.eligibleToRecover, 1);
+assert.equal(capturedReconciliationDryRun.wouldRecover, 1);
+assert.equal(capturedReconciliationDryRun.recovered, 0);
+
+const capturedReconciliationApplyResponse = await watchWorker.fetch(
+  new Request('https://worker.example/analytics/captured-watch-setups/reconcile', {
+    method: 'POST',
+    headers: {
+      authorization: 'Bearer test-admin-token',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ dryRun: false }),
+  }),
+  env,
+  {},
+);
+const capturedReconciliationApply = await capturedReconciliationApplyResponse.json();
+assert.equal(capturedReconciliationApplyResponse.status, 200);
+assert.equal(capturedReconciliationApply.recovered, 1);
+const recoveredWatchInsert = [...queries].reverse().find((statement) => (
+  /insert into watch_requests/i.test(statement.query) &&
+  statement.bindings[2] === 'applyfirst-capture-recovery'
+));
+assert.equal(recoveredWatchInsert.bindings[1], 'workspace-1');
+assert.equal(recoveredWatchInsert.bindings[6], 'all');
+assert.equal(recoveredWatchInsert.bindings[7], 'prepOpenDeadline');
+
+const capturedReconciliationRepeatResponse = await watchWorker.fetch(
+  new Request('https://worker.example/analytics/captured-watch-setups/reconcile', {
+    method: 'POST',
+    headers: {
+      authorization: 'Bearer test-admin-token',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ dryRun: true }),
+  }),
+  env,
+  {},
+);
+const capturedReconciliationRepeat = await capturedReconciliationRepeatResponse.json();
+assert.equal(capturedReconciliationRepeatResponse.status, 200);
+assert.equal(capturedReconciliationRepeat.wouldRecover, 0);
+assert.equal(capturedReconciliationRepeat.alreadyCurrent, 1);
 
 const unknownInviteResponse = await watchWorker.fetch(
   new Request('https://worker.example/workspace?code=AF-FAKE-9999'),

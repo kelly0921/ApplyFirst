@@ -78,6 +78,16 @@ const env = {
           return { meta: { changes: 0 } };
         },
         async first() {
+          if (/datetime\(created_at\)[\s\S]*-2 minutes/i.test(sql)) {
+            const [source, email, preferenceSummary, note] = this.values;
+            const match = [...waitlistRows].reverse().find((row) => (
+              row.source === source
+              && row.email.toLowerCase() === email
+              && row.preferenceSummary === preferenceSummary
+              && row.note === note
+            ));
+            return match ? { id: match.id, createdAt: match.createdAt } : null;
+          }
           if (/email_confirmation_token_hash = \?/i.test(sql)) {
             return waitlistRows.find((row) => row.emailConfirmationTokenHash === this.values[0]) || null;
           }
@@ -108,6 +118,33 @@ function waitlistRequest(token = '', overrides = {}) {
       emailConsentText: 'I agree to receive ApplyFirst beta access and opportunity updates by email.',
       referralSource: 'Other',
       referralDetail: 'Campus newsletter',
+      turnstileToken: token,
+      ...overrides,
+    }),
+  });
+}
+
+function betaAlertRequest(token = '', overrides = {}) {
+  return new Request('https://applyfirst-capture.example/waitlist', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Origin: 'https://applyfirst-careers.pages.dev',
+      'CF-Connecting-IP': '203.0.113.10',
+    },
+    body: JSON.stringify({
+      source: 'applyfirst-beta-email-alert',
+      firstName: 'Student',
+      lastName: 'Tester',
+      email: 'alert-student@example.com',
+      classYear: 'Sophomore',
+      interest: 'Software Engineering',
+      note: 'Beta email alert setup.',
+      preferenceSummary: 'Sophomore / Software Engineering / All Recommendations / Prep, Openings & Deadlines',
+      notificationMode: 'Beta Email Alerts',
+      emailConsentAt: '2026-10-28T12:00:00.000Z',
+      emailConsentText: 'I agree to receive ApplyFirst beta alerts.',
+      savedAt: '2026-10-28T12:00:00.000Z',
       turnstileToken: token,
       ...overrides,
     }),
@@ -234,6 +271,40 @@ async function run() {
   response = await captureWorker.fetch(waitlistRequest('single-use-token'), env);
   assert.equal(response.status, 403, 'replayed tokens must be rejected');
   assert.equal(savedRows.length, 2, 'a replay must not create another row');
+
+  globalThis.fetch = async () => Response.json({
+    success: true,
+    action: 'waitlist',
+    hostname: 'applyfirst-careers.pages.dev',
+  });
+
+  response = await captureWorker.fetch(betaAlertRequest('beta-alert-missing-name', { firstName: '' }), env);
+  assert.equal(response.status, 400, 'beta alert opt-ins must include both name fields');
+  assert.equal(savedRows.length, 2, 'a nameless beta alert opt-in must not write to D1');
+
+  response = await captureWorker.fetch(betaAlertRequest('beta-alert-first'), env);
+  assert.equal(response.status, 200);
+  const firstBetaAlertPayload = await response.json();
+  assert.equal(firstBetaAlertPayload.duplicate, false);
+  assert.equal(savedRows.length, 3, 'the first beta alert opt-in should be stored');
+  assert.equal(savedRows[2].values[3], 'Student');
+  assert.equal(savedRows[2].values[4], 'Tester');
+  assert.equal(savedRows[2].values[12], '2026-10-28T12:00:00.000Z');
+  assert.equal(savedRows[2].values[13], 'I agree to receive ApplyFirst beta alerts.');
+  assert.match(sentEmails.at(-1).subject, /Student Tester/);
+  assert.match(sentEmails.at(-1).html, /A student enabled opening alerts from My Focus/);
+  assert.match(sentEmails.at(-1).html, />Alert Setup</);
+  assert.doesNotMatch(sentEmails.at(-1).html, />School</);
+  assert.doesNotMatch(sentEmails.at(-1).html, />Referral</);
+
+  const ownerEmailCount = sentEmails.length;
+  response = await captureWorker.fetch(betaAlertRequest('beta-alert-retry'), env);
+  assert.equal(response.status, 200);
+  const repeatedBetaAlertPayload = await response.json();
+  assert.equal(repeatedBetaAlertPayload.duplicate, true);
+  assert.equal(savedRows.length, 3, 'an identical beta alert retry must not create another row');
+  assert.equal(sentEmails.length, ownerEmailCount, 'an identical beta alert retry must not send another owner email');
+  assert.equal(repeatedBetaAlertPayload.ownerNotification.status, 'duplicate_suppressed');
 
   console.log('Capture Worker Turnstile checks passed.');
 }
