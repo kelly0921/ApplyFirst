@@ -563,6 +563,12 @@ The Worker sends one consolidated list of verified suitable matches after a stud
 
 Student alerts must be generated from clean student-facing templates. Internal source-check notes, raw page excerpts, classifier labels, and maintainer instructions stay in D1 for review and should not appear in outbound student notifications. Each email includes a tokenized unsubscribe link plus `List-Unsubscribe` and one-click unsubscribe headers. SMS is disabled for the email-first beta. Unsubscribed watch requests are excluded before delivery.
 
+### Company event feeds
+
+ApplyFirst monitors selected official student-event calendars without turning every webinar into a permanent library record. Multi-day summits, selective insight programs, and recurring events with a meaningful recruiting pathway may have their own public opportunity. Ordinary information sessions, recruiter Q&As, and interview workshops remain discovery candidates and require maintainer review before they can affect a public record or student delivery.
+
+An office visit or company event is in scope only when its official page confirms a current date and registration route, it is school-agnostic or meaningfully available to students across the United States, and it supports ApplyFirst tracks such as software engineering, product, design, quant/finance, or early-career access. In-person events that impose a narrow regional requirement without travel support, campus-only events, expired recordings, and generic employer-promotion sessions are excluded. A useful virtual event normally belongs in a digest; immediate email is reserved for selective registration windows, limited-capacity events, or a material application-timing signal.
+
 ## Proactive Delivery Layer
 
 The proactive-delivery iteration reuses the verified library, source checks, alert candidates, explicit Watch state, My Focus, relevance evidence, application attempts, Cloudflare Email binding, and unsubscribe flow. It adds a server-side delivery catalog generated from `src/opportunities.js` plus a durable batch/item ledger.

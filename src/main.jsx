@@ -404,6 +404,7 @@ const hostQualifiedTitleIds = new Set([
   'jane-street-qtc-watch',
   'jane-street-wise-watch',
   'jane-street-amp-watch',
+  'capital-one-analyst-summit',
   'capital-one-tech-summit',
   'capital-one-product-summit',
   'capital-one-analyst-early-internship',

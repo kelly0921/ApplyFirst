@@ -373,6 +373,26 @@ curl -X POST "https://applyfirst-watch.YOUR-SUBDOMAIN.workers.dev/watch/discover
   -d "{\"status\":\"accepted\",\"reviewNote\":\"Official current-cycle page.\"}"
 ```
 
+### Weekly new-program radar
+
+The weekly research radar and the Worker source-discovery queue solve different problems. Source discovery finds a current-cycle URL for a program already in the library. The radar finds programs that are not yet in the library, or material new cycles and URLs that need a maintainer decision.
+
+Radar findings must be written to a JSON batch and validated before they enter D1. Preview a batch first:
+
+```bash
+npm run watch:program-candidates:radar:sync -- --file data/radar-candidates.generated.json
+```
+
+After the preview is clean, save the findings to the quarantined maintainer queue:
+
+```bash
+npm run watch:program-candidates:radar:sync -- --file data/radar-candidates.generated.json --remote
+```
+
+The importer requires `runId` and a non-empty `candidates` array. Each candidate needs `programName`, `organization`, a direct HTTPS `officialUrl`, `evidenceDate`, an ApplyFirst `opportunityType`, `evidenceNote`, `fitReason`, `duplicateType`, and `confidence`. Use `duplicateProgramId` for `existing_cycle` and `updated_url` findings. Shortened lead URLs are rejected, exact library matches cannot be mislabeled as new programs, and repeated runs update the same D1 record without changing its review status.
+
+This command never edits `src/opportunities.js`, enables monitoring, approves a candidate, or sends a student alert. A maintainer must still move the candidate through `candidate -> verified -> added -> monitored` in the review console.
+
 To dry-run a candidate delivery:
 
 ```bash

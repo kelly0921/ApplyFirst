@@ -4,6 +4,7 @@ import {
   getMonitoringReadiness,
   getOpportunityTracks,
   getSourceUpdatePlan,
+  monitoringOnlySources,
   opportunities,
 } from '../src/opportunities.js';
 import { detectOfficialSourceType } from '../workers/source-adapters.js';
@@ -18,7 +19,7 @@ const officialSourceInsertChunkSize = 1;
 const scheduleProfileInsertChunkSize = 1;
 const deliveryCatalogInsertChunkSize = 4;
 
-const sourceRows = opportunities
+const sourceRows = [...opportunities, ...monitoringOnlySources]
   .filter((opportunity) => opportunity.url?.startsWith('https://'))
   .map((opportunity) => {
     const plan = getSourceUpdatePlan(opportunity);
@@ -39,7 +40,8 @@ const sourceRows = opportunities
       enabled: opportunity.monitoringEnabled !== false,
       seededSample: readiness.alertable,
       scheduleProfile: createScheduleProfile(opportunity),
-      deliveryCatalog: createDeliveryCatalogRow(opportunity, readiness),
+      deliveryCatalog:
+        opportunity.deliveryEnabled === false ? null : createDeliveryCatalogRow(opportunity, readiness),
     };
   });
 
@@ -93,7 +95,10 @@ function assertRuntimeSchedulePreservation(sqlText) {
 }
 
 function createRemovedDeliveryCatalogCleanupStatement(rows) {
-  const activeProgramIds = rows.map((row) => sqlValue(row.programId)).join(', ');
+  const activeProgramIds = rows
+    .filter((row) => row.deliveryCatalog)
+    .map((row) => sqlValue(row.programId))
+    .join(', ');
 
   return `update program_delivery_catalog
 set delivery_enabled = 0,
@@ -269,7 +274,7 @@ function createScheduleProfileValueSql(row) {
 }
 
 function createDeliveryCatalogStatements(rows) {
-  return chunkRows(rows, deliveryCatalogInsertChunkSize).map((chunk) => `insert into program_delivery_catalog (
+  return chunkRows(rows.filter((row) => row.deliveryCatalog), deliveryCatalogInsertChunkSize).map((chunk) => `insert into program_delivery_catalog (
   program_id,
   program_name,
   organization,
@@ -470,8 +475,9 @@ function createVerifiedScheduleOverrides() {
       discoveryCheckIntervalHours: 48,
       sourceVolatility: 'moving_cycle_page',
       discoveryQueries: [
-        createDiscoveryQuery('official_program_page', 'site:careers.microsoft.com/v2/global/en/exploremicrosoft "Explore Microsoft" "first-year"', 'Verify the stable Explore program page.'),
         createDiscoveryQuery('current_cycle_application', 'site:jobs.careers.microsoft.com "Explore Microsoft" internship 2027', 'Find the current application posting if Microsoft publishes it on jobs.careers.microsoft.com.'),
+        createDiscoveryQuery('official_virtual_event', 'site:careers.microsoft.com/v2/global/en/virtualevents "Microsoft Explore program info session"', 'Find an official Explore webinar or recruiting session; keep it in maintainer review until its date and audience are current.'),
+        createDiscoveryQuery('official_program_page', 'site:careers.microsoft.com/v2/global/en/exploremicrosoft "Explore Microsoft" "first-year"', 'Verify the stable Explore program page.'),
         createDiscoveryQuery('current_cycle_deadline', '"Microsoft Explore" "application" "deadline" 2027', 'Find current-cycle deadline language.'),
       ],
       scheduleNote:
@@ -491,8 +497,9 @@ function createVerifiedScheduleOverrides() {
       discoveryCheckIntervalHours: 72,
       sourceVolatility: 'moving_cycle_page',
       discoveryQueries: [
-        createDiscoveryQuery('official_program_page', 'site:careers.microsoft.com/v2/global/en/discoveryprogram "Microsoft Discovery Program"', 'Check the stable Discovery Program page for a new cycle.'),
         createDiscoveryQuery('current_cycle_application', 'site:jobs.careers.microsoft.com "Discovery Program" "rising college freshman" 2027', 'Find the next official Discovery application posting.'),
+        createDiscoveryQuery('official_virtual_event', 'site:careers.microsoft.com/v2/global/en/virtualevents "first- or second-year" Microsoft', 'Find a current official Microsoft university event for underclassmen; do not treat a recorded or past webinar as a live event.'),
+        createDiscoveryQuery('official_program_page', 'site:careers.microsoft.com/v2/global/en/discoveryprogram "Microsoft Discovery Program"', 'Check the stable Discovery Program page for a new cycle.'),
         createDiscoveryQuery('current_cycle_deadline', 'site:careers.microsoft.com "Discovery Program" application deadline 2027', 'Confirm future application dates from Microsoft.'),
       ],
       scheduleNote:
@@ -504,7 +511,7 @@ function createVerifiedScheduleOverrides() {
     {
       cycleFrequency: 'annual',
       expectedOpenMonths: [10, 11, 12],
-      lastKnownOpenAt: '2025-11-24',
+      lastKnownOpenAt: '2026-10-29',
       activeLeadDays: 90,
       activeCheckIntervalHours: 24,
       warmupCheckIntervalHours: 72,
@@ -512,12 +519,13 @@ function createVerifiedScheduleOverrides() {
       discoveryCheckIntervalHours: 48,
       sourceVolatility: 'moving_cycle_page',
       discoveryQueries: [
-        createDiscoveryQuery('official_program_page', 'site:careers.linkedin.com/pathways-programs/internships/Technical/first-play "First Play"', 'Check the official First Play overview for a new cycle.'),
-        createDiscoveryQuery('current_cycle_application', 'site:linkedin.com/jobs "Software Engineer Intern" "First Play" 2027', 'Find the next LinkedIn-hosted First Play role.'),
+        createDiscoveryQuery('official_application', 'site:jobs.smartrecruiters.com/LinkedIn3 "First Play" "Summer 2027"', 'Confirm that the current LinkedIn First Play application remains live.'),
+        createDiscoveryQuery('official_program_page', 'site:careers.linkedin.com/pathways-programs/internships/Technical/first-play "First Play"', 'Check the official First Play overview for cycle updates.'),
+        createDiscoveryQuery('current_cycle_application', 'site:linkedin.com/jobs "Software Engineer Intern" "First Play" 2027', 'Find a replacement LinkedIn-hosted First Play role if the application moves.'),
         createDiscoveryQuery('official_announcement', 'site:linkedin.com/company/linkedin "First Play" 2027 applications', 'Find a current official LinkedIn announcement if the job URL changes.'),
       ],
       scheduleNote:
-        'Summer 2026 applications opened November 24, 2025 and are now closed. Begin discovery in October, monitor daily during November and December, and never reuse the archived deadline for a future cycle.',
+        'The official Summer 2027 SmartRecruiters application is live without a stated deadline. Check daily while open and require an official closing signal before changing status.',
     },
   ],
   [
@@ -661,7 +669,67 @@ function createVerifiedScheduleOverrides() {
         createDiscoveryQuery('official_program_page', 'site:mlt.org/career-prep "Career Prep" "2029"', 'Check the MLT overview for cycle updates.'),
       ],
       scheduleNote:
-        'Career Prep 2029 opened June 8, 2026. The SWE/Technology priority deadline is November 1, 2026 and the final deadline is January 15, 2027; monitor the direct application page daily through the priority window.',
+        'Career Prep 2029 remains open through the January 15, 2027 final deadline. The November 1 SWE/Technology priority deadline has passed, so monitoring and student copy should emphasize the final deadline.',
+    },
+  ],
+  [
+    'bank-of-america-student-leaders',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [12, 1, 2],
+      lastKnownOpenAt: null,
+      activeLeadDays: 90,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 72,
+      sourceVolatility: 'stable_application_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_program_page', 'site:about.bankofamerica.com/en/making-an-impact/student-leaders "December 14, 2026"', 'Confirm the 2027 Student Leaders application window.'),
+        createDiscoveryQuery('official_application', 'site:bankofamerica.com/studentleaders "Apply Now" 2027', 'Find the live application when the December 14 window opens.'),
+      ],
+      scheduleNote:
+        'The official page says applications open December 14, 2026 and close February 15, 2027. Check more frequently during the opening window and preserve the eligible-market residency restriction in student copy.',
+    },
+  ],
+  [
+    'amazon-future-engineer-scholarship',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [11, 12, 1],
+      lastKnownOpenAt: '2026-11-03',
+      activeLeadDays: 90,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 72,
+      sourceVolatility: 'stable_application_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_application', 'site:scholarshipamerica.org/scholarship/amazonfutureengineer "January 5, 2027"', 'Confirm the current Scholarship America application and deadline.'),
+        createDiscoveryQuery('official_program_page', 'site:amazonfutureengineer.com/scholarships "Application Deadline"', 'Check Amazon for eligibility or timeline changes.'),
+      ],
+      scheduleNote:
+        'The scholarship is open through January 5, 2027 at 3:00 PM CT, with teacher recommendations due January 8. Monitor both official pages through the deadline.',
+    },
+  ],
+  [
+    'citadel-womens-datathon-2027',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [11, 12, 1],
+      lastKnownOpenAt: '2026-11-16',
+      activeLeadDays: 90,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 48,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_application', 'site:citadel.com/careers/programs-and-events/datathons/apply-womens-datathon "January 11, 2027"', 'Confirm the current Women’s Datathon application and deadline.'),
+        createDiscoveryQuery('official_program_page', 'site:citadel.com/careers/programs-and-events/datathons "Women’s Datathon"', 'Check the Datathon overview for event updates.'),
+      ],
+      scheduleNote:
+        'The official event application is open through January 11, 2027. Check daily while open and return to annual discovery after the event-specific page closes.',
     },
   ],
   [
@@ -801,7 +869,7 @@ function createVerifiedScheduleOverrides() {
         createDiscoveryQuery('official_batch_schedule', 'site:recurse.com/apply "Accepting applications"', 'Confirm which upcoming Recurse Center batches are accepting applications.'),
       ],
       scheduleNote:
-        'Applications remain open year-round while on-time deadlines move about every six weeks. Monitor daily near the current October 18 deadline and refresh the curated deadline after each batch transition.',
+        'Applications remain open year-round while available batches and on-time deadlines move about every six weeks. Monitor the accepting-batch list and refresh timing without closing the rolling program.',
     },
   ],
   [
@@ -865,6 +933,135 @@ function createVerifiedScheduleOverrides() {
     },
   ],
   [
+    'capital-one-students-grads-event-feed',
+    {
+      cycleFrequency: 'ongoing',
+      expectedOpenMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+      lastKnownOpenAt: null,
+      activeLeadDays: 14,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 48,
+      dormantCheckIntervalDays: 7,
+      discoveryCheckIntervalHours: 48,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_student_events', 'site:capitalone.eightfold.ai/events/candidate "Students & Grads" "Capital One"', 'Find current official Students & Grads registration pages across Capital One programs.'),
+        createDiscoveryQuery('official_summit_registration', 'site:capitalone.eightfold.ai/events/candidate Capital One Summit students', 'Find current multi-day summit registrations without assuming every webinar is a program.'),
+        createDiscoveryQuery('official_office_event', 'site:capitalone.eightfold.ai/events/candidate "in-person" "Students & Grads" Capital One', 'Find selective office events for maintainer review; exclude regional events without travel support from the public library.'),
+        createDiscoveryQuery('official_virtual_event', 'site:capitalone.eightfold.ai/events/candidate "virtual event" "Students & Grads" Capital One', 'Find current school-agnostic virtual sessions and route useful ones to a digest after review.'),
+      ],
+      scheduleNote:
+        'Internal event feed only. Search official Capital One event registrations every two days; discoveries remain quarantined from public records and student delivery until a maintainer confirms date, audience, access, and recruiting value.',
+    },
+  ],
+  [
+    'microsoft-university-event-feed',
+    {
+      cycleFrequency: 'ongoing',
+      expectedOpenMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+      lastKnownOpenAt: null,
+      activeLeadDays: 14,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 7,
+      discoveryCheckIntervalHours: 72,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_university_events', 'site:careers.microsoft.com/v2/global/en/virtualevents Microsoft university recruiting event', 'Check the official virtual-events page for current live university sessions.'),
+        createDiscoveryQuery('official_underclassman_event', 'site:careers.microsoft.com "first- or second-year" "virtual event" Microsoft', 'Find current official underclassman sessions tied to Explore or other early-in-profession paths.'),
+        createDiscoveryQuery('official_product_design_event', 'site:careers.microsoft.com/v2/global/en/virtualevents Microsoft product design student webinar', 'Look for current Product, PM, or Design sessions that address ApplyFirst coverage gaps.'),
+      ],
+      scheduleNote:
+        'Internal event feed only. Check the official Microsoft page every three days; archived recordings and generic career content are not live opportunities and cannot enter delivery.',
+    },
+  ],
+  [
+    'goldman-sachs-student-event-feed',
+    {
+      cycleFrequency: 'ongoing',
+      expectedOpenMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+      lastKnownOpenAt: null,
+      activeLeadDays: 14,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 7,
+      discoveryCheckIntervalHours: 48,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_student_events', 'site:recruiting360.avature.net "Goldman Sachs" student event "United States"', 'Find current official U.S. student registrations on My GS Events.'),
+        createDiscoveryQuery('official_engineering_event', 'site:recruiting360.avature.net "Goldman Sachs" engineering virtual event', 'Find current engineering or technology events for maintainer review.'),
+        createDiscoveryQuery('official_insight_event', 'site:recruiting360.avature.net "Goldman Sachs" insight program student', 'Find substantive insight programs without promoting ordinary networking sessions to permanent records.'),
+      ],
+      scheduleNote:
+        'Internal event feed only. Search My GS Events every two days; confirm U.S. relevance, broad access, current registration, and substantive student value before creating or updating any public program.',
+    },
+  ],
+  [
+    'capital-one-analyst-summit',
+    {
+      cycleFrequency: 'multiple_per_year',
+      expectedOpenMonths: [4, 5, 7, 8],
+      lastKnownOpenAt: null,
+      activeLeadDays: 60,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 21,
+      discoveryCheckIntervalHours: 48,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_program_page', 'site:capitalonecareers.com/get-ahead-with-early-career-programs-for-students "Analyst Summit"', 'Verify the recurring Analyst Summit description and audience.'),
+        createDiscoveryQuery('official_event_registration', 'site:capitalone.eightfold.ai/events/candidate "Analyst Summit"', 'Find a current official Analyst Summit registration page.'),
+        createDiscoveryQuery('official_virtual_event', 'site:capitalone.eightfold.ai/events/candidate "Students & Grads" "Analyst Programs" "2027"', 'Find a school-agnostic Analyst program overview or recruiter Q&A; keep ordinary webinars in maintainer review.'),
+        createDiscoveryQuery('official_case_workshop', 'site:capitalone.eightfold.ai/events/candidate "Business Case Workshop" "Students & Grads"', 'Find a current Capital One case workshop that materially supports Analyst, Product, Finance, or Data applicants.'),
+      ],
+      scheduleNote:
+        'Analyst Summit recurs in May and August. Search the official event host every two days during spring and summer; dated event pages remain maintainer-only until audience, date, and national or school-agnostic access are confirmed.',
+    },
+  ],
+  [
+    'capital-one-tech-summit',
+    {
+      cycleFrequency: 'multiple_per_year',
+      expectedOpenMonths: [1, 4, 5, 7, 8, 12],
+      lastKnownOpenAt: null,
+      activeLeadDays: 60,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 21,
+      discoveryCheckIntervalHours: 48,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_program_page', 'site:capitalonecareers.com/get-ahead-with-early-career-programs-for-students "Tech Summit"', 'Verify the recurring Tech Summit description and audience.'),
+        createDiscoveryQuery('official_event_registration', 'site:capitalone.eightfold.ai/events/candidate "Tech Summit" "Capital One"', 'Find a current official Tech Summit registration page.'),
+        createDiscoveryQuery('official_virtual_event', 'site:capitalone.eightfold.ai/events/candidate "Students & Grads" "Tech Programs" "2027"', 'Find a current school-agnostic Tech programs overview or recruiter Q&A.'),
+        createDiscoveryQuery('official_technical_workshop', 'site:capitalone.eightfold.ai/events/candidate "Tech Case Workshop" "Students & Grads"', 'Find a current technical workshop; keep it in maintainer review unless it offers meaningful application preparation.'),
+      ],
+      scheduleNote:
+        'Tech Summit can run in January, May, and August. Search the official event host for dated summit registrations and substantial school-agnostic technical sessions; do not publish routine recruiting webinars as permanent programs.',
+    },
+  ],
+  [
+    'capital-one-product-summit',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [4, 5],
+      lastKnownOpenAt: null,
+      activeLeadDays: 75,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 48,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_program_page', 'site:capitalonecareers.com/get-ahead-with-early-career-programs-for-students "Product Summit"', 'Verify the recurring Product Summit description and audience.'),
+        createDiscoveryQuery('official_event_registration', 'site:capitalone.eightfold.ai/events/candidate "Product Summit" "Capital One"', 'Find a current official Product Summit registration page.'),
+        createDiscoveryQuery('official_virtual_event', 'site:capitalone.eightfold.ai/events/candidate "Students & Grads" "Product" "2027"', 'Find a current school-agnostic Product program overview, workshop, or recruiter Q&A.'),
+      ],
+      scheduleNote:
+        'Product Summit typically runs in May. Search the official event host during winter and spring, and require a current date plus first-year or sophomore access before changing public status.',
+    },
+  ],
+  [
     'goldman-sachs-emerging-leaders-series',
     {
       cycleFrequency: 'annual',
@@ -879,6 +1076,8 @@ function createVerifiedScheduleOverrides() {
       discoveryQueries: [
         createDiscoveryQuery('official_program_page', 'site:goldmansachs.com/careers/students/programs-and-internships/americas/emerging-leaders-series "October 4"', 'Check whether Goldman has closed or updated the Emerging Leaders page.'),
         createDiscoveryQuery('current_cycle_application', 'site:recruiting360.avature.net "Emerging Leaders Series" "Goldman Sachs"', 'Find a replacement official application route if Goldman republishes one.'),
+        createDiscoveryQuery('official_student_event', 'site:recruiting360.avature.net "Goldman Sachs" "Engineering" "Virtual" "2027"', 'Find current U.S. student engineering events; require a school-agnostic audience and current registration before surfacing.'),
+        createDiscoveryQuery('official_insight_event', 'site:recruiting360.avature.net "Goldman Sachs" "Insight" "United States" "2027"', 'Find current U.S. insight events or skill-building series tied to student recruiting.'),
       ],
       scheduleNote:
         'Keep the official October 4, 2026 deadline visible even though the Avature application route is unavailable. After the deadline passes, return to monitoring for a future cycle or replacement application.',
@@ -898,6 +1097,7 @@ function createVerifiedScheduleOverrides() {
       sourceVolatility: 'moving_cycle_page',
       discoveryQueries: [
         createDiscoveryQuery('official_program_page', 'site:goldmansachs.com/careers/students/programs-and-internships/americas/possibilities-series "Possibilities Series"', 'Check the official first-year program page for a new cycle.'),
+        createDiscoveryQuery('official_student_event', 'site:recruiting360.avature.net "Goldman Sachs" "first-year" "Virtual" "United States"', 'Find current school-agnostic U.S. events for first-year students and keep each result in maintainer review.'),
         createDiscoveryQuery('current_cycle_application', 'site:recruiting360.avature.net "Possibilities Series" "Goldman Sachs" 2027', 'Find a future current-cycle application route.'),
       ],
       scheduleNote:
@@ -997,11 +1197,11 @@ function createVerifiedScheduleOverrides() {
       discoveryCheckIntervalHours: 24,
       sourceVolatility: 'moving_cycle_page',
       discoveryQueries: [
-        createDiscoveryQuery('official_job_page', 'site:careers.sig.com/jobs/11148 "November 16, 2026"', 'Confirm the current program deadline and status.'),
+        createDiscoveryQuery('official_job_page', 'site:careers.sig.com/jobs/11148 "August 3, 2027"', 'Confirm the current program deadline and status.'),
         createDiscoveryQuery('replacement_posting', 'site:careers.sig.com "Quantitative Trading" "Discovery Program 2027"', 'Find a replacement URL if the posting moves.'),
       ],
       scheduleNote:
-        'Current 2027 application is open through November 16, 2026. Keep active until the posting closes.',
+        'Current 2027 application is open through August 3, 2027. Keep active until the posting closes.',
     },
   ],
   [
@@ -1017,11 +1217,11 @@ function createVerifiedScheduleOverrides() {
       discoveryCheckIntervalHours: 24,
       sourceVolatility: 'moving_cycle_page',
       discoveryQueries: [
-        createDiscoveryQuery('official_job_page', 'site:careers.sig.com/predictions/jobs/11491 "November 16, 2026"', 'Confirm the current engineering discovery deadline and status.'),
+        createDiscoveryQuery('official_job_page', 'site:careers.sig.com/predictions/jobs/11491 "September 9, 2027"', 'Confirm the current engineering discovery deadline and status.'),
         createDiscoveryQuery('replacement_posting', 'site:careers.sig.com "Trading System Engineer" "Discovery Program 2027"', 'Find a replacement URL if the posting moves.'),
       ],
       scheduleNote:
-        'Current 2027 application is open through November 16, 2026. Keep active until the posting closes.',
+        'Current 2027 application is open through September 9, 2027. Keep active until the posting closes.',
     },
   ],
   [
@@ -1285,7 +1485,7 @@ function createVerifiedScheduleOverrides() {
         createDiscoveryQuery('official_careers_page', 'site:virtu.com/careers "Women\'s Winternship"', 'Check the corporate careers page if job board links move.'),
       ],
       scheduleNote:
-        'Official Virtu Greenhouse board has January 2027 winternship postings. Treat fall as active and keep discovery on because location postings can move.',
+        'The prior January 2027 winternship posting has closed. Return to annual discovery and require a new location-specific Greenhouse posting before alerting students.',
     },
   ],
   [
@@ -1452,7 +1652,7 @@ function createVerifiedScheduleOverrides() {
         createDiscoveryQuery('official_nomination', 'site:nrffoundation.org "Rising Retail Stars" nomination', 'Find the current official nomination route if the scholarship hub changes.'),
       ],
       scheduleNote:
-        'Rising Retail Stars is open for college-advisor nominations through October 30, 2026. Check the official scholarship hub daily through the deadline and return to dormant monitoring after the window closes.',
+        'The October 30, 2026 nomination window has closed. Return to annual discovery and require a future advisor-nomination deadline before alerting students.',
     },
   ],
   [
@@ -1488,10 +1688,10 @@ function createVerifiedScheduleOverrides() {
       discoveryCheckIntervalHours: 168,
       sourceVolatility: 'stable',
       discoveryQueries: [
-        createDiscoveryQuery('official_deadlines', 'site:women.acm.org/scholarships "October 15" "ACM-W"', 'Confirm recurring scholarship deadline groups.'),
+        createDiscoveryQuery('official_deadlines', 'site:women.acm.org/scholarships "December 15, 2026" "ACM-W"', 'Confirm the next recurring scholarship deadline group.'),
       ],
       scheduleNote:
-        'ACM-W uses recurring conference-date deadline groups. Next audited deadline is Oct 15, 2026.',
+        'ACM-W uses recurring conference-date deadline groups. The next audited deadline is December 15, 2026 for February-March 2027 conferences.',
     },
   ],
   [
@@ -1543,7 +1743,7 @@ function createVerifiedScheduleOverrides() {
         createDiscoveryQuery('official_program_notice', 'site:jpmorganchase.com/careers "IB & Markets Insights" sophomore', 'Confirm a new cycle or eligibility update from JPMorganChase.'),
       ],
       scheduleNote:
-        'The 2026 registration deadline is October 15 at noon ET. Check the Yello page frequently through the deadline, then discover a replacement route before next fall.',
+        'The October 15, 2026 registration deadline has passed. Keep the source dormant and discover a replacement route before the next fall cycle.',
     },
   ],
   [
@@ -1563,7 +1763,7 @@ function createVerifiedScheduleOverrides() {
         createDiscoveryQuery('official_careers_notice', 'site:hl.com/careers "Insight Day" sophomore', 'Confirm future Insight Day cycles from Houlihan Lokey.'),
       ],
       scheduleNote:
-        'The 2026 posting closes October 19. Monitor daily through the deadline and search for a new Workday requisition next fall.',
+        'The October 19, 2026 deadline has passed. Search for a new Workday requisition before the next fall cycle.',
     },
   ],
   [
@@ -1583,7 +1783,7 @@ function createVerifiedScheduleOverrides() {
         createDiscoveryQuery('official_careers_notice', 'site:rothschildandco.com/careers "Sophomore Leadership Program"', 'Confirm future program cycles from Rothschild & Co.'),
       ],
       scheduleNote:
-        'The 2027 program application closes November 15, 2026. Keep the source active through the deadline and search for a replacement posting next fall.',
+        'The November 15, 2026 deadline has passed. Return to annual discovery and require a future official posting before alerting students.',
     },
   ],
   [
@@ -1603,7 +1803,7 @@ function createVerifiedScheduleOverrides() {
         createDiscoveryQuery('official_careers_notice', 'site:pwpartners.com "Advisory Prep Program"', 'Confirm a new program cycle from Perella Weinberg Partners.'),
       ],
       scheduleNote:
-        'The 2026 application closes October 25. Monitor the candidate page through the deadline and search for a new posting next fall.',
+        'The October 25, 2026 deadline has passed. Search for a new candidate posting before the next fall cycle.',
     },
   ],
   [
@@ -1623,7 +1823,7 @@ function createVerifiedScheduleOverrides() {
         createDiscoveryQuery('official_program_notice', 'site:baincapital.com "Investors of Tomorrow" sophomore', 'Confirm future program dates or eligibility from Bain Capital.'),
       ],
       scheduleNote:
-        'The in-person 2026 deadline is October 25, while later registrants can still attend the December 2 virtual panel. Monitor both states without calling the full program closed after October 25.',
+        'The in-person deadline passed October 25, but later registrants can still attend the December 2 virtual panel. Keep active through the virtual event without reopening in-person consideration.',
     },
   ],
   [
@@ -1643,7 +1843,7 @@ function createVerifiedScheduleOverrides() {
         createDiscoveryQuery('official_careers_notice', 'site:stifel.com/careers "Emerging Leaders" student', 'Confirm eligibility or future program cycles from Stifel.'),
       ],
       scheduleNote:
-        'The official registration confirms an October 16, 2026 webinar but not sophomore-only eligibility or a recruiting pipeline. Keep this lower-confidence and do not infer feeder status.',
+        'The October 16, 2026 webinar has ended. Keep annual discovery active, retain medium confidence, and do not infer sophomore-only eligibility or feeder status.',
     },
   ],
   [
@@ -1663,7 +1863,7 @@ function createVerifiedScheduleOverrides() {
         createDiscoveryQuery('official_company_notice', 'site:weissasset.com "Underclassmen Fellowship"', 'Confirm future fellowship cycles from Weiss Asset Management.'),
       ],
       scheduleNote:
-        'The 2027 fellowship application is open without a listed deadline. Check the Greenhouse posting daily while open and search for a replacement requisition next fall.',
+        'The January 2027 fellowship posting has closed and now redirects to the Weiss job board. Search for a new underclassmen fellowship requisition before the next cycle.',
     },
   ],
   [
@@ -1685,6 +1885,27 @@ function createVerifiedScheduleOverrides() {
       ],
       scheduleNote:
         'The official 2027 Greenhouse application is live without a listed deadline. Check daily while open and require an official closing signal before changing status.',
+    },
+  ],
+  [
+    'five-rings-qt-connect-2027-us',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [10, 11, 12],
+      lastKnownOpenAt: '2026-11-16',
+      activeLeadDays: 90,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 24,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_application', 'site:job-boards.greenhouse.io/fiveringsllc "QT Connect 2027 - US"', 'Confirm that the current Five Rings QT Connect application remains live.'),
+        createDiscoveryQuery('official_careers_page', 'site:fiverings.com/careers "QT Connect"', 'Find a replacement QT Connect posting or future cycle.'),
+        createDiscoveryQuery('current_cycle_deadline', 'site:job-boards.greenhouse.io/fiveringsllc "QT Connect" "January 4th, 2027"', 'Confirm the current official deadline.'),
+      ],
+      scheduleNote:
+        'The official U.S. application is live through January 4, 2027. Check daily while open, then return the program to annual discovery after the deadline passes.',
     },
   ],
   [
@@ -1771,6 +1992,206 @@ function createVerifiedScheduleOverrides() {
     },
   ],
   [
+    'adobe-digital-academy',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [8, 9, 10],
+      lastKnownOpenAt: null,
+      activeLeadDays: 120,
+      activeCheckIntervalHours: 72,
+      warmupCheckIntervalHours: 168,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 168,
+      sourceVolatility: 'stable_application_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_program_page', 'site:adobe.com/about-adobe/corporate-responsibility/education/digital-academy "2027"', 'Check Adobe for a clearly dated new Digital Academy cycle.'),
+        createDiscoveryQuery('official_training_partner', 'site:generalassemb.ly "Adobe Digital Academy" application', 'Find a current General Assembly application only after Adobe identifies the same cycle.'),
+      ],
+      scheduleNote:
+        'The official FAQ confirms the program but still references 2025. Keep this monitoring-only and require matching Adobe and General Assembly current-cycle dates before alerting students.',
+    },
+  ],
+  [
+    'pear-prime-2027',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [11, 12, 1],
+      lastKnownOpenAt: '2026-11-16',
+      activeLeadDays: 90,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 72,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_program_page', 'site:pear.vc/pear-prime-2027 "January 4, 2027"', 'Confirm the current Pear Prime application and deadline.'),
+        createDiscoveryQuery('next_cycle_announcement', 'site:pear.vc "Pear Prime 2028"', 'Find the next official cohort after the current cycle closes.'),
+      ],
+      scheduleNote:
+        'Pear Prime 2027 is open through January 4, 2027. Monitor the official announcement daily near the deadline and return to annual discovery afterward.',
+    },
+  ],
+  [
+    'alumni-ventures-venture-fellow-2027',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [11],
+      lastKnownOpenAt: '2026-11-16',
+      activeLeadDays: 45,
+      activeCheckIntervalHours: 12,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 48,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_program_page', 'site:av.vc/venture-fellow-program "November 30" "2027 cohort"', 'Confirm the current application window and early-cap language.'),
+        createDiscoveryQuery('official_application', 'site:job-boards.greenhouse.io/alumniventures "Venture Fellow Program"', 'Find the current direct application if the Greenhouse ID changes.'),
+      ],
+      scheduleNote:
+        'The 2027 cohort closes November 30, 2026 at noon ET or earlier at 500 applications. Check twice daily during this short capped window.',
+    },
+  ],
+  [
+    'lime-connect-fellowship',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [1, 2],
+      lastKnownOpenAt: null,
+      activeLeadDays: 90,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 72,
+      sourceVolatility: 'stable_application_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_program_page', 'site:limeconnect.com/opportunities/leadership-programs/fellowship-program "2027 applications"', 'Find the next Lime Connect Fellowship cycle.'),
+        createDiscoveryQuery('official_announcement', 'site:limeconnect.com "Fellowship Program" "class of 2029"', 'Confirm future sophomore eligibility and dates.'),
+      ],
+      scheduleNote:
+        'The 2026 cycle is closed. Increase discovery in January and require a future cohort year and deadline before changing the public status.',
+    },
+  ],
+  [
+    'pear-fellows',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [6, 7, 8],
+      lastKnownOpenAt: '2026-07-01',
+      activeLeadDays: 90,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 168,
+      sourceVolatility: 'stable_application_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_program_page', 'site:pear.vc/fellows "deadline"', 'Check the current Pear Fellows page for a new deadline.'),
+        createDiscoveryQuery('official_announcement', 'site:pear.vc "Pear Fellows" "2027-2028"', 'Find the next official cohort announcement.'),
+      ],
+      scheduleNote:
+        'The 2026-2027 deadline passed August 9, 2026. Monitor the current /fellows page and begin more frequent discovery next summer.',
+    },
+  ],
+  [
+    'dorm-room-fund-investment-partner',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [8, 9, 10],
+      lastKnownOpenAt: '2026-08-01',
+      activeLeadDays: 90,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 168,
+      sourceVolatility: 'stable_application_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_program_page', 'site:dormroomfund.com/join "Applications are open" deadline', 'Check future regional deadlines on the official join page.'),
+        createDiscoveryQuery('official_announcement', 'site:dormroomfund.com "partner applications" 2027', 'Find the next student partner cycle.'),
+      ],
+      scheduleNote:
+        'The 2026 regional deadlines passed. Keep the stable join page dormant and increase checks in late summer when regional applications normally return.',
+    },
+  ],
+  [
+    'apple-swift-student-challenge-2027',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [2],
+      lastKnownOpenAt: null,
+      activeLeadDays: 120,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 72,
+      sourceVolatility: 'stable_application_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_program_page', 'site:developer.apple.com/swift-student-challenge "February 8" "2027"', 'Confirm the 2027 submission window.'),
+        createDiscoveryQuery('official_policy', 'site:developer.apple.com/swift-student-challenge/policy "2027"', 'Confirm current eligibility and submission rules.'),
+      ],
+      scheduleNote:
+        'Submissions open February 8 and close February 28, 2027. Keep in warmup until Apple changes the page to an active submission state.',
+    },
+  ],
+  [
+    'sig-first-year-quant-discovery-2027',
+    {
+      cycleFrequency: 'multiple_per_year',
+      expectedOpenMonths: [5, 12],
+      lastKnownOpenAt: '2026-11-16',
+      activeLeadDays: 90,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 21,
+      discoveryCheckIntervalHours: 72,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_job_page', 'site:careers.sig.com/jobs/11571 "First Year College Students"', 'Confirm that the virtual discovery application remains live.'),
+        createDiscoveryQuery('replacement_posting', 'site:careers.sig.com "High School + First Year College Students"', 'Find a replacement posting if the current URL moves.'),
+      ],
+      scheduleNote:
+        'The official application is live for December 2026 and May 2027 sessions without a listed deadline. Check daily while open.',
+    },
+  ],
+  [
+    'sig-growth-equity-discovery-2027',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [9, 10, 11, 12, 1],
+      lastKnownOpenAt: '2026-11-16',
+      activeLeadDays: 120,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 72,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_job_page', 'site:careers.sig.com/jobs/11191 "Growth Equity" "Discovery Program 2027"', 'Confirm the current official application.'),
+        createDiscoveryQuery('replacement_posting', 'site:careers.sig.com "Discovery Program: Growth Equity"', 'Find a replacement posting if the URL moves.'),
+      ],
+      scheduleNote:
+        'The 2027 application is live without a listed deadline. Monitor daily and require an explicit closing signal before returning to annual discovery.',
+    },
+  ],
+  [
+    'sig-capital-markets-discovery-2027',
+    {
+      cycleFrequency: 'annual',
+      expectedOpenMonths: [9, 10, 11, 12, 1],
+      lastKnownOpenAt: '2026-11-16',
+      activeLeadDays: 120,
+      activeCheckIntervalHours: 24,
+      warmupCheckIntervalHours: 72,
+      dormantCheckIntervalDays: 30,
+      discoveryCheckIntervalHours: 72,
+      sourceVolatility: 'moving_cycle_page',
+      discoveryQueries: [
+        createDiscoveryQuery('official_job_page', 'site:careers.sig.com "Discovery Program: Capital Markets" "2027"', 'Confirm the current official application.'),
+        createDiscoveryQuery('replacement_posting', 'site:careers.sig.com "Capital Markets" "Discovery Program" New York', 'Find a replacement posting if the URL moves.'),
+      ],
+      scheduleNote:
+        'The Spring 2027 application is live without a listed deadline. Monitor daily and require an explicit closing signal before returning to annual discovery.',
+    },
+  ],
+  [
     'standard-chartered-spring-insight-2027-us',
     {
       cycleFrequency: 'annual',
@@ -1787,7 +2208,7 @@ function createVerifiedScheduleOverrides() {
         createDiscoveryQuery('next_cycle_application', 'site:jobs.standardchartered.com "Spring Insight Programme 2028" "US"', 'Find the next U.S. sophomore insight cycle after the current posting closes.'),
       ],
       scheduleNote:
-        'The U.S. Spring Insight application is open through November 15, 2026. Keep the official requisition on an active cadence through the deadline, then return to annual discovery.',
+        'The November 15, 2026 U.S. deadline has passed. Return to annual discovery and require a new official requisition before alerting students.',
     },
   ],
   ]);
