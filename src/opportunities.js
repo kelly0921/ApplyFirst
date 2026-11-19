@@ -125,6 +125,7 @@ const repeatedProgramIds = new Set([
   'jpmorgan-career-ed-you-watch',
   'jpmorgan-code-for-good',
   'bloomberg-nextgen-leadership-summit',
+  'capital-one-analyst-summit',
   'capital-one-tech-summit',
   'capital-one-product-summit',
   'capital-one-analyst-early-internship',
@@ -470,29 +471,30 @@ export const opportunities = [
     timing: 'Summer',
     status: 'watching',
     confidence: 'high',
-    funding: 'Paid program',
+    funding: '$45-$55 per hour, plus applicable intern benefits',
     location: 'Mountain View, CA (hybrid)',
-    url: 'https://careers.linkedin.com/pathways-programs/internships/Technical/first-play',
-    previousUrl: '',
-    openDate: 'Watch November for the next First Play application window',
-    deadline: 'Summer 2026 applications closed December 7, 2025; the next deadline has not been posted',
+    programModel: 'cohort',
+    url: 'https://jobs.smartrecruiters.com/LinkedIn3/744000158394370-software-engineer-intern-first-play-summer-2027-mountain-view-ca-',
+    previousUrl: 'https://careers.linkedin.com/pathways-programs/internships/Technical/first-play',
+    openDate: 'Summer 2027 applications are open',
+    deadline: 'No application deadline is listed',
     tags: ['Software engineering', 'AI', 'Underclassmen', 'Big tech'],
     description:
       'LinkedIn First Play is a paid twelve-week engineering program for students early in their computer science education who want hands-on project experience before a traditional software engineering internship.',
     eligibilitySummary:
-      'The Summer 2026 cycle required U.S. work eligibility, a CS or related bachelor degree, and an expected graduation date of December 2027 or later; future-cycle rules must be rechecked.',
+      'Current undergraduate students pursuing a bachelor degree in computer science or a related technical field with an expected graduation date of December 2028 or later. Applicants need programming experience in Python, Java, C, C++, C#, Rust, or a similar object-oriented language; prior internship experience is not required.',
     experienceSummary:
-      'Participants join a LinkedIn engineering team, build a practical project, receive cohort programming and mentorship, and practice AI-assisted development. The 2026 cycle included hourly pay, relocation support, hardware, and intern benefits.',
+      'Participants join a LinkedIn engineering team, build scoped production-oriented projects, receive mentorship and cohort programming, and practice AI-assisted development. The two 2027 sessions run May 24-August 13 and June 14-September 3 in Mountain View.',
     detailBasis:
-      'Current official LinkedIn First Play page documents the completed Summer 2026 cycle; LuisaE/opportunities independently surfaced it as an underclassman lead.',
+      'The official LinkedIn SmartRecruiters application confirms the active Summer 2027 role, dates, graduation window, technical requirements, hybrid Mountain View format, and $45-$55 hourly range.',
     why:
       'It is specifically designed for students still building foundational engineering skills and does not require prior internship experience.',
     prep:
-      'Prepare foundational coding examples, a project or coursework story, and evidence of curiosity about AI-assisted engineering before the next application window.',
+      'Apply through the current role and prepare foundational coding examples, a project or coursework story, and evidence of curiosity about AI-assisted engineering.',
     sourceNote:
-      'Official LinkedIn page says Summer 2026 applications are closed and confirms the twelve-week hybrid Mountain View program. Monitor for a new cycle rather than treating the archived dates as current.',
-    lastChecked: '2026-10-05',
-    statusReviewedAt: '2026-10-05T13:00:00.000Z',
+      'The official SmartRecruiters application is live for Summer 2027. It does not list a deadline, so ApplyFirst should monitor the application directly and must not infer a close date from third-party boards.',
+    lastChecked: '2026-11-16',
+    statusReviewedAt: '2026-11-16T19:30:00.000Z',
   },
   {
     id: 'nvidia-ignite',
@@ -692,6 +694,78 @@ export const opportunities = [
     statusReviewedAt: '2026-10-26T16:20:00.000Z',
   },
   {
+    id: 'claude-corps-2027',
+    name: 'Claude Corps',
+    organization: 'Anthropic + CodePath',
+    category: 'Full-Time Alternative',
+    classYears: ['All class years'],
+    timing: 'Summer',
+    status: 'open',
+    confidence: 'high',
+    funding: 'Paid full-time fellowship ($85,000 + benefits)',
+    location: 'United States; host placement may require relocation',
+    programModel: 'cohort',
+    programDuration: '12 Months',
+    weeklyCommitment: 'Full-time',
+    url: 'https://www.anthropic.com/claude-corps/fellow',
+    applicationUrl: 'https://job-boards.greenhouse.io/claudecorps/jobs/4402649009',
+    monitorUrl: 'https://job-boards.greenhouse.io/claudecorps/jobs/4402649009',
+    previousUrl: '',
+    openDate: 'Applications are open for Cohort 3, which starts in late August 2027',
+    deadline: 'January 31, 2027; applications are reviewed on a rolling basis',
+    tags: ['AI', 'Software engineering', 'Product', 'Public interest technology', 'Nonprofits', 'Early career'],
+    description:
+      'Claude Corps is a paid, yearlong fellowship from Anthropic and CodePath that places early-career builders inside mission-driven organizations across the United States. Fellows use Claude to scope and ship practical tools, agents, automations, evaluations, and workflows, then train host teams to maintain what they build.',
+    eligibilitySummary:
+      'Applicants must be at least 18, early in their career, authorized to work in the United States without sponsorship, and willing to relocate for an in-person host placement if needed. No degree or specific technical major is required.',
+    experienceSummary:
+      'Fellows are full-time CodePath employees earning $85,000 plus benefits. The program includes an Anthropic onboarding bootcamp, cohort sessions, technical office hours, relocation support for qualifying placements, and a 12-month project with one host organization.',
+    detailBasis:
+      'The official 2027 Greenhouse posting confirms the Cohort 3 start, rolling review, January 31 deadline, salary, national placement model, and current eligibility requirements.',
+    why:
+      'A distinctive first-job alternative that gives early-career students and recent graduates paid experience applying AI inside public-interest organizations instead of entering a conventional corporate role.',
+    prep:
+      'Prepare examples of something you built and shipped, explain how you use AI tools thoughtfully, and identify community, nonprofit, civic-tech, education, or public-interest work that matters to you.',
+    sourceNote:
+      'The official 2027 Claude Corps posting says Cohort 3 begins in late August 2027, pays $85,000 plus benefits, reviews applications on a rolling basis, and closes January 31, 2027.',
+    lastChecked: '2026-11-09',
+    statusReviewedAt: '2026-11-09T14:30:00.000Z',
+  },
+  {
+    id: 'adobe-digital-academy',
+    name: 'Adobe Digital Academy',
+    organization: 'Adobe + General Assembly',
+    category: 'Full-Time Alternative',
+    classYears: ['All class years'],
+    timing: 'Rolling',
+    status: 'verifyManually',
+    confidence: 'needsReview',
+    funding: 'Training scholarship and living stipend; selected learners may receive a paid Adobe internship',
+    location: 'Remote training in eligible U.S. states; internship location varies',
+    programModel: 'cohort',
+    url: 'https://www.adobe.com/about-adobe/corporate-responsibility/education/digital-academy/faq.html',
+    previousUrl: '',
+    openDate: 'The next confirmed U.S. application cycle has not been posted',
+    deadline: 'The official page still references 2025 dates; verify a new cycle before applying',
+    tags: ['Software engineering', 'UX design', 'Data science', 'Digital marketing', 'Career transition'],
+    description:
+      'Adobe Digital Academy gives people from nontraditional backgrounds an accelerated path into software engineering, data science, UX design, or digital marketing through General Assembly training and possible Adobe internship consideration.',
+    eligibilitySummary:
+      'The program is intended for U.S.-based career changers from nontraditional backgrounds. Eligible states, course requirements, and any current application criteria must be confirmed when Adobe publishes the next cycle.',
+    experienceSummary:
+      'Scholars receive training tuition and a living stipend. Learners who complete training in good standing and align with Adobe hiring needs may interview for a three-month internship with mentorship and possible full-time conversion.',
+    detailBasis:
+      'Adobe\'s official FAQ confirms the two-part program model and support, but its dates remain anchored to 2025 and do not establish a current 2026 or 2027 application.',
+    why:
+      'A distinctive career-transition route into technical and design work, but it should remain monitoring-only until Adobe publishes one unambiguous current-cycle application.',
+    prep:
+      'Review the training tracks and eligible-state rules, but do not rely on the old dates; ApplyFirst will watch the official Adobe page for a new cycle.',
+    sourceNote:
+      'The official Adobe FAQ confirms scholarships, living stipends, General Assembly training, and possible paid internships. Current-cycle timing is not reliable enough for a student alert.',
+    lastChecked: '2026-11-16',
+    statusReviewedAt: '2026-11-16T20:00:00.000Z',
+  },
+  {
     id: 'jane-street-fttp-watch',
     name: 'Focus on Trading and Technology',
     organization: 'Jane Street',
@@ -730,14 +804,14 @@ export const opportunities = [
     category: 'Winternship',
     classYears: ['Sophomore'],
     timing: 'Winter',
-    status: 'open',
+    status: 'watching',
     confidence: 'high',
     funding: 'Varies',
     location: 'New York, NY',
-    url: 'https://job-boards.greenhouse.io/virtu/jobs/8445018002',
-    previousUrl: 'https://www.virtu.com/careers/',
-    openDate: 'January 11-15 New York winternship posting is live',
-    deadline: 'Apply while the New York posting remains active; exact close date is not listed',
+    url: 'https://www.virtu.com/careers/',
+    previousUrl: 'https://job-boards.greenhouse.io/virtu/jobs/8445018002',
+    openDate: 'The prior New York posting is no longer available; watch for the next winternship cycle',
+    deadline: 'The next application deadline has not been posted',
     tags: ['Trading', 'Finance', 'Women in tech'],
     description:
       'Virtu Women’s Winternship is a short winter program for students exploring trading, market structure, quantitative thinking, and financial technology.',
@@ -746,14 +820,15 @@ export const opportunities = [
     experienceSummary:
       'Students get winter-break exposure to quantitative trading, engineering, market-making, and how technology supports electronic trading.',
     detailBasis:
-      'Current official Virtu Greenhouse posting lists the New York Women’s Winternship.',
+      'The prior official Greenhouse posting is no longer available, while Virtu\'s careers page remains the canonical source for future openings.',
     why:
       'Winternships can create a real signal during school breaks without requiring a full summer internship.',
     prep:
       'Search company careers for winternship language and prepare finance-plus-technology interest notes before fall deadlines.',
     sourceNote:
-      'Official Virtu Greenhouse posting lists the New York Women’s Winternship for second-year undergraduates graduating in 2029, with January 11-15 dates, provided meals, domestic transportation, and hotel.',
-    lastChecked: '2026-08-18',
+      'The prior New York Women’s Winternship posting has closed. Monitor Virtu careers for a new location-specific application instead of reusing the expired Greenhouse URL.',
+    lastChecked: '2026-11-16',
+    statusReviewedAt: '2026-11-16T20:00:00.000Z',
   },
   {
     id: 'google-summer-of-code',
@@ -831,6 +906,8 @@ export const opportunities = [
     confidence: 'high',
     funding: 'Stipend',
     location: 'Remote',
+    programModel: 'cohort',
+    weeklyCommitment: '20 hrs/week',
     url: 'https://fellowship.mlh.com/programs/open-source',
     previousUrl: 'https://fellowship.mlh.io/',
     openDate: 'Rolling applications by cohort',
@@ -863,6 +940,8 @@ export const opportunities = [
     confidence: 'high',
     funding: 'Stipend',
     location: 'Remote',
+    programModel: 'cohort',
+    weeklyCommitment: '20 hrs/week',
     url: 'https://fellowship.mlh.com/programs/software-engineering',
     previousUrl: 'https://fellowship.mlh.io/',
     openDate: 'Fall 2026 batch listed for Sep 14-Dec 4, 2026',
@@ -895,6 +974,8 @@ export const opportunities = [
     confidence: 'high',
     funding: 'Stipend',
     location: 'Remote',
+    programModel: 'cohort',
+    weeklyCommitment: '20 hrs/week',
     url: 'https://fellowship.mlh.com/programs/web3-engineering',
     previousUrl: 'https://fellowship.mlh.io/',
     openDate: 'Fall 2026 batch listed for Sep 14-Dec 4, 2026',
@@ -927,6 +1008,8 @@ export const opportunities = [
     confidence: 'high',
     funding: 'Stipend',
     location: 'Remote',
+    programModel: 'cohort',
+    weeklyCommitment: '20 hrs/week',
     url: 'https://fellowship.mlh.com/',
     previousUrl: '',
     openDate: 'Fall 2026 batch listed for Sep 14-Dec 4, 2026',
@@ -1025,6 +1108,8 @@ export const opportunities = [
     confidence: 'high',
     funding: 'Free',
     location: 'Virtual',
+    programModel: 'cohort',
+    weeklyCommitment: '2-10 hrs/week',
     url: 'https://www.codepath.org/courses',
     previousUrl: '',
     openDate: 'The official courses page includes Spring waitlist language and course links, but a current-cycle application window is not confirmed',
@@ -1106,11 +1191,46 @@ export const opportunities = [
     why:
       'High-leverage career-prep pathway for sophomores who want coaching, employer access, and structured recruiting support before internships and full-time recruiting intensify.',
     prep:
-      'Prepare a resume, leadership examples, your target-track rationale, and evidence of commitment to MLT’s mission before the November 1 SWE/Technology priority deadline.',
+      'Prepare a resume, leadership examples, your target-track rationale, and evidence of commitment to MLT’s mission before the January 15 final deadline.',
     sourceNote:
       'Official Career Prep 2029 application says applications are open, SWE/Technology and Corporate Management have a November 1, 2026 priority deadline, and the final deadline is January 15, 2027.',
-    lastChecked: '2026-10-26',
-    statusReviewedAt: '2026-10-26T16:20:00.000Z',
+    lastChecked: '2026-11-16',
+    statusReviewedAt: '2026-11-16T19:45:00.000Z',
+  },
+  {
+    id: 'mlt-ascend-career-accelerator-2027',
+    name: 'Ascend: Career Accelerator',
+    organization: 'Management Leadership for Tomorrow',
+    category: 'Community / Prep Program',
+    classYears: ['Freshman'],
+    timing: 'Winter',
+    status: 'open',
+    confidence: 'high',
+    funding: 'Not listed',
+    location: 'Virtual',
+    programModel: 'cohort',
+    commitmentDetail: 'Monthly sessions',
+    url: 'https://mlt.smapply.org/prog/ascend_scholar/',
+    previousUrl: '',
+    openDate: 'Applications opened November 2, 2026',
+    deadline: 'January 4, 2027 at 11:59 PM ET',
+    tags: ['Access & Prep', 'Technology', 'Business', 'Career coaching', 'First-generation students', 'Freshmen'],
+    description:
+      'MLT Ascend: Career Accelerator is an early-college coaching and career-exploration program for students interested in business or technology. Scholars build a professional toolkit, explore career interests, develop a peer and industry network, and receive structured programming designed to prepare them for later recruiting opportunities.',
+    eligibilitySummary:
+      'Recent high-school graduates enrolled in college and current freshmen graduating by Fall 2029, Spring 2030, or Summer 2030 may apply. Applicants must be U.S. citizens, permanent residents, or DACA participants; attend a four-year accredited institution; hold at least a 3.0 cumulative college GPA; and identify with low-to-moderate-income and/or first-generation experiences or inequitable access to career resources. All majors are accepted.',
+    experienceSummary:
+      'Virtual monthly assignments and required seminars, personalized coaching, peer and industry connections, and career exploration. Successful completion may lead to preferred admission to MLT Career Prep. The program begins January 27, 2027.',
+    detailBasis:
+      'Current official MLT Ascend application page, reviewed November 2, 2026.',
+    why:
+      'A strong freshman-specific bridge into business and technology careers for students who may not yet have access to established professional networks or recruiting preparation.',
+    prep:
+      'Apply before January 4 and prepare a current resume, college transcript, examples of academic performance and initiative, and a clear explanation of your business or technology interests and connection to MLT’s mission.',
+    sourceNote:
+      'The official application confirms freshman and recent-high-school-graduate eligibility, all-major access, virtual monthly requirements, the January 27 start, possible preferred admission to Career Prep, and the January 4 deadline.',
+    lastChecked: '2026-11-02',
+    statusReviewedAt: '2026-11-02T17:24:00.000Z',
   },
   {
     id: 'forage-virtual-experience',
@@ -1376,14 +1496,14 @@ export const opportunities = [
     category: 'Discovery Program',
     classYears: ['All class years'],
     timing: 'Fall',
-    status: 'open',
+    status: 'watching',
     confidence: 'high',
     funding: 'Free',
     location: 'Brooklyn, NY or Columbus, OH',
     url: 'https://jpmc.fa.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001/job/210773759',
     previousUrl: 'https://www.jpmorganchase.com/careers/explore-opportunities/programs/tfsg-hackathons',
-    openDate: 'Brooklyn event: October 16-17, 2026\nColumbus event: November 6-7, 2026',
-    deadline: 'Brooklyn deadline: September 18, 2026\nColumbus deadline: October 9, 2026',
+    openDate: 'The 2026 Brooklyn and Columbus events have ended; watch for the next Code for Good cycle',
+    deadline: 'The next application deadlines have not been posted',
     tags: ['Hackathon', 'Software engineering', 'Civic tech', 'Nonprofit', 'Brooklyn', 'Columbus'],
     description:
       'Code for Good is JPMorgan Chase’s Tech for Social Good hackathon where students build technology solutions for nonprofit organizations with guidance from JPMorgan technologists.',
@@ -1402,8 +1522,9 @@ export const opportunities = [
     prep:
       'Choose the event tied to your preferred office locations, prepare a resume, complete any coding challenge promptly, and be ready to discuss nonprofit problem solving and team tradeoffs.',
     sourceNote:
-      'Official JPMorgan Chase candidate posting lists Brooklyn October 16-17, 2026 with a September 18 deadline, and Columbus November 6-7, 2026 with an October 9 deadline.',
-    lastChecked: '2026-08-22',
+      'The 2026 Brooklyn and Columbus deadlines and event dates have passed. Monitor JPMorgan Chase for the next location-specific Code for Good application.',
+    lastChecked: '2026-11-16',
+    statusReviewedAt: '2026-11-16T20:00:00.000Z',
   },
   {
     id: 'bloomberg-nextgen-leadership-summit',
@@ -1733,6 +1854,39 @@ export const opportunities = [
     statusReviewedAt: '2026-10-04T14:40:33.036Z',
   },
   {
+    id: 'capital-one-analyst-summit',
+    name: 'Analyst Summit',
+    organization: 'Capital One',
+    category: 'Discovery Program',
+    classYears: ['Freshman', 'Sophomore'],
+    timing: 'Summer',
+    status: 'watching',
+    confidence: 'high',
+    funding: 'Free',
+    location: 'Summit format; confirm the current event location',
+    url: 'https://www.capitalonecareers.com/get-ahead-with-early-career-programs-for-students',
+    previousUrl: 'https://capitalone.eightfold.ai/events/open?domain=capitalone.com',
+    openDate: 'Capital One lists Analyst Summit timing in May and August',
+    deadline: 'Registration timing varies; monitor the official Students & Grads event calendar',
+    tags: ['Business analytics', 'Case interviews', 'Strategy', 'Product', 'Underclassmen'],
+    description:
+      'Capital One Analyst Summit is a two-day Students & Grads event where underclassmen explore business analysis, build analytical skills, meet Capital One analysts, and practice a live case interview before internship recruiting.',
+    eligibilitySummary:
+      'First-year students and sophomores pursuing quantitative or STEM majors according to Capital One’s official early-programs page.',
+    experienceSummary:
+      'Students learn how analysts improve products and processes through strategic consulting, network with working analysts, and prepare for the Analyst Early Internship, Analyst Internship, and Analyst Development programs.',
+    detailBasis:
+      'The official Capital One early-programs page confirms the two-day format, May and August cadence, underclassman audience, and case-interview workshop. A current registration deadline is not posted on the stable page.',
+    why:
+      'A nationally relevant underclassman discovery signal for students interested in data-informed product, strategy, and analytical career paths.',
+    prep:
+      'Prepare examples of quantitative problem-solving and teamwork, then watch the official event calendar for a dated, school-agnostic registration page.',
+    sourceNote:
+      'Capital One lists Analyst Summit as part of its recurring Students & Grads Summit family. ApplyFirst monitors the official event calendar but does not treat ordinary recruiter webinars as separate permanent programs.',
+    lastChecked: '2026-11-17',
+    statusReviewedAt: '2026-11-17T00:00:00.000Z',
+  },
+  {
     id: 'capital-one-tech-summit',
     name: 'Tech Summit',
     organization: 'Capital One',
@@ -1761,8 +1915,9 @@ export const opportunities = [
     prep:
       'Prepare beginner coding examples, project stories, and questions about technology internship pathways.',
     sourceNote:
-      'Official Capital One page lists Tech Summit as a five-day program for sophomores with beginner coding experience, with May, August, and January timing.',
-    lastChecked: '2026-08-22',
+      'Official Capital One page lists Tech Summit as a five-day program in its recurring Students & Grads Summit family, with May, August, and January timing. ApplyFirst also monitors the official event calendar for a dated, school-agnostic registration page.',
+    lastChecked: '2026-11-17',
+    statusReviewedAt: '2026-11-17T00:00:00.000Z',
   },
   {
     id: 'capital-one-product-summit',
@@ -1793,8 +1948,9 @@ export const opportunities = [
     prep:
       'Prepare a product curiosity story, examples of user or data thinking, and questions about the Product Development Program.',
     sourceNote:
-      'Official Capital One page lists Product Summit as a May program for first-year students and sophomores interested in product management.',
-    lastChecked: '2026-08-22',
+      'Official Capital One page lists Product Summit as a May program in its recurring Students & Grads Summit family for first-year students and sophomores interested in product management. ApplyFirst also monitors the official event calendar for a dated, school-agnostic registration page.',
+    lastChecked: '2026-11-17',
+    statusReviewedAt: '2026-11-17T00:00:00.000Z',
   },
   {
     id: 'capital-one-analyst-early-internship',
@@ -1834,31 +1990,32 @@ export const opportunities = [
     organization: 'Bank of America',
     category: 'Discovery Program',
     classYears: ['Freshman'],
-    timing: 'Spring',
-    status: 'watching',
+    timing: 'Summer',
+    status: 'expectedSoon',
     confidence: 'high',
     funding: 'Paid program',
     location: 'Eligible U.S. markets',
     url: 'https://about.bankofamerica.com/en/making-an-impact/student-leaders',
     previousUrl: 'https://about.bankofamerica.com/en/making-an-impact/student-leaders-program-faq',
-    openDate: 'Previous-cycle context: 2026 applications opened February 9; watch winter for the next cycle',
-    deadline: 'Previous-cycle context: 2026 application deadline was March 16 at 11:59 p.m. ET; watch for the next deadline',
+    openDate: '2027 applications open December 14, 2026',
+    deadline: 'February 15, 2027 at 11:59 PM ET',
     tags: ['Leadership', 'Nonprofit', 'Community impact', 'Access & Prep', 'Paid experience'],
     description:
-      'Bank of America Student Leaders connects more than 300 community-minded early college students with a paid six-week internship at a local nonprofit organization and a national Leadership Summit. Participants build workforce, leadership, service, and public/private-sector problem-solving experience while working on community needs.',
+      'Bank of America Student Leaders connects community-minded rising college sophomores with a paid seven-week internship at a local nonprofit organization and a national Leadership Summit. Participants build workforce, leadership, service, and public/private-sector problem-solving experience while working on community needs.',
     eligibilitySummary:
-      'Official 2026 FAQ targeted students at least 18 years old who earned a high school diploma within the last 24 months, had 12-18 post-secondary credit hours, could work in the U.S. through July 2026 without sponsorship, and lived in an eligible program market.',
+      'Applicants must be at least 18, have earned a high school diploma within the last 24 months, enter their second undergraduate year in 2027-2028, hold at least a 3.0 GPA, have U.S. work authorization through July 2027, and reside in an eligible Bank of America market for the summer placement.',
     experienceSummary:
-      'Students work full-time with a nonprofit in June-July, attend a three-day paid-expenses Leadership Summit, connect with peers and Bank of America leaders, and develop career skills around community impact.',
+      'Students work at least 35 hours per week with a nonprofit for seven weeks in June and July, attend a three-day Leadership Summit, connect with peers and Bank of America leaders, and develop career skills around community impact.',
     detailBasis:
-      'Official Bank of America program and FAQ pages confirm the paid nonprofit placement, Leadership Summit, 2026 application timing, eligibility, and hourly pay details.',
+      'The official 2027 program page confirms the December 14 opening, February 15 deadline, rising-sophomore eligibility, paid seven-week nonprofit placement, location restriction, and Leadership Summit.',
     why:
       'A strong early leadership pathway for students who want paid experience, nonprofit exposure, and a sponsor-backed signal before later internship recruiting.',
     prep:
-      'Prepare community-impact examples, leadership/service stories from the last two years, transcript details, eligible-market availability, and two school-based recommendations.',
+      'Prepare community-impact and leadership examples, a two-page resume, college transcript, and two eligible references before applications open December 14. Confirm that you can reside and commute within an eligible market.',
     sourceNote:
-      'Official Bank of America page confirms a paid six-week nonprofit internship and Leadership Summit; official FAQ says 2026 applications opened February 9 and closed March 16, 2026.',
-    lastChecked: '2026-08-23',
+      'The official page says 2027 applications run December 14, 2026 through February 15, 2027. This is not nationally location-flexible: applicants must reside in an eligible program market and commute to the assigned nonprofit placement.',
+    lastChecked: '2026-11-16',
+    statusReviewedAt: '2026-11-16T19:45:00.000Z',
   },
   {
     id: 'codepath-futureforce-tech-launchpad',
@@ -1871,6 +2028,7 @@ export const opportunities = [
     confidence: 'high',
     funding: 'Paid program',
     location: 'San Francisco, CA',
+    programModel: 'cohort',
     url: 'https://info.codepath.org/futureforce-tech-launchpad',
     previousUrl: '',
     openDate: 'Watch winter for the next application window',
@@ -1903,6 +2061,8 @@ export const opportunities = [
     confidence: 'high',
     funding: 'Free; student grants available',
     location: 'Virtual',
+    programModel: 'cohort',
+    weeklyCommitment: '5-10 hrs/week',
     url: 'https://www.developforgood.org/for-students',
     previousUrl: '',
     openDate: 'Winter 2027 applications closed September 19, 2026; the batch begins October 25-31',
@@ -1932,30 +2092,31 @@ export const opportunities = [
     category: 'Scholarship / Funding',
     classYears: ['Freshman'],
     timing: 'Winter',
-    status: 'watching',
+    status: 'open',
     confidence: 'high',
-    funding: 'Scholarship',
+    funding: 'Up to $40,000 plus a potential paid Amazon internship',
     location: 'United States',
-    url: 'https://www.amazonfutureengineer.com/scholarships',
-    previousUrl: '',
-    openDate: '2025-2026 applications are closed; sign up for next-cycle updates',
-    deadline: 'Watch for the next scholarship cycle',
-    tags: ['Computer science', 'Scholarship', 'Amazon', 'High school senior'],
+    url: 'https://scholarshipamerica.org/scholarship/amazonfutureengineer/',
+    previousUrl: 'https://www.amazonfutureengineer.com/scholarships',
+    openDate: 'Applications opened November 3, 2026',
+    deadline: 'January 5, 2027 at 3:00 PM CT; teacher recommendation due January 8',
+    tags: ['Computer science', 'Software engineering', 'Automation engineering', 'Scholarship', 'Amazon', 'High school senior'],
     description:
-      'Amazon Future Engineer Scholarship combines up to $40,000 in college funding with a paid Amazon internship opportunity for eligible CS-bound students.',
+      'Amazon Future Engineer Scholarship combines up to $40,000 in college funding with mentorship, student support, and a potential paid Amazon internship for students pursuing software development or automation engineering pathways.',
     eligibilitySummary:
-      'U.S. high school senior audience planning a CS-related bachelor’s path, with work authorization, financial need, and GPA requirements.',
+      'U.S. high school seniors with U.S. work authorization, financial need, at least a 2.3 GPA, and plans to pursue an eligible computer science, data, information systems, electrical, mechanical, industrial, or automation-related bachelor’s degree.',
     experienceSummary:
       'Recipients receive scholarship support, industry mentorship, and an early paid Amazon internship pathway after starting college.',
     detailBasis:
-      'Official Amazon Future Engineer page confirms the scholarship/internship model and current closed status.',
+      'The official Amazon Future Engineer and Scholarship America pages confirm the open 2026-2027 application, two engineering tracks, eligibility, funding, and January deadlines.',
     why:
       'A high-leverage pre-college-to-freshman pathway that can materially change both funding and early industry access.',
     prep:
-      'Sign up for next-cycle updates and prepare financial need, CS coursework, GPA, and work authorization documentation.',
+      'Choose the Software Development or Automation Engineering track and prepare transcripts, financial documentation, qualifying coursework or assessment plans, and a teacher recommendation before the January deadlines.',
     sourceNote:
-      'Official Amazon Future Engineer page confirms up to $10,000 per year for four years plus a paid Amazon internship; 2025-2026 applications are closed.',
-    lastChecked: '2026-08-22',
+      'Scholarship America lists the application as open through January 5, 2027 at 3:00 PM CT. Amazon lists the teacher recommendation deadline as January 8 and describes the potential paid internship as subject to eligibility and available positions.',
+    lastChecked: '2026-11-16',
+    statusReviewedAt: '2026-11-16T19:45:00.000Z',
   },
   {
     id: 'duolingo-thrive-program-watch',
@@ -2122,6 +2283,40 @@ export const opportunities = [
     lastChecked: '2026-08-22',
   },
   {
+    id: 'citadel-womens-datathon-2027',
+    name: 'Women’s Datathon 2027',
+    organization: 'Citadel',
+    category: 'Discovery Program',
+    classYears: ['Freshman', 'Sophomore'],
+    timing: 'Winter',
+    status: 'open',
+    confidence: 'high',
+    funding: 'Cash prizes; travel support is not listed',
+    location: 'Miami, FL (in person)',
+    programModel: 'cohort',
+    url: 'https://www.citadel.com/careers/programs-and-events/datathons/apply-womens-datathon/',
+    previousUrl: 'https://www.citadel.com/careers/programs-and-events/datathons/',
+    openDate: 'Applications are open for the February 2027 event',
+    deadline: 'January 11, 2027',
+    tags: ['Data science', 'Quant / Finance', 'Computer science', 'Women in technology', 'Underclassmen'],
+    description:
+      'Citadel Women’s Datathon is an early-career data competition where undergraduate teams analyze a large dataset, build evidence-based solutions, and present their findings to judges in a market-focused environment.',
+    eligibilitySummary:
+      'Undergraduate students age 18 or older attending a university in the United States, U.S. territories, Washington, DC, or Canada, with an expected graduation date between December 2028 and June 2030.',
+    experienceSummary:
+      'The in-person event takes place in Miami in early February 2027. Participants work in teams on data, mathematics, and technology challenges; Citadel’s Datathon program offers cash prizes and potential interview eligibility.',
+    detailBasis:
+      'The official Citadel application confirms the Miami location, early-February timing, January 11 deadline, and graduation-window eligibility. The official Datathon overview confirms the team competition, presentations, prizes, and interview pathway.',
+    why:
+      'A current, broadly accessible underclassmen program with concrete data-science and quantitative problem-solving experience before internship recruiting.',
+    prep:
+      'Apply before January 11 and prepare examples of data analysis, Python, statistics, quantitative reasoning, and collaborative problem-solving.',
+    sourceNote:
+      'The event-specific Citadel application is live and should be tracked separately from the evergreen Datathon overview. Citadel does not list travel or lodging support on the official pages reviewed.',
+    lastChecked: '2026-11-16',
+    statusReviewedAt: '2026-11-16T19:45:00.000Z',
+  },
+  {
     id: 'citadel-trading-invitational-watch',
     name: 'Trading Invitational',
     organization: 'Citadel',
@@ -2199,6 +2394,8 @@ export const opportunities = [
     confidence: 'high',
     funding: 'Paid program',
     location: 'Virtual in the United States',
+    programModel: 'cohort',
+    programDuration: '1 Year',
     url: 'https://www.breakthroughtech.org/programs/',
     previousUrl: 'https://ecornell.cornell.edu/portal/break-through-tech-ai-information/',
     openDate: 'Applications open in early December every year',
@@ -2286,6 +2483,42 @@ export const opportunities = [
     statusReviewedAt: '2026-10-04T14:40:33.036Z',
   },
   {
+    id: 'true-ventures-fellowship-2027',
+    name: 'True Ventures Fellowship',
+    organization: 'True Ventures',
+    category: 'Startup / VC Fellowship',
+    classYears: ['All class years'],
+    timing: 'Summer',
+    status: 'watching',
+    confidence: 'high',
+    funding: '$12,000 compensation; housing support when required',
+    location: 'Hybrid; portfolio-company dependent with a San Francisco kickoff',
+    programModel: 'cohort',
+    programDuration: 'About 10 Weeks',
+    weeklyCommitment: 'Full-time',
+    url: 'https://www.trueventuresfellowship.com/',
+    previousUrl: '',
+    openDate: 'Summer 2027 applications will open in Spring 2027',
+    deadline: 'The Summer 2027 application deadline has not been posted',
+    tags: ['Startups', 'VC', 'AI', 'Software engineering', 'Product', 'Portfolio companies'],
+    description:
+      'The True Ventures Fellowship places rising college seniors in substantive full-time roles at early-stage True Ventures portfolio companies. Fellows build real products and workflows, develop practical AI fluency, learn how seed-stage startups and venture capital work, and join a long-running alumni network.',
+    eligibilitySummary:
+      'Applicants must be rising college seniors with at least one semester remaining after the fellowship and must be eligible to work in the United States without sponsorship.',
+    experienceSummary:
+      'The fellowship runs from early June to mid-August in a hybrid format. Fellows receive $12,000, qualifying housing support, a San Francisco kickoff week, startup work experience, peer programming, and access to True Ventures founders and investors.',
+    detailBasis:
+      'The official fellowship page confirms the Summer 2027 cycle, rising-senior eligibility, compensation, hybrid format, portfolio-company placement model, and spring application timing.',
+    why:
+      'A high-signal startup pathway for students who want meaningful early-stage company experience and founder access rather than another broad internship listing.',
+    prep:
+      'Build evidence of initiative, adaptability, AI fluency, and interest in early-stage companies; sign up for the official notice and prepare before applications open in spring.',
+    sourceNote:
+      'The official True Ventures Fellowship page confirms that Summer 2027 applications will open in Spring 2027. Do not send an opening alert until the official application becomes available.',
+    lastChecked: '2026-11-09',
+    statusReviewedAt: '2026-11-09T14:30:00.000Z',
+  },
+  {
     id: 'bessemer-fellows-watch',
     name: 'Bessemer Fellowship Program',
     organization: 'Bessemer Venture Partners',
@@ -2355,32 +2588,34 @@ export const opportunities = [
     name: 'Thrive Capital Summer Fellowship',
     organization: 'Thrive Capital',
     category: 'Startup / VC Fellowship',
-    classYears: ['Freshman', 'Sophomore'],
+    classYears: ['All class years'],
     timing: 'Summer',
-    status: 'watching',
+    status: 'open',
     confidence: 'high',
-    funding: 'Scholarship',
-    location: 'New York, NY',
+    funding: 'Paid at a $100,000 annualized salary plus a $40,000 education stipend',
+    location: 'New York or San Francisco',
+    programModel: 'cohort',
     url: 'https://fellows.thrivecap.com/',
     previousUrl: '',
-    openDate: '2026 application is closed; watch fall for next cycle',
-    deadline: '2026 deadline was December 1, 2025',
-    tags: ['VC', 'Startups', 'Founders', 'Research'],
+    openDate: 'Summer 2027 applications are open',
+    deadline: 'December 11, 2026',
+    tags: ['VC', 'Startups', 'Founders', 'Research', 'AI', 'Product', 'Technology'],
     description:
-      'Thrive Capital Summer Fellowship is a 10-week paid summer fellowship for college students to work inside Thrive Capital and learn from technology investors and portfolio companies.',
+      'Thrive Capital Summer Fellowship gives college students room to pursue an original technical, product, research, or investment question with support from Thrive and its portfolio. Example projects include building AI tools, developing data infrastructure and products, testing new manufacturing approaches, and researching emerging technology markets.',
     eligibilitySummary:
-      'Current college freshman, sophomore, or junior with U.S. work authorization and deep interest in technology per official 2026 page.',
+      'Current college students with U.S. work authorization who demonstrate exceptional ability, sound judgment, and the ability to contribute meaningfully to Thrive and its portfolio companies.',
     experienceSummary:
-      'Fellows apprentice with a Thrive team, participate in curated events, receive mentorship, and get a grant to offset education costs.',
+      'Fellows pursue self-directed work while contributing to Thrive or its portfolio. The program is based in New York or San Francisco and pays an annualized $100,000 salary plus a $40,000 education stipend.',
     detailBasis:
-      'Official Thrive page lists 2026 fellowship details, eligibility, compensation, grant, and closed status.',
+      'The official 2027 fellowship page confirms that applications are open, lists current eligibility and compensation, and gives a December 11, 2026 deadline.',
     why:
-      'Distinctive VC/startup exposure for students deciding whether they care about founders, investing, research, or company-building.',
+      'A distinctive startup and venture fellowship for students who want to investigate ambitious ideas, build alongside technology companies, or explore company-building outside a conventional internship structure.',
     prep:
-      'Prepare technology thesis examples, startup curiosity, and communication stories for the next cycle.',
+      'Develop a specific technical, product, research, or market question you want to explore and apply before December 11, 2026.',
     sourceNote:
-      'Official Thrive page says applications are closed and lists a 10-week paid fellowship, $40,000 grant, New York location, and U.S. work authorization requirement.',
-    lastChecked: '2026-08-22',
+      'The official Thrive page says Summer 2027 applications are open through December 11, 2026. It lists a $100,000 annualized salary, $40,000 education stipend, New York or San Francisco location, and U.S. work authorization requirement.',
+    lastChecked: '2026-11-09',
+    statusReviewedAt: '2026-11-09T15:30:00.000Z',
   },
   {
     id: 'contrary-research-fellowship',
@@ -2518,13 +2753,188 @@ export const opportunities = [
     statusReviewedAt: '2026-10-12T13:00:00.000Z',
   },
   {
+    id: 'pear-prime-2027',
+    name: 'Pear Prime 2027',
+    organization: 'Pear VC',
+    category: 'Startup / VC Fellowship',
+    classYears: ['All class years'],
+    timing: 'Rolling',
+    status: 'open',
+    confidence: 'high',
+    funding: 'Career community; no compensation stated',
+    location: 'United States; startup access varies by company',
+    programModel: 'cohort',
+    url: 'https://pear.vc/pear-prime-2027/',
+    applicationUrl: 'https://airtable.com/appb7Nlzw1t0e8zq1/pagR9cksnxP2SINET/form',
+    previousUrl: '',
+    openDate: 'Applications are open for Pear Prime 2027',
+    deadline: 'January 4, 2027',
+    tags: ['Software engineering', 'Startups', 'Founding engineers', 'AI', 'Mentorship'],
+    description:
+      'Pear Prime is a selective community for computer science students, new graduates, and early-career engineers who want to become founding engineers, technical leaders, or startup founders.',
+    eligibilitySummary:
+      'The official 2027 page targets exceptional CS students, new graduates, and early-career engineers. Applicants should confirm any application-specific work authorization or location requirements in the form.',
+    experienceSummary:
+      'Prime Engineers meet founders and technical leaders across Pear portfolio companies, explore startup roles, receive ongoing career coaching, and join a long-term network of engineers, founders, and investors.',
+    detailBasis:
+      'Pear\'s official announcement confirms the 2027 cohort, current application, target audience, mentorship model, and January 4 deadline.',
+    why:
+      'A strong early-career alternative for technical students who want direct startup and founder access rather than a conventional corporate recruiting path.',
+    prep:
+      'Show strong engineering trajectory through projects, open-source work, research, or startup building and explain why an early-stage team fits your goals.',
+    sourceNote:
+      'Official Pear Prime 2027 page says applications are open through January 4, 2027.',
+    lastChecked: '2026-11-16',
+    statusReviewedAt: '2026-11-16T20:00:00.000Z',
+  },
+  {
+    id: 'alumni-ventures-venture-fellow-2027',
+    name: 'Venture Fellow Program',
+    organization: 'Alumni Ventures',
+    category: 'Startup / VC Fellowship',
+    classYears: ['All class years'],
+    timing: 'Winter',
+    status: 'deadlineSoon',
+    confidence: 'high',
+    funding: 'Unpaid professional-development program',
+    location: 'Remote in the United States',
+    programModel: 'cohort',
+    programDuration: '6 Months',
+    weeklyCommitment: '5-7 hours per week',
+    url: 'https://www.av.vc/venture-fellow-program',
+    applicationUrl: 'https://job-boards.greenhouse.io/alumniventures/jobs/4489032009',
+    previousUrl: '',
+    openDate: 'Applications are open for the 2027 cohort starting February 1, 2027',
+    deadline: 'November 30, 2026 at 12:00 PM ET, or earlier if 500 applications are received',
+    tags: ['Venture capital', 'Startups', 'Entrepreneurship', 'Due diligence', 'Remote'],
+    description:
+      'Alumni Ventures Venture Fellow Program is a six-month remote professional extracurricular that teaches venture capital and entrepreneurship through curriculum, live deal sourcing, diligence work, and an investment-thesis capstone.',
+    eligibilitySummary:
+      'Open to U.S. residents who are U.S. citizens or lawful permanent residents. Prior professional venture-investing experience is not required.',
+    experienceSummary:
+      'Ten fellows commit about five to seven hours per week, complete a ten-week project sprint, submit sourced companies and diligence memos, attend network webinars, and build a sector investment thesis.',
+    detailBasis:
+      'The official Alumni Ventures page confirms the 2027 cohort, six-month remote format, ten-fellow limit, eligibility, weekly commitment, and application window.',
+    why:
+      'A concrete, structured route into venture capital for students and early-career applicants without a traditional VC resume.',
+    prep:
+      'Apply early because the window may close at 500 applications; prepare a startup you would source, a market thesis, and examples of independent research.',
+    sourceNote:
+      'Official Alumni Ventures page says applications run November 16-30, 2026 at noon ET and may close early at 500 applications.',
+    lastChecked: '2026-11-16',
+    statusReviewedAt: '2026-11-16T20:00:00.000Z',
+  },
+  {
+    id: 'lime-connect-fellowship',
+    name: 'Lime Connect Fellowship Program',
+    organization: 'Lime Connect',
+    category: 'Fellowship',
+    classYears: ['Sophomore'],
+    timing: 'Summer',
+    status: 'watching',
+    confidence: 'medium',
+    funding: 'Leadership and career-development program',
+    location: 'Virtual coaching and an in-person New York symposium',
+    programModel: 'cohort',
+    url: 'https://limeconnect.com/opportunities/leadership-programs/fellowship-program/',
+    previousUrl: '',
+    openDate: 'The 2026 cycle is closed; watch for the next sophomore cohort',
+    deadline: 'The next application deadline has not been posted',
+    tags: ['Students with disabilities', 'Leadership', 'Mentorship', 'Corporate partners', 'Sophomores'],
+    description:
+      'The Lime Connect Fellowship is a leadership and career-development program for highly accomplished U.S. sophomores with visible or invisible disabilities.',
+    eligibilitySummary:
+      'The most recent cycle required current sophomores at four-year U.S. universities, full-time enrollment for the following academic year, U.S. work eligibility, and self-identification as a person with a disability.',
+    experienceSummary:
+      'Fellows receive virtual learning and coaching, introductions to corporate partners, a multi-day leadership symposium in New York, and ongoing access to the Lime Connect Fellows community.',
+    detailBasis:
+      'The official page confirms the recurring program and most recent eligibility, but explicitly says 2026 applications are closed and does not yet post the next cycle.',
+    why:
+      'A high-value underclassmen pathway combining identity-informed career support, employer access, and a lasting professional community.',
+    prep:
+      'Create a Lime Connect account, prepare a recommendation request, and watch for the next application rather than reusing the closed 2026 dates.',
+    sourceNote:
+      'Official Lime Connect page says 2026 applications are closed. Keep monitoring until a future deadline and cohort year are explicit.',
+    lastChecked: '2026-11-16',
+    statusReviewedAt: '2026-11-16T20:00:00.000Z',
+  },
+  {
+    id: 'pear-fellows',
+    name: 'Pear Fellows',
+    organization: 'Pear VC',
+    category: 'Startup / VC Fellowship',
+    classYears: ['All class years'],
+    timing: 'Fall',
+    status: 'watching',
+    confidence: 'medium',
+    funding: 'No compensation stated',
+    location: 'U.S. universities; virtual curriculum and campus programming',
+    programModel: 'cohort',
+    url: 'https://pear.vc/fellows/',
+    previousUrl: 'https://pear.vc/programs/dorm/fellows/',
+    openDate: 'The 2026-2027 cycle is closed; watch for the next annual cohort',
+    deadline: 'The next application deadline has not been posted',
+    tags: ['Venture capital', 'Startups', 'Due diligence', 'Campus community', 'Mentorship'],
+    description:
+      'Pear Fellows is an immersive venture-capital apprenticeship for undergraduate, MBA, and PhD students who want to support founders and build investing or entrepreneurship skills.',
+    eligibilitySummary:
+      'The official page targets proactive students with a strong entrepreneurial network or industry expertise. Exact next-cycle enrollment and geography should be confirmed when applications reopen.',
+    experienceSummary:
+      'Fellows receive group and one-to-one mentorship, virtual curriculum, access to deal flow, responsibility for campus programming, and direction on company diligence and sector theses.',
+    detailBasis:
+      'Pear\'s current program page confirms the annual apprenticeship model; the archived 2026-2027 page shows that the previous deadline was August 9, 2026.',
+    why:
+      'A selective student venture path with hands-on investing exposure and meaningful founder access.',
+    prep:
+      'Build a clear sector point of view, map founders or startup communities you know, and watch the current Pear Fellows page for the next application.',
+    sourceNote:
+      'The current official Pear Fellows page confirms the recurring program but does not list a new deadline. The 2026-2027 deadline has passed.',
+    lastChecked: '2026-11-16',
+    statusReviewedAt: '2026-11-16T20:00:00.000Z',
+  },
+  {
+    id: 'dorm-room-fund-investment-partner',
+    name: 'Investment Partner Program',
+    organization: 'Dorm Room Fund',
+    category: 'Startup / VC Fellowship',
+    classYears: ['All class years'],
+    timing: 'Rolling',
+    status: 'watching',
+    confidence: 'medium',
+    funding: 'Unpaid student investing role; annual community gathering costs covered',
+    location: 'Remote across U.S. and Canadian regional teams',
+    programModel: 'cohort',
+    weeklyCommitment: 'About 10-15 hours per week',
+    url: 'https://dormroomfund.com/join',
+    previousUrl: '',
+    openDate: 'The prior regional deadlines have passed; watch for the next application window',
+    deadline: 'The next regional application deadlines have not been posted',
+    tags: ['Venture capital', 'Startups', 'Student investors', 'Founders', 'Remote'],
+    description:
+      'Dorm Room Fund gives student investment partners real authority to source founders, diligence companies, make investment decisions, and build startup communities with mentorship from experienced investors.',
+    eligibilitySummary:
+      'Current students in the United States or Canada may apply, including freshmen. Applicants do not need prior finance experience, but should be able to commit consistently to a regional team.',
+    experienceSummary:
+      'Partners work on live deals, receive twice-weekly training, build an investment track record, organize regional founder events, and join a long-term network of student investors and alumni.',
+    detailBasis:
+      'The official join page confirms the student audience, rolling model, regional teams, training, investment authority, and covered annual community gathering; the prior 2026 regional deadlines have passed.',
+    why:
+      'A rare hands-on student venture program with real investment responsibility instead of only workshops or shadowing.',
+    prep:
+      'Develop a strong view of the founders and technical communities around you and prepare an example company you would source and defend.',
+    sourceNote:
+      'Official Dorm Room Fund page remains the canonical source. Keep the record in monitoring until the FAQ posts future regional deadlines.',
+    lastChecked: '2026-11-16',
+    statusReviewedAt: '2026-11-16T20:00:00.000Z',
+  },
+  {
     id: 'recurse-center',
     name: 'Recurse Center',
     organization: 'Recurse Center',
     category: 'Full-Time Alternative',
     classYears: ['All class years'],
     timing: 'Rolling',
-    status: 'deadlineSoon',
+    status: 'open',
     confidence: 'high',
     funding: 'Free program',
     location: 'Brooklyn, NY or remote worldwide',
@@ -2532,7 +2942,7 @@ export const opportunities = [
     applicationUrl: 'https://www.recurse.com/apply/retreat',
     previousUrl: '',
     openDate: 'Applications are always open and new batches begin about every six weeks',
-    deadline: 'October 18, 2026 for on-time consideration for the next batch',
+    deadline: 'Applications are rolling; the January 4, 2027 batch is accepting applications and may fill before it begins',
     tags: ['Software engineering', 'Programming', 'Independent learning', 'Community', 'Career transition'],
     description:
       'Recurse Center is a free, self-directed programming retreat where participants spend six or twelve full-time weeks becoming better programmers, building projects, learning with peers, and joining a lasting technical community. It is not a bootcamp or conventional job program.',
@@ -2541,15 +2951,15 @@ export const opportunities = [
     experienceSummary:
       'Participants attend at the Brooklyn hub or remotely worldwide, choose their own technical work, pair with peers, and participate during core weekday hours. Accepted applicants can choose an upcoming batch with available space.',
     detailBasis:
-      'The official application page confirms rolling applications, six- and twelve-week formats, six-week batch cadence, Brooklyn or remote attendance, and the October 18 on-time deadline for the next batch.',
+      'The official application page confirms rolling applications, six- and twelve-week formats, six-week batch cadence, Brooklyn or remote attendance, and that the January 4, 2027 batch is accepting applications.',
     why:
       'A credible full-time alternative for technical students and recent graduates who want deep programming growth and community outside a traditional corporate role.',
     prep:
       'Choose a project or technical area you genuinely want to explore, prepare a small program written from scratch, and explain how full-time participation would differ from learning alone.',
     sourceNote:
-      'Official Recurse Center page says applications are always open, batches begin every six weeks, and October 18, 2026 is the on-time deadline for the next available batch.',
-    lastChecked: '2026-10-12',
-    statusReviewedAt: '2026-10-12T13:00:00.000Z',
+      'Official Recurse Center page says applications are always open and batches begin every six weeks. The January 4, 2027 batch is currently accepting applications.',
+    lastChecked: '2026-11-16',
+    statusReviewedAt: '2026-11-16T20:00:00.000Z',
   },
   {
     id: 'hrt-women-trading-technology',
@@ -2558,32 +2968,33 @@ export const opportunities = [
     category: 'Winternship',
     classYears: ['Freshman', 'Sophomore'],
     timing: 'Winter',
-    status: 'deadlineSoon',
+    status: 'watching',
     confidence: 'high',
     funding: 'Paid program',
     location: 'New York City',
     url: 'https://www.hudsonrivertrading.com/student-opportunities/',
-    applicationUrl: 'https://www.hudsonrivertrading.com/hrt-job/women-in-trading-and-technology-internship-witti-winter-2027/',
-    monitorUrl: 'https://www.hudsonrivertrading.com/hrt-job/women-in-trading-and-technology-internship-witti-winter-2027/',
+    applicationUrl: '',
+    monitorUrl: 'https://www.hudsonrivertrading.com/student-opportunities/',
     previousUrl: '',
-    openDate: 'Applications are open for the January 2027 program',
-    deadline: 'October 16, 2026',
+    openDate: 'January 2027 applications are closed; monitoring for the January 2028 cycle',
+    deadline: 'The January 2028 application deadline has not been posted',
     tags: ['Trading', 'Quant', 'Women in tech', 'Finance'],
     description:
-      'HRT Women in Trading & Technology is a 2-4 week January program introducing students to automated trading, software engineering, and algorithm development. Participants complete independent Python and C++ projects, attend technical talks and seminars, and learn how quantitative researchers and engineers work together at HRT.',
+      'HRT Women in Trading & Technology is a 2-4 week January program introducing students to automated trading, software engineering, and algorithm development. In the latest published cycle, participants completed independent Python and C++ projects, attended technical talks and seminars, and learned how quantitative researchers and engineers work together at HRT.',
     eligibilitySummary:
-      'Full-time undergraduates in a technical or quantitative discipline graduating between Fall 2028 and Summer 2030; HRT describes the program as designed for students without extensive quantitative-trading experience.',
+      'Previous-cycle context: the January 2027 program accepted full-time undergraduates in a technical or quantitative discipline graduating between Fall 2028 and Summer 2030. Confirm the next cycle eligibility when applications reopen.',
     experienceSummary:
       'In-person in New York beginning January 4, 2027, with a flexible two-, three-, or four-week duration based on the student’s winter break.',
     detailBasis:
-      'The official HRT student page and current Winter 2027 posting confirm the program format, technical content, location, and application status; HRT’s official announcement supplies the October 16 deadline and graduation window.',
+      'The official HRT student page confirms that January 2027 applications are closed and directs students to check back for January 2028. Program format and eligibility details are retained as clearly marked previous-cycle context.',
     why:
       'High-signal quant/finance discovery path for underclassmen, especially students exploring trading technology early.',
     prep:
-      'Apply before October 16 and prepare programming, probability, quantitative problem-solving, and technical-curiosity examples.',
+      'Keep programming, probability, quantitative problem-solving, and technical-curiosity examples ready while ApplyFirst watches for the January 2028 application.',
     sourceNote:
-      'Official HRT sources confirm January 2027 applications are open for students graduating Fall 2028-Summer 2030 and close October 16, 2026.',
-    lastChecked: '2026-09-26',
+      'The official HRT student page now says January 2027 applications are closed and asks students to check back for January 2028 applications.',
+    lastChecked: '2026-11-02',
+    statusReviewedAt: '2026-11-02T13:58:25.312Z',
   },
   {
     id: 'hrt-inside-hrt',
@@ -2682,6 +3093,139 @@ export const opportunities = [
     lastChecked: '2026-09-26',
   },
   {
+    id: 'apple-swift-student-challenge-2027',
+    name: 'Swift Student Challenge 2027',
+    organization: 'Apple',
+    category: 'Discovery Program',
+    classYears: ['All class years'],
+    timing: 'Winter',
+    status: 'expectedSoon',
+    confidence: 'high',
+    funding: 'Apple Developer Program membership for winners; distinguished-winner recognition',
+    location: 'Global online submission; U.S. students eligible',
+    programModel: 'cohort',
+    url: 'https://developer.apple.com/swift-student-challenge/',
+    previousUrl: '',
+    openDate: 'Submissions open February 8, 2027',
+    deadline: 'February 28, 2027 at 11:59 PM PST',
+    tags: ['Software engineering', 'iOS', 'Swift', 'App development', 'Design'],
+    description:
+      'Apple\'s Swift Student Challenge invites students to design and build an original interactive app playground that demonstrates coding skill, creativity, and product thinking on an Apple platform.',
+    eligibilitySummary:
+      'Students must meet Apple\'s current age, enrollment, developer-registration, and prior-winner rules. U.S. students are eligible, and the official policy should be checked before submission.',
+    experienceSummary:
+      'Students prepare an app submission, can attend free Apple preparation sessions, and compete for winner recognition and Apple Developer Program membership. Distinguished Winners receive additional Apple recognition and programming.',
+    detailBasis:
+      'Apple\'s official challenge page confirms the February 8-28, 2027 submission window and current preparation resources.',
+    why:
+      'A high-signal student build challenge that rewards both engineering and design and can create a concrete portfolio artifact before internship recruiting.',
+    prep:
+      'Review the official eligibility policy, attend preparation sessions, and begin building and testing the app before the February submission window.',
+    sourceNote:
+      'Official Apple Developer page says 2027 submissions open February 8 and close February 28 at 11:59 PM PST.',
+    lastChecked: '2026-11-16',
+    statusReviewedAt: '2026-11-16T20:00:00.000Z',
+  },
+  {
+    id: 'sig-first-year-quant-discovery-2027',
+    name: 'First-Year Quantitative Trading Discovery Event',
+    organization: 'Susquehanna',
+    category: 'Discovery Program',
+    classYears: ['Freshman', 'Sophomore'],
+    timing: 'Winter',
+    status: 'open',
+    confidence: 'high',
+    funding: 'Free virtual event',
+    location: 'Virtual in the United States',
+    url: 'https://careers.sig.com/jobs/11571?lang=en-us',
+    previousUrl: '',
+    openDate: 'Applications are open for December 2026 and May 2027 virtual sessions',
+    deadline: 'No application deadline is listed',
+    tags: ['Quantitative trading', 'Software engineering', 'Freshmen', 'Sophomores', 'Virtual'],
+    description:
+      'Susquehanna\'s virtual discovery event gives first- and second-year college students an early look at quantitative trading and how math, technology, and rapid decision-making come together inside a trading firm.',
+    eligibilitySummary:
+      'Open to first- and second-year college students, as well as high school students, with interest in math, physics, computer science, engineering, finance, economics, information systems, or technology.',
+    experienceSummary:
+      'The event is offered virtually in December 2026 and May 2027 and is designed to help students build a relationship with Susquehanna before they are ready for internships or full-time roles.',
+    detailBasis:
+      'The current official Susquehanna posting confirms the virtual format, two session windows, and first- and second-year eligibility.',
+    why:
+      'An unusually early, nationally accessible quant and technology discovery route for freshmen who are not yet ready for internship recruiting.',
+    prep:
+      'Submit a current resume and prepare questions about quantitative trading, technology, and future student pathways.',
+    sourceNote:
+      'Official Susquehanna posting is live for December 2026 and May 2027 virtual sessions; no deadline is listed.',
+    lastChecked: '2026-11-16',
+    statusReviewedAt: '2026-11-16T20:00:00.000Z',
+  },
+  {
+    id: 'sig-growth-equity-discovery-2027',
+    name: 'Growth Equity Discovery Program',
+    organization: 'Susquehanna Growth Equity',
+    category: 'Discovery Program',
+    classYears: ['Sophomore'],
+    timing: 'Spring',
+    status: 'open',
+    confidence: 'high',
+    funding: 'Not listed',
+    location: 'Bala Cynwyd, PA',
+    url: 'https://careers.sig.com/jobs/11191?lang=en-us',
+    previousUrl: '',
+    openDate: 'Applications are open for the 2027 discovery program',
+    deadline: 'No application deadline is listed',
+    tags: ['Growth equity', 'Venture capital', 'Technology investing', 'Sophomores', 'Startups'],
+    description:
+      'Susquehanna Growth Equity Discovery Program introduces sophomores to technology-focused growth investing, value creation, the firm\'s investment approach, and preparation for future growth-equity interviews.',
+    eligibilitySummary:
+      'Open to students planning to graduate in Winter 2028 or Spring 2029 who are interested in technology, investing, and growth equity.',
+    experienceSummary:
+      'Students learn from investing and value-creation teams, explore Susquehanna Growth Equity\'s entrepreneurial environment, and receive an early look at its internship program.',
+    detailBasis:
+      'The current official Susquehanna posting confirms the 2027 program, target graduation window, and technology-investing focus.',
+    why:
+      'A direct sophomore pathway into startup and growth-equity work that complements ApplyFirst\'s founder and venture coverage.',
+    prep:
+      'Prepare a resume, one technology company you find compelling, and a concise explanation of why growth equity interests you.',
+    sourceNote:
+      'Official Susquehanna posting is live for the 2027 program and says attendance next steps will be shared toward the end of 2026.',
+    lastChecked: '2026-11-16',
+    statusReviewedAt: '2026-11-16T20:00:00.000Z',
+  },
+  {
+    id: 'sig-capital-markets-discovery-2027',
+    name: 'Capital Markets Discovery Program',
+    organization: 'Susquehanna',
+    category: 'Discovery Program',
+    classYears: ['Sophomore'],
+    timing: 'Spring',
+    status: 'open',
+    confidence: 'high',
+    funding: 'Not listed',
+    location: 'New York, NY',
+    url: 'https://careers.sig.com/machine-learning-engineering/jobs/11259?lang=en-us',
+    previousUrl: '',
+    openDate: 'Applications are open for the Spring 2027 discovery program',
+    deadline: 'No application deadline is listed',
+    tags: ['Capital markets', 'Equity research', 'Finance', 'Quantitative analysis', 'Sophomores'],
+    description:
+      'Susquehanna\'s Capital Markets Discovery Program introduces sophomores to sell-side research, derivatives sales, and ETF sales through panels, employee conversations, and interactive market games.',
+    eligibilitySummary:
+      'Open to students graduating in Winter 2028 or Spring 2029 with interest or coursework in finance, economics, math, statistics, computer science, or engineering.',
+    experienceSummary:
+      'The Spring 2027 New York program offers an early view of investment-finance careers and Susquehanna\'s analytical, collaborative culture.',
+    detailBasis:
+      'The current official Susquehanna posting confirms the Spring 2027 program, New York location, eligible graduation window, and target majors.',
+    why:
+      'A nationally relevant sophomore finance discovery program with room for technical and quantitative students.',
+    prep:
+      'Submit a resume and prepare examples of market curiosity, analytical thinking, and interest in research or sales pathways.',
+    sourceNote:
+      'Official Susquehanna posting is live for Spring 2027; no application deadline is listed.',
+    lastChecked: '2026-11-16',
+    statusReviewedAt: '2026-11-16T20:00:00.000Z',
+  },
+  {
     id: 'sig-quant-trading-strategy-discovery-2027',
     name: 'Quantitative Trading & Strategy Discovery Program',
     organization: 'Susquehanna',
@@ -2695,7 +3239,7 @@ export const opportunities = [
     url: 'https://careers.sig.com/jobs/11148',
     previousUrl: '',
     openDate: 'Applications are open for the 2027 discovery program',
-    deadline: 'November 16, 2026',
+    deadline: 'August 3, 2027',
     tags: ['Quantitative trading', 'Strategy development', 'Software engineering', 'C++'],
     description:
       'Susquehanna’s multi-day Quantitative Trading and Quantitative Strategy Development Discovery Program introduces students to quantitative development, trading, signal creation, low-latency execution, and the C++ systems behind systematic markets. The invitation-only event includes interactive sessions, assessment-based challenges, and interviews connected to Summer 2028 internship opportunities.',
@@ -2704,14 +3248,15 @@ export const opportunities = [
     experienceSummary:
       'A multi-day, in-person New York event combining technical learning, trading and strategy exposure, challenges, and interviews.',
     detailBasis:
-      'The current official Susquehanna posting confirms the 2027 program, target graduation dates, content, and November 16 application deadline.',
+      'The current official Susquehanna posting confirms the 2027 program, target graduation dates, content, and August 3, 2027 application deadline.',
     why:
       'A direct early pathway into quantitative trading and low-latency software work before Summer 2028 recruiting.',
     prep:
-      'Submit a resume before November 16 and prepare probability, market, programming, and quantitative problem-solving examples.',
+      'Submit a resume before August 3, 2027 and prepare probability, market, programming, and quantitative problem-solving examples.',
     sourceNote:
-      'Official Susquehanna posting says applications close November 16, 2026 and describes a pathway to Summer 2028 internships.',
-    lastChecked: '2026-09-26',
+      'Official Susquehanna posting says applications are open through August 3, 2027 and describes a pathway to Summer 2028 internships.',
+    lastChecked: '2026-11-16',
+    statusReviewedAt: '2026-11-16T20:00:00.000Z',
   },
   {
     id: 'sig-trading-system-engineer-discovery-2027',
@@ -2727,7 +3272,7 @@ export const opportunities = [
     url: 'https://careers.sig.com/predictions/jobs/11491?lang=en-us',
     previousUrl: '',
     openDate: 'Applications are open for the 2027 discovery program',
-    deadline: 'November 16, 2026',
+    deadline: 'September 9, 2027',
     tags: ['C++', 'Software engineering', 'Low-latency systems', 'Trading infrastructure'],
     description:
       'Susquehanna’s multi-day Trading System Engineer Discovery Program shows students how C++ engineers build low-latency trading systems and complex strategies. Participants join interactive technical sessions, assessment-based challenges, and interviews that can lead toward Summer 2028 internship opportunities.',
@@ -2736,14 +3281,15 @@ export const opportunities = [
     experienceSummary:
       'An in-person event near Philadelphia focused on C++ engineering, trading systems, technical challenges, and internship-pathway interviews.',
     detailBasis:
-      'The current official Susquehanna posting confirms the 2027 event, graduation window, technical focus, and November 16 deadline.',
+      'The current official Susquehanna posting confirms the 2027 event, graduation window, technical focus, and September 9, 2027 deadline.',
     why:
       'A rare early program specifically focused on systems engineering rather than general software internship recruiting.',
     prep:
-      'Submit a resume before November 16 and prepare C++ fundamentals, systems thinking, and technical problem-solving examples.',
+      'Submit a resume before September 9, 2027 and prepare C++ fundamentals, systems thinking, and technical problem-solving examples.',
     sourceNote:
-      'Official Susquehanna posting says applications close November 16, 2026 and connects the event to Summer 2028 internships.',
-    lastChecked: '2026-09-26',
+      'Official Susquehanna posting says applications are open through September 9, 2027 and connects the event to Summer 2028 internships.',
+    lastChecked: '2026-11-16',
+    statusReviewedAt: '2026-11-16T20:00:00.000Z',
   },
   {
     id: 'akuna-trading-sneak-peek-2027',
@@ -2884,14 +3430,14 @@ export const opportunities = [
     category: 'Conference / Travel Funding',
     classYears: ['Freshman', 'Sophomore'],
     timing: 'Winter',
-    status: 'deadlineSoon',
+    status: 'watching',
     confidence: 'high',
     funding: 'NRF NXT travel scholarship',
     location: 'New York, NY',
     url: 'https://nrffoundation.org/retail-scholarships',
     previousUrl: '',
-    openDate: 'College advisor nominations are open for the 2027 NRF NXT trip',
-    deadline: 'October 30, 2026',
+    openDate: 'The 2027 trip nomination window has closed; watch for the next underclassmen cycle',
+    deadline: 'The next nomination deadline has not been posted',
     tags: ['Conference / Travel Funding', 'Freshman', 'Sophomore', 'Retail careers', 'Advisor nomination'],
     description:
       'NRF Foundation Rising Retail Stars is an advisor-nominated travel scholarship for freshmen and sophomores who want early exposure to retail careers. Selected students receive a trip to NRF NXT in New York City, held January 7-10, 2027.',
@@ -2900,15 +3446,15 @@ export const opportunities = [
     experienceSummary:
       'A funded trip to NRF NXT in New York City with industry exposure, career programming, and opportunities to explore paths across retail.',
     detailBasis:
-      'The official NRF Foundation scholarship page marks Rising Retail Stars as open, college-advisor nominated, and due October 30, 2026.',
+      'The official NRF Foundation page confirms the advisor-nominated program; the October 30, 2026 nomination deadline has passed.',
     why:
       'A time-sensitive underclassmen opportunity that offers funded access to a major industry event rather than a general scholarship search result.',
     prep:
-      'Contact your college advisor immediately to confirm whether they can nominate you before October 30, 2026.',
+      'Identify your school\'s NRF Student Association advisor and watch for the next nomination window.',
     sourceNote:
-      'Official NRF Foundation page confirms the advisor-nominated freshman and sophomore opportunity is open through October 30, 2026 for the January 2027 NRF NXT trip.',
-    lastChecked: '2026-10-26',
-    statusReviewedAt: '2026-10-26T16:20:00.000Z',
+      'The October 30, 2026 advisor-nomination deadline has passed. Keep the program monitored for the next freshman and sophomore cycle.',
+    lastChecked: '2026-11-16',
+    statusReviewedAt: '2026-11-16T20:00:00.000Z',
   },
   {
     id: 'google-scholarships-watch',
@@ -2956,7 +3502,7 @@ export const opportunities = [
     url: 'https://women.acm.org/scholarships/',
     previousUrl: '',
     openDate: 'Six conference-date deadline groups run throughout the year',
-    deadline: 'Next listed deadline: Oct 15, 2026 for Dec 1, 2026-Jan 30, 2027 conferences',
+    deadline: 'December 15, 2026 for conferences occurring February 1-March 31, 2027',
     tags: ['Research conference', 'CS research', 'Women in computing'],
     description:
       'ACM-W Research Conference Scholarships help students attend computing research conferences when travel funding is a barrier.',
@@ -2965,14 +3511,15 @@ export const opportunities = [
     experienceSummary:
       'Travel-support funding for conference attendance, networking, and exposure to computing research communities.',
     detailBasis:
-      'Current official ACM-W scholarship page lists recurring deadline groups and next listed deadline.',
+      'Current official ACM-W scholarship page lists six recurring deadline groups and the December 15, 2026 upcoming deadline.',
     why:
       'Useful for students who want to attend research conferences before they have a large travel budget or strong academic network.',
     prep:
       'Pick the conference first, draft why attendance supports your path, and ask an advisor early for the support letter.',
     sourceNote:
-      'Official ACM-W scholarship page lists recurring conference-date groups and the next Oct 15, 2026 deadline.',
-    lastChecked: '2026-08-18',
+      'Official ACM-W scholarship page lists December 15, 2026 as the upcoming deadline for February 1-March 31, 2027 conferences.',
+    lastChecked: '2026-11-16',
+    statusReviewedAt: '2026-11-16T20:00:00.000Z',
   },
   {
     id: 'rewriting-the-code-community',
@@ -3141,14 +3688,14 @@ export const opportunities = [
     category: 'Discovery Program',
     classYears: ['Sophomore'],
     timing: 'Fall',
-    status: 'deadlineSoon',
+    status: 'watching',
     confidence: 'high',
     funding: 'Travel and accommodations covered for eligible participants',
     location: 'Chicago, New York, or San Francisco',
     url: 'https://jpmc.recsolu.com/app/collect/event/PmuqzKf0GsBN1KG_vpKrBA',
     previousUrl: '',
-    openDate: 'Interest registration and required HireVue screening are open',
-    deadline: 'October 15, 2026 at 12:00 PM ET',
+    openDate: 'The 2026 registration window has closed; watch for the next sophomore cycle',
+    deadline: 'The next application deadline has not been posted',
     tags: ['Investment banking', 'Markets', 'Finance', 'Sophomores', 'Summer Analyst pipeline'],
     description:
       'JPMorganChase IB & Markets Insights is a set of in-person December events for sophomores exploring Investment Banking or Markets. The program covers how client-facing teams operate, industry career paths, recruiting and interview preparation, and the 2028 Summer Analyst process.',
@@ -3163,9 +3710,9 @@ export const opportunities = [
     prep:
       'Complete the candidate profile and attachments before submitting, then finish the HireVue within two days of receiving it for priority consideration.',
     sourceNote:
-      'The official registration page confirms four December 2026 events, the October 15 deadline, graduation window, 3.6 GPA guidance, and covered travel for selected students. Treat the live registration route as the application source.',
-    lastChecked: '2026-10-05',
-    statusReviewedAt: '2026-10-05T17:12:30.926Z',
+      'The October 15, 2026 registration deadline has passed. Keep the program monitored for a future JPMorganChase sophomore insights cycle.',
+    lastChecked: '2026-11-16',
+    statusReviewedAt: '2026-11-16T20:00:00.000Z',
   },
   {
     id: 'houlihan-lokey-investment-banking-insight-day',
@@ -3174,14 +3721,14 @@ export const opportunities = [
     category: 'Discovery Program',
     classYears: ['Sophomore'],
     timing: 'Fall',
-    status: 'deadlineSoon',
+    status: 'watching',
     confidence: 'high',
     funding: 'Travel and accommodations provided for eligible attendees',
     location: 'New York, NY or Chicago, IL',
     url: 'https://hl.wd1.myworkdayjobs.com/Campus/job/New-York-NY-USA/XMLNAME-2026-Houlihan-Lokey-Investment-Banking-Insight-Day_R3628',
     previousUrl: '',
-    openDate: 'Applications are open for one preferred event location',
-    deadline: 'October 19, 2026',
+    openDate: 'The 2026 application window has closed; watch for the next Insight Day cycle',
+    deadline: 'The next application deadline has not been posted',
     tags: ['Investment banking', 'Finance', 'Sophomores', 'Summer Analyst pipeline'],
     description:
       'Houlihan Lokey Investment Banking Insight Day gives sophomores training, networking, and direct exposure to the firm and its Investment Banking team. Select attendees may receive an accelerated interview process for the 2028 Summer Analyst Program.',
@@ -3196,9 +3743,9 @@ export const opportunities = [
     prep:
       'Choose one event location, submit a resume and original short essay, and be ready to explain finance interest and leadership experience.',
     sourceNote:
-      'The official posting confirms both event dates, the Class of 2029 requirement, covered travel for eligible attendees, and the October 19 deadline.',
-    lastChecked: '2026-10-05',
-    statusReviewedAt: '2026-10-05T17:12:30.926Z',
+      'The October 19, 2026 deadline has passed. Preserve the prior-cycle format as context and monitor for a new official Workday posting.',
+    lastChecked: '2026-11-16',
+    statusReviewedAt: '2026-11-16T20:00:00.000Z',
   },
   {
     id: 'rothschild-sophomore-leadership-program',
@@ -3207,14 +3754,14 @@ export const opportunities = [
     category: 'Discovery Program',
     classYears: ['Sophomore'],
     timing: 'Winter',
-    status: 'open',
+    status: 'watching',
     confidence: 'high',
     funding: 'Not listed',
     location: 'New York, NY (virtual and in person)',
     url: 'https://rothschildandco.tal.net/vx/lang-en-GB/appcentre-1/candidate/postings/553',
     previousUrl: '',
-    openDate: 'Applications are open for the January 2027 program',
-    deadline: 'November 15, 2026 at 11:55 PM ET',
+    openDate: 'The January 2027 application window has closed; watch for the next cycle',
+    deadline: 'The next application deadline has not been posted',
     tags: ['Investment banking', 'Financial services', 'Sophomores', 'Summer Analyst pipeline'],
     description:
       'Rothschild & Co Sophomore Leadership Program is a two-day finance immersion that combines a virtual session with in-person programming and networking in the New York office throughout January. Participants attend workshops, learn about Global Advisory, and meet Rothschild bankers.',
@@ -3229,9 +3776,9 @@ export const opportunities = [
     prep:
       'Prepare a finance-interest story, academic examples, and questions about Global Advisory before applying through the official candidate page.',
     sourceNote:
-      'The official posting confirms the two-day format, January programming, graduation requirement, November 15 deadline, and 2028 Summer Analyst interview opportunity.',
-    lastChecked: '2026-10-05',
-    statusReviewedAt: '2026-10-05T17:12:30.926Z',
+      'The November 15, 2026 deadline has passed. Keep the official candidate page monitored for a future Sophomore Leadership Program posting.',
+    lastChecked: '2026-11-16',
+    statusReviewedAt: '2026-11-16T20:00:00.000Z',
   },
   {
     id: 'perella-weinberg-advisory-prep-program',
@@ -3240,14 +3787,14 @@ export const opportunities = [
     category: 'Discovery Program',
     classYears: ['Sophomore'],
     timing: 'Fall',
-    status: 'open',
+    status: 'watching',
     confidence: 'high',
     funding: 'Not listed',
     location: 'Chicago, Los Angeles, New York, or San Francisco',
     url: 'https://pwpcareers.tal.net/vx/lang-en-GB/mobile-0/appcentre-1/brand-4/user-413790/xf-3692fcc9b38d/candidate/so/pm/1/pl/1/opp/1117-U-S-Advisory-Prep-Program/en-GB',
     previousUrl: '',
-    openDate: 'Applications are open for November and December programming',
-    deadline: 'October 25, 2026',
+    openDate: 'The 2026 application window has closed; watch for the next Advisory Prep cycle',
+    deadline: 'The next application deadline has not been posted',
     tags: ['Investment banking', 'Advisory', 'Sophomores', 'Interview preparation', 'Summer Analyst pipeline'],
     description:
       'Perella Weinberg Partners U.S. Advisory Prep Program combines a November 6 virtual skills workshop with an in-person Insight Day in November or December. Students practice pitching themselves and technical interviews, learn about the firm, and network with bankers.',
@@ -3262,9 +3809,9 @@ export const opportunities = [
     prep:
       'Choose a location preference, prepare a concise personal pitch, and review introductory investment-banking technical questions before the virtual workshop.',
     sourceNote:
-      'The official posting confirms the October 25 deadline, virtual workshop, in-person Insight Days, graduation window, and potential fast-track interview path.',
-    lastChecked: '2026-10-05',
-    statusReviewedAt: '2026-10-05T17:12:30.926Z',
+      'The October 25, 2026 deadline has passed. Monitor the official candidate site for a future U.S. Advisory Prep Program cycle.',
+    lastChecked: '2026-11-16',
+    statusReviewedAt: '2026-11-16T20:00:00.000Z',
   },
   {
     id: 'bain-capital-investors-of-tomorrow',
@@ -3279,8 +3826,8 @@ export const opportunities = [
     location: 'Boston, MA and virtual',
     url: 'https://baincapital.wd1.myworkdayjobs.com/en-US/External_Public/job/Bain-Capital-Investors-of-Tomorrow---November-December-2026_REQ_108406',
     previousUrl: '',
-    openDate: 'Registration is open for the November and December 2026 events',
-    deadline: 'October 25, 2026 at 11:59 PM ET for in-person consideration',
+    openDate: 'Virtual-panel registration remains available for the December 2, 2026 event',
+    deadline: 'In-person consideration closed October 25, 2026; no separate virtual-panel deadline is listed',
     tags: ['Investing', 'Private equity', 'Finance', 'Sophomores', 'Virtual option'],
     description:
       'Bain Capital Investors of Tomorrow introduces sophomores to investing through a small in-person program at the Boston office on November 19 and a broader virtual panel on December 2. Investment professionals across the Bain Capital platform share their work, backgrounds, and approach.',
@@ -3295,9 +3842,9 @@ export const opportunities = [
     prep:
       'Complete both application steps, reserve uninterrupted time for the timed cognitive assessment, and review the linked practice test first.',
     sourceNote:
-      'The official posting confirms the November 19 Boston event, December 2 virtual panel, October 25 in-person deadline, assessment requirement, and covered travel for selected students.',
-    lastChecked: '2026-10-05',
-    statusReviewedAt: '2026-10-05T17:12:30.926Z',
+      'The official posting says the October 25 in-person deadline has passed but later registrants can still attend the December 2 virtual panel.',
+    lastChecked: '2026-11-16',
+    statusReviewedAt: '2026-11-16T20:00:00.000Z',
   },
   {
     id: 'stifel-emerging-leaders',
@@ -3306,14 +3853,14 @@ export const opportunities = [
     category: 'Discovery Program',
     classYears: ['All class years'],
     timing: 'Fall',
-    status: 'open',
+    status: 'watching',
     confidence: 'medium',
     funding: 'Free webinar',
     location: 'Virtual',
     url: 'https://stifel.zoom.us/webinar/register/WN_oQfCtXbuRFyk6q6OMmBCEQ#/registration',
     previousUrl: '',
-    openDate: 'Registration is open for the October 16 webinar',
-    deadline: 'No registration deadline is listed; event is October 16, 2026 at 11:00 AM ET',
+    openDate: 'The October 16, 2026 webinar has ended; watch for a future Emerging Leaders event',
+    deadline: 'The next event date and registration deadline have not been posted',
     tags: ['Finance', 'Investment banking', 'Capital markets', 'Equity research', 'Webinar'],
     description:
       'Stifel Emerging Leaders is a virtual information session for students exploring finance opportunities across Investment Banking, Fixed Income Capital Markets, Public Finance, and Equity Research.',
@@ -3328,8 +3875,9 @@ export const opportunities = [
     prep:
       'Register before the event, choose the finance area you most want to understand, and submit a specific question about internship recruiting.',
     sourceNote:
-      'The official Stifel-hosted registration confirms the October 16 event and topic choices. It does not confirm sophomore-only eligibility or a feeder-program outcome, so this remains medium confidence.',
-    lastChecked: '2026-10-05',
+      'The October 16, 2026 webinar has ended. Keep the Stifel-hosted source in monitoring for a new event and do not infer a feeder-program outcome.',
+    lastChecked: '2026-11-16',
+    statusReviewedAt: '2026-11-16T20:00:00.000Z',
   },
   {
     id: 'weiss-underclassmen-fellowship',
@@ -3338,14 +3886,14 @@ export const opportunities = [
     category: 'Fellowship',
     classYears: ['Freshman', 'Sophomore'],
     timing: 'Winter',
-    status: 'open',
+    status: 'watching',
     confidence: 'high',
     funding: 'Transportation and hotel covered',
     location: 'Boston, MA',
-    url: 'https://job-boards.greenhouse.io/weissassetmanagement/jobs/8831639002',
-    previousUrl: '',
-    openDate: 'Applications are open for the January 7-8, 2027 fellowship',
-    deadline: 'No application deadline is listed',
+    url: 'https://job-boards.greenhouse.io/weissassetmanagement',
+    previousUrl: 'https://job-boards.greenhouse.io/weissassetmanagement/jobs/8831639002',
+    openDate: 'The January 2027 fellowship posting has closed; watch for the next underclassmen cycle',
+    deadline: 'The next application deadline has not been posted',
     tags: ['Quant / Finance', 'Investment analysis', 'Freshmen', 'Sophomores', 'Python'],
     description:
       'Weiss Asset Management Underclassmen Fellowship is a two-day Boston program for freshmen and sophomores interested in finance. Fellows learn about financial markets, risk assessment, investment analysis, and the work of an investment analyst through sessions with analysts and senior leaders.',
@@ -3354,15 +3902,15 @@ export const opportunities = [
     experienceSummary:
       'The January 7-8 program includes technical learning, mentorship, feedback, networking, and social programming. Transportation and hotel costs are covered, and high-performing fellows may be considered for future internships.',
     detailBasis:
-      'Current official Weiss Asset Management Greenhouse posting 8831639002, reviewed October 5, 2026.',
+      'The previous official posting confirms the program model, but it now redirects to the Weiss job board and is no longer an active application.',
     why:
       'A funded underclassmen program that exposes students to both quantitative and fundamental investing before internship recruiting.',
     prep:
       'Choose the interview track that best represents your strengths and prepare the requested transcript, test-score context, and examples of analytical achievement.',
     sourceNote:
-      'The official application confirms the two-day January program, freshman and sophomore eligibility, covered travel and hotel, interview tracks, and possible future internship consideration. No deadline is currently listed.',
-    lastChecked: '2026-10-05',
-    statusReviewedAt: '2026-10-05T17:12:30.926Z',
+      'The January 2027 application has closed and the direct posting now redirects to the Weiss job board. Monitor for a future underclassmen fellowship posting.',
+    lastChecked: '2026-11-16',
+    statusReviewedAt: '2026-11-16T20:00:00.000Z',
   },
   {
     id: 'five-rings-link-2027',
@@ -3396,6 +3944,40 @@ export const opportunities = [
       'The official application is live and confirms sophomore eligibility, three 2027 sessions, the technical curriculum, stipend, travel, housing, and meals. It does not list an application deadline.',
     lastChecked: '2026-10-26',
     statusReviewedAt: '2026-10-26T12:58:56.584Z',
+  },
+  {
+    id: 'five-rings-qt-connect-2027-us',
+    name: 'QT Connect 2027 - US',
+    organization: 'Five Rings',
+    category: 'Discovery Program',
+    classYears: ['Sophomore'],
+    timing: 'Spring',
+    status: 'open',
+    confidence: 'high',
+    funding: 'Travel and housing provided',
+    location: 'New York, NY',
+    programModel: 'cohort',
+    url: 'https://job-boards.greenhouse.io/fiveringsllc/jobs/5473043008',
+    previousUrl: 'https://fiverings.com/careers/',
+    openDate: 'Applications are open for two spring 2027 sessions',
+    deadline: 'January 4, 2027',
+    tags: ['Quant / Finance', 'Quantitative trading', 'STEM', 'Underclassmen', 'Sophomores'],
+    description:
+      'Five Rings QT Connect is a two-day quantitative trading discovery program for undergraduates who want an early introduction to market making, trading careers, and the work of a proprietary trading firm.',
+    eligibilitySummary:
+      'Students graduating in December 2028 or spring or summer 2029 who intend to major in a STEM-related field and are interested in quantitative trading. No prior financial experience is required.',
+    experienceSummary:
+      'Participants meet and network with Five Rings traders, take part in market-making games, and learn about quantitative trading and the firm. Sessions run March 11-12 and April 1-2, 2027 in New York; Five Rings provides travel and housing.',
+    detailBasis:
+      'The current official Five Rings Greenhouse application confirms the two spring sessions, January 4 deadline, graduation window, STEM interest, and covered travel and housing.',
+    why:
+      'A funded underclassmen discovery program that gives STEM students direct exposure to quantitative trading before traditional internship recruiting.',
+    prep:
+      'Apply before January 4, upload the requested transcript, indicate every session you can attend, and prepare examples of quantitative problem-solving and interest in markets.',
+    sourceNote:
+      'The official Five Rings application is live for the U.S. program and explicitly lists the January 4, 2027 deadline. Keep this separate from the software-focused LINK intensive.',
+    lastChecked: '2026-11-16',
+    statusReviewedAt: '2026-11-16T19:30:00.000Z',
   },
   {
     id: 'pwc-engineer-your-career',
@@ -3495,6 +4077,177 @@ export const opportunities = [
       'Official Code2040 pages confirm the program structure and latest-cycle eligibility, while the trusted underclassmen opportunity list independently identifies it as a fellowship lead. The 2026 application is closed, so monitor for a new official cycle without reusing prior dates.',
     lastChecked: '2026-10-26',
     statusReviewedAt: '2026-10-26T12:58:56.584Z',
+  },
+  {
+    id: 'cme-software-engineering-fellowship-2027',
+    name: 'Software Engineering Fellowship',
+    organization: 'CME Group',
+    category: 'Fellowship',
+    classYears: ['Sophomore', 'Junior'],
+    timing: 'Summer',
+    status: 'open',
+    confidence: 'high',
+    funding: 'Paid full-time fellowship',
+    location: 'Chicago, IL',
+    url: 'https://cmegroup.wd1.myworkdayjobs.com/en-US/cme_careers/job/Software-Engineering-Fellowship---Summer-2027_34824',
+    previousUrl: '',
+    openDate: 'Applications are open for Summer 2027',
+    deadline: 'No application deadline is listed',
+    tags: ['Software Engineering', 'FinTech', 'Mentorship', 'Sophomores', 'Juniors', 'First internship'],
+    description:
+      'CME Group’s Software Engineering Fellowship is a paid, full-time program that combines hands-on engineering work with technical learning, career development, and mentorship. Fellows explore software-design fundamentals, work alongside professional mentors, attend technical talks, and learn how engineering teams build technology for global financial markets.',
+    eligibilitySummary:
+      'Undergraduate students at any level may apply, but the program specifically targets rising sophomores and juniors in the Classes of 2028 and 2029 who may not have held a prior software engineering internship.',
+    experienceSummary:
+      'A 10-12 week, full-time summer fellowship in Chicago with engineering work, mentorship, technical enrichment, interview preparation, and a cohort of early-career students.',
+    detailBasis:
+      'Current official CME Group Workday application for Summer 2027, reviewed November 2, 2026.',
+    why:
+      'A strong underclassman pathway for students seeking their first substantive software engineering experience rather than another general internship listing.',
+    prep:
+      'Prepare a current resume and examples from coursework, projects, or technical clubs that demonstrate programming fundamentals, curiosity, and readiness to learn with a mentor.',
+    sourceNote:
+      'The official application confirms the paid 10-12 week format, rising-sophomore and rising-junior focus, first-internship orientation, mentorship, and technical development. No deadline is currently listed.',
+    lastChecked: '2026-11-02',
+    statusReviewedAt: '2026-11-02T13:58:25.312Z',
+  },
+  {
+    id: 'standard-chartered-spring-insight-2027-us',
+    name: 'Spring Insight Programme',
+    organization: 'Standard Chartered',
+    category: 'Discovery Program',
+    classYears: ['Sophomore'],
+    timing: 'Winter',
+    status: 'watching',
+    confidence: 'high',
+    funding: 'Unpaid workshop; travel and accommodations reimbursed for students outside New York',
+    location: 'New York, NY',
+    url: 'https://jobs.standardchartered.com/job/Spring-Insight-Programme-2027-US/63952-en_GB',
+    previousUrl: '',
+    openDate: 'The 2027 U.S. application window has closed; watch for the next cycle',
+    deadline: 'The next application deadline has not been posted',
+    tags: ['Quant / Finance', 'Investment Banking', 'Markets', 'Transaction Banking', 'Sophomores', 'All majors'],
+    description:
+      'Standard Chartered’s Spring Insight Programme is a three-day introduction to Corporate and Investment Banking. Students explore Markets, Global Banking, Coverage Banking, and Transaction Banking through business simulations, workshops, job shadowing, conversations with employees, and career coaching.',
+    eligibilitySummary:
+      'Current sophomores from any degree discipline may apply. No prior banking or financial-services experience is required, and Standard Chartered encourages students from groups underrepresented in banking.',
+    experienceSummary:
+      'An in-person program at Standard Chartered’s New York headquarters from February 1-3, 2027. Strong performers receive fast-track consideration for the 2028 Summer Internship Programme, and travel and accommodations are reimbursed for students outside the immediate New York area.',
+    detailBasis:
+      'Current official Standard Chartered requisition 63952, reviewed November 2, 2026.',
+    why:
+      'A nationally accessible sophomore discovery program that lets students explore major finance pathways before they need prior banking experience.',
+    prep:
+      'Prepare examples of analytical thinking, teamwork, curiosity about markets, and interest in international banking while ApplyFirst watches for the next cycle.',
+    sourceNote:
+      'The November 15, 2026 deadline has passed. Preserve the all-major sophomore eligibility and program model as prior-cycle context while monitoring for the next U.S. requisition.',
+    lastChecked: '2026-11-16',
+    statusReviewedAt: '2026-11-16T20:00:00.000Z',
+  },
+];
+
+export const monitoringOnlySources = [
+  {
+    id: 'capital-one-students-grads-event-feed',
+    name: 'Students & Grads Event Feed',
+    organization: 'Capital One',
+    category: 'Discovery Program',
+    classYears: ['Freshman', 'Sophomore', 'All class years'],
+    timing: 'Rolling',
+    status: 'verifyManually',
+    confidence: 'needsReview',
+    funding: 'Varies by event',
+    location: 'Virtual and U.S. office events',
+    url: 'https://capitalone.eightfold.ai/events/open?domain=capitalone.com',
+    previousUrl: 'https://www.capitalonecareers.com/get-ahead-with-early-career-programs-for-students',
+    openDate: 'New Students & Grads events are posted throughout the recruiting cycle',
+    deadline: 'Each registration page has its own timing',
+    tags: ['Internal event feed', 'Virtual events', 'Office visits', 'Students & Grads'],
+    description:
+      'Internal monitoring source for Capital One’s school-agnostic student summits, program overviews, recruiting workshops, and selective office events.',
+    eligibilitySummary:
+      'Maintainer review must confirm that an event is current, school-agnostic or nationally accessible, and relevant to an ApplyFirst role track.',
+    experienceSummary:
+      'Not a public opportunity. Relevant event pages are reviewed and either attached to an existing Capital One program, added as a substantive new program, or dismissed.',
+    detailBasis:
+      'Official Capital One Students & Grads event calendar and early-programs page.',
+    why:
+      'Captures short-lived official registrations without creating a permanent public card for every webinar.',
+    prep:
+      'Review event date, audience, location, travel support, and recruiting value before taking action.',
+    sourceNote:
+      'Monitoring-only event feed. Never deliver directly to students and never treat expired, campus-only, or generic employer-promotion sessions as programs.',
+    lastChecked: '2026-11-17',
+    statusReviewedAt: '2026-11-17T00:00:00.000Z',
+    deliveryEnabled: false,
+  },
+  {
+    id: 'microsoft-university-event-feed',
+    name: 'University Virtual Event Feed',
+    organization: 'Microsoft',
+    category: 'Discovery Program',
+    classYears: ['Freshman', 'Sophomore', 'All class years'],
+    timing: 'Rolling',
+    status: 'verifyManually',
+    confidence: 'needsReview',
+    funding: 'Free virtual events',
+    location: 'Virtual',
+    url: 'https://careers.microsoft.com/v2/global/en/virtualevents',
+    previousUrl: 'https://careers.microsoft.com/v2/global/en/universityinternship',
+    openDate: 'Microsoft updates university recruiting events throughout the year',
+    deadline: 'Each event has its own registration timing',
+    tags: ['Internal event feed', 'Virtual events', 'Software Engineering', 'Product Management', 'Design'],
+    description:
+      'Internal monitoring source for current Microsoft university webinars, program sessions, and recruiting workshops relevant to early-college students.',
+    eligibilitySummary:
+      'Maintainer review must confirm a current live session, U.S.-relevant access, and an ApplyFirst-aligned student audience.',
+    experienceSummary:
+      'Not a public opportunity. Recorded webinars and generic career content are excluded from alerts.',
+    detailBasis:
+      'Official Microsoft University Virtual Events page.',
+    why:
+      'Provides timely discovery around Explore, early-in-profession roles, and application preparation without cluttering the library.',
+    prep:
+      'Confirm the event is upcoming and live rather than an archived recording before surfacing it.',
+    sourceNote:
+      'Monitoring-only event feed. Keep all discoveries in maintainer review and attach useful sessions to their real Microsoft program when possible.',
+    lastChecked: '2026-11-17',
+    statusReviewedAt: '2026-11-17T00:00:00.000Z',
+    deliveryEnabled: false,
+  },
+  {
+    id: 'goldman-sachs-student-event-feed',
+    name: 'Student Event Feed',
+    organization: 'Goldman Sachs',
+    category: 'Discovery Program',
+    classYears: ['Freshman', 'Sophomore', 'All class years'],
+    timing: 'Rolling',
+    status: 'verifyManually',
+    confidence: 'needsReview',
+    funding: 'Varies by event',
+    location: 'Virtual and U.S. offices',
+    url: 'https://recruiting360.avature.net/candidates',
+    previousUrl: 'https://www.goldmansachs.com/careers/students/prepare/',
+    openDate: 'Goldman Sachs posts virtual and in-person student events throughout the recruiting cycle',
+    deadline: 'Each event has its own registration timing',
+    tags: ['Internal event feed', 'Virtual events', 'Engineering', 'Quant / Finance', 'Insight events'],
+    description:
+      'Internal monitoring source for school-agnostic Goldman Sachs information sessions, skill-building workshops, insight events, panels, and networking programs.',
+    eligibilitySummary:
+      'Maintainer review must confirm that an event is current, U.S.-relevant, broadly accessible, and useful to an ApplyFirst audience.',
+    experienceSummary:
+      'Not a public opportunity. Substantive selective programs remain separate records; ordinary recruiting events are digest-only when useful.',
+    detailBasis:
+      'Official Goldman Sachs Students and Prepare pages link to My GS Events for current registrations.',
+    why:
+      'Finds short-lived student events and potential new insight series while preserving the library’s narrower program focus.',
+    prep:
+      'Confirm current registration, audience, business track, and whether the event is more than generic company promotion.',
+    sourceNote:
+      'Monitoring-only event feed. Discoveries cannot enter student delivery without a separate verified public-program record.',
+    lastChecked: '2026-11-17',
+    statusReviewedAt: '2026-11-17T00:00:00.000Z',
+    deliveryEnabled: false,
   },
 ];
 

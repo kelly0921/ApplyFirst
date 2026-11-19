@@ -6,6 +6,7 @@ dist
 .applyfirst-monitoring-state.json
 data/monitoring-seed.generated.json
 data/monitoring-review.generated.json
+data/radar-candidates.generated.json
 supabase/seed.generated.sql
 cloudflare/seeds/watch-seed.generated.sql
 docs/private/*

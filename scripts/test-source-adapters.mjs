@@ -3,7 +3,9 @@ import {
   buildStructuredSourceRequest,
   buildUnpublishedPostingText,
   detectOfficialSourceType,
+  extractFramerSearchIndexUrl,
   extractStructuredJobPostingText,
+  formatFramerSearchIndexPayload,
   formatStructuredSourcePayload,
 } from '../workers/source-adapters.js';
 import { classifySourceText } from '../workers/applyfirst-watch-worker.js';
@@ -18,6 +20,38 @@ assert.equal(
   'ashby_posting',
 );
 assert.equal(detectOfficialSourceType('https://example.com/program'), 'official_program_page');
+
+const framerHtml = '<meta name="framer-search-index" content="https://framerusercontent.com/search-index.json">';
+assert.equal(
+  extractFramerSearchIndexUrl(framerHtml),
+  'https://framerusercontent.com/search-index.json',
+);
+const framerText = formatFramerSearchIndexPayload(
+  {
+    '/': {
+      title: 'Thrive Capital Summer Fellowship 2027',
+      h2: ['Eligibility', 'Timeline'],
+      p: [
+        'Today, we are excited to open the Summer 2027 Thrive Fellowship application.',
+        'Current college student with US work authorization.',
+        'Application Deadline',
+        'December 11, 2026',
+      ],
+    },
+  },
+  'https://fellows.thrivecap.com/',
+);
+assert.match(framerText, /December 11, 2026/);
+const framerAnalysis = classifySourceText(
+  framerText,
+  { program_id: 'thrive-capital-summer-fellowship', program_name: 'Thrive Capital Summer Fellowship' },
+  new Date('2026-11-09T12:00:00Z'),
+);
+assert.deepEqual(
+  [framerAnalysis.suggestedStatus, framerAnalysis.reviewDecision, framerAnalysis.detectedSignal],
+  ['open', 'Alert Candidate', 'December 11, 2026'],
+  'Framer search-index text should expose a current opening and deadline before large HTML truncates them',
+);
 
 const greenhouseRequest = buildStructuredSourceRequest({
   url: 'https://job-boards.greenhouse.io/virtu/jobs/8445018002',

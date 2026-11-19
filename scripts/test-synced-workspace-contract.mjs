@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import {
   createApplicationAttempt,
   loadBetaWorkspace,
@@ -13,6 +14,37 @@ const workerBaseUrl = 'https://worker.example';
 const accessCode = 'AF-STUDENT-1234';
 const requests = [];
 let workspaceState = null;
+
+const mainSource = await readFile(new URL('../src/main.jsx', import.meta.url), 'utf8');
+const betaAlertSource = mainSource.slice(
+  mainSource.indexOf('function BetaAlertSystem('),
+  mainSource.indexOf('function WatchSetupReceipt('),
+);
+assert.match(
+  mainSource,
+  /<BetaAlertSystem[\s\S]*?accessCode=\{accessCode\}[\s\S]*?\/>/,
+  'AlertSetupPanel must pass the active invite code into BetaAlertSystem.',
+);
+assert.match(
+  mainSource,
+  /await postJson\(watchEndpoint,[\s\S]*?accessCode,[\s\S]*?source: 'applyfirst-watch-request'/,
+  'The beta alert submission must authenticate its watch request with the active invite code.',
+);
+assert.match(
+  betaAlertSource,
+  /postJson\(captureEndpoint,[\s\S]*?firstName: payload\.firstName,[\s\S]*?lastName: payload\.lastName,[\s\S]*?emailConsentAt:[\s\S]*?emailConsentText:/,
+  'The owner capture record must receive the same student identity and consent context as the watch setup.',
+);
+assert.doesNotMatch(
+  betaAlertSource,
+  /Saved Locally After Endpoint Issue/,
+  'A failed watch request must not be persisted as an active-looking local alert setup.',
+);
+assert.match(
+  betaAlertSource,
+  /Alerts were not activated\. Try again\./,
+  'A failed watch request must give the student a clear retry state.',
+);
 
 function json(payload, status = 200) {
   return new Response(JSON.stringify(payload), {

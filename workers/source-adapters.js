@@ -143,6 +143,45 @@ export function extractStructuredJobPostingText(sourceText, referenceDate = new 
     .join(' ');
 }
 
+export function extractFramerSearchIndexUrl(sourceText) {
+  const metaTag = String(sourceText || '').match(
+    /<meta\b[^>]*\bname=["']framer-search-index["'][^>]*>/i,
+  )?.[0];
+
+  if (!metaTag) {
+    return '';
+  }
+
+  const content = metaTag.match(/\bcontent=["']([^"']+)["']/i)?.[1] || '';
+  return decodeHtmlEntities(content);
+}
+
+export function formatFramerSearchIndexPayload(payload, sourceUrl) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return '';
+  }
+
+  const sourcePath = parseHttpUrl(sourceUrl)?.pathname || '/';
+  const normalizedPath = sourcePath === '/' ? '/' : sourcePath.replace(/\/$/, '');
+  const entry = payload[normalizedPath] || payload[`${normalizedPath}/`] || payload['/'] || Object.values(payload)[0];
+
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+    return '';
+  }
+
+  return [
+    entry.title,
+    entry.description,
+    entry.keywords,
+    ...['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'codeblock'].flatMap((key) =>
+      Array.isArray(entry[key]) ? entry[key] : [],
+    ),
+  ]
+    .map(cleanText)
+    .filter(Boolean)
+    .join(' ');
+}
+
 function formatGreenhousePayload(payload, source, isDirectPosting) {
   const jobs = isDirectPosting ? (payload?.id ? [payload] : []) : Array.isArray(payload?.jobs) ? payload.jobs : [];
   const matchingJobs = isDirectPosting ? jobs : jobs.filter((job) => titlesLikelyMatch(source?.program_name, job?.title));
@@ -410,6 +449,15 @@ function stripHtml(value) {
     .replace(/&amp;/gi, '&')
     .replace(/&quot;/gi, '"')
     .replace(/&#39;/gi, "'"));
+}
+
+function decodeHtmlEntities(value) {
+  return String(value || '')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>');
 }
 
 function cleanText(value) {

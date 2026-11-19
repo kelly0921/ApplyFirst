@@ -404,6 +404,7 @@ const hostQualifiedTitleIds = new Set([
   'jane-street-qtc-watch',
   'jane-street-wise-watch',
   'jane-street-amp-watch',
+  'capital-one-analyst-summit',
   'capital-one-tech-summit',
   'capital-one-product-summit',
   'capital-one-analyst-early-internship',
@@ -6211,6 +6212,7 @@ function AlertSetupPanel({
         waitlistIntent={waitlistIntent}
         captureEndpoint={alertEndpoint}
         watchEndpoint={watchEndpoint}
+        accessCode={accessCode}
       />
     </section>
   );
@@ -6227,8 +6229,11 @@ function BetaAlertSystem({
   waitlistIntent,
   captureEndpoint = '',
   watchEndpoint = '',
+  accessCode = '',
 }) {
   const textAlertsAvailable = textAlertsEnabled;
+  const [firstName, setFirstName] = useState(waitlistIntent?.firstName ?? betaAlertSetup?.firstName ?? '');
+  const [lastName, setLastName] = useState(waitlistIntent?.lastName ?? betaAlertSetup?.lastName ?? '');
   const [email, setEmail] = useState(waitlistIntent?.email ?? betaAlertSetup?.email ?? '');
   const [phoneNumber, setPhoneNumber] = useState(betaAlertSetup?.phoneNumber ?? '');
   const [contactMethod, setContactMethod] = useState(betaAlertSetup?.contactMethod ?? 'email');
@@ -6238,10 +6243,16 @@ function BetaAlertSystem({
   const effectiveContactMethod = textAlertsAvailable ? contactMethod : 'email';
 
   useEffect(() => {
+    if (waitlistIntent?.firstName && !firstName) {
+      setFirstName(waitlistIntent.firstName);
+    }
+    if (waitlistIntent?.lastName && !lastName) {
+      setLastName(waitlistIntent.lastName);
+    }
     if (waitlistIntent?.email && !email) {
       setEmail(waitlistIntent.email);
     }
-  }, [email, waitlistIntent]);
+  }, [email, firstName, lastName, waitlistIntent]);
 
   const requiredFields = [
     { label: 'Class Year', value: alertPrefs.classYear },
@@ -6254,6 +6265,7 @@ function BetaAlertSystem({
   const hasIncompleteSetup = missingSetupFields.length > 0;
   const hasPreviewFocus = ![alertPrefs.classYear, alertPrefs.roleTrack].some(isPreferenceUnset);
   const hasEmail = Boolean(email.trim());
+  const hasName = Boolean(firstName.trim() && lastName.trim());
   const hasPhone = Boolean(phoneNumber.trim());
   const hasContact = effectiveContactMethod === 'phone' ? hasPhone : hasEmail;
   const missingSetupSummary =
@@ -6273,6 +6285,8 @@ function BetaAlertSystem({
     roleTrack: alertPrefs.roleTrack,
     priority: alertPrefs.priority || 'all',
     sendTiming: alertPrefs.sendTiming,
+    firstName: firstName.trim(),
+    lastName: lastName.trim(),
     email: email.trim(),
     phoneNumber: phoneNumber.trim(),
     contactMethod,
@@ -6281,9 +6295,13 @@ function BetaAlertSystem({
   const hasUnsavedWatchSetupChanges =
     Boolean(betaAlertSetup) && !watchSetupMatches(betaAlertSetup, currentWatchSetup);
   const isSavedWatchSetupCurrent = Boolean(betaAlertSetup) && !hasUnsavedWatchSetupChanges;
+  const savedSetupHasIdentity = Boolean(betaAlertSetup?.firstName && betaAlertSetup?.lastName);
+  const shouldCollectIdentity = !isSavedWatchSetupCurrent || savedSetupHasIdentity;
   const needsTurnstile = Boolean(captureEndpoint && email.trim() && !turnstileToken);
   const setupActionMessage = hasIncompleteSetup
     ? `Choose ${missingSetupSummary} first.`
+      : !hasName
+        ? 'Add your first and last name.'
       : !hasContact
       ? effectiveContactMethod === 'phone'
         ? 'Add a phone number to receive text alerts.'
@@ -6309,7 +6327,7 @@ function BetaAlertSystem({
       ? 'is-dirty'
       : '';
   const setupButtonDisabled =
-    hasIncompleteSetup || !hasContact || needsTurnstile || submitState === 'submitting' || isSavedWatchSetupCurrent;
+    hasIncompleteSetup || !hasName || !hasContact || needsTurnstile || submitState === 'submitting' || isSavedWatchSetupCurrent;
   const shouldShowSetupStatus = setupButtonDisabled && !isSavedWatchSetupCurrent;
 
   const createSetupPayload = (captureStatus) => ({
@@ -6317,6 +6335,8 @@ function BetaAlertSystem({
     roleTrack: alertPrefs.roleTrack,
     priority: alertPrefs.priority || 'all',
     sendTiming: alertPrefs.sendTiming,
+    firstName: firstName.trim(),
+    lastName: lastName.trim(),
     email: email.trim(),
     phoneNumber: phoneNumber.trim(),
     contactMethod: effectiveContactMethod,
@@ -6357,12 +6377,42 @@ function BetaAlertSystem({
 
       setSubmitState('submitting');
       try {
-        const requests = [];
+        let watchSaved = false;
+        if (watchEndpoint) {
+          await postJson(watchEndpoint, {
+            accessCode,
+            source: 'applyfirst-watch-request',
+            email: payload.email,
+            classYear: payload.classYear,
+            roleTrack: payload.roleTrack,
+            priority: payload.priority,
+            sendTiming: payload.sendTiming,
+            phoneNumber: payload.phoneNumber,
+            contactMethod: payload.contactMethod,
+            preferenceSummary,
+            notificationMode: 'Beta Watch Request',
+            notificationConsentAt: new Date().toISOString(),
+            notificationConsentText,
+            matchCount: payload.matchCount,
+            alertReadyCount: payload.alertReadyCount,
+            savedCount: payload.savedCount,
+            needsSourceCheck: payload.needsSourceCheck,
+            matchingProgramIds: payload.matchingProgramIds,
+            alertReadyProgramIds: payload.alertReadyProgramIds,
+            savedProgramIds: payload.savedProgramIds,
+            watchedProgramIds: payload.watchedProgramIds,
+            watchedPrograms: payload.watchedPrograms,
+            requestedAt: new Date().toISOString(),
+          });
+          watchSaved = true;
+        }
 
         if (captureEndpoint && payload.email) {
-          requests.push(
-            postJson(captureEndpoint, {
+          try {
+            await postJson(captureEndpoint, {
               source: 'applyfirst-beta-email-alert',
+              firstName: payload.firstName,
+              lastName: payload.lastName,
               email: payload.email,
               classYear: payload.classYear,
               interest: payload.roleTrack,
@@ -6370,51 +6420,25 @@ function BetaAlertSystem({
               note: `Beta email alert setup. Focus matches: ${payload.matchCount}. Alert-ready: ${payload.alertReadyCount}. Priority Watches: ${watchedProgramNames.join(', ') || 'None'}.`,
               preferenceSummary,
               notificationMode: 'Beta Email Alerts',
+              emailConsentAt: new Date().toISOString(),
+              emailConsentText: notificationConsentText,
               savedAt: new Date().toISOString(),
               turnstileToken,
-            }),
-          );
+            });
+          } catch (error) {
+            if (!watchSaved) throw error;
+            logClientIssue('watch_setup_capture', error, { accessCode, view: 'focus' });
+          }
         }
 
-        if (watchEndpoint) {
-          requests.push(
-            postJson(watchEndpoint, {
-              accessCode,
-              source: 'applyfirst-watch-request',
-              email: payload.email,
-              classYear: payload.classYear,
-              roleTrack: payload.roleTrack,
-              priority: payload.priority,
-              sendTiming: payload.sendTiming,
-              phoneNumber: payload.phoneNumber,
-              contactMethod: payload.contactMethod,
-              preferenceSummary,
-              notificationMode: 'Beta Watch Request',
-              notificationConsentAt: new Date().toISOString(),
-              notificationConsentText,
-              matchCount: payload.matchCount,
-              alertReadyCount: payload.alertReadyCount,
-              savedCount: payload.savedCount,
-              needsSourceCheck: payload.needsSourceCheck,
-              matchingProgramIds: payload.matchingProgramIds,
-              alertReadyProgramIds: payload.alertReadyProgramIds,
-              savedProgramIds: payload.savedProgramIds,
-              watchedProgramIds: payload.watchedProgramIds,
-              watchedPrograms: payload.watchedPrograms,
-              requestedAt: new Date().toISOString(),
-            }),
-          );
-        }
-
-        await Promise.all(requests);
         setTurnstileResetKey((current) => current + 1);
         onSave(createSetupPayload(watchEndpoint ? 'Opening Alerts Submitted' : 'Email Alerts Submitted'));
         setSubmitState('submitted');
         return;
-      } catch {
+      } catch (error) {
         setTurnstileResetKey((current) => current + 1);
-        onSave(createSetupPayload('Saved Locally After Endpoint Issue'));
-        setSubmitState('localFallback');
+        logClientIssue('watch_setup_save', error, { accessCode, view: 'focus' });
+        setSubmitState('submissionError');
         return;
       }
     }
@@ -6444,6 +6468,28 @@ function BetaAlertSystem({
       </div>
 
       <div className="beta-alert-actions">
+        {shouldCollectIdentity ? (
+          <div className="beta-alert-identity-fields">
+            <label>
+              <span>First Name *</span>
+              <input
+                autoComplete="given-name"
+                value={firstName}
+                onChange={(event) => setFirstName(event.target.value)}
+                maxLength={80}
+              />
+            </label>
+            <label>
+              <span>Last Name *</span>
+              <input
+                autoComplete="family-name"
+                value={lastName}
+                onChange={(event) => setLastName(event.target.value)}
+                maxLength={80}
+              />
+            </label>
+          </div>
+        ) : null}
         <div className="contact-method-control" role="group" aria-label="Alert delivery method">
           <button
             className={contactMethod === 'email' ? 'active' : ''}
@@ -6500,6 +6546,9 @@ function BetaAlertSystem({
         {captureEndpoint && email.trim() ? (
           <TurnstileVerification action="waitlist" onTokenChange={setTurnstileToken} resetKey={turnstileResetKey} />
         ) : null}
+        {submitState === 'submissionError' ? (
+          <p className="form-helper form-error">Alerts were not activated. Try again.</p>
+        ) : null}
       </div>
 
       {betaAlertSetup ? <WatchSetupReceipt setup={betaAlertSetup} /> : null}
@@ -6554,10 +6603,15 @@ function WatchSetupReceipt({ setup }) {
 }
 
 function watchSetupMatches(savedSetup, currentSetup) {
-  return (
-    JSON.stringify(normalizeWatchSetupForComparison(savedSetup)) ===
-    JSON.stringify(normalizeWatchSetupForComparison(currentSetup))
-  );
+  const normalizedSaved = normalizeWatchSetupForComparison(savedSetup);
+  const normalizedCurrent = normalizeWatchSetupForComparison(currentSetup);
+
+  if (!normalizedSaved.firstName && !normalizedSaved.lastName) {
+    normalizedCurrent.firstName = '';
+    normalizedCurrent.lastName = '';
+  }
+
+  return JSON.stringify(normalizedSaved) === JSON.stringify(normalizedCurrent);
 }
 
 function normalizeWatchSetupForComparison(setup = {}) {
@@ -6569,6 +6623,8 @@ function normalizeWatchSetupForComparison(setup = {}) {
     roleTrack: setup.roleTrack || '',
     priority: setup.priority || 'all',
     sendTiming: setup.sendTiming || '',
+    firstName: String(setup.firstName ?? '').trim(),
+    lastName: String(setup.lastName ?? '').trim(),
     contactMethod,
     contact:
       contactMethod === 'phone'
@@ -7495,10 +7551,15 @@ function OpportunityDetail({
       : verificationState === 'watchOnly'
         ? 'watch'
         : 'review';
+  const isCohortProgram = opportunity.programModel === 'cohort';
   const programHighlights = [
     { label: 'Class Year', value: opportunity.classYears?.join(', ') || 'Not Listed Yet' },
-    { label: 'Format', value: getProgramFormatText(opportunity) },
-    { label: 'Duration', value: getProgramLengthText(opportunity) },
+    ...(isCohortProgram
+      ? [{ label: 'Commitment', value: getProgramCommitmentText(opportunity) }]
+      : [
+          { label: 'Format', value: getProgramFormatText(opportunity) },
+          { label: 'Duration', value: getProgramLengthText(opportunity) },
+        ]),
     { label: 'Pay / Funding', value: opportunity.funding },
     { label: 'Focus', value: tracks.join(' + ') },
   ].filter((detail) => {
@@ -7526,6 +7587,7 @@ function OpportunityDetail({
       <div className="detail-header">
         <div className="detail-status-strip">
           <span className={`status-pill status-${opportunity.status}`}>{statusLabels[opportunity.status]}</span>
+          {isCohortProgram ? <span className="detail-program-model">Cohort Program</span> : null}
         </div>
         <h2 className="detail-title-line">
           <span>{displayTitle}</span>
@@ -7976,6 +8038,9 @@ function getProgramFormatText(opportunity) {
 }
 
 function getProgramLengthText(opportunity) {
+  const statedDuration = cleanText(opportunity.programDuration);
+  if (statedDuration) return statedDuration;
+
   const searchableText = [
     opportunity.sourceNote,
     opportunity.description,
@@ -8011,6 +8076,14 @@ function getProgramLengthText(opportunity) {
   }
 
   return '';
+}
+
+function getProgramCommitmentText(opportunity) {
+  return uniqueList([
+    getProgramLengthText(opportunity),
+    cleanText(opportunity.commitmentDetail || opportunity.weeklyCommitment),
+    getProgramFormatText(opportunity),
+  ]).join(' \u00b7 ');
 }
 
 function getRecordTimingSignal(opportunity, monitorSignal) {

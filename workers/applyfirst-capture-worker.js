@@ -24,6 +24,7 @@ const PUBLIC_WAITLIST_INTERESTS = new Set([
 const PUBLIC_WAITLIST_CONSENT_TEXT =
   'By joining, you agree to receive ApplyFirst beta access and opportunity updates by email. Unsubscribe anytime.';
 const WAITLIST_CONFIRMATION_TTL_MS = 48 * 60 * 60 * 1000;
+const BETA_ALERT_SOURCE_PREFIX = 'applyfirst-beta-email-alert';
 
 export default {
   async fetch(request, env) {
@@ -71,11 +72,14 @@ export default {
           });
         }
 
-        const ownerNotification = await sendOwnerWaitlistNotification(env, row);
+        const ownerNotification = row.duplicate
+          ? { status: 'duplicate_suppressed' }
+          : await sendOwnerWaitlistNotification(env, row);
 
         return jsonResponse(request, env, {
           ok: true,
           id: row.id,
+          duplicate: Boolean(row.duplicate),
           ownerNotification,
         });
       }
@@ -250,6 +254,12 @@ async function saveWaitlistRequest(env, payload, confirmation = null) {
     throw error;
   }
 
+  if (row.source.startsWith(BETA_ALERT_SOURCE_PREFIX) && (!row.firstName || !row.lastName)) {
+    const error = new Error('First and last name are required for beta alert opt-ins.');
+    error.status = 400;
+    throw error;
+  }
+
   if (
     row.source === 'applyfirst-waitlist' &&
     (!PUBLIC_WAITLIST_CLASS_YEARS.has(row.classYear) || !PUBLIC_WAITLIST_INTERESTS.has(row.interest))
@@ -257,6 +267,16 @@ async function saveWaitlistRequest(env, payload, confirmation = null) {
     const error = new Error('Select a valid class year and primary interest.');
     error.status = 400;
     throw error;
+  }
+
+  const recentDuplicate = await findRecentBetaAlertDuplicate(env, row);
+  if (recentDuplicate) {
+    return {
+      ...row,
+      id: recentDuplicate.id,
+      createdAt: recentDuplicate.createdAt,
+      duplicate: true,
+    };
   }
 
   const result = await env.DB.prepare(
@@ -308,6 +328,24 @@ async function saveWaitlistRequest(env, payload, confirmation = null) {
     id: result.meta?.last_row_id ?? null,
     createdAt: new Date().toISOString(),
   };
+}
+
+async function findRecentBetaAlertDuplicate(env, row) {
+  if (!row.source.startsWith(BETA_ALERT_SOURCE_PREFIX)) return null;
+
+  return env.DB.prepare(
+    `SELECT id, created_at AS createdAt
+     FROM waitlist_requests
+     WHERE source = ?
+       AND lower(trim(email)) = ?
+       AND coalesce(preference_summary, '') = ?
+       AND coalesce(note, '') = ?
+       AND datetime(created_at) >= datetime('now', '-2 minutes')
+     ORDER BY id DESC
+     LIMIT 1`,
+  )
+    .bind(row.source, row.email, row.preferenceSummary, row.note)
+    .first();
 }
 
 function shouldRequireWaitlistEmailConfirmation(env, payload) {
@@ -588,10 +626,12 @@ async function sendOwnerWaitlistNotification(env, row) {
   }
 
   const signupType = getSignupType(row);
+  const isBetaAlertOptIn = row.source.startsWith(BETA_ALERT_SOURCE_PREFIX);
   const submittedAt = row.savedAt || row.createdAt || 'Unknown';
   const studentNote = row.note || 'No note provided.';
+  const noteLabel = isBetaAlertOptIn ? 'Alert Setup' : 'Student Note';
   const studentName = [row.firstName, row.lastName].filter(Boolean).join(' ');
-  const subject = `New ApplyFirst Signup: ${studentName || row.email}`;
+  const subject = `${isBetaAlertOptIn ? 'New ApplyFirst Alert Opt-In' : 'New ApplyFirst Signup'}: ${studentName || row.email}`;
   const text = [
     `New ApplyFirst ${signupType}`,
     '',
@@ -599,15 +639,15 @@ async function sendOwnerWaitlistNotification(env, row) {
     `Email: ${row.email}`,
     `Class Year: ${row.classYear || 'Not provided'}`,
     `Interest: ${row.interest || 'Not provided'}`,
-    `School: ${row.school || 'Not provided'}`,
+    ...(!isBetaAlertOptIn ? [`School: ${row.school || 'Not provided'}`] : []),
     `Preference: ${row.preferenceSummary || 'Not provided'}`,
     `Signup Type: ${row.notificationMode || signupType}`,
     `Submitted: ${submittedAt}`,
     `Source: ${row.source}`,
-    `Referral: ${row.referralSource || 'Not provided'}`,
-    ...(row.referralDetail ? [`Referral Detail: ${row.referralDetail}`] : []),
+    ...(!isBetaAlertOptIn ? [`Referral: ${row.referralSource || 'Not provided'}`] : []),
+    ...(!isBetaAlertOptIn && row.referralDetail ? [`Referral Detail: ${row.referralDetail}`] : []),
     '',
-    'Student Note:',
+    `${noteLabel}:`,
     studentNote,
   ].join('\n');
 
@@ -617,22 +657,24 @@ async function sendOwnerWaitlistNotification(env, row) {
         ${escapeHtml(signupType)}
       </div>
       <h2 style="margin: 0 0 4px; font-size: 22px; line-height: 1.25;">New ApplyFirst signup</h2>
-      <p style="margin: 0 0 18px; color: #52645d;">A student submitted interest through the beta capture flow.</p>
+      <p style="margin: 0 0 18px; color: #52645d;">${isBetaAlertOptIn
+        ? 'A student enabled opening alerts from My Focus.'
+        : 'A student submitted interest through the beta capture flow.'}</p>
       <table style="border-collapse: collapse; width: 100%; max-width: 640px; border-top: 1px solid #dce8e4;">
         ${emailRow('Name', studentName || 'Not provided')}
         ${emailRow('Email', row.email)}
         ${emailRow('Class Year', row.classYear || 'Not provided')}
         ${emailRow('Interest', row.interest || 'Not provided')}
-        ${emailRow('School', row.school || 'Not provided')}
+        ${!isBetaAlertOptIn ? emailRow('School', row.school || 'Not provided') : ''}
         ${emailRow('Preference', row.preferenceSummary || 'Not provided')}
         ${emailRow('Signup Type', row.notificationMode || signupType)}
         ${emailRow('Submitted', submittedAt)}
         ${emailRow('Source', row.source)}
-        ${emailRow('Referral', row.referralSource || 'Not provided')}
-        ${row.referralDetail ? emailRow('Referral Detail', row.referralDetail) : ''}
+        ${!isBetaAlertOptIn ? emailRow('Referral', row.referralSource || 'Not provided') : ''}
+        ${!isBetaAlertOptIn && row.referralDetail ? emailRow('Referral Detail', row.referralDetail) : ''}
       </table>
       <div style="margin-top: 20px; padding: 14px 16px; border: 1px solid #dce8e4; border-radius: 12px; background: #fbfdfc;">
-        <h3 style="margin: 0 0 8px; font-size: 14px; line-height: 1.3; color: #52645d; text-transform: uppercase; letter-spacing: 0.03em;">Student Note</h3>
+        <h3 style="margin: 0 0 8px; font-size: 14px; line-height: 1.3; color: #52645d; text-transform: uppercase; letter-spacing: 0.03em;">${escapeHtml(noteLabel)}</h3>
         <p style="margin: 0; white-space: pre-wrap;">${escapeHtml(studentNote)}</p>
       </div>
     </div>

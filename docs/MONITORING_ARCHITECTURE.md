@@ -529,6 +529,7 @@ The Cloudflare watch Worker adds the first durable monitoring path:
 - `POST /analytics/participants/segment` lets the maintainer classify a masked workspace as RSA-assisted, independent/waitlist, other, or unknown. It requires `WATCH_ADMIN_TOKEN`; cohort membership remains separate from outcome-level support.
 - `POST /analytics/invitations/sync` accepts only locally generated SHA-256 invite hashes, masked labels, send status, segment, and invite date. It powers accurate invited/opened cohort counts without moving the private identity registry into analytics and requires `WATCH_ADMIN_TOKEN`.
 - `POST /analytics/watch-requests/reconcile` privacy-safely links legacy active alert profiles to an existing invited workspace by comparing namespaced email hashes. It defaults to dry-run, skips missing or ambiguous matches, supersedes older active profiles only after an applied reconciliation, and requires `WATCH_ADMIN_TOKEN`.
+- `POST /analytics/captured-watch-setups/reconcile` recovers a missing alert profile when a prior My Focus opt-in reached the capture database but not the watch database. It matches only active invitations through namespaced email hashes, keeps a newer active profile untouched, defaults to dry-run, and requires `WATCH_ADMIN_TOKEN`.
 - `POST /analytics/monitoring-audits` records a known-opening, information-accuracy, or correction audit. Requires `WATCH_ADMIN_TOKEN`.
 - `POST /analytics/operations` records a small manual estimate of monitoring, correction, or support time. Requires `WATCH_ADMIN_TOKEN`.
 - `GET /watch/engagement` records tracked official-source clicks and one-tap usefulness feedback from alert emails.
@@ -561,6 +562,12 @@ The first official seed/schedule audit lives in `docs/VERIFIED_SEED_SCHEDULE_AUD
 The Worker sends one consolidated list of verified suitable matches after a student first saves My Focus. Later email is limited to meaningful verified changes, newly suitable programs, and one approaching-deadline reminder when the student selected deadline alerts. An explicit Watch raises a program's priority but is not required for matching coverage. Medium-confidence openings, large-page failures, and ambiguous eligibility changes stay in review. SMS remains disabled for the email-first beta.
 
 Student alerts must be generated from clean student-facing templates. Internal source-check notes, raw page excerpts, classifier labels, and maintainer instructions stay in D1 for review and should not appear in outbound student notifications. Each email includes a tokenized unsubscribe link plus `List-Unsubscribe` and one-click unsubscribe headers. SMS is disabled for the email-first beta. Unsubscribed watch requests are excluded before delivery.
+
+### Company event feeds
+
+ApplyFirst monitors selected official student-event calendars without turning every webinar into a permanent library record. Multi-day summits, selective insight programs, and recurring events with a meaningful recruiting pathway may have their own public opportunity. Ordinary information sessions, recruiter Q&As, and interview workshops remain discovery candidates and require maintainer review before they can affect a public record or student delivery.
+
+An office visit or company event is in scope only when its official page confirms a current date and registration route, it is school-agnostic or meaningfully available to students across the United States, and it supports ApplyFirst tracks such as software engineering, product, design, quant/finance, or early-career access. In-person events that impose a narrow regional requirement without travel support, campus-only events, expired recordings, and generic employer-promotion sessions are excluded. A useful virtual event normally belongs in a digest; immediate email is reserved for selective registration windows, limited-capacity events, or a material application-timing signal.
 
 ## Proactive Delivery Layer
 
