@@ -1233,6 +1233,42 @@ export const opportunities = [
     statusReviewedAt: '2026-11-02T17:24:00.000Z',
   },
   {
+    id: 'loreal-usa-fellowship-2027',
+    name: "L'Oréal USA Fellowship Program",
+    organization: "L'Oréal USA",
+    category: 'Discovery Program',
+    classYears: ['Sophomore'],
+    timing: 'Spring',
+    status: 'open',
+    confidence: 'high',
+    funding: 'Compensation not specified',
+    location: 'Virtual across the United States',
+    programModel: 'cohort',
+    programDuration: 'February-August 2027',
+    commitmentDetail: 'Monthly programming',
+    url: 'https://careers.loreal.com/en/job/new-york/2027-l-oreal-usa-fellowship-program/3456/46557101440',
+    previousUrl: '',
+    openDate: 'Applications are open for the 2027 fellowship',
+    deadline: 'December 31, 2026',
+    tags: ['Access & Prep', 'Business discovery', 'Leadership', 'Mentorship', 'Consumer industry', 'Sophomores'],
+    description:
+      "The L'Oréal USA Fellowship is a virtual professional-development and business-discovery program for sophomores. Monthly sessions introduce fellows to different areas of L'Oréal, including consumer-focused business work, marketing, operations, digital and technology, finance, and research and innovation.",
+    eligibilitySummary:
+      'Undergraduates graduating between December 2028 and June 2029 who attend an accredited four-year U.S. college may apply. Final-year community college students transferring into a four-year bachelor program within the same graduation window are also eligible. Applicants need demonstrated extracurricular leadership; the official posting lists no required major or GPA.',
+    experienceSummary:
+      "Fellows join monthly virtual programming from February through August, work through a consumer-focused business challenge, develop networking and leadership skills, receive mentorship, and learn about potential career opportunities across L'Oréal. Compensation is not stated in the fellowship description.",
+    detailBasis:
+      'The current official 2027 posting confirms the virtual format, February-August monthly programming, graduation window, community-college transfer path, leadership requirement, application components, and December 31 deadline.',
+    why:
+      'A major company-sponsored sophomore program that gives students broad business exposure, mentorship, and early access before traditional internship recruiting intensifies.',
+    prep:
+      'Prepare a 200-400 word leadership example and a two-to-three-minute YouTube video describing what diversity means to you and how companies should support inclusion.',
+    sourceNote:
+      "The official L'Oréal posting says the 2027 virtual fellowship is open through December 31, 2026. It does not restrict applicants to a particular major or state that the fellowship is paid, so compensation remains unconfirmed.",
+    lastChecked: '2026-11-20',
+    statusReviewedAt: '2026-11-20T07:42:11.959Z',
+  },
+  {
     id: 'forage-virtual-experience',
     name: 'Virtual Work Experience Programs',
     organization: 'Forage',
