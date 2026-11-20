@@ -6350,18 +6350,6 @@ a {
   align-items: center;
 }
 
-.detail-program-model {
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-  border-left: 2px solid var(--brand-accent);
-  padding-left: 8px;
-  color: var(--brand-accent);
-  font-size: 0.68rem;
-  font-weight: 800;
-  line-height: 1.2;
-}
-
 .detail-title-block {
   display: grid;
   gap: 5px;

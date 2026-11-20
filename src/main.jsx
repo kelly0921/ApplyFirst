@@ -7555,7 +7555,7 @@ function OpportunityDetail({
   const programHighlights = [
     { label: 'Class Year', value: opportunity.classYears?.join(', ') || 'Not Listed Yet' },
     ...(isCohortProgram
-      ? [{ label: 'Commitment', value: getProgramCommitmentText(opportunity) }]
+      ? [{ label: 'Format', value: getCohortProgramFormatText(opportunity) }]
       : [
           { label: 'Format', value: getProgramFormatText(opportunity) },
           { label: 'Duration', value: getProgramLengthText(opportunity) },
@@ -7587,7 +7587,6 @@ function OpportunityDetail({
       <div className="detail-header">
         <div className="detail-status-strip">
           <span className={`status-pill status-${opportunity.status}`}>{statusLabels[opportunity.status]}</span>
-          {isCohortProgram ? <span className="detail-program-model">Cohort Program</span> : null}
         </div>
         <h2 className="detail-title-line">
           <span>{displayTitle}</span>
@@ -8078,8 +8077,9 @@ function getProgramLengthText(opportunity) {
   return '';
 }
 
-function getProgramCommitmentText(opportunity) {
+function getCohortProgramFormatText(opportunity) {
   return uniqueList([
+    'Cohort',
     getProgramLengthText(opportunity),
     cleanText(opportunity.commitmentDetail || opportunity.weeklyCommitment),
     getProgramFormatText(opportunity),
