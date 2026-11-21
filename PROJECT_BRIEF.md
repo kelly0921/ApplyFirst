@@ -2,7 +2,7 @@
 
 ## One-Line Positioning
 
-ApplyFirst is an early-career program monitor that helps underclassmen and emerging technical students discover relevant career-launch opportunities, receive trustworthy timing signals, and apply earlier.
+ApplyFirst is a notification-first monitor for selective early-career programs: students set their Focus once, then receive trustworthy opening and deadline signals when a relevant application is ready for action.
 
 ## Core Problem
 
@@ -48,10 +48,10 @@ Existing tools already cover broad job volume: Simplify, LinkedIn, Handshake, sc
 
 ApplyFirst has two connected product layers:
 
-1. **Student Opportunity Library**: the public-facing foundation that helps students discover high-signal programs worth knowing about.
+1. **Student Opportunity Library**: the supporting reference layer that lets students inspect the programs behind their alerts.
 2. **Opportunity Signal Tracker**: the differentiated product engine that tracks official-page changes, seasonality, confidence, and human verification before students are notified.
 
-The library is the front door. The signal tracker is the product moat. They should not be treated as separate projects; ApplyFirst needs both to become useful, trustworthy, and meaningfully different from a normal opportunity list.
+Focus and alerts are the front door. The library supports trust and exploration. The signal tracker is the product moat. They should not be treated as separate projects; ApplyFirst needs both to become useful, trustworthy, and meaningfully different from a normal opportunity list.
 
 The primary ongoing loop is proactive delivery, not habitual browsing. A student should be able to configure Focus once, receive a small number of verified and relevant opportunities at useful moments, go directly to the official source, and act without needing to remember to reopen ApplyFirst every week. Manual search remains useful, but weekly return frequency is a diagnostic rather than the product's north-star outcome.
 
@@ -65,16 +65,16 @@ The wedge:
 
 ## In Scope
 
-ApplyFirst should include:
+The default **Core Programs** view should include:
 
 - Discovery Program: early discovery, insight, externship, and special exploratory programs for underclassmen.
 - Fellowship: fellowships, project fellowships, placement fellowships, nonprofit fellowships, and internship alternatives.
 - Startup / VC Fellowship: fellowships that place students into portfolio companies, founder networks, or venture-backed ecosystems.
 - Winternship: short winter-break programs.
-- Scholarship / Funding: company-sponsored or major nonprofit-sponsored scholarships and grants.
-- Conference / Travel Funding: conference scholarships, travel grants, and event access funding.
-- Community / Prep Program: career prep programs, technical communities, mentorship, training, courses, and resource hubs.
+- Community / Prep Program only when it is a structured, selective career-launch program with a meaningful cohort, training, mentorship, employer access, or project component.
 - Full-Time Alternative: new grad, recent grad, apprenticeship, bridge, and full-time alternative pathways.
+
+The broader dataset may continue to hold sponsor-backed scholarships, conference/travel funding, communities, and other useful reference records. These stay available through **All Records** but do not define the default product promise. Existing saves, watches, and application history remain available even when a record is outside the core view.
 
 ### Selection Standard
 

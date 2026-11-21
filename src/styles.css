@@ -6267,6 +6267,12 @@ a {
   background: var(--green-soft);
 }
 
+.status-closed {
+  border-color: rgba(86, 101, 98, 0.24);
+  background: #f1f4f3;
+  color: #485653;
+}
+
 .status-expectedSoon {
   border-color: rgba(88, 103, 201, 0.28);
   background: var(--gold-soft);
@@ -6280,6 +6286,13 @@ a {
 .status-verifyManually {
   border-color: rgba(176, 86, 104, 0.3);
   background: var(--rose-soft);
+}
+
+.beta-alert-consent {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
 }
 
 .detail-next-step {

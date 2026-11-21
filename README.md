@@ -1,6 +1,6 @@
 # ApplyFirst
 
-A standalone product MVP for helping underclassmen and emerging technical students discover and apply earlier to high-signal career-launch programs: early discovery programs, fellowships, externships, winternships, company/nonprofit-sponsored scholarships, technical communities, conference funding paths, and internship alternatives.
+A notification-first private beta for selective early-career programs. Students set their class year and career interests once; ApplyFirst monitors official sources and emails them when a relevant application is verified open or approaching its deadline.
 
 For the reusable product narrative, portfolio angle, scope decisions, and future roadmap, see [PROJECT_BRIEF.md](./PROJECT_BRIEF.md).
 
@@ -28,10 +28,10 @@ ApplyFirst is part of the broader Opportunity Systems product exploration. This 
 
 ApplyFirst combines two connected layers:
 
-- **Student Opportunity Library**: the public foundation for curated programs, fellowships, sponsor-backed scholarships, grants, technical communities, and conference funding paths.
+- **Student Opportunity Library**: the supporting reference layer for inspecting the programs behind each alert.
 - **Opportunity Signal Tracker**: the product layer for tracking official-page changes, old vs new URLs, application season patterns, sponsor announcements, confidence scores, and human/community verification.
 
-The library is the front door. The tracker is the moat. The current app starts with the library, student watch requests, and a Cloudflare D1 source-check worker that can send beta opening alerts for high-confidence official-source signals.
+Focus and alerts are the front door. The library supports trust and optional browsing. The tracker is the moat. The current app uses student Focus preferences and a Cloudflare D1 source-check worker to send beta alerts only from high-confidence official-source signals.
 
 The product belief: ApplyFirst should help students apply earlier and discover what kinds of companies, cultures, mentors, products, and industries fit them. Early-career programs are not only resume builders; they are exposure, confidence, network, and career-agency builders.
 
@@ -39,7 +39,8 @@ The first version focuses on:
 
 - Class-year fit for freshmen, sophomores, and all class years.
 - Role-track fit for software engineering, product management, design, quant / finance, and Access & Prep programs.
-- Eight student-facing opportunity types: Discovery Program, Fellowship, Startup / VC Fellowship, Winternship, Scholarship / Funding, Conference / Travel Funding, Community / Prep Program, and Full-Time Alternative.
+- A default Core Programs view for discovery programs, fellowships, startup/VC fellowships, winternships, distinctive full-time alternatives, and a small set of structured career-launch prep programs.
+- An All Records view that preserves useful adjacent scholarships, conference funding, communities, and historical/reference records without making them the primary product promise.
 - Recommendation, application status, and confirmation labels.
 - Maintainer-only source review and confidence labels.
 - Clear eligibility, timing, program context, and official-source links so students can decide what to pursue.

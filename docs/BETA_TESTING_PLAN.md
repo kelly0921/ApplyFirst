@@ -65,7 +65,7 @@ At the current beta size, infrastructure should remain inside Cloudflare's free 
 
 Prioritize students who resemble the primary target user:
 
-- Freshman or sophomore exploring tech, PM, quant / finance, data / AI, fellowships, sponsor-backed scholarships, or conference funding.
+- Freshman or sophomore exploring tech, PM, design, quant / finance, data / AI, discovery programs, or selective fellowships.
 - Actively trying to find career-launch programs before normal internship recruiting gets crowded.
 - Familiar with scattered lists, school links, Discord posts, LinkedIn posts, or GitHub opportunity repos.
 
@@ -116,9 +116,15 @@ Ask the tester to share their screen and think out loud.
    - Watch whether the private beta framing feels intentional or confusing.
    - After they enter the app, ask what they expect the `About` button to do.
 
-3. Program discovery
-   - Ask them to find one program they would personally save.
-   - Ask: What made it feel useful or not useful?
+3. Focus and alerts
+   - Ask them to open My Focus and set their class year, role track, and timing preference.
+   - Ask: If you closed ApplyFirst now, what would you expect it to do for you?
+   - Ask them to review the watch plan, add their email, and submit a beta alert setup if comfortable.
+   - Ask whether the default opening and deadline timing feels useful without being noisy.
+
+4. Program review
+   - Ask them to open one matching program they would genuinely consider.
+   - Ask: What made it feel relevant or not relevant?
    - Ask: Does the expanded program view give enough detail: description, eligibility, format/location, length, funding/pay, timing, and source status?
    - Ask: Does the Start Here guide make it clear what to do next?
    - After they inspect a meaningful program, ask them to use the optional relevance check-in. Confirm that prior awareness appears only for a current- or future-cycle fit, and that eligibility uncertainty asks what is unclear.
@@ -138,20 +144,18 @@ Before deploying a lifecycle change, verify these histories without redesigning 
 6. Double-click or repeat ordinary Mark Applied; only one same-cycle attempt exists. Use Add Another Application to create an intentional same-cycle repeat.
 7. Migrate repeated legacy `submitted` events; same-year duplicates collapse, distinct years remain separate attempts, ambiguous timestamps collapse to one unspecified attempt, and only explicit legacy program-watch reasons become watches.
 
-4. My Focus
-   - Ask them to open My Focus and set their class year, role track, and timing preference.
-   - Ask them to review the watch plan, choose email or text, add contact info, and submit a beta watch setup.
-   - Ask: Do these fields match how you think about opportunities?
-   - Ask: Is it clear what ApplyFirst would watch, which saved programs are prioritized, and which programs still need source checks?
-   - Ask: Is anything missing, unnecessary, or worded oddly?
+5. Independent research check
+   - Give the tester 15 minutes to look for one relevant program using their usual sources.
+   - Compare what they find with ApplyFirst's Core Programs and All Records views.
+   - Record whether ApplyFirst already tracked it, whether the record was current, and whether the alert promise would have saved time.
 
-5. Suggest Updates / feedback
+6. Suggest Updates / feedback
    - Ask them to suggest one program ApplyFirst should watch or report one confusing/stale item.
    - Ask: Did this feel like feedback, a support ticket, or a maintainer tool?
    - Ask: Was it clear that useful feedback includes wrong opening dates, wrong deadlines, eligibility issues, broken links, missing programs, confusing labels, duplicates, and programs they want alerts for?
    - Ask: Did Start Here update or disappear at the right time?
 
-6. Trust and return intent
+7. Trust and return intent
    - Ask: Would you trust ApplyFirst to notify you when something opens?
    - Ask: What proof would make you trust it more?
    - Ask: Would you come back during recruiting season?
@@ -162,7 +166,8 @@ The beta is working if:
 
 - Students can explain the product in one sentence without help.
 - Students understand this is not a generic job board.
-- Students save at least one program they would actually track.
+- Students can explain what ApplyFirst will monitor after Focus is saved.
+- Students can identify at least one relevant program or confidently conclude that no current match exists.
 - Students understand that Saved is a bookmark, Watching controls future alerts, and Application History records each attempt without treating the program as permanently completed.
 - Students can represent a realistic repeat-cycle lifecycle: applied before, still watching, applied again later.
 - Students can use the expanded program view like a job-board detail page and know what is still missing or needs verification.
@@ -193,15 +198,15 @@ Pause and revise if:
 Use this as the invite note for the first beta group:
 
 ```text
-I am testing ApplyFirst, a private beta tool for finding and tracking early-career programs before applications get crowded.
+I am testing ApplyFirst, a private beta that monitors selective early-career programs and emails students when a relevant application is ready for action.
 
 Please try it like a freshman/sophomore looking for useful programs to save and monitor:
 1. Open the site and read the About page.
 2. Join the waitlist or enter the invite code.
-3. Search for one program you would actually save.
-4. Open the program details and check whether the description, eligibility, timing, format/location, length, and funding info feel useful.
-5. Save one program, set My Focus, and join beta alerts if you would want opening reminders.
-6. Submit one Suggest Updates item: a missing program, wrong date, broken link, confusing label, or alert request.
+3. Set My Focus and explain what you expect ApplyFirst to monitor.
+4. Join beta email alerts if you would want opening and deadline reminders.
+5. Open one matching program and check whether its eligibility, timing, status, and official source are clear.
+6. Save it if useful, then submit one Suggest Updates item: a missing program, wrong date, broken link, confusing label, or alert request.
 
 Please tell me what felt useful, what felt confusing, and whether you would trust ApplyFirst to notify you when a watched program opens.
 ```

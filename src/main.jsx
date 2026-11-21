@@ -14,6 +14,8 @@ import {
   saveProgramWatch,
 } from './workspace-api';
 import { createSourceAnalysis, getSourceReviewDecision } from './monitoring';
+import { getOpportunityDiscoveryScope, isCoreOpportunity } from './opportunity-scope';
+import { getPublicOpportunityStatusUpdate } from './public-opportunity-status';
 import {
   confidenceLabels,
   filterOptions,
@@ -75,7 +77,7 @@ const defaultAlertPrefs = {
   roleTrack: '',
   priority: 'all',
   notificationMode: 'waitlist',
-  sendTiming: '',
+  sendTiming: 'openAndDeadline',
 };
 const newProgramOpportunityTypes = [
   'Discovery Program',
@@ -119,6 +121,13 @@ const libraryPriorityLabels = {
   recommended: 'Recommended Programs',
   foundation: 'Prep Resources',
 };
+const libraryDiscoveryScopeLabels = {
+  core: 'Core',
+  all: 'All Records',
+};
+const coreCategoryOptions = filterOptions.categories.filter((category) =>
+  opportunities.some((opportunity) => opportunity.category === category && isCoreOpportunity(opportunity)),
+);
 const librarySortOptions = [
   { value: 'actSoon', label: 'Act Soon' },
   { value: 'recentlyVerified', label: 'Recently Verified' },
@@ -129,21 +138,15 @@ const opportunityStatusSortOrder = {
   open: 1,
   expectedSoon: 2,
   watching: 3,
-  verifyManually: 4,
+  closed: 4,
+  verifyManually: 5,
 };
-const publicMonitorStatusMap = {
-  open: 'open',
-  deadline: 'deadlineSoon',
-  opening_soon: 'expectedSoon',
-  watching: 'watching',
-  closed: 'watching',
-};
-const landingProofSummary = `${opportunities.length}+ Special Programs`;
-const landingSourceCheckedCount = opportunities.filter((opportunity) => getVerificationState(opportunity) === 'verified').length;
+const coreOpportunities = opportunities.filter(isCoreOpportunity);
+const landingSourceCheckedCount = coreOpportunities.filter((opportunity) => getVerificationState(opportunity) === 'verified').length;
 const landingImpactStats = [
-  { value: `${opportunities.length}+`, label: 'Special Programs' },
+  { value: `${coreOpportunities.length}+`, label: 'Core Programs' },
   { value: `${landingSourceCheckedCount}`, label: 'Source-Checked' },
-  { value: 'Beta', label: 'Opening Alerts' },
+  { value: 'Email', label: 'Opening Alerts' },
 ];
 
 function inferClassYearPreference(value = '') {
@@ -801,39 +804,6 @@ function compareOpportunities(a, b, sortMode) {
   return timingDifference || compareOpportunityNames(a, b);
 }
 
-function getLiveOpportunityUpdate(opportunity, liveStatus) {
-  const status = publicMonitorStatusMap[liveStatus?.status];
-  const checkedAt = String(liveStatus?.lastCheckedAt ?? '');
-  const checkedDate = checkedAt.slice(0, 10);
-  const isPositiveSignal = ['open', 'deadline', 'opening_soon'].includes(liveStatus?.status);
-  const isConservativeSignal = ['watching', 'closed'].includes(liveStatus?.status);
-  const hasAcceptedConfidence = isPositiveSignal
-    ? liveStatus?.confidence === 'high'
-    : isConservativeSignal && ['high', 'medium'].includes(liveStatus?.confidence);
-
-  if (!status || !hasAcceptedConfidence) {
-    return null;
-  }
-
-  if (
-    opportunity.statusReviewedAt &&
-    checkedAt &&
-    Date.parse(checkedAt) <= Date.parse(opportunity.statusReviewedAt)
-  ) {
-    return null;
-  }
-
-  if (opportunity.lastChecked && checkedDate && checkedDate < opportunity.lastChecked) {
-    return null;
-  }
-
-  return {
-    status,
-    confidence: liveStatus.confidence,
-    ...(checkedDate ? { lastChecked: checkedDate } : {}),
-  };
-}
-
 function App() {
   const cleanCaptureMode = isCleanCaptureMode();
   const privacyViewRequested = isPrivacyViewRequested();
@@ -869,6 +839,7 @@ function App() {
     }
   });
   const [query, setQuery] = useState(() => getInitialSearchQuery());
+  const [discoveryScope, setDiscoveryScope] = useState('core');
   const [category, setCategory] = useState('all');
   const [roleTrack, setRoleTrack] = useState('all');
   const [priority, setPriority] = useState('all');
@@ -879,6 +850,7 @@ function App() {
   const [libraryScope, setLibraryScope] = useState('all');
   const [sortMode, setSortMode] = useState('actSoon');
   const [liveProgramStatuses, setLiveProgramStatuses] = useState({});
+  const [liveProgramStatusState, setLiveProgramStatusState] = useState('loading');
   const [selectedId, setSelectedId] = useState(() => getInitialSelectedId());
   const [showInternalTools, setShowInternalTools] = useState(() => isReviewToolsRequested());
   const [maintainerToken, setMaintainerToken] = useState('');
@@ -1067,7 +1039,11 @@ function App() {
   const opportunityRecords = useMemo(
     () =>
       opportunities.map((opportunity) => {
-        const liveUpdate = getLiveOpportunityUpdate(opportunity, liveProgramStatuses[opportunity.id]);
+        const liveUpdate = getPublicOpportunityStatusUpdate(
+          opportunity,
+          liveProgramStatuses[opportunity.id],
+          liveProgramStatusState,
+        );
 
         return {
           ...opportunity,
@@ -1076,7 +1052,7 @@ function App() {
           hasLocalVerificationEdit: Boolean(verificationEdits[opportunity.id]),
         };
       }),
-    [liveProgramStatuses, verificationEdits],
+    [liveProgramStatusState, liveProgramStatuses, verificationEdits],
   );
 
   useEffect(() => {
@@ -1102,9 +1078,11 @@ function App() {
                 .map((program) => [program.programId, program]),
             ),
           );
+          setLiveProgramStatusState('loaded');
         })
         .catch(() => {
-          // Keep the curated library available when the live status feed is temporarily unavailable.
+          setLiveProgramStatuses({});
+          setLiveProgramStatusState('unavailable');
         });
     };
 
@@ -1180,6 +1158,7 @@ function App() {
 
       return (
         (!normalizedQuery || searchText.includes(normalizedQuery)) &&
+        (libraryScope !== 'all' || discoveryScope === 'all' || getOpportunityDiscoveryScope(opportunity) === 'core') &&
         (libraryScope === 'all' ||
           (libraryScope === 'saved' && activeSavedIdSet.has(opportunity.id)) ||
           (libraryScope === 'history' && historyProgramIdSet.has(opportunity.id))) &&
@@ -1195,7 +1174,7 @@ function App() {
         (status === 'all' || opportunity.status === status)
       );
     });
-  }, [activeSavedIdSet, category, classYear, historyProgramIdSet, libraryScope, opportunityRecords, priority, query, roleTrack, showInternalTools, status, timing, verification]);
+  }, [activeSavedIdSet, category, classYear, discoveryScope, historyProgramIdSet, libraryScope, opportunityRecords, priority, query, roleTrack, showInternalTools, status, timing, verification]);
 
   const sortedFiltered = useMemo(
     () => [...filtered].sort((a, b) => compareOpportunities(a, b, sortMode)),
@@ -1230,7 +1209,11 @@ function App() {
   const verifiedCount = opportunityRecords.filter((item) => item.confidence === 'high').length;
   const readinessPercent = Math.min(Math.round((opportunityRecords.length / phaseOneTarget) * 100), 100);
   const alertableCount = opportunityRecords.filter((item) => getMonitoringReadiness(item).alertable).length;
-  const readySoonCount = opportunityRecords.filter((item) =>
+  const visibleLibraryRecords = discoveryScope === 'core'
+    ? opportunityRecords.filter(isCoreOpportunity)
+    : opportunityRecords;
+  const visibleLibraryVerifiedCount = visibleLibraryRecords.filter((item) => item.confidence === 'high').length;
+  const visibleReadySoonCount = visibleLibraryRecords.filter((item) =>
     ['open', 'expectedSoon', 'deadlineSoon'].includes(item.status),
   ).length;
   const showReviewToolsToggle =
@@ -1246,7 +1229,7 @@ function App() {
     alerted: onboardingProgress.alerted || Boolean(betaAlertSetup),
     improved: onboardingProgress.improved || studentContributions.length > 0,
   };
-  const onboardingComplete = ['browsed', 'saved', 'focused', 'alerted', 'improved'].every((step) => guideProgress[step]);
+  const onboardingComplete = ['focused', 'alerted', 'browsed', 'saved'].every((step) => guideProgress[step]);
   const showFirstSessionGuide = !onboardingProgress.dismissed && !onboardingComplete;
   const canSyncWorkspace = hasAccess && isWorkspaceInviteCode(activeAccessCode) && Boolean(getWorkerBaseUrl(activeWatchEndpoint));
   const trackProductEvent = (eventName, details = {}) => {
@@ -1780,6 +1763,7 @@ function App() {
 
   const resetFilters = () => {
     setQuery('');
+    setDiscoveryScope('core');
     setRoleTrack('all');
     setPriority('all');
     setVerification('all');
@@ -1891,7 +1875,7 @@ function App() {
           ? getDefaultClassYearForOpportunity(opportunity)
           : currentPrefs.classYear,
         roleTrack: isPreferenceUnset(currentPrefs.roleTrack) ? tracks[0] : currentPrefs.roleTrack,
-        sendTiming: isPreferenceUnset(currentPrefs.sendTiming) ? 'openOnly' : currentPrefs.sendTiming,
+        sendTiming: isPreferenceUnset(currentPrefs.sendTiming) ? 'openAndDeadline' : currentPrefs.sendTiming,
       };
     });
     setActiveView('alerts');
@@ -2236,8 +2220,8 @@ function App() {
             <section className="alert-hero" aria-label="ApplyFirst watch overview">
               <div>
                 <span>My Focus</span>
-                <h1 className="page-hero-title">Choose What ApplyFirst Watches.</h1>
-                <p>Set your focus once. ApplyFirst covers matching programs, while Priority Watches remain optional.</p>
+                <h1 className="page-hero-title">Set Your Focus Once.</h1>
+                <p>ApplyFirst monitors matching programs for you. Priority Watches are optional for the programs you care about most.</p>
               </div>
             </section>
             <AlertSetupPanel
@@ -2270,10 +2254,10 @@ function App() {
               <div className="library-summary-copy">
                 <span>Opportunity Library</span>
                 <h1 className="page-hero-title">
-                  <span className="headline-line">Find Early Programs</span>
-                  <span className="headline-line headline-highlight">Before They Get Crowded.</span>
+                  <span className="headline-line">Selective Programs</span>
+                  <span className="headline-line headline-highlight">Worth Tracking Early.</span>
                 </h1>
-                <p>Compare early programs, fellowships, funding, communities, and timing in one place.</p>
+                <p>Review fellowships, discovery programs, winternships, and distinctive career-launch paths behind your alerts.</p>
                 <label className="global-search hero-search">
                   <span className="sr-only">Search Programs</span>
                   <input
@@ -2296,11 +2280,11 @@ function App() {
                 </div>
                 <dl className="library-stat-grid">
                   <div>
-                    <dt>{opportunityRecords.length}</dt>
-                    <dd>Curated Programs</dd>
+                    <dt>{visibleLibraryRecords.length}</dt>
+                    <dd>{discoveryScope === 'core' ? 'Core Programs' : 'All Records'}</dd>
                   </div>
                   <div>
-                    <dt>{readySoonCount}</dt>
+                    <dt>{visibleReadySoonCount}</dt>
                     <dd>Ready Soon</dd>
                   </div>
                   <div>
@@ -2308,7 +2292,7 @@ function App() {
                     <dd>Saved By You</dd>
                   </div>
                   <div>
-                    <dt>{verifiedCount}</dt>
+                    <dt>{visibleLibraryVerifiedCount}</dt>
                     <dd>Source Confirmed</dd>
                   </div>
                 </dl>
@@ -2333,6 +2317,8 @@ function App() {
               </div>
               <FilterStack
                 showInternalTools={showInternalTools}
+                discoveryScope={discoveryScope}
+                setDiscoveryScope={setDiscoveryScope}
                 category={category}
                 setCategory={setCategory}
                 roleTrack={roleTrack}
@@ -2355,7 +2341,6 @@ function App() {
                 savedCount={activeSavedIds.length}
                 onBrowse={browseProgramsFromGuide}
                 onFocusSetup={() => setActiveView('alerts')}
-                onImproveLibrary={() => setActiveView('contribute')}
                 onDismiss={() => markOnboardingStep('dismissed')}
               />
             ) : null}
@@ -2575,13 +2560,13 @@ function LandingPage({
       <main className="landing-main">
         <section className="landing-hero" aria-label="ApplyFirst private beta">
           <div className="landing-copy">
-            <span>For Openings Students Usually Catch Too Late</span>
+            <span>Fellowships And Discovery Programs, Tracked For You</span>
             <h1 className="landing-headline page-hero-title">
-              <span className="landing-headline-text">Track Early Programs</span>
-              <span className="landing-headline-text landing-headline-accent">Before They Open</span>
+              <span className="landing-headline-text">Know When</span>
+              <span className="landing-headline-text landing-headline-accent">Applications Open</span>
             </h1>
             <p>
-              Save high-signal programs, watch opening windows, and get reviewed alerts before deadlines get crowded.
+              Set your interests once. ApplyFirst monitors official sources and emails you when a relevant application is verified open.
             </p>
             <div className="landing-impact-panel" aria-label="ApplyFirst beta impact">
               <div className="landing-impact-grid">
@@ -2595,7 +2580,7 @@ function LandingPage({
             </div>
             <div className="landing-actions">
               <a className="button primary" href="#waitlist">
-                Join the Waitlist
+                Join the Opening-Alert Waitlist
               </a>
             </div>
           </div>
@@ -2744,8 +2729,8 @@ function ProductPreviewSection() {
     <section className="product-preview" aria-label="ApplyFirst product preview">
       <div className="product-preview-heading">
         <span>Product Preview</span>
-        <h2>From Scattered Links to One Watchlist.</h2>
-        <p>Compare programs, timing, saved targets, and source confidence in one view.</p>
+        <h2>The Details Behind Each Alert.</h2>
+        <p>Check eligibility, timing, current status, and the official source before you act.</p>
       </div>
       <div className="product-preview-layout">
         <div className="product-preview-gallery">
@@ -2781,15 +2766,15 @@ function ProductPreviewSection() {
           <article>
             <span className="signal-icon">02</span>
             <div>
-              <strong>Timing Signal</strong>
-              <p>Opening windows, deadlines, and prep reminders become easier to watch.</p>
+              <strong>Opening Signal</strong>
+              <p>Confirmed openings stay separate from historical estimates and uncertain changes.</p>
             </div>
           </article>
           <article>
             <span className="signal-icon">03</span>
             <div>
               <strong>Student Action</strong>
-              <p>Save programs now; future alerts only go out when signals are trustworthy.</p>
+              <p>Continue to the official application, save the program, or prioritize it for future cycles.</p>
             </div>
           </article>
         </div>
@@ -2803,8 +2788,8 @@ function BetaExampleStrip() {
   return (
     <section className="beta-example-strip" aria-label="Trusted beta examples">
       <div>
-        <span>Beyond Internship Boards</span>
-        <p>Discovery programs, fellowships, funding, prep programs, and alternative paths worth tracking early.</p>
+        <span>Selective Programs, Not Job Volume</span>
+        <p>Discovery programs, fellowships, winternships, and distinctive career-launch paths worth tracking early.</p>
       </div>
       <div className="beta-example-list">
         {betaReadyExamples.slice(0, 4).map((program) => (
@@ -2858,23 +2843,23 @@ function HowItWorksSection() {
   const steps = [
     {
       label: '1',
-      title: 'Find',
-      text: 'Search programs by year, role, timing, and source status.',
+      title: 'Set Your Focus',
+      text: 'Choose your class year, career interest, and alert timing once.',
     },
     {
       label: '2',
-      title: 'Save',
-      text: 'Build one focused list instead of checking scattered links.',
+      title: 'We Monitor',
+      text: 'ApplyFirst checks each official source on its program schedule.',
     },
     {
       label: '3',
-      title: 'Set Focus',
-      text: 'Tell ApplyFirst which openings and deadlines matter to you.',
+      title: 'Get The Signal',
+      text: 'Receive an email when a relevant application is verified open.',
     },
     {
       label: '4',
-      title: 'Get Alerts',
-      text: 'Receive reviewed opening signals for programs that match your focus.',
+      title: 'Act',
+      text: 'Review eligibility and continue to the official application.',
     },
   ];
 
@@ -2882,8 +2867,8 @@ function HowItWorksSection() {
     <section className="how-it-works" aria-label="How ApplyFirst works">
       <div className="how-it-works-copy">
         <span>How It Works</span>
-        <h2>Less Checking. Earlier Action.</h2>
-        <p>ApplyFirst turns scattered lists, old spreadsheets, and official pages into one watchlist students can act on earlier.</p>
+        <h2>Set It Once. Act When It Matters.</h2>
+        <p>The library supports the alert experience; students do not need to keep checking a dashboard.</p>
       </div>
       <div className="how-it-works-steps">
         {steps.map((step) => (
@@ -2898,46 +2883,38 @@ function HowItWorksSection() {
   );
 }
 
-function FirstSessionGuide({ progress, savedCount, onBrowse, onFocusSetup, onImproveLibrary, onDismiss }) {
+function FirstSessionGuide({ progress, savedCount, onBrowse, onFocusSetup, onDismiss }) {
   const steps = [
     {
-      id: 'browsed',
-      label: '1',
-      title: 'Find a Program',
-      text: 'Search or open a listing.',
-      actionLabel: 'Search',
-      onAction: onBrowse,
-    },
-    {
-      id: 'saved',
-      label: '2',
-      title: 'Save One',
-      text: savedCount ? `${savedCount} saved` : 'Bookmark one item.',
-      actionLabel: savedCount ? 'Saved' : 'Bookmark',
-    },
-    {
       id: 'focused',
-      label: '3',
-      title: 'Set Focus',
-      text: progress.focused ? 'Focus set.' : 'Add year, role, timing.',
+      label: '1',
+      title: 'Set Your Focus',
+      text: progress.focused ? 'Focus set.' : 'Choose year, role, and timing.',
       actionLabel: 'Set focus',
       onAction: onFocusSetup,
     },
     {
       id: 'alerted',
-      label: '4',
-      title: 'Enable Alerts',
-      text: 'Add email or phone.',
+      label: '2',
+      title: 'Enable Email Alerts',
+      text: progress.alerted ? 'Alerts active.' : 'Add your email and consent.',
       actionLabel: 'Get alerts',
       onAction: onFocusSetup,
     },
     {
-      id: 'improved',
-      label: '5',
-      title: 'Suggest Updates',
-      text: 'Report stale info',
-      actionLabel: 'Suggest',
-      onAction: onImproveLibrary,
+      id: 'browsed',
+      label: '3',
+      title: 'Review a Match',
+      text: 'Check eligibility and the official source.',
+      actionLabel: 'Browse',
+      onAction: onBrowse,
+    },
+    {
+      id: 'saved',
+      label: '4',
+      title: 'Save If Useful',
+      text: savedCount ? `${savedCount} saved` : 'Keep a program for later.',
+      actionLabel: savedCount ? 'Saved' : 'Save',
     },
   ];
   const completedCount = steps.filter((step) => progress[step.id]).length;
@@ -6534,6 +6511,9 @@ function BetaAlertSystem({
             />
           </label>
         )}
+        <p className="beta-alert-consent">
+          By starting alerts, you agree to receive ApplyFirst email alerts. Unsubscribe anytime.
+        </p>
         <button
           className={setupButtonClassName}
           type="button"
@@ -7372,6 +7352,8 @@ function ReadinessPanel({ readinessPercent, recordCount, verifiedCount, target }
 
 function FilterStack({
   showInternalTools,
+  discoveryScope,
+  setDiscoveryScope,
   category,
   setCategory,
   roleTrack,
@@ -7386,12 +7368,28 @@ function FilterStack({
   setStatus,
   resetFilters,
 }) {
+  const categoryOptions = discoveryScope === 'core' ? coreCategoryOptions : filterOptions.categories;
+  const updateDiscoveryScope = (nextScope) => {
+    setDiscoveryScope(nextScope);
+    if (nextScope === 'core' && category !== 'all' && !coreCategoryOptions.includes(category)) {
+      setCategory('all');
+    }
+  };
+
   return (
     <section className="filter-stack">
       <div className="panel-heading">
         <span>Filters</span>
         <h2>Find Programs That Fit You</h2>
       </div>
+      <FilterSelect
+        label="Library Scope"
+        value={discoveryScope}
+        onChange={updateDiscoveryScope}
+        options={Object.keys(libraryDiscoveryScopeLabels)}
+        labels={libraryDiscoveryScopeLabels}
+        includeAll={false}
+      />
       <FilterSelect
         label="Role track"
         value={roleTrack}
@@ -7414,7 +7412,7 @@ function FilterStack({
           labels={verificationLabels}
         />
       ) : null}
-      <FilterSelect label="Opportunity Type" value={category} onChange={setCategory} options={filterOptions.categories} />
+      <FilterSelect label="Opportunity Type" value={category} onChange={setCategory} options={categoryOptions} />
       <FilterSelect label="Timing" value={timing} onChange={setTiming} options={filterOptions.timing} />
       <FilterSelect label="Status" value={status} onChange={setStatus} options={filterOptions.status} labels={statusLabels} />
       <button className="plain-button" type="button" onClick={resetFilters}>

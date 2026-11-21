@@ -33,6 +33,8 @@
     "frontend:http:test": "node scripts/test-frontend-http.mjs",
     "frontend:workspace:test": "node scripts/test-synced-workspace-contract.mjs",
     "frontend:observability:test": "node scripts/test-client-observability.mjs",
+    "frontend:scope:test": "node scripts/test-opportunity-scope.mjs",
+    "frontend:status:test": "node scripts/test-public-opportunity-status.mjs",
     "watch:invites:sync": "node scripts/sync-beta-invitations.mjs",
     "watch:invites:sync:dry": "node scripts/sync-beta-invitations.mjs --dry-run",
     "watch:d1:migrate": "npx wrangler d1 migrations apply applyfirst-watch --config wrangler.watch.toml --remote",

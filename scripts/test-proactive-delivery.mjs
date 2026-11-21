@@ -711,6 +711,8 @@ function createFocusDeliveryEnv({
   watched = false,
   watchStartedAt = '',
   enableSending = false,
+  activeRecipient = true,
+  failSending = false,
 }) {
   const recipient = {
     id: 'focus-request-1',
@@ -774,7 +776,7 @@ function createFocusDeliveryEnv({
           },
           async all() {
             if (/from watch_requests request/i.test(query)) {
-              return { results: [recipient] };
+              return { results: activeRecipient ? [recipient] : [] };
             }
             if (/from program_delivery_catalog catalog/i.test(query)) {
               return { results: [program] };
@@ -987,6 +989,9 @@ function createFocusDeliveryEnv({
       WATCH_WORKER_PUBLIC_URL: 'https://applyfirst-watch.example.workers.dev',
       EMAIL: {
         async send(message) {
+          if (failSending) {
+            throw new Error('Simulated provider rejection');
+          }
           testState.sentEmails.push(message);
           return { messageId: `test-message-${testState.sentEmails.length}` };
         },
@@ -1390,6 +1395,44 @@ assert.equal(
   sendingImmediateEnv.__testState.autoCandidateUpdates.length,
   1,
   'a successfully delivered proactive opening should mark its linked candidate auto-sent',
+);
+
+const inactiveRecipientRun = await runProactiveDelivery(
+  createFocusDeliveryEnv({
+    subscribedAt: new Date(now - 4 * 24 * 60 * 60 * 1000).toISOString(),
+    statusChangedAt: new Date(now - 60 * 60 * 1000).toISOString(),
+    activeRecipient: false,
+    enableSending: true,
+  }),
+  { dryRun: false, force: true },
+);
+assert.equal(inactiveRecipientRun.eligibleRecipients, 0);
+assert.equal(inactiveRecipientRun.attemptedDeliveries, 0);
+assert.equal(inactiveRecipientRun.sent, 0);
+
+const failedDeliveryEnv = createFocusDeliveryEnv({
+  subscribedAt: new Date(now - 4 * 24 * 60 * 60 * 1000).toISOString(),
+  statusChangedAt: new Date(now - 60 * 60 * 1000).toISOString(),
+  watched: true,
+  watchStartedAt: new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString(),
+  enableSending: true,
+  failSending: true,
+});
+const failedDeliveryRun = await runProactiveDelivery(
+  failedDeliveryEnv,
+  { dryRun: false, force: true, watchRequestId: 'focus-request-1' },
+);
+assert.equal(failedDeliveryRun.attemptedDeliveries, 1);
+assert.equal(failedDeliveryRun.sent, 0);
+assert.equal(failedDeliveryRun.failed, 1);
+assert.equal(
+  [...failedDeliveryEnv.__testState.batchesById.values()][0].status,
+  'failed',
+  'a provider failure must persist the delivery batch as failed',
+);
+assert.match(
+  [...failedDeliveryEnv.__testState.batchesById.values()][0].errorMessage,
+  /Simulated provider rejection/,
 );
 
 const repeatedImmediateRun = await runProactiveDelivery(

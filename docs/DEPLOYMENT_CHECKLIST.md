@@ -5,15 +5,16 @@ Use this checklist before sharing the public prototype link with beta testers.
 ## Before Commit
 
 - Run `npm run build`.
-- Browser-check landing page, invite code flow, Programs, My Focus, and Suggest Updates.
+- Browser-check landing page, invite code flow, My Focus, Programs, and Suggest Updates.
 - Confirm mobile has no horizontal overflow.
 - Confirm waitlist/contact copy says beta watch requests are available and high-confidence opening alerts can email automatically.
 - Confirm My Focus can submit a beta watch setup by email or text, shows the watch plan and submitted receipt, and clearly says high-confidence opening signals can email automatically while uncertain signals stay in review.
 - Confirm My Focus says beta alerts are opt-in and can be unsubscribed from email.
 - Confirm Suggest Updates feels student-facing, not maintainer-only.
 - Confirm Suggest Updates asks for wrong dates, wrong eligibility, broken links, outdated status, missing programs, alert requests, confusing labels, duplicates, and other feedback.
-- Confirm the landing page explains that library, saved programs, My Focus, beta watch requests, and feedback are beta-testable.
-- Confirm Start Here tracks Find, Save, Set My Focus, Join Alerts, and Suggest Updates, then hides after completion or dismissal.
+- Confirm the landing page leads with setting Focus and receiving verified opening alerts, not browsing a large directory.
+- Confirm Programs defaults to Core Programs, All Records remains available, and Saved/Application History records are not hidden by the scope switch.
+- Confirm Start Here tracks Set Your Focus, Enable Email Alerts, Review a Match, and Save If Useful, then hides after completion or dismissal.
 - Review `docs/VERIFIED_SEED_SCHEDULE_AUDIT.md` if opportunity URLs, statuses, or expected opening months changed.
 - Turn on Maintainer Mode, open Review, enter the Worker admin token, and confirm queues can load without exposing the token in browser storage.
 
@@ -30,7 +31,7 @@ After push:
 
 1. Wait for Cloudflare Pages to build the latest commit.
 2. Open the production URL.
-3. Confirm the deployed build shows the latest nav: Programs / My Focus / Suggest Updates / About.
+3. Confirm the deployed build shows the latest nav: Programs / My Focus / Suggest Updates / About and the notification-first landing copy.
 4. Confirm invite code access works.
 5. Submit one test waitlist/contact entry.
 6. Submit one test beta watch setup.
@@ -56,7 +57,7 @@ Share the public prototype only after:
 - Capture endpoints are working, or you intentionally accept local-only testing.
 - The tester has an invite code.
 - The tester knows ApplyFirst can email high-confidence official opening signals automatically, while uncertain candidates are reviewed before sending.
-- The tester has a simple task path: read About, join or unlock, browse Programs, open one expanded program detail, save one program, set My Focus, submit a beta watch setup, and submit one piece of feedback.
+- The tester has a simple task path: read About, join or unlock, set My Focus, enable email alerts, review one matching program, save it if useful, and submit one piece of feedback.
 
 ## Rollback Plan
 
