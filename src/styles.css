@@ -634,6 +634,15 @@ a {
   margin-top: 28px;
 }
 
+.landing-cta-note {
+  max-width: 620px;
+  margin-top: 12px;
+  color: var(--quiet);
+  font-size: 0.82rem;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
 .beta-panel-note {
   margin: 2px 0 0;
   color: var(--muted);
