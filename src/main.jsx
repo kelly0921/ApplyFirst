@@ -142,11 +142,10 @@ const opportunityStatusSortOrder = {
   verifyManually: 5,
 };
 const coreOpportunities = opportunities.filter(isCoreOpportunity);
-const landingSourceCheckedCount = coreOpportunities.filter((opportunity) => getVerificationState(opportunity) === 'verified').length;
 const landingImpactStats = [
-  { value: `${coreOpportunities.length}+`, label: 'Core Programs' },
-  { value: `${landingSourceCheckedCount}`, label: 'Source-Checked' },
-  { value: 'Email', label: 'Opening Alerts' },
+  { value: `${coreOpportunities.length}`, label: 'Curated Programs' },
+  { value: 'Official', label: 'Program Sources' },
+  { value: 'Opt-in', label: 'Opening Alerts' },
 ];
 
 function inferClassYearPreference(value = '') {
@@ -2552,7 +2551,7 @@ function LandingPage({
           <ApplyFirstMark />
           <span className="brand-copy">
             <strong>ApplyFirst</strong>
-            <em>Find Early. Apply First.</em>
+            <em>More Doors. Better Timing.</em>
           </span>
         </div>
       </header>
@@ -2560,13 +2559,15 @@ function LandingPage({
       <main className="landing-main">
         <section className="landing-hero" aria-label="ApplyFirst private beta">
           <div className="landing-copy">
-            <span>Fellowships And Discovery Programs, Tracked For You</span>
+            <span>Beyond The Usual Internship Search</span>
             <h1 className="landing-headline page-hero-title">
-              <span className="landing-headline-text">Know When</span>
-              <span className="landing-headline-text landing-headline-accent">Applications Open</span>
+              <span className="landing-headline-text">Discover More Doors.</span>
+              <span className="landing-headline-text landing-headline-accent">Know When They Open.</span>
             </h1>
             <p>
-              Set your interests once. ApplyFirst monitors official sources and emails you when a relevant application is verified open.
+              Great early-career opportunities go beyond traditional internships. Explore fellowships,
+              discovery programs, winternships, and distinctive career-launch paths. Set your Focus once;
+              ApplyFirst checks official sources and emails you when a matching application is confirmed open.
             </p>
             <div className="landing-impact-panel" aria-label="ApplyFirst beta impact">
               <div className="landing-impact-grid">
@@ -2580,12 +2581,19 @@ function LandingPage({
             </div>
             <div className="landing-actions">
               <a className="button primary" href="#waitlist">
-                Join the Opening-Alert Waitlist
+                Join the Private Beta Waitlist
               </a>
+              <a className="button secondary" href="#beta-access">
+                Already Invited? Enter Your Code
+              </a>
+            </div>
+            <div className="landing-cta-note">
+              Joining the waitlist does not start email alerts. Invited students choose whether to receive
+              opening alerts after entering the beta.
             </div>
           </div>
 
-          <aside className="landing-panel" aria-label="Private Beta Access">
+          <aside id="beta-access" className="landing-panel" aria-label="Private Beta Access">
             <div className="landing-panel-kicker">
               <span>Private Beta</span>
               <strong>Invite Only</strong>
@@ -2659,7 +2667,7 @@ function PrivacyDataUsePage() {
           <ApplyFirstMark />
           <span className="brand-copy">
             <strong>ApplyFirst</strong>
-            <em>Find Early. Apply First.</em>
+            <em>More Doors. Better Timing.</em>
           </span>
         </a>
         <a className="privacy-back-link" href="/">Back to ApplyFirst</a>
@@ -2729,8 +2737,8 @@ function ProductPreviewSection() {
     <section className="product-preview" aria-label="ApplyFirst product preview">
       <div className="product-preview-heading">
         <span>Product Preview</span>
-        <h2>The Details Behind Each Alert.</h2>
-        <p>Check eligibility, timing, current status, and the official source before you act.</p>
+        <h2>Know What It Is. Know If It's Time.</h2>
+        <p>See eligibility, timing, current status, and official-source links before you decide what to pursue.</p>
       </div>
       <div className="product-preview-layout">
         <div className="product-preview-gallery">
@@ -2788,8 +2796,8 @@ function BetaExampleStrip() {
   return (
     <section className="beta-example-strip" aria-label="Trusted beta examples">
       <div>
-        <span>Selective Programs, Not Job Volume</span>
-        <p>Discovery programs, fellowships, winternships, and distinctive career-launch paths worth tracking early.</p>
+        <span>Beyond Ordinary Job Posts</span>
+        <p>Insight programs, fellowships, winternships, and structured career-launch experiences that open up new paths.</p>
       </div>
       <div className="beta-example-list">
         {betaReadyExamples.slice(0, 4).map((program) => (
@@ -2803,20 +2811,20 @@ function BetaExampleStrip() {
 function CareerAgencySection() {
   const agencySignals = [
     {
-      title: 'Apply Earlier',
-      text: 'Many programs review as applications arrive or close once spots fill, so timing alerts help students move early.',
+      title: 'Move When It Matters',
+      text: 'Some programs have short or rolling application windows. Confirmed opening alerts help you act in time.',
     },
     {
-      title: 'Built For Your Stage',
-      text: 'Many programs are designed before students have traditional internship experience.',
+      title: 'Find Early-Career Paths',
+      text: 'Discover experiences designed for students who are still exploring their first career steps.',
     },
     {
-      title: 'Build Proof',
-      text: 'Turn programs, fellowships, and prep into projects, resume signal, peers, and clearer stories.',
+      title: 'Gain Exposure',
+      text: 'Programs can introduce you to new fields, mentors, peers, and workplace environments.',
     },
     {
-      title: 'Choose Better',
-      text: 'Use early exposure to learn what kind of work and environment you actually want.',
+      title: 'Choose For Yourself',
+      text: 'Learn what kind of work, team, and environment fits you—not just where you could apply.',
     },
   ];
 
@@ -2824,7 +2832,7 @@ function CareerAgencySection() {
     <section className="career-agency" aria-label="Why early career programs matter">
       <div className="career-agency-copy">
         <span>Why It Matters</span>
-        <h2>Explore Early. Build Leverage.</h2>
+        <h2>More Than A Résumé Line.</h2>
       </div>
       <div className="agency-map" aria-label="Early career program benefits">
         {agencySignals.map((signal) => (
@@ -2843,23 +2851,23 @@ function HowItWorksSection() {
   const steps = [
     {
       label: '1',
-      title: 'Set Your Focus',
-      text: 'Choose your class year, career interest, and alert timing once.',
+      title: 'Choose Your Direction',
+      text: 'Explore programs and set your class year and interests; alert opt-in comes later.',
     },
     {
       label: '2',
-      title: 'We Monitor',
-      text: 'ApplyFirst checks each official source on its program schedule.',
+      title: 'We Check Sources',
+      text: 'ApplyFirst monitors official program pages and holds uncertain updates for review.',
     },
     {
       label: '3',
-      title: 'Get The Signal',
-      text: 'Receive an email when a relevant application is verified open.',
+      title: 'Get Opening Alerts',
+      text: 'If you opt in, receive email alerts when a matching application is confirmed open.',
     },
     {
       label: '4',
-      title: 'Act',
-      text: 'Review eligibility and continue to the official application.',
+      title: 'Decide And Apply',
+      text: 'Confirm your eligibility and apply through the official program site.',
     },
   ];
 
@@ -2867,8 +2875,8 @@ function HowItWorksSection() {
     <section className="how-it-works" aria-label="How ApplyFirst works">
       <div className="how-it-works-copy">
         <span>How It Works</span>
-        <h2>Set It Once. Act When It Matters.</h2>
-        <p>The library supports the alert experience; students do not need to keep checking a dashboard.</p>
+        <h2>Discover Your Direction. We'll Watch The Timing.</h2>
+        <p>See your matches before opting in. Once alerts are on, you don't need to keep checking a dashboard.</p>
       </div>
       <div className="how-it-works-steps">
         {steps.map((step) => (
@@ -2979,7 +2987,7 @@ function Header({
         <ApplyFirstMark />
         <span className="brand-copy">
           <strong>ApplyFirst</strong>
-          <em>Find Early. Apply First.</em>
+          <em>More Doors. Better Timing.</em>
         </span>
       </button>
       <nav aria-label="Page links">
