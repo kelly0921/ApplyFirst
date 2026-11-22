@@ -385,10 +385,24 @@ const testerSegmentOptions = [
 ];
 
 const betaReadyExamples = [
-  'INSIGHT',
-  'Futureforce Tech Launchpad',
-  'Women in Trading Technology',
-  'The New Technologists',
+  {
+    id: 'capital-one-analyst-summit',
+    title: 'Capital One Analyst Summit',
+    category: 'Underclassman discovery',
+    fit: 'First-year students and sophomores',
+  },
+  {
+    id: 'thrive-capital-summer-fellowship',
+    title: 'Thrive Capital Summer Fellowship',
+    category: 'Startup / VC fellowship',
+    fit: 'Current college students',
+  },
+  {
+    id: 'claude-corps-2027',
+    title: 'Claude Corps',
+    category: 'First-job alternative',
+    fit: 'Early-career applicants; full-time program',
+  },
 ];
 
 const hostQualifiedTitleIds = new Set([
@@ -2559,16 +2573,15 @@ function LandingPage({
       <main className="landing-main">
         <section className="landing-hero" aria-label="ApplyFirst private beta">
           <div className="landing-copy">
-            <span>College Students · Fellowships · Insight Programs · Winternships</span>
+            <span>Discovery Programs · Fellowships · Winternships · Career-Start Paths</span>
             <h1 className="landing-headline page-hero-title">
-              <span className="landing-headline-text">Find Programs Beyond the Job Board.</span>
-              <span className="landing-headline-text landing-headline-accent">Know When Applications Open.</span>
+              <span className="landing-headline-text">Find Selective Programs</span>
+              <span className="landing-headline-text landing-headline-accent">Before Applications Open.</span>
             </h1>
             <p>
-              Internships are not the only way to get started. Explore curated fellowships, company
-              insight programs, winternships, and distinctive career-launch paths. Choose your class
-              year and interests; we monitor selected official program pages and, if you opt in, email
-              you when a matching application is confirmed open.
+              Explore underclassman discovery programs, fellowships, winternships, and first-job
+              alternatives. Programs remain discoverable between application cycles. Set your Focus
+              and opt into email alerts when a matching application is confirmed open.
             </p>
             <div className="landing-impact-panel" aria-label="ApplyFirst beta impact">
               <div className="landing-impact-grid">
@@ -2798,15 +2811,30 @@ function ProductPreviewSection() {
 
 function BetaExampleStrip() {
   return (
-    <section className="beta-example-strip" aria-label="Trusted beta examples">
+    <section className="beta-example-strip" aria-label="Examples of programs ApplyFirst tracks">
       <div>
-        <span>Examples From The Library</span>
-        <p>Real programs, not generic job listings. Check each official page for current eligibility and timing.</p>
+        <span>Across Early-Career Paths</span>
+        <p>
+          Explore these programs even between application cycles. Examples show program types, not
+          guaranteed current openings; check each official page for eligibility and timing.
+        </p>
       </div>
       <div className="beta-example-list">
-        {betaReadyExamples.slice(0, 4).map((program) => (
-          <em key={program}>{program}</em>
-        ))}
+        {betaReadyExamples.map((example) => {
+          const program = coreOpportunities.find((item) => item.id === example.id);
+          if (!program) return null;
+
+          return (
+            <article className="beta-example-item" key={example.id}>
+              <span>{example.category}</span>
+              <strong>{example.title}</strong>
+              <small>{example.fit}</small>
+              <a href={program.url} target="_blank" rel="noopener noreferrer" aria-label={`Official page for ${example.title}`}>
+                Official program page ↗
+              </a>
+            </article>
+          );
+        })}
       </div>
     </section>
   );
@@ -2815,16 +2843,16 @@ function BetaExampleStrip() {
 function WhyApplyFirstSection() {
   const differences = [
     {
-      title: 'Beyond job postings',
-      text: 'Find selected discovery programs, fellowships, winternships, and career-launch paths alongside your usual internship search.',
+      title: 'Selective programs, not job volume',
+      text: 'Explore underclassman discovery programs, fellowships, winternships, and distinctive first-job alternatives.',
     },
     {
-      title: 'Watched between cycles',
-      text: 'We check official program pages for opening signals instead of leaving you to revisit last year’s links.',
+      title: 'Discoverable between cycles',
+      text: 'Keep programs in view after applications close. We track selected official sources rather than relying only on past-year links.',
     },
     {
-      title: 'Relevant, confirmed alerts',
-      text: 'Choose your class year and interests. Opt in to email alerts for confirmed openings; uncertain statuses stay marked Needs Confirmation.',
+      title: 'Matched, verified opening alerts',
+      text: 'Choose your class year and interests. Opt in to emails for confirmed openings; uncertain statuses remain Needs Confirmation.',
     },
   ];
 
@@ -2832,11 +2860,11 @@ function WhyApplyFirstSection() {
     <section className="landing-difference" aria-label="What makes ApplyFirst different">
       <div className="landing-difference-heading">
         <span>Why ApplyFirst?</span>
-        <h2>A list tells you what exists. ApplyFirst helps you know when to act.</h2>
+        <h2>Programs Stay Visible Between Application Cycles.</h2>
         <p>
-          Job boards focus on open roles. Opportunity lists help you find programs.
-          ApplyFirst connects that discovery with official-source monitoring for programs
-          that may open only during certain recruiting cycles.
+          See what is open now, what may return in another cycle, and what still needs
+          confirmation—all in one curated program library. ApplyFirst tracks selected official
+          sources and alerts matching students only after an opening is confirmed.
         </p>
       </div>
       <div className="landing-difference-grid">
