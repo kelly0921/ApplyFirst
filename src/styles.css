@@ -1171,6 +1171,10 @@ a {
   line-height: 1.42;
 }
 
+.landing-main > .beta-example-strip {
+  margin: 0 0 18px;
+}
+
 .beta-example-strip {
   display: grid;
   grid-template-columns: minmax(380px, 0.44fr) minmax(0, 1fr);
