@@ -2747,6 +2747,10 @@ function ProductPreviewSection() {
             <img
               src={programsScreenshot}
               alt="ApplyFirst Programs page with search, filters, library snapshot, opportunity list, and selected program details."
+              width="3600"
+              height="2500"
+              loading="lazy"
+              decoding="async"
             />
             <figcaption>
               <strong>Program Library</strong>
@@ -2757,6 +2761,10 @@ function ProductPreviewSection() {
             <img
               src={programStatusMixScreenshot}
               alt="ApplyFirst program rows showing Open Now, Watching, Deadline Soon, and Opening Soon status examples."
+              width="1232"
+              height="2454"
+              loading="lazy"
+              decoding="async"
             />
             <figcaption>
               <strong>Status Signals</strong>
