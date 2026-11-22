@@ -22,6 +22,19 @@ For freshmen and sophomores, these programs can be especially valuable because c
 
 The long-term benefit is agency. The more early exposure a student gets, the more they can compare environments, build a network, understand their own values, and make informed choices. Over time, the goal is not only helping companies choose students; it is helping students understand which companies, roles, cultures, and industries they want to choose.
 
+## Homepage Content Rules
+
+- Lead with one literal product promise. Supporting copy should add only the opportunity types, monitoring behavior, and optional alert outcome needed to understand it.
+- Keep the hero concise. Do not repeat the same idea across the eyebrow, headline, paragraph, proof, and CTA note.
+- Use the eyebrow for audience context, not a second list of product categories.
+- Treat numbers as proof only when they are real, meaningful, and automatically derived. Do not format feature labels such as `Official Sources` or `Opt-in Alerts` as metrics.
+- Place the current curated-program count near real program examples, not in the hero.
+- Keep each section responsible for one job: the hero states the promise, examples show what is tracked, differentiation explains why ApplyFirst exists, process explains how it works, and program benefits explain why the opportunities matter.
+- Show the product with real catalog records and screenshots. Avoid explanatory cards that restate a process already described elsewhere.
+- Keep invite access language direct: `Already invited?`, `Open your workspace`, `Invite code`, and `Continue`. Avoid stacking synonymous labels such as `Private Beta`, `Invite Only`, and `Enter Invite Code`.
+- State the consent boundary once near the primary action: waitlist signup is for beta access, and alerts remain optional inside ApplyFirst.
+- Preserve the final waitlist CTA even when it repeats the action; a closing CTA is useful repetition, while repeated explanatory copy is not.
+
 This matters most in fields that are hard to break into, such as quant, finance tech, product, AI, research, and selective fellowship pipelines. Discovery programs can become a bridge into those spaces before traditional internship recruiting becomes highly competitive.
 
 ## Target User

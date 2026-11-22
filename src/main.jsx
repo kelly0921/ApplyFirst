@@ -142,11 +142,6 @@ const opportunityStatusSortOrder = {
   verifyManually: 5,
 };
 const coreOpportunities = opportunities.filter(isCoreOpportunity);
-const landingImpactStats = [
-  { value: `${coreOpportunities.length}`, label: 'Curated Programs' },
-  { value: 'Official', label: 'Program Sources' },
-  { value: 'Opt-in', label: 'Opening Alerts' },
-];
 
 function inferClassYearPreference(value = '') {
   const normalizedValue = value.toLowerCase();
@@ -384,26 +379,26 @@ const testerSegmentOptions = [
   { value: 'other', label: 'Other Beta Group' },
 ];
 
-const betaReadyExamples = [
-  {
-    id: 'capital-one-analyst-summit',
-    title: 'Capital One Analyst Summit',
-    category: 'Underclassman discovery',
-    fit: 'First-year students and sophomores',
-  },
-  {
-    id: 'thrive-capital-summer-fellowship',
-    title: 'Thrive Capital Summer Fellowship',
-    category: 'Startup / VC fellowship',
-    fit: 'Current college students',
-  },
-  {
-    id: 'claude-corps-2027',
-    title: 'Claude Corps',
-    category: 'First-job alternative',
-    fit: 'Early-career applicants; full-time program',
-  },
+const landingExampleProgramIds = [
+  'capital-one-tech-summit',
+  'thrive-capital-summer-fellowship',
+  'claude-corps-2027',
 ];
+
+const landingExamplePresentationById = {
+  'capital-one-tech-summit': {
+    stage: 'Underclassman',
+    summary: 'Five-day technology discovery program for sophomores exploring engineering careers.',
+  },
+  'thrive-capital-summer-fellowship': {
+    stage: 'College',
+    summary: 'Paid startup and venture fellowship for current college students.',
+  },
+  'claude-corps-2027': {
+    stage: 'New Grad / Early Career',
+    summary: 'Paid, 12-month full-time fellowship for applicants starting their careers.',
+  },
+};
 
 const hostQualifiedTitleIds = new Set([
   'palantir-american-tech-fellowship',
@@ -2189,6 +2184,7 @@ function App() {
       <LandingPage
         alertPrefs={alertPrefs}
         alertStrategy={alertStrategy}
+        opportunities={opportunityRecords}
         waitlistIntent={waitlistIntent}
         waitlistEndpoint={activeWaitlistEndpoint}
         watchEndpoint={activeWatchEndpoint}
@@ -2508,6 +2504,7 @@ function App() {
 function LandingPage({
   alertPrefs,
   alertStrategy,
+  opportunities: landingOpportunities,
   waitlistIntent,
   waitlistEndpoint,
   watchEndpoint,
@@ -2573,37 +2570,25 @@ function LandingPage({
       <main className="landing-main">
         <section className="landing-hero" aria-label="ApplyFirst private beta">
           <div className="landing-copy">
-            <span>Discovery Programs · Fellowships · Winternships · Career-Start Paths</span>
+            <span>For College Students and Early-Career Talent</span>
             <h1 className="landing-headline page-hero-title">
-              <span className="landing-headline-text">Find Selective Programs</span>
-              <span className="landing-headline-text landing-headline-accent">Before Applications Open.</span>
+              <span className="landing-headline-text">Find selective programs</span>
+              <span className="landing-headline-text landing-headline-accent">before applications open.</span>
             </h1>
             <p>
-              Explore underclassman discovery programs, fellowships, winternships, and first-job
-              alternatives. Programs remain discoverable between application cycles. Set your Focus
-              and opt into email alerts when a matching application is confirmed open.
+              Explore underclassman discovery programs, fellowships, winternships, and first-job alternatives.
+              Set your Focus, and ApplyFirst can alert you when a matching application is confirmed open.
             </p>
-            <div className="landing-impact-panel" aria-label="ApplyFirst beta impact">
-              <div className="landing-impact-grid">
-                {landingImpactStats.map((stat) => (
-                  <span key={stat.label}>
-                    <strong>{stat.value}</strong>
-                    <em>{stat.label}</em>
-                  </span>
-                ))}
-              </div>
-            </div>
             <div className="landing-actions">
               <a className="button primary" href="#waitlist">
                 Join the Private Beta Waitlist
               </a>
               <a className="button secondary" href="#beta-access">
-                Have an Invite? Enter Your Code
+                Have an Invite Code?
               </a>
             </div>
             <div className="landing-cta-note">
-              Joining the waitlist does not start email alerts. Invited students choose whether to receive
-              opening alerts after entering the beta.
+              Waitlist signup is for beta access only. Alerts are optional inside ApplyFirst.
             </div>
           </div>
 
@@ -2639,11 +2624,9 @@ function LandingPage({
           </aside>
         </section>
 
-        <BetaExampleStrip />
+        <ProgramExampleSection opportunities={landingOpportunities} />
 
         <WhyApplyFirstSection />
-
-        <HowItWorksSection />
 
         <ProductPreviewSection />
 
@@ -2781,81 +2764,66 @@ function ProductPreviewSection() {
             </figcaption>
           </figure>
         </div>
-        <div className="signal-stack" aria-label="ApplyFirst signal examples">
-          <article>
-            <span className="signal-icon">01</span>
-            <div>
-              <strong>Source Check</strong>
-              <p>Official page, prior URL, timing notes, and verification status stay together.</p>
-            </div>
-          </article>
-          <article>
-            <span className="signal-icon">02</span>
-            <div>
-              <strong>Opening Signal</strong>
-              <p>Confirmed openings stay separate from historical estimates and uncertain changes.</p>
-            </div>
-          </article>
-          <article>
-            <span className="signal-icon">03</span>
-            <div>
-              <strong>Student Action</strong>
-              <p>Continue to the official application, save the program, or prioritize it for future cycles.</p>
-            </div>
-          </article>
-        </div>
       </div>
     </section>
   );
 }
 
-function BetaExampleStrip() {
+function ProgramExampleSection({ opportunities: landingOpportunities }) {
+  const examples = landingExampleProgramIds
+    .map((programId) => landingOpportunities.find((opportunity) => opportunity.id === programId))
+    .filter(Boolean);
+
   return (
-    <section className="beta-example-strip" aria-label="Examples of programs ApplyFirst tracks">
-      <div>
-        <span>Across Early-Career Paths</span>
+    <section className="landing-program-showcase" aria-labelledby="landing-program-showcase-title">
+      <div className="landing-program-showcase-heading">
+        <span>Underclassman · College · New Grad</span>
+        <h2 id="landing-program-showcase-title">Three different ways to start.</h2>
         <p>
-          Explore these programs even between application cycles. Examples show program types, not
-          guaranteed current openings; check each official page for eligibility and timing.
+          {coreOpportunities.length} curated programs include discovery experiences, selective fellowships,
+          and distinctive alternatives to a conventional first job.
         </p>
       </div>
-      <div className="beta-example-list">
-        {betaReadyExamples.map((example) => {
-          const program = coreOpportunities.find((item) => item.id === example.id);
-          if (!program) return null;
+      <div className="landing-program-grid">
+        {examples.map((program) => {
+          const presentation = landingExamplePresentationById[program.id] ?? {
+            stage: 'Early Career',
+            summary: program.description,
+          };
+          const statusLabel = statusLabels[program.status] ?? 'Needs Confirmation';
 
           return (
-            <article className="beta-example-item" key={example.id}>
-              <span>{example.category}</span>
-              <strong>{example.title}</strong>
-              <small>{example.fit}</small>
-              <a href={program.url} target="_blank" rel="noopener noreferrer" aria-label={`Official page for ${example.title}`}>
-                Official program page ↗
+            <article className="landing-program-card" key={program.id}>
+              <div className="landing-program-card-status">
+                <span className="landing-program-stage">{presentation.stage}</span>
+                <span className={`status-pill status-${program.status}`}>{statusLabel}</span>
+              </div>
+              <div className="landing-program-card-title">
+                <h3>{program.name}</h3>
+                <p>{program.organization}</p>
+              </div>
+              <p className="landing-program-card-summary">{presentation.summary}</p>
+              <a
+                className="landing-program-source"
+                href={program.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`Open the official source for ${program.name}`}
+              >
+                View official source <span aria-hidden="true">↗</span>
               </a>
             </article>
           );
         })}
       </div>
+      <p className="landing-program-showcase-note">
+        Statuses are checked against official sources. Uncertain openings are labeled Needs Confirmation.
+      </p>
     </section>
   );
 }
 
 function WhyApplyFirstSection() {
-  const differences = [
-    {
-      title: 'Selective programs, not job volume',
-      text: 'Explore underclassman discovery programs, fellowships, winternships, and distinctive first-job alternatives.',
-    },
-    {
-      title: 'Discoverable between cycles',
-      text: 'Keep programs in view after applications close. We track selected official sources rather than relying only on past-year links.',
-    },
-    {
-      title: 'Matched, verified opening alerts',
-      text: 'Choose your class year and interests. Opt in to emails for confirmed openings; uncertain statuses remain Needs Confirmation.',
-    },
-  ];
-
   return (
     <section className="landing-difference" aria-label="What makes ApplyFirst different">
       <div className="landing-difference-heading">
@@ -2863,28 +2831,43 @@ function WhyApplyFirstSection() {
         <h2>Programs Stay Visible Between Application Cycles.</h2>
         <p>
           See what is open now, what may return in another cycle, and what still needs
-          confirmation—all in one curated program library. ApplyFirst tracks selected official
+          confirmation. ApplyFirst tracks selected official
           sources and alerts matching students only after an opening is confirmed.
         </p>
       </div>
-      <div className="landing-difference-grid">
-        {differences.map((difference, index) => (
-          <article key={difference.title}>
-            <span>{`0${index + 1}`}</span>
-            <h3>{difference.title}</h3>
-            <p>{difference.text}</p>
-          </article>
-        ))}
-      </div>
+      <ProgramLifecycle />
     </section>
+  );
+}
+
+function ProgramLifecycle() {
+  const stages = [
+    ['Discover', 'Learn what the program offers'],
+    ['Between cycles', 'Keep it visible after applications close'],
+    ['Monitoring', 'Check the selected official source'],
+    ['Confirmed open', 'Update only with current evidence'],
+    ['Matched alert', 'Email students who opted in'],
+    ['Apply', 'Continue on the official site'],
+  ];
+
+  return (
+    <ol className="program-lifecycle" aria-label="Illustrative ApplyFirst program lifecycle">
+      {stages.map(([title, text], index) => (
+        <li key={title} className={index === 2 ? 'active' : ''}>
+          <span>{index + 1}</span>
+          <strong>{title}</strong>
+          <p>{text}</p>
+        </li>
+      ))}
+    </ol>
   );
 }
 
 function CareerAgencySection() {
   const agencySignals = [
     {
-      title: 'Move When It Matters',
-      text: 'Some programs have short or rolling application windows. Confirmed opening alerts help you act in time.',
+      title: 'Explore An Industry',
+      text: 'Use focused programs to experience a field before deciding where you want to build your career.',
     },
     {
       title: 'Find Early-Career Paths',
@@ -2912,50 +2895,6 @@ function CareerAgencySection() {
             <span aria-hidden="true" />
             <strong>{signal.title}</strong>
             <p>{signal.text}</p>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function HowItWorksSection() {
-  const steps = [
-    {
-      label: '1',
-      title: 'Choose Your Direction',
-      text: 'Explore programs and set your class year and interests; alert opt-in comes later.',
-    },
-    {
-      label: '2',
-      title: 'We Check Sources',
-      text: 'ApplyFirst monitors official program pages and holds uncertain updates for review.',
-    },
-    {
-      label: '3',
-      title: 'Get Opening Alerts',
-      text: 'If you opt in, receive email alerts when a matching application is confirmed open.',
-    },
-    {
-      label: '4',
-      title: 'Decide And Apply',
-      text: 'Confirm your eligibility and apply through the official program site.',
-    },
-  ];
-
-  return (
-    <section className="how-it-works" aria-label="How ApplyFirst works">
-      <div className="how-it-works-copy">
-        <span>How It Works</span>
-        <h2>Set Your Focus. Get Opening Alerts.</h2>
-        <p>Explore programs before opting in. We'll check official sources so you don't have to keep refreshing each one.</p>
-      </div>
-      <div className="how-it-works-steps">
-        {steps.map((step) => (
-          <article key={step.label}>
-            <span>{step.label}</span>
-            <strong>{step.title}</strong>
-            <p>{step.text}</p>
           </article>
         ))}
       </div>
@@ -7181,6 +7120,12 @@ function WaitlistPanel({
           <p>
             This is optional. Add an email only if you want ApplyFirst to reach out when live reminders or beta testing
             are ready.
+          </p>
+        ) : null}
+        {isLandingContext && !confirmationComplete && !confirmationPending && !waitlistIntent ? (
+          <p>
+            Join for private-beta access to the program library. After you are invited, you decide whether to start
+            personalized opening alerts.
           </p>
         ) : null}
       </div>
