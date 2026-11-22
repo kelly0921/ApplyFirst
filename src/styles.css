@@ -913,6 +913,81 @@ a {
   line-height: 1.45;
 }
 
+.landing-difference {
+  display: grid;
+  gap: 18px;
+  margin: 0 0 18px;
+  border: 1px solid rgba(15, 127, 150, 0.2);
+  border-radius: 24px;
+  background: linear-gradient(145deg, #f9fcfd, #eef7fa);
+  padding: clamp(18px, 2.5vw, 26px);
+}
+
+.landing-difference-heading {
+  display: grid;
+  gap: 8px;
+}
+
+.landing-difference-heading > span {
+  color: var(--brand-accent);
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.landing-difference-heading h2 {
+  max-width: 800px;
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(1.45rem, 2.5vw, 2.1rem);
+  line-height: 1.15;
+}
+
+.landing-difference-heading p {
+  max-width: 820px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.96rem;
+  line-height: 1.55;
+}
+
+.landing-difference-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 12px;
+}
+
+.landing-difference-grid article {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 18px;
+}
+
+.landing-difference-grid article > span {
+  color: var(--brand-accent);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.landing-difference-grid h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 1.04rem;
+  line-height: 1.25;
+}
+
+.landing-difference-grid p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
 .how-it-works {
   display: grid;
   grid-template-columns: 1fr;
