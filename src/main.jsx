@@ -2551,7 +2551,7 @@ function LandingPage({
           <ApplyFirstMark />
           <span className="brand-copy">
             <strong>ApplyFirst</strong>
-            <em>More Doors. Better Timing.</em>
+            <em>Career-launch programs, tracked early.</em>
           </span>
         </div>
       </header>
@@ -2559,15 +2559,16 @@ function LandingPage({
       <main className="landing-main">
         <section className="landing-hero" aria-label="ApplyFirst private beta">
           <div className="landing-copy">
-            <span>Beyond The Usual Internship Search</span>
+            <span>Fellowships · Insight Programs · Winternships</span>
             <h1 className="landing-headline page-hero-title">
-              <span className="landing-headline-text">Discover More Doors.</span>
-              <span className="landing-headline-text landing-headline-accent">Know When They Open.</span>
+              <span className="landing-headline-text">Find Early-Career Programs.</span>
+              <span className="landing-headline-text landing-headline-accent">Get Alerts When Applications Open.</span>
             </h1>
             <p>
-              Great early-career opportunities go beyond traditional internships. Explore fellowships,
-              discovery programs, winternships, and distinctive career-launch paths. Set your Focus once;
-              ApplyFirst checks official sources and emails you when a matching application is confirmed open.
+              Explore fellowships, company insight programs, winternships, and other career-launch
+              opportunities beyond ordinary internship listings. Choose your class year and interests,
+              then opt into email alerts when a matching program is confirmed open—without checking
+              every website yourself.
             </p>
             <div className="landing-impact-panel" aria-label="ApplyFirst beta impact">
               <div className="landing-impact-grid">
@@ -2584,7 +2585,7 @@ function LandingPage({
                 Join the Private Beta Waitlist
               </a>
               <a className="button secondary" href="#beta-access">
-                Already Invited? Enter Your Code
+                Have an Invite? Enter Your Code
               </a>
             </div>
             <div className="landing-cta-note">
@@ -2624,6 +2625,8 @@ function LandingPage({
             </a>
           </aside>
         </section>
+
+        <BetaExampleStrip />
 
         <HowItWorksSection />
 
@@ -2667,7 +2670,7 @@ function PrivacyDataUsePage() {
           <ApplyFirstMark />
           <span className="brand-copy">
             <strong>ApplyFirst</strong>
-            <em>More Doors. Better Timing.</em>
+            <em>Career-launch programs, tracked early.</em>
           </span>
         </a>
         <a className="privacy-back-link" href="/">Back to ApplyFirst</a>
@@ -2787,7 +2790,6 @@ function ProductPreviewSection() {
           </article>
         </div>
       </div>
-      <BetaExampleStrip />
     </section>
   );
 }
@@ -2796,8 +2798,8 @@ function BetaExampleStrip() {
   return (
     <section className="beta-example-strip" aria-label="Trusted beta examples">
       <div>
-        <span>Beyond Ordinary Job Posts</span>
-        <p>Insight programs, fellowships, winternships, and structured career-launch experiences that open up new paths.</p>
+        <span>Examples From The Library</span>
+        <p>Real programs, not generic job listings. Check each official page for current eligibility and timing.</p>
       </div>
       <div className="beta-example-list">
         {betaReadyExamples.slice(0, 4).map((program) => (
@@ -2875,8 +2877,8 @@ function HowItWorksSection() {
     <section className="how-it-works" aria-label="How ApplyFirst works">
       <div className="how-it-works-copy">
         <span>How It Works</span>
-        <h2>Discover Your Direction. We'll Watch The Timing.</h2>
-        <p>See your matches before opting in. Once alerts are on, you don't need to keep checking a dashboard.</p>
+        <h2>Set Your Focus. Get Opening Alerts.</h2>
+        <p>Explore programs before opting in. We'll check official sources so you don't have to keep refreshing each one.</p>
       </div>
       <div className="how-it-works-steps">
         {steps.map((step) => (
@@ -2987,7 +2989,7 @@ function Header({
         <ApplyFirstMark />
         <span className="brand-copy">
           <strong>ApplyFirst</strong>
-          <em>More Doors. Better Timing.</em>
+          <em>Career-launch programs, tracked early.</em>
         </span>
       </button>
       <nav aria-label="Page links">
