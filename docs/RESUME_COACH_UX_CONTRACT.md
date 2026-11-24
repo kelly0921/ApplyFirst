@@ -2,6 +2,14 @@
 
 **Product decision:** The tool is a résumé reviewer, not a recruiting intake questionnaire or full career-advising assessment. This is a specification for a future web interface and agent adapter; **no public upload page or production AI service is implemented by this document.**
 
+## First-screen privacy notice (nonblocking)
+
+Before the file control, encourage students to upload a **privacy-safe copy** without their name, personal email, phone number, home address, private links, or other details they do not wish to share with an AI provider. Keep useful descriptions of skills, projects, outcomes and experience; otherwise the review loses the evidence it needs.
+
+A separate **automatic masking layer** should run in the browser on extracted text, and an optional preview should show exactly what will be sent. This second layer is not guaranteed to identify every sensitive detail. No required checkbox, anonymization questionnaire, or personal-information collection is allowed, and student intent to review must still be explicit via the Review button.
+
+**Do not present the notice as an implementation claim:** neither upload/extraction nor end-to-end masking is live yet. Use the privacy-release contract before publication: [Privacy and Trust Contract](./RESUME_PRIVACY_TRUST_CONTRACT.md).
+
 ## First screen: the smallest useful workflow
 
 1. **Upload résumé** (PDF/DOCX when safe parsing exists) **or paste text** — the only required content input.
