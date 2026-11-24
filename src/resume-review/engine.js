@@ -134,7 +134,7 @@ export function validateReviewOutput(raw, prepared) {
         if (!item || typeof item !== 'object' || !signalIs(item.signal)) errors.push(`Positioning gap ${index}: invalid signal`);
         if (typeof item?.question !== 'string' || !normalize(item.question)) errors.push(`Positioning gap ${index}: question required`);
       }
-      if (/\b(?:top\s*\d+(?:\.\d+)?\s*%|\d+(?:\.\d+)?(?:st|nd|rd|th)?\s*percentile|(?:higher|better|stronger)\s+than\s+(?:most|\d+%\s+of)\s+(?:applicants|candidates)|\d+%\s+chance\s+of\s+(?:interview|being\s+hired))\b/i.test(JSON.stringify(p))) errors.push('Positioning invents applicant rank or interview odds');
+      if (/\b(?:top\s*\d+(?:\.\d+)?\s*%|\d+(?:\.\d+)?(?:st|nd|rd|th)?\s*percentile|(?:higher|better|stronger)\s+than\s+(?:most|\d+%\s+of)\s+(?:applicants|candidates)|\d+%\s+chance\s+of\s+(?:interview|being\s+hired))/i.test(JSON.stringify(p))) errors.push('Positioning invents applicant rank or interview odds');
     }
   }
   if (!Array.isArray(raw.findings) || raw.findings.length > FINDING_LIMIT) errors.push('Findings must be an array of at most 3');
