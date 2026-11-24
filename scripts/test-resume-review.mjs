@@ -30,6 +30,24 @@ const base = prepareReviewInput({ resumeText: 'Developed a Python matching app u
 const valid = { findings: [{ signal: 'why', evidenceState: 'partially_signaled', priority: 'high', entryId: 'x', sourceQuote: base.resumeText, explanation: 'The purpose is unclear.', action: 'ask' }], questions: ['Who needed it?'], readiness: 'insufficient_context' };
 check(validateReviewOutput(valid, base).valid, 'valid evidenced review should pass');
 check(!validateReviewOutput({ ...valid, atsScore: 98 }, base).valid, 'unfounded ATS score must be rejected');
+
+const positioning = {
+  basis: 'role_evidence_only',
+  takeaway: 'The project shows technical work but does not yet explain the user problem or purpose.',
+  strengths: [{ signal: 'method', sourceQuote: base.resumeText, whyRelevant: 'Provides concrete evidence of a built Python/FastAPI application.' }],
+  missingEvidence: [{ signal: 'why', question: 'Who needed the matching app and what problem did it solve?' }],
+  uncertainty: 'The other applicants are unknown, so this is not a ranking of the candidate pool.',
+};
+const positionedReady = { ...valid, readiness: 'ready_to_apply', positioning };
+check(validateReviewOutput(positionedReady, base).valid, 'a role-ready résumé may have differentiation opportunities without being ranked');
+check(!validateReviewOutput({ ...positionedReady, applicantPercentile: 90 }, base).valid, 'fake applicant percentile must be rejected');
+check(!validateReviewOutput({ ...positionedReady, positioning: { ...positioning, basis: 'unseen_applicant_pool' } }, base).valid, 'unknown applicant pool must not be the comparison basis');
+check(!validateReviewOutput({ ...positionedReady, positioning: { ...positioning, strengths: [{ ...positioning.strengths[0], sourceQuote: 'Led 500 engineers worldwide.' }] } }, base).valid, 'invented differentiator source must fail');
+check(!validateReviewOutput({ ...positionedReady, positioning: { ...positioning, uncertainty: 'Everyone knows you are top.' } }, base).valid, 'positioning must note uncertainty about other applicants');
+check(!validateReviewOutput({ ...positionedReady, positioning: { ...positioning, takeaway: 'You are top 10% of candidates.' } }, base).valid, 'unsupported top-percentile language must fail');
+check(!validateReviewOutput({ ...positionedReady, positioning: { ...positioning, takeaway: 'You have an 80% chance of interview.' } }, base).valid, 'unsupported interview-odds language must fail');
+check(!validateReviewOutput({ ...positionedReady, positioning: { ...positioning, strengths: [positioning.strengths[0], positioning.strengths[0], positioning.strengths[0]] } }, base).valid, 'at most two evidence-backed differentiators are presented');
+
 check(!validateReviewOutput({ ...valid, findings: [{ ...valid.findings[0], sourceQuote: 'Used by 40,000 customers.' }] }, base).valid, 'fabricated source quote must be rejected');
 check(!validateReviewOutput({ ...valid, findings: [{ ...valid.findings[0], evidenceState: 'demonstrated', sourceQuote: '' }] }, base).valid, 'demonstrated with no evidence must be rejected');
 check(!validateReviewOutput({ ...valid, findings: Array(4).fill(valid.findings[0]) }, base).valid, 'more than 3 findings must be rejected');
@@ -47,6 +65,7 @@ check(!validateRevision({ ...approved, claims: [{ source: 'student_confirmed', e
 check(REVIEW_SIGNALS.length === 11, 'rubric should have all 11 signals');
 const prompt = buildReviewInstructions();
 check(prompt.includes('UNTRUSTED DATA') && prompt.includes('reusable') && prompt.includes('professional'), 'prompt must contain evidence and untrusted-data rules');
+check(prompt.includes('Competitive positioning') && prompt.includes('applicant pool') && prompt.includes('APPLY NOW'), 'prompt must separate role readiness from comparative differentiation');
 const returned = await runReviewWithAdapter({ resumeText: base.resumeText, targetRole: base.targetRole, entries: base.entries }, async () => valid);
 check(returned.readiness === 'insufficient_context', 'adapter output accepted');
 await assert.rejects(
