@@ -1,8 +1,17 @@
 import assert from 'node:assert/strict';
-import {maskContactDetails,PRIVACY_POLICY_VERSION} from '../src/resume-review/privacy.js';
+import {maskContactDetails,PRIVACY_POLICY_VERSION,PRE_UPLOAD_PRIVACY_NOTICE} from '../src/resume-review/privacy.js';
 import {prepareMaskedModelInput,runReviewWithAdapter} from '../src/resume-review/engine.js';
 
 let assertions=0;
+const notice=PRE_UPLOAD_PRIVACY_NOTICE;
+for(const term of ['name','email','phone','home address','AI provider']){
+  assert.ok(notice.beforeUpload.toLowerCase().includes(term.toLowerCase()),'Privacy notice must recommend removing '+term);
+}
+assert.ok(notice.secondLayer.includes('automatically')&&notice.secondLayer.includes('may miss'),'Must describe imperfect second masking layer');
+assert.ok(notice.retainUsefulEvidence.includes('technical skills')&&notice.retainUsefulEvidence.includes('projects'),'Protect review substance');
+assert.ok(notice.preview.includes('optionally'),'Sanitized preview is optional');
+assert.equal(notice.noExtraForm,true,'Privacy guidance cannot become a compulsory intake form');
+
 const check=(ok,msg)=>{assertions++;assert.ok(ok,msg)};
 const raw=[
   'Jane Example',
