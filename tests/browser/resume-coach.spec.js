@@ -154,8 +154,10 @@ test("mobile resolving returns focus to the source paragraph and preserves repli
     .click();
   await expect(page.locator("#rc-block-9")).toBeFocused();
   const source = await page.locator("#rc-block-9").boundingBox();
-  expect(source.y).toBeGreaterThanOrEqual(0);
-  expect(source.y).toBeLessThan(844);
+  // Scroll positions round to device pixels; Linux font metrics can leave a
+  // fractional CSS pixel above the edge even though the paragraph is visible.
+  expect(source.y).toBeGreaterThanOrEqual(-1);
+  expect(source.y + source.height).toBeLessThanOrEqual(845);
   await page.getByRole("button", { name: "All Comments", exact: true }).click();
   await page
     .locator(".rc-history-item")
