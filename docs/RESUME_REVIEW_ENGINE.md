@@ -96,3 +96,12 @@ This module is intentionally **not connected to the production React frontend**.
 - [OpenAI — Evaluation best practices](https://developers.openai.com/api/docs/guides/evaluation-best-practices): task-specific data, human calibration, continuous regression tests, pairwise judgments.
 - [OpenAI — Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs): prefer schema-constrained response formats over unverified JSON text.
 - [NACE — Key skills employers seek on college students' résumés, April 2026](https://www.naceweb.org/talent-acquisition/candidate-selection/the-key-skills-employers-seek-on-college-students-resumes/): employer interest in demonstrated teamwork, problem solving and communication.
+
+## Lessons from existing résumé tools (researched November 2026)
+
+- **[Resume Worded's résumé helper](https://resumeworded.com/resume-helper)** illustrates the value of concrete *line-by-line* findings with explanations and quick suggested edits. Adopt its location-specific, actionable feedback pattern, **not** a universal score threshold or reflex to make every bullet contain numbers.
+- **[Jobscan's match report](https://www.jobscan.co/jobscan-tutorial)** demonstrates the usability of an optional *résumé + specific job description* comparison and a separate text-searchability check. A match rate is based on the supplied posting and that tool's own weighting—not a guarantee of passing any employer's ATS. ApplyFirst should show exact requirement-to-evidence coverage instead of a percentage.
+- **[LangSmith's evaluation guidance](https://www.langchain.com/resources/llm-evals)** recommends promoting real failures into versioned offline test cases, comparing new versions against a stable baseline, and calibrating subjective model judges with human labels. Collect opt-in, redacted feedback only, not full raw résumés as default traces.
+- **Our product differentiation:** an interview-like coaching loop that uncovers **WHY / business leverage**, genuine **collaboration**, substantive **leadership or community support**, verified **startup context**, and potentially overlooked **professional development**. Strong existing content should remain unchanged. Trust, precision and student agency matter more than producing a higher proprietary score.
+
+Suggested interface presentation: one brief positive first-read assessment, up to three source-located concerns (most valuable first), one or two questions, and only after confirmation a side-by-side revision with an explicit accept/reject choice.
