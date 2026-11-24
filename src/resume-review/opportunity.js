@@ -34,9 +34,11 @@ export function prepareOpportunity(x) {
     if (!REQUIREMENT_KINDS.includes(r.kind) || !REQUIREMENT_PRIORITIES.includes(r.priority)) throw Error('Invalid requirement type at '+i);
     if (typeof r.sourceQuote!=='string' || !norm(r.sourceQuote) || !includes(x.sourceText,r.sourceQuote)) throw Error('Requirement not grounded in source: '+r.id);
     if (!Array.isArray(r.capabilities) || !r.capabilities.every(validId)) throw Error('Invalid requirement capability tags: '+r.id);
+    if (!['eligibility','application_material'].includes(r.kind) && r.capabilities.length===0) throw Error('A capability-bearing requirement needs an explicit matching label: '+r.id);
     return Object.freeze({id:r.id,kind:r.kind,priority:r.priority,sourceQuote:r.sourceQuote,capabilities:Object.freeze(uniq(r.capabilities))});
   });
   if (resumeRequirement==='required' && !requirements.some(r=>r.kind==='application_material' && /r[eé]sum[eé]|cv\b/i.test(r.sourceQuote))) throw Error('Résumé requirement needs a quoted source');
+  if (resumeRequirement==='not_required' && !requirements.some(r=>r.kind==='application_material' && /(?:no\s+r[eé]sum[eé]\s+(?:is\s+)?(?:needed|required)|r[eé]sum[eé]\s+(?:is\s+)?(?:not\s+required|optional)|without\s+(?:a\s+)?r[eé]sum[eé])/i.test(r.sourceQuote))) throw Error('No-résumé status requires an explicit quoted source');
   return Object.freeze({id:x.id,title:x.title,kind:x.kind,sourceText:x.sourceText,sourceState:x.sourceState,
     programId:x.programId??null,officialUrl:x.officialUrl??null,verifiedAt:x.verifiedAt??null,
     resumeRequirement,requirements:Object.freeze(requirements)});
