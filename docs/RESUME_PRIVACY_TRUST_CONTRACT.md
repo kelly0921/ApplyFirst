@@ -1,6 +1,6 @@
 # ApplyFirst Résumé Coach — Privacy and Trust Contract (Draft v0.1)
 
-**Status: mandatory release gate; not an implemented upload experience.** The public ApplyFirst site currently has no résumé upload or live AI review. The draft branch includes a provisional text masker and synthetic tests, but pattern-based masking is NOT complete anonymization.
+**Status: mandatory release gate.** The public ApplyFirst site currently has no résumé upload or live AI review. The development branch now has a [local-only upload/commenter prototype](RESUME_COACH_V1.md), browser extraction/masking tests, and a disabled server integration seam. Provider, host logging and retention validation remain pending. Pattern-based masking is NOT complete anonymization. Future-UI language below describes the external AI release requirements; local prototype status is documented separately.
 
 ## Experience must remain simple
 

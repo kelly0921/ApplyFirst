@@ -7,6 +7,8 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
+          if (id.includes('node_modules/pdfjs-dist')) return 'resume-pdf';
+          if (id.includes('node_modules/fflate')) return 'resume-docx';
           if (id.includes('node_modules')) {
             return 'vendor';
           }

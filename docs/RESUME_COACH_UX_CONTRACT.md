@@ -1,6 +1,6 @@
 # ApplyFirst Résumé Coach — Minimal User Experience Contract
 
-**Product decision:** The tool is a résumé reviewer, not a recruiting intake questionnaire or full career-advising assessment. This is a specification for a future web interface and agent adapter; **no public upload page or production AI service is implemented by this document.**
+**Product decision:** The tool is a résumé reviewer, not a recruiting intake questionnaire or full career-advising assessment. A [working local V1](RESUME_COACH_V1.md) now implements the commenter and input experience with labelled fixtures/rules. **No public upload page is deployed and no production AI service is connected.**
 
 ## First-screen privacy notice (nonblocking)
 
@@ -26,7 +26,7 @@ If a target role or job description is absent, produce a useful **general résum
 
 Desktop comments appear beside the relevant passage; mobile comments open immediately below the selected excerpt or in a bottom sheet without hiding the document. Comments with ambiguous anchors fall back to general feedback rather than highlighting incorrect text. All interaction state and replies stay local by default.
 
-This is **specified but not implemented**. Detailed behavior, state model, accessibility and acceptance tests: [Google Docs-style Commenter Interaction Spec](./RESUME_COMMENTER_INTERACTION_SPEC.md).
+This is implemented in the **local prototype only**. Detailed behavior, state model, accessibility and acceptance tests: [Google Docs-style Commenter Interaction Spec](./RESUME_COMMENTER_INTERACTION_SPEC.md). Verification limits and remaining gates are in the [V1 implementation notes](RESUME_COACH_V1.md).
 
 ## First review: substantive result, not a question gate
 

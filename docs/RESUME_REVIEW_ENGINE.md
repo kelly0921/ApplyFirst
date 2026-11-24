@@ -4,7 +4,7 @@
 
 **Opportunity-aware extension:** [Source-grounded comparison contract, two input types, and 10 × 3 evaluation experiment](./RESUME_OPPORTUNITY_REVIEW_CONTRACT.md). The experiment is deterministic and synthetic; no live opportunity-aware AI review exists yet.
 
-**Status: isolated review-engine foundation, not a public feature.** No UI route, PDF/DOCX parsing, AI connection, protected résumé storage, or deployment is included in this change. The rule-based preflight flags only obvious possible gaps; it is **not a complete résumé review**.
+**Status: development only, not a public feature.** A [working local commenter and browser PDF/DOCX extraction](RESUME_COACH_V1.md) now wraps this engine at `/resume-coach`. AI remains disabled and nothing is deployed or saved. The rule-based preflight flags only obvious possible gaps; it is **not a complete résumé review**.
 
 ## Product goal
 
@@ -92,7 +92,7 @@ Use two suites: **regression** for known must-never-fail cases, and **capability
 
 ## Current implementation scope
 
-This module is intentionally **not connected to the production React frontend**. Keep it on a draft PR until the results are reviewed and the full-document parser, provider adapter and consent/privacy plan are ready. A separate Agent Skill can reuse this rubric and gold evaluation cases after its outputs have been calibrated.
+This module is used by the **local development React route**, with explicit rule-based labelling, and is **not deployed in production**. Keep it on a draft PR until provider, consent, privacy and quality gates are verified. A separate Agent Skill can reuse this rubric and gold evaluation cases after its outputs have been calibrated.
 
 ### Sources informing the evaluation strategy
 

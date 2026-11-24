@@ -1,6 +1,6 @@
 # ApplyFirst Résumé Coach — Google Docs–Style Commenter Interaction Spec
 
-**Design direction confirmed November 24, 2026. Status: interaction specification only, not a working UI.** ApplyFirst Résumé Coach should feel deliberately close to **Google Docs commenting mode**: a document-centered review with anchored comments in the right margin, selection synchronization, collapsed/minimized states, replies, resolving, and comment history. Do **not** reinvent this as a long score dashboard or a full document-editing application.
+**Design direction confirmed November 24, 2026. Development update: a working local commenter now implements this interaction model; see [V1 implementation and limits](RESUME_COACH_V1.md). It is not deployed and has no live AI provider.** ApplyFirst Résumé Coach should feel deliberately close to **Google Docs commenting mode**: a document-centered review with anchored comments in the right margin, selection synchronization, collapsed/minimized states, replies, resolving, and comment history. Do **not** reinvent this as a long score dashboard or a full document-editing application.
 
 References: [Google Workspace — comments display modes](https://workspaceupdates.googleblog.com/2024/02/manage-comments-faster-google-docs-sheets-slides.html), [Google Help — comments, replies, resolve/reopen](https://support.google.com/docs/answer/65129), and [Google Help — suggested edits](https://support.google.com/docs/answer/6033474). Follow their **interaction conventions**, not exact Google branding or pixel-level cloning.
 

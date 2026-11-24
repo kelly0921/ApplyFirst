@@ -2,6 +2,14 @@ name: Resume review evaluation checks
 on:
   pull_request:
     paths:
+      - 'src/resume-coach/**'
+      - 'src/main.jsx'
+      - 'server/resume-coach-adapter.js'
+      - 'tests/resume-coach*.test.js'
+      - 'tests/browser/**'
+      - 'playwright.config.js'
+      - 'playwright.preview.config.js'
+      - 'package-lock.json'
       - 'src/resume-review/**'
       - 'tests/resume-review-fixtures.js'
       - 'tests/resume-opportunity-fixtures.js'
@@ -19,6 +27,13 @@ on:
   push:
     branches: [main]
     paths:
+      - 'src/resume-coach/**'
+      - 'server/resume-coach-adapter.js'
+      - 'tests/resume-coach*.test.js'
+      - 'tests/browser/**'
+      - 'playwright.config.js'
+      - 'playwright.preview.config.js'
+      - 'package-lock.json'
       - 'src/resume-review/**'
       - 'tests/resume-review-fixtures.js'
       - 'tests/resume-opportunity-fixtures.js'
@@ -39,3 +54,19 @@ jobs:
         with:
           node-version: '22'
       - run: npm run resume:eval
+  interactive-coach:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run resume:unit-test
+      - run: npm run resume:ui-test
+      - run: npm run frontend:http:test && npm run frontend:workspace:test && npm run frontend:observability:test && npm run frontend:scope:test && npm run frontend:status:test
+      - run: npm run build

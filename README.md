@@ -475,3 +475,7 @@ The first Phase 3 slice adds:
 - Cloudflare D1 watch schema, source seed exporter, and scheduled Worker for beta source checks.
 - JSON report output for future automation.
 - Monitoring architecture documentation covering backend tables, alert-candidate review, and the human confirmation gate.
+
+## Local Résumé Coach prototype
+
+The development branch includes a working coach at `/resume-coach`. See [run instructions, test results, screenshots, and release blockers](docs/RESUME_COACH_V1.md). Feedback is explicitly labelled as fictional fixtures or local rules; no AI provider is connected. Do not merge or deploy this draft feature.

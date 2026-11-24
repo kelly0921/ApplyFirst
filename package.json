@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "resume:ui-test": "playwright test",
+    "resume:preview-test": "npm run build && playwright test --config=playwright.preview.config.js",
+    "resume:unit-test": "node --test tests/resume-coach.test.js tests/resume-coach-adapter.test.js",
     "resume:eval": "node scripts/test-resume-review.mjs && node scripts/test-resume-opportunities.mjs && node scripts/test-resume-mentor-calibration.mjs && node scripts/test-resume-privacy.mjs",
     "dev": "vite --host 127.0.0.1",
     "build": "vite build && node scripts/build-sites.mjs",
@@ -53,11 +56,15 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "^6.0.3",
+    "fflate": "^0.8.3",
+    "pdfjs-dist": "^6.5.438",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "vite": "^8.1.3"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.1",
+    "@playwright/test": "^1.65.1",
     "wrangler": "^4.123.0"
   }
 }

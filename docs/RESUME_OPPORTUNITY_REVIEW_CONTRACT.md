@@ -1,6 +1,6 @@
 # ApplyFirst — Opportunity-Aware Résumé Review Contract (Draft v0.1)
 
-**Status:** Isolated draft PR. No public résumé UI, job-link fetch, PDF/DOCX parser, live AI model, or eligibility-verification backend. This experiment is deterministic and uses synthetic, manually normalized evidence.
+**Status:** Unmerged draft PR. A [local résumé UI and PDF/DOCX parser](RESUME_COACH_V1.md) now exists; its optional opportunity input retains context without claiming automated matching. No public deployment, job-link fetch, live AI model, or eligibility-verification backend exists. This matching experiment remains deterministic and uses synthetic, manually normalized evidence.
 
 ## Two supported opportunity inputs
 

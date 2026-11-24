@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import ResumeCoach from './resume-coach/ResumeCoach.jsx';
 import './styles.css';
 import programsScreenshot from '../docs/assets/screenshots/applyfirst-programs-desktop.png';
 import programStatusMixScreenshot from '../docs/assets/screenshots/applyfirst-program-status-mix-desktop.png';
@@ -501,6 +502,7 @@ function sendProductEvent(workerBaseUrl, accessCode, sessionId, eventName, detai
 }
 
 function logClientIssue(operation, error, details = {}) {
+  if (window.location.pathname.replace(/\/$/, '') === '/resume-coach') return;
   let accessCode = details.accessCode || '';
   let sessionId = '';
 
@@ -2565,6 +2567,7 @@ function LandingPage({
             <em>Career-launch programs, tracked early.</em>
           </span>
         </div>
+        <a href="/resume-coach">Résumé Coach</a>
       </header>
 
       <main className="landing-main">
@@ -3011,6 +3014,7 @@ function Header({
       </button>
       <nav aria-label="Page links">
         <div className="nav-tabs" role="group" aria-label="Primary views">
+          <a href="/resume-coach">Résumé Coach</a>
           <button
             className={activeView === 'monitor' ? 'active' : ''}
             type="button"
@@ -8937,6 +8941,7 @@ class AppErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, info) {
+    if (window.location.pathname.replace(/\/$/, '') === '/resume-coach') return;
     logClientIssue('react_render', error, {
       componentStack: info?.componentStack || '',
       view: getClientViewLabel(),
@@ -8967,6 +8972,6 @@ const appRoot = rootElement._applyFirstRoot ?? createRoot(rootElement);
 rootElement._applyFirstRoot = appRoot;
 appRoot.render(
   <AppErrorBoundary>
-    <App />
+    {window.location.pathname.replace(/\/$/, '') === '/resume-coach' ? <ResumeCoach /> : <App />}
   </AppErrorBoundary>,
 );
