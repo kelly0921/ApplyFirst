@@ -105,3 +105,80 @@ This module is intentionally **not connected to the production React frontend**.
 - **Our product differentiation:** an interview-like coaching loop that uncovers **WHY / business leverage**, genuine **collaboration**, substantive **leadership or community support**, verified **startup context**, and potentially overlooked **professional development**. Strong existing content should remain unchanged. Trust, precision and student agency matter more than producing a higher proprietary score.
 
 Suggested interface presentation: one brief positive first-read assessment, up to three source-located concerns (most valuable first), one or two questions, and only after confirmation a side-by-side revision with an explicit accept/reject choice.
+
+## Readiness vs competitive differentiation (November 23, 2026)
+
+**Product decision:** A résumé may be **ready to apply** while leaving compelling, role-specific evidence poorly communicated. Do not collapse "ready" and "distinctive" into one score. Hiring is comparative, but ApplyFirst does not have access to other applicants, company-specific cutoffs, real application volume for the opening, or private decision rules. Never say someone is "top X%" or has an estimated interview probability.
+
+### Two separate lenses
+
+| Lens | Question | Evidence basis | Student-facing decision |
+| --- | --- | --- | --- |
+| **Role readiness** | Are real, relevant qualifications and material claims clearly presented? | User's actual résumé; explicit target JD and true eligibility where supplied | Ready to apply / fix material issues / insufficient context |
+| **Distinctive evidence** | What are the one or two strongest concrete, relevant reasons a hiring team might remember this candidate? What is currently generic or undersold? | Exact source spans, role-relevant problem/decision/ownership/team benefit/technical depth/verified outcome; optionally illustrative examples of stronger wording | Standout evidence / missing differentiating context and targeted question, not numerical peer ranking |
+
+**No comparison to an imaginary applicant pool.** The hiring team can compare actual candidates against predetermined job criteria and assess role-specific evidence. We can compare the student's actual wording to role expectations or to a *fictional illustration*, but cannot conclude the candidate outranks unseen applicants.
+
+### What reviewers should say
+
+- **Qualified and distinctive:** "Your backend internship demonstrates [exact technical contribution] and a supported [specific team outcome]. Keep the bullet; prioritize applying." If source facts are clear, do not push more editing.
+- **Qualified, differentiation unclear:** "Your résumé shows relevant experience, so don't delay applications. However, your strongest project lists tools without explaining what problem you solved or what you personally contributed; answering [one question] would help it stand out for this role."
+- **Role-critical evidence missing:** "This posting requires [explicit criterion], but the résumé does not show it. You may have this experience—can you point to a real example? If not, target roles whose requirements align with your actual background." Do not imply the candidate lacks the skill simply because the résumé omits it.
+- **Insufficient context:** Without a job posting or confirmed role/level, assess general readability/evidence quality but make no specific candidate-pool or company-specific claims.
+
+### A fairer and more informative comparison
+
+Rather than make up competitor résumés, compare the **same applicant's** evidence at increasing clarity (only when confirmed):
+
+- Generic: "Developed a Kafka onboarding tool using React and Spring Boot."
+- Specific: "Developed a self-service Kafka onboarding workflow that eliminated manual onboarding steps." (Only if verified.)
+- Distinctive: "Built a self-service Kafka onboarding tool for internal teams, reducing confirmed onboarding time from hours to minutes while preserving required validation steps." (Only if all details and measurement are supported.)
+
+This illustrates increased clarity of contribution/impact; it is **not** proof of a higher hiring probability. If an existing bullet is already well supported, keep it.
+
+### Role-context variation
+
+For a highly technical SWE role, an exceptional technical artifact, depth of reasoning or rigorous testing may be the differentiator; for product/startup, verified user/problem and shipping evidence; for research, rigor/findings; for student community/leadership, need and meaningful beneficiary outcomes. Technical depth must never be replaced with generic leadership language. Formal leadership and professional affiliations are optional, not universal standout requirements. Industry internship experience can matter, but should not crowd out actual demonstrated ability or exclude candidates without corporate opportunities.
+
+### Proposed optional structured-review contract (implemented only as output validation in draft branch)
+
+```json
+{
+  "readiness": "ready_to_apply",
+  "positioning": {
+    "basis": "role_evidence_only",
+    "takeaway": "Your strongest project is role-relevant, but its user problem is not yet clear.",
+    "strengths": [
+      {
+        "signal": "method",
+        "sourceQuote": "Developed a Python matching app using FastAPI.",
+        "whyRelevant": "A concrete implemented backend artifact"
+      }
+    ],
+    "missingEvidence": [
+      {"signal": "why", "question": "Who needed the matching app, and what changed for them?"}
+    ],
+    "uncertainty": "The other applicants are unknown; this is not a ranking of the candidate pool."
+  }
+}
+```
+
+The optional positioning object is **not currently produced by a live AI model**. Structural validation checks known signal IDs, exact source quotes, small UI limits and false-rank patterns; whether a reasoning claim truly follows from evidence still requires human and semantic evaluation.
+
+### Dedicated quality tests to add with human calibration
+
+1. Same candidate with weak-vs-accurately-improved description: humans prefer the version with a clearer *role-relevant* problem, ownership, method or verified outcome.
+2. Strong technical résumé with no officer titles: reviewer does not penalize missing formal leadership, professional affiliations or prestige.
+3. Internship with verified narrow contribution vs highly inflated business claim: prefer the accurate contribution; never reward fabrication.
+4. Technically strong candidate with unknown peer pool: explicitly mark comparison uncertainty and show genuine standout evidence without percentile/odds.
+5. Role-ready but generic résumé: respond **apply now + one optional high-value clarity improvement**, not "not competitive; delay applications."
+6. Two résumé versions with identical evidence but different school/company brand labels: do not re-rank by prestige or demographic proxy; only the *role-relevant substance* should change judgment.
+7. Strongly different role requirements: rerank which of the same candidate's evidence is relevant without claiming one universal top résumé.
+8. Evaluate model-generated outputs with blinded human pairwise comparisons of useful feedback, including no-change cases, plus structural tests for unsupported ranking claims.
+
+References:
+- [Greenhouse Scorecard overview (updated May 29, 2026)](https://support.greenhouse.io/hc/en-us/articles/4414777492891-Scorecard-overview)
+- [Greenhouse Talent Matching FAQ (October 2026)](https://support.greenhouse.io/hc/en-us/articles/41131886674075-Talent-Matching-FAQ)
+- [NACE: 2026 internship experience as tie-breaker](https://www.naceweb.org/talent-acquisition/candidate-selection/internship-experience-often-the-deciding-factor-between-equal-candidates)
+- [NACE: Key skills employers seek on resumes (April 20, 2026)](https://www.naceweb.org/talent-acquisition/candidate-selection/the-key-skills-employers-seek-on-college-students-resumes/)
+- [Harvard: Creating a strong resume](https://careerservices.fas.harvard.edu/resources/create-a-strong-resume/)
