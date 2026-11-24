@@ -6,6 +6,18 @@
 
 Upload or paste résumé → get useful review. An external job description or ApplyFirst program is optional. No mandatory personal information questionnaire, login, recruiting history, or contact form. Put clear privacy information next to Review, and make “Preview what the AI sees” optional.
 
+## Pre-upload request plus automatic second layer
+
+Before the upload control, prominently invite students to upload a privacy-safe copy of their résumé. Recommend removing full name, personal email, phone number, full home address, private personal links, and anything else they do not want shared with an AI provider. Explicitly ask them to preserve experience, technical achievements and relevant projects. This is *recommended but not an extra gating form*: no required checkbox, no redaction attestation, no mandatory manual editing step.
+
+After upload, a separately implemented, browser-local extraction and masking layer should remove remaining recognizable contact details before *any* outbound request. Offer an optional editable sanitized-text preview. Never promise the uploaded résumé is fully anonymized; names within work history, schools, project metrics, metadata and unusual address strings may still identify a candidate. Students who are uncomfortable with the residual exposure should be able to cancel or use a more fully redacted copy. Provider retention and third-party processing must be disclosed before submission.
+
+Sample notice **for the future working UI only**:
+
+“**Please upload a privacy-safe copy.** Remove your name, personal email, phone, home address, and any other details you don't want shared. Keep your experience and achievements. We'll also try to mask common contact details automatically, but this may miss identifying information. Preview what we'll send to AI (optional).”
+
+This design is a **user recommendation plus defense in depth**, not a claim that current browser upload or AI-processing protections already work.
+
 ## Risks and data-minimization defaults
 
 A résumé commonly includes a name, personal email, phone number, full street address, LinkedIn/GitHub profiles, personal website, school and graduation, and unique identifying achievements. It may also include work authorization or sensitive attributes. Removing the contact block is valuable but does not guarantee deidentification, because project and employment details can still identify someone.
