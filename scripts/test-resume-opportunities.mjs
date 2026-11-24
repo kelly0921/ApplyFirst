@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {prepareOpportunity,prepareCandidate,evaluateOpportunityCoverage} from '../src/resume-review/opportunity.js';
 import {CANDIDATES,OPPORTUNITIES} from '../tests/resume-opportunity-fixtures.js';
+import {buildOpportunityReviewInstructions} from '../src/resume-review/model-prompt.js';
 
 let assertions=0;
 const check=(ok,msg)=>{assertions++;assert.ok(ok,msg)};
@@ -47,6 +48,12 @@ rejects(()=>prepareOpportunity({...o,sourceState:'official_confirmed',officialUr
 rejects(()=>prepareOpportunity({...OPPORTUNITIES[1],programId:null}),'ApplyFirst item must map to real catalog ID');
 rejects(()=>prepareOpportunity({...o,sourceText:''}),'Source text required');
 rejects(()=>prepareCandidate({...c,evidence:[{...c.evidence[0],evidenceState:'believed'}]}),'Unsupported evidence state rejected');
+rejects(()=>prepareOpportunity({...OPPORTUNITIES[1],resumeRequirement:'not_required',requirements:OPPORTUNITIES[1].requirements.filter(x=>x.kind!=='application_material')}),'A no-résumé claim needs its own evidence');
+rejects(()=>prepareOpportunity({...o,requirements:[{...o.requirements[0],capabilities:[]}]}),'Non-eligibility criteria need explicit normalization');
+const listedCandidate={...c,evidence:c.evidence.map(e=>e.id==='p01-backend'?{...e,evidenceState:'listed_only'}:e)};
+check(evaluateOpportunityCoverage(listedCandidate,o).coverage.find(x=>x.requirementId==='java-spring').status==='listed_only','A listed skill is not the same as demonstrated use');
+const opportunityInstructions=buildOpportunityReviewInstructions();
+check(opportunityInstructions.includes('UNTRUSTED DATA')&&opportunityInstructions.includes('NOT_SHOWN')&&opportunityInstructions.includes('applicant pool ranking')&&opportunityInstructions.includes('no')&&opportunityInstructions.includes('eligibility'),'Future AI instructions describe grounded opportunity matching');
 const sameProofDifferentIdentity=evaluateOpportunityCoverage({...c,id:'identity-changed'},o);
 const original=evaluateOpportunityCoverage(c,o);
 check(sameProofDifferentIdentity.standoutEvidence[0]?.evidenceId===original.standoutEvidence[0]?.evidenceId,'No resume judgment based on identity');
