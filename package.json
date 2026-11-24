@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "resume:eval": "node scripts/test-resume-review.mjs && node scripts/test-resume-opportunities.mjs",
+    "resume:eval": "node scripts/test-resume-review.mjs && node scripts/test-resume-opportunities.mjs && node scripts/test-resume-mentor-calibration.mjs",
     "dev": "vite --host 127.0.0.1",
     "build": "vite build && node scripts/build-sites.mjs",
     "monitor:demo": "node scripts/monitor-official-pages.mjs",
@@ -47,7 +47,8 @@
     "capture:turnstile:test": "node scripts/test-capture-turnstile.mjs",
     "capture:smoke": "node scripts/smoke-capture-endpoints.mjs",
     "preview": "vite preview --host 127.0.0.1",
-    "resume:opportunity-eval": "node scripts/test-resume-opportunities.mjs"
+    "resume:opportunity-eval": "node scripts/test-resume-opportunities.mjs",
+    "resume:mentor-eval": "node scripts/test-resume-mentor-calibration.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^6.0.3",
