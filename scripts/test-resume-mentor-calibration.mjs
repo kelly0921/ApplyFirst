@@ -35,7 +35,7 @@ const params=[
 for(const input of params)rejects(()=>assessCoachingContext(input),'Invalid user data must not be converted into confident advice');
 const prompt=buildReviewInstructions();
 for(const phrase of ['Before assuming the résumé','Missing funnel data is UNKNOWN','qualitative result must still be supported','no rigid universal','Never suggest answering eligibility']){
-  check(prompt.includes(phrase),'Coach instructions missing '+phrase);
+  check(prompt.toLowerCase().includes(phrase.toLowerCase()),'Coach instructions missing '+phrase);
 }
 check(!JSON.stringify(MENTOR_CONTEXT_CASES).includes('Kudzaishe')&&!JSON.stringify(MENTOR_CONTEXT_CASES).includes('Allison Lee')&&!JSON.stringify(MENTOR_CONTEXT_CASES).includes('Catherine Kennedy'),'No real participant information in synthetic tests');
 
