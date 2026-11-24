@@ -20,6 +20,14 @@ Do **not** ask for school, graduation date, job title, target role, company list
 
 If a target role or job description is absent, produce a useful **general résumé review immediately**. If a job description/program is supplied, add grounded opportunity-specific comparison. Do not infer employer requirements from a vague title. If the uploaded document cannot be parsed, ask for a corrected upload or pasted text, not a career survey.
 
+## Results layout: anchored Google Docs-style comments
+
+**Presentation choice:** a unified résumé document preview with a compact first-impression strip and **anchored comments in a right-margin gutter**. Clicking a highlighted résumé passage opens its attached comment; the previously active comment collapses. Students can expand, minimize to icons, hide, or view all comments. Reply and Resolve/Reopen are local thread actions. Source-backed wording suggestions are copyable; no full document editing is required for V1.
+
+Desktop comments appear beside the relevant passage; mobile comments open immediately below the selected excerpt or in a bottom sheet without hiding the document. Comments with ambiguous anchors fall back to general feedback rather than highlighting incorrect text. All interaction state and replies stay local by default.
+
+This is **specified but not implemented**. Detailed behavior, state model, accessibility and acceptance tests: [Google Docs-style Commenter Interaction Spec](./RESUME_COMMENTER_INTERACTION_SPEC.md).
+
 ## First review: substantive result, not a question gate
 
 Deliver, in this order:
