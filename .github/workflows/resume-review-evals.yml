@@ -9,6 +9,7 @@ on:
       - 'scripts/test-resume-review.mjs'
       - 'scripts/test-resume-opportunities.mjs'
       - 'scripts/test-resume-mentor-calibration.mjs'
+      - 'scripts/test-resume-privacy.mjs'
       - 'docs/RESUME_REVIEW_ENGINE.md'
       - 'docs/RESUME_COACH_UX_CONTRACT.md'
       - 'docs/RESUME_MENTOR_CALIBRATION.md'
@@ -25,6 +26,7 @@ on:
       - 'scripts/test-resume-review.mjs'
       - 'scripts/test-resume-opportunities.mjs'
       - 'scripts/test-resume-mentor-calibration.mjs'
+      - 'scripts/test-resume-privacy.mjs'
       - 'package.json'
 jobs:
   smoke-evals:
