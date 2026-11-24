@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "resume:eval": "node scripts/test-resume-review.mjs",
     "dev": "vite --host 127.0.0.1",
     "build": "vite build && node scripts/build-sites.mjs",
     "monitor:demo": "node scripts/monitor-official-pages.mjs",
