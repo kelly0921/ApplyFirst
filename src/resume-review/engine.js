@@ -114,7 +114,29 @@ export function createPreflightReview(prepared) {
 export function validateReviewOutput(raw, prepared) {
   const errors = [];
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { valid: false, errors: ['Expected review object'] };
-  if (raw.atsScore !== undefined || raw.interviewProbability !== undefined || raw.hireProbability !== undefined) errors.push('Forbidden ATS or hiring prediction');
+  if (['atsScore', 'interviewProbability', 'hireProbability', 'applicantPercentile', 'relativeApplicantRank', 'competitiveScore'].some((key) => raw[key] !== undefined)) errors.push('Forbidden ATS, applicant ranking or hiring prediction');
+  if (raw.positioning !== undefined) {
+    const p = raw.positioning;
+    if (!p || typeof p !== 'object' || Array.isArray(p)) {
+      errors.push('Positioning must be an object');
+    } else {
+      if (p.basis !== 'role_evidence_only') errors.push('Positioning must use role evidence, not an unseen applicant pool');
+      if (typeof p.takeaway !== 'string' || !normalize(p.takeaway)) errors.push('Positioning takeaway required');
+      if (typeof p.uncertainty !== 'string' || !/unknown|unavailable|not available|cannot know|cannot determine|do not know/i.test(p.uncertainty) || !/applicant|candidate|pool/i.test(p.uncertainty)) errors.push('Positioning must acknowledge unknown applicant pool');
+      if (!Array.isArray(p.strengths) || p.strengths.length > 2) errors.push('Positioning strengths must be an array of at most 2');
+      if (!Array.isArray(p.missingEvidence) || p.missingEvidence.length > 2) errors.push('Positioning evidence gaps must be an array of at most 2');
+      for (const [index, item] of (Array.isArray(p.strengths) ? p.strengths : []).entries()) {
+        if (!item || typeof item !== 'object' || !signalIs(item.signal)) errors.push(`Positioning strength ${index}: invalid signal`);
+        if (typeof item?.sourceQuote !== 'string' || !normalize(item.sourceQuote) || !containsPhrase(prepared.resumeText, item.sourceQuote)) errors.push(`Positioning strength ${index}: source quote not in résumé`);
+        if (typeof item?.whyRelevant !== 'string' || !normalize(item.whyRelevant)) errors.push(`Positioning strength ${index}: explanation required`);
+      }
+      for (const [index, item] of (Array.isArray(p.missingEvidence) ? p.missingEvidence : []).entries()) {
+        if (!item || typeof item !== 'object' || !signalIs(item.signal)) errors.push(`Positioning gap ${index}: invalid signal`);
+        if (typeof item?.question !== 'string' || !normalize(item.question)) errors.push(`Positioning gap ${index}: question required`);
+      }
+      if (/\b(?:top\s*\d+(?:\.\d+)?\s*%|\d+(?:\.\d+)?(?:st|nd|rd|th)?\s*percentile|(?:higher|better|stronger)\s+than\s+(?:most|\d+%\s+of)\s+(?:applicants|candidates)|\d+%\s+chance\s+of\s+(?:interview|being\s+hired))\b/i.test(JSON.stringify(p))) errors.push('Positioning invents applicant rank or interview odds');
+    }
+  }
   if (!Array.isArray(raw.findings) || raw.findings.length > FINDING_LIMIT) errors.push('Findings must be an array of at most 3');
   if (!Array.isArray(raw.questions) || raw.questions.length > QUESTION_LIMIT) errors.push('Questions must be an array of at most 2');
   if (raw.readiness !== undefined && !['ready_to_apply', 'fix_material_issues', 'insufficient_context'].includes(raw.readiness)) errors.push('Invalid readiness');
