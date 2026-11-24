@@ -55,6 +55,7 @@ export function assessCoachingContext(input={}) {
     questions.push('Which opportunity are you targeting now, and what different real experiences should it emphasize?');
   }
   if(reportedFocus==='resume')nextFocus.unshift('offer_targeted_resume_review_without_auto_rewriting');
+  if(stage==='insufficient_context')nextFocus.push('ask_for_recruiting_context');
   if(nextFocus.length===0)nextFocus.push('ask_for_recruiting_context');
   return {
     stage,focus: [...new Set(nextFocus)],
