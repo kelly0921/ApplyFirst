@@ -1,4 +1,5 @@
 import { EVIDENCE_STATES, NEXT_ACTIONS, PRIORITIES, REVIEW_POLICY_VERSION, SIGNAL_IDS } from './rubric.js';
+import { maskContactDetails } from './privacy.js';
 
 const MAX_RESUME_CHARS = 40_000;
 const MAX_JOB_CHARS = 15_000;
@@ -183,14 +184,33 @@ export function validateRevision({ original, proposed, claims, approved = false 
   return { valid: errors.length === 0, errors, canApply: errors.length === 0 && approved === true };
 }
 
-/** Provider-agnostic orchestration boundary. The app injects a model adapter later;
- * never send résumé text to an AI provider without the student's consent.
+/** Development-only defense in depth for the model adapter.
+ * The FINAL client must also locally parse/mask before any network upload.
+ * This method cannot guarantee complete anonymization.
+ */
+export function prepareMaskedModelInput(input) {
+  const original = prepareReviewInput(input);
+  const resumeText=maskContactDetails(original.resumeText,{resumeHeader:true}).text;
+  const jobDescription=maskContactDetails(original.jobDescription).text;
+  const targetRole=maskContactDetails(original.targetRole).text;
+  const entries=original.entries.map(entry=>({
+    ...entry,
+    text:maskContactDetails(entry.text).text,
+    companyContext:maskContactDetails(entry.companyContext).text,
+  })).filter(entry=>containsPhrase(resumeText,entry.text));
+  return prepareReviewInput({resumeText,jobDescription,targetRole,entries});
+}
+
+/** Provider-agnostic orchestration boundary for a future AI adapter.
+ * Never send raw résumé contact text to a provider via this adapter.
+ * User consent, browser-local parsing/redaction, request logging controls and
+ * provider retention settings remain separate mandatory launch gates.
  */
 export async function runReviewWithAdapter(input, adapter) {
-  const prepared = prepareReviewInput(input);
   if (typeof adapter !== 'function') throw new Error('AI adapter is not configured');
-  const response = await adapter(prepared);
-  const checked = validateReviewOutput(response, prepared);
+  const prepared=prepareMaskedModelInput(input);
+  const response=await adapter(prepared);
+  const checked=validateReviewOutput(response,prepared);
   if (!checked.valid) throw new Error(`Model output failed validation: ${checked.errors.join('; ')}`);
   return response;
 }
