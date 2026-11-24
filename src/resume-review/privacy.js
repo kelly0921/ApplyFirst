@@ -6,6 +6,21 @@
  */
 export const PRIVACY_POLICY_VERSION = 'resume-privacy-0.1.0';
 
+/**
+ * Proposed pre-upload message for a future UI. It must be rendered prominently,
+ * but without a mandatory checkbox or separate personal-data questionnaire.
+ * Never present this copy as a live feature promise until masking is tested end-to-end.
+ */
+export const PRE_UPLOAD_PRIVACY_NOTICE = Object.freeze({
+  title: 'Upload a privacy-safe copy of your résumé',
+  beforeUpload: 'Before uploading, please remove your name, personal email, phone number, home address, and any other details you do not want shared with an AI provider.',
+  retainUsefulEvidence: 'Keep your experience, technical skills, projects, and accomplishments so the review stays useful.',
+  secondLayer: 'ApplyFirst will also try to hide common contact details automatically before AI processing, but masking may miss identifying information.',
+  preview: 'You can optionally preview and edit the text that will be sent.',
+  noExtraForm: true,
+});
+
+
 const REPLACEMENTS = Object.freeze({
   email:'[EMAIL REMOVED]',
   phone:'[PHONE REMOVED]',
