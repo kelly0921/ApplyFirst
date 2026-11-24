@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "resume:eval": "node scripts/test-resume-review.mjs",
+    "resume:eval": "node scripts/test-resume-review.mjs && node scripts/test-resume-opportunities.mjs",
     "dev": "vite --host 127.0.0.1",
     "build": "vite build && node scripts/build-sites.mjs",
     "monitor:demo": "node scripts/monitor-official-pages.mjs",
@@ -46,7 +46,8 @@
     "capture:d1:migrate": "npx wrangler d1 migrations apply applyfirst_beta --config wrangler.capture.toml --remote",
     "capture:turnstile:test": "node scripts/test-capture-turnstile.mjs",
     "capture:smoke": "node scripts/smoke-capture-endpoints.mjs",
-    "preview": "vite preview --host 127.0.0.1"
+    "preview": "vite preview --host 127.0.0.1",
+    "resume:opportunity-eval": "node scripts/test-resume-opportunities.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^6.0.3",
