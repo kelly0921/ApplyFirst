@@ -3,16 +3,16 @@ import {maskContactDetails,PRIVACY_POLICY_VERSION,PRE_UPLOAD_PRIVACY_NOTICE} fro
 import {prepareMaskedModelInput,runReviewWithAdapter} from '../src/resume-review/engine.js';
 
 let assertions=0;
+const check=(ok,msg)=>{assertions++;assert.ok(ok,msg)};
 const notice=PRE_UPLOAD_PRIVACY_NOTICE;
 for(const term of ['name','email','phone','home address','AI provider']){
-  assert.ok(notice.beforeUpload.toLowerCase().includes(term.toLowerCase()),'Privacy notice must recommend removing '+term);
+  check(notice.beforeUpload.toLowerCase().includes(term.toLowerCase()),'Privacy notice must recommend removing '+term);
 }
-assert.ok(notice.secondLayer.includes('automatically')&&notice.secondLayer.includes('may miss'),'Must describe imperfect second masking layer');
-assert.ok(notice.retainUsefulEvidence.includes('technical skills')&&notice.retainUsefulEvidence.includes('projects'),'Protect review substance');
-assert.ok(notice.preview.includes('optionally'),'Sanitized preview is optional');
-assert.equal(notice.noExtraForm,true,'Privacy guidance cannot become a compulsory intake form');
+check(notice.secondLayer.includes('automatically')&&notice.secondLayer.includes('may miss'),'Must describe imperfect second masking layer');
+check(notice.retainUsefulEvidence.includes('technical skills')&&notice.retainUsefulEvidence.includes('projects'),'Protect review substance');
+check(notice.preview.includes('optionally'),'Sanitized preview is optional');
+check(notice.noExtraForm===true,'Privacy guidance cannot become a compulsory intake form');
 
-const check=(ok,msg)=>{assertions++;assert.ok(ok,msg)};
 const raw=[
   'Jane Example',
   'jane.example+careers@example.org | (212) 555-0189 | linkedin.com/in/jane-example | github.com/jane-example',
