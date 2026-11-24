@@ -1,5 +1,7 @@
 # ApplyFirst Résumé Coach — evidence-first engine and evaluation plan
 
+**Opportunity-aware extension:** [Source-grounded comparison contract, two input types, and 10 × 3 evaluation experiment](./RESUME_OPPORTUNITY_REVIEW_CONTRACT.md). The experiment is deterministic and synthetic; no live opportunity-aware AI review exists yet.
+
 **Status: isolated review-engine foundation, not a public feature.** No UI route, PDF/DOCX parsing, AI connection, protected résumé storage, or deployment is included in this change. The rule-based preflight flags only obvious possible gaps; it is **not a complete résumé review**.
 
 ## Product goal
