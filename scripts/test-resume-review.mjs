@@ -26,6 +26,16 @@ for (const sample of CASES) {
   check(!JSON.stringify(preliminary).includes('atsScore'), `${sample.id}: invented ATS score`);
 }
 
+const resumeOnly=prepareReviewInput({resumeText:'Implemented a Python FastAPI endpoint for a small project.'});
+check(resumeOnly.targetRole==='General résumé review','Resume upload alone must be a valid review input');
+check(resumeOnly.jobDescription===''&&resumeOnly.entries.length===0,'No opportunity, career profile or manual entry tags required');
+const optionalJD=prepareReviewInput({resumeText:'Built and tested a Node.js API.',jobDescription:'Backend internship requiring API design and integration testing.'});
+check(optionalJD.targetRole==='General résumé review'&&optionalJD.jobDescription.includes('integration testing'),'Optional job description works without a target role');
+const roleOnly=prepareReviewInput({resumeText:'Built an Android application.',targetRole:'Mobile engineer'});
+check(roleOnly.targetRole==='Mobile engineer','Explicit role still allowed but never mandatory');
+check(!buildReviewInstructions().includes('Before assuming the résumé is the student\'s biggest blocker, ask how'),'No forced recruiting funnel intake before the review');
+check(buildReviewInstructions().includes('The résumé is the ONLY required user input'),'Prompt must enforce low friction');
+
 const base = prepareReviewInput({ resumeText: 'Developed a Python matching app using FastAPI.', targetRole: 'SWE internship', entries: [{ id: 'x', kind: 'project', text: 'Developed a Python matching app using FastAPI.' }] });
 const valid = { findings: [{ signal: 'why', evidenceState: 'partially_signaled', priority: 'high', entryId: 'x', sourceQuote: base.resumeText, explanation: 'The purpose is unclear.', action: 'ask' }], questions: ['Who needed it?'], readiness: 'insufficient_context' };
 check(validateReviewOutput(valid, base).valid, 'valid evidenced review should pass');
