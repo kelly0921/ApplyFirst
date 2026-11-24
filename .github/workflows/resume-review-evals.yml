@@ -10,6 +10,7 @@ on:
       - 'scripts/test-resume-opportunities.mjs'
       - 'scripts/test-resume-mentor-calibration.mjs'
       - 'docs/RESUME_REVIEW_ENGINE.md'
+      - 'docs/RESUME_COACH_UX_CONTRACT.md'
       - 'docs/RESUME_MENTOR_CALIBRATION.md'
       - 'docs/RESUME_OPPORTUNITY_REVIEW_CONTRACT.md'
       - 'package.json'
