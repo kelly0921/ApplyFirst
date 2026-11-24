@@ -10,6 +10,8 @@ on:
       - 'scripts/test-resume-opportunities.mjs'
       - 'scripts/test-resume-mentor-calibration.mjs'
       - 'docs/RESUME_REVIEW_ENGINE.md'
+      - 'docs/RESUME_MENTOR_CALIBRATION.md'
+      - 'docs/RESUME_OPPORTUNITY_REVIEW_CONTRACT.md'
       - 'package.json'
       - '.github/workflows/resume-review-evals.yml'
   push:
@@ -17,7 +19,11 @@ on:
     paths:
       - 'src/resume-review/**'
       - 'tests/resume-review-fixtures.js'
+      - 'tests/resume-opportunity-fixtures.js'
+      - 'tests/resume-mentor-context-fixtures.js'
       - 'scripts/test-resume-review.mjs'
+      - 'scripts/test-resume-opportunities.mjs'
+      - 'scripts/test-resume-mentor-calibration.mjs'
       - 'package.json'
 jobs:
   smoke-evals:
