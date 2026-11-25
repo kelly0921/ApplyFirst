@@ -10,17 +10,25 @@ export const MAX_TEXT = 40000;
 export function sanitizeInput(resumeText, jobDescription = "") {
   if (typeof resumeText !== "string" || !resumeText.trim())
     throw new Error("Upload a résumé or paste its text first.");
-  if (resumeText.length > MAX_TEXT || jobDescription.length > 15000)
+  if (typeof jobDescription !== "string")
+    throw new Error("Use plain text for the optional job description.");
+  const canonical = resumeText.normalize("NFKC").replace(/\r\n?/g, "\n");
+  const canonicalJob = jobDescription.normalize("NFKC").replace(/\r\n?/g, "\n");
+  if (
+    resumeText.length > MAX_TEXT ||
+    canonical.length > MAX_TEXT ||
+    canonicalJob.length > 15000
+  )
     throw new Error(
       "Use a résumé under 40,000 characters and a job description under 15,000 characters.",
     );
-  return {
-    resumeText: maskContactDetails(
-      resumeText.normalize("NFKC").replace(/\r\n?/g, "\n"),
-      { resumeHeader: true },
-    ).text,
-    jobDescription: maskContactDetails(jobDescription).text,
+  const safe = {
+    resumeText: maskContactDetails(canonical, { resumeHeader: true }).text,
+    jobDescription: maskContactDetails(canonicalJob).text,
   };
+  if (safe.resumeText.length > MAX_TEXT || safe.jobDescription.length > 15000)
+    throw new Error("The sanitized text exceeds the review size limit.");
+  return safe;
 }
 
 // IDs refer to individual source blocks. Offsets always refer to sanitized text,
@@ -69,7 +77,9 @@ export function resolveAnchor(finding, blocks) {
   if (finding.anchor)
     return finding.sourceQuote === finding.anchor.sourceQuote &&
       (!finding.entryId || finding.entryId === finding.anchor.sectionId) &&
-      validateAnchor(finding.anchor, blocks) ? finding.anchor : null;
+      validateAnchor(finding.anchor, blocks)
+      ? finding.anchor
+      : null;
   const quote = finding.sourceQuote;
   if (!quote) return null;
   const matches = blocks.filter(
@@ -243,6 +253,10 @@ export function commentReducer(state, event) {
   if (event.type === "status")
     return {
       ...state,
+      filter:
+        event.status === "open" && state.filter === "resolved"
+          ? "all"
+          : state.filter,
       expanded: event.status === "open",
       activeId: event.id,
       comments: state.comments.map((comment) =>
@@ -255,13 +269,22 @@ export function commentReducer(state, event) {
 }
 export function feedbackText(review, comments) {
   return [
-    `ApplyFirst Résumé Coach — ${review.demo ? "Fictional demonstration" : "Local rule-based preflight"} (not AI analysis)`,
+    `ApplyFirst Résumé Coach — ${review.mode === "ai" ? "AI review" : review.mode === "structured_simulation" ? "Structured simulation (not AI analysis)" : review.demo ? "Fictional demonstration (not AI analysis)" : "Local rule-based preflight (not AI analysis)"}`,
     review.assessment,
     ...review.strengths.map((s) => `Strength: ${s.text}\nSource: ${s.quote}`),
     ...comments.map(
       (c) =>
         `${c.title} [${c.status}]\nSource: ${c.sourceQuote}\nObserved: ${c.observation}\nWhy: ${c.why}\nAction: ${c.action}${c.question ? `\nOptional question: ${c.question}` : ""}${c.suggestion ? `\nOptional wording: ${c.suggestion}` : ""}${c.replies.map((r) => `\nStudent reply (unverified): ${r.text}`).join("")}`,
     ),
+    ...(review.comparison
+      ? [
+          `Opportunity: ${review.comparison.takeaway}`,
+          ...review.comparison.requirements.map(
+            (r) => `${r.state}: ${r.quote}\n${r.explanation}`,
+          ),
+          review.comparison.uncertainty,
+        ]
+      : []),
     "Original résumé unchanged. Masking may miss identifying information.",
   ].join("\n\n");
 }

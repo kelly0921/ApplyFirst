@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import { commentReducer, feedbackText, initialCommentState } from "./model.js";
 import Thread from "./Thread.jsx";
+import OpportunityFeedback from "./OpportunityFeedback.jsx";
 
 export default function Results({ review, onReset }) {
   const [state, dispatch] = useReducer(
@@ -21,8 +22,10 @@ export default function Results({ review, onReset }) {
   const [notice, setNotice] = useState("");
   const stageRef = useRef(null);
   const documentRef = useRef(null);
-  const anchorRefs = useRef({});
-  const threadRefs = useRef({});
+  const anchorRefs = useRef(Object.create(null));
+  const threadRefs = useRef(Object.create(null));
+  const activeIdRef = useRef(state.activeId);
+  activeIdRef.current = state.activeId;
   const open = state.comments.filter((c) => c.status === "open");
   const resolvedCount = state.comments.length - open.length;
   const visible =
@@ -35,7 +38,20 @@ export default function Results({ review, onReset }) {
   const general = visible.filter((c) => !c.anchor);
   useEffect(() => {
     const query = matchMedia("(max-width: 800px)");
-    const changed = () => setMobile(query.matches);
+    const changed = () => {
+      const interacting = document.activeElement?.closest(
+        ".rc-thread, .rc-anchor",
+      );
+      setMobile(query.matches);
+      if (interacting)
+        requestAnimationFrame(() => {
+          const source =
+            anchorRefs.current[activeIdRef.current] ||
+            threadRefs.current[activeIdRef.current]?.querySelector("button");
+          source?.focus({ preventScroll: true });
+          source?.scrollIntoView({ block: "nearest", behavior: "instant" });
+        });
+    };
     query.addEventListener("change", changed);
     return () => query.removeEventListener("change", changed);
   }, []);
@@ -76,7 +92,8 @@ export default function Results({ review, onReset }) {
     requestAnimationFrame(() => {
       const element = fromAnchor
         ? threadRefs.current[comment.id]?.querySelector("button")
-        : anchorRefs.current[comment.id];
+        : anchorRefs.current[comment.id] ||
+          threadRefs.current[comment.id]?.querySelector("button");
       element?.focus({ preventScroll: true });
       element?.scrollIntoView({ block: "nearest", behavior: "instant" });
     });
@@ -84,7 +101,9 @@ export default function Results({ review, onReset }) {
   const close = (comment) => {
     dispatch({ type: "collapse" });
     requestAnimationFrame(() => {
-      const anchor = anchorRefs.current[comment.id];
+      const anchor =
+        anchorRefs.current[comment.id] ||
+        threadRefs.current[comment.id]?.querySelector("button");
       anchor?.focus({ preventScroll: true });
       if (mobile)
         anchor?.scrollIntoView({ block: "nearest", behavior: "instant" });
@@ -116,7 +135,13 @@ export default function Results({ review, onReset }) {
     if (!candidates.length) return;
     const index = candidates.findIndex((c) => c.id === state.activeId);
     select(
-      candidates[(index + direction + candidates.length) % candidates.length],
+      candidates[
+        index < 0
+          ? direction > 0
+            ? 0
+            : candidates.length - 1
+          : (index + direction + candidates.length) % candidates.length
+      ],
     );
   };
   const download = () => {
@@ -150,6 +175,7 @@ export default function Results({ review, onReset }) {
         threadRefs.current[comment.id] = el;
       }}
       demo={review.demo}
+      mode={review.mode}
     />
   );
   return (
@@ -160,16 +186,24 @@ export default function Results({ review, onReset }) {
         if (event.key === "Escape" && state.mode === "all") {
           dispatch({ type: "mode", mode: "expand" });
           requestAnimationFrame(() =>
-            anchorRefs.current[state.activeId]?.focus({ preventScroll: true }),
+            (
+              anchorRefs.current[state.activeId] ||
+              threadRefs.current[state.activeId]?.querySelector("button") ||
+              document.getElementById("rc-all-mode")
+            )?.focus({ preventScroll: true }),
           );
         }
       }}
     >
       <div className="rc-result-meta">
         <span className="rc-badge">
-          {review.demo
-            ? "FICTIONAL EXAMPLE · FIXTURE FEEDBACK"
-            : "LOCAL RULE-BASED PREFLIGHT"}
+          {review.mode === "structured_simulation"
+            ? "STRUCTURED REVIEW SIMULATION · NOT AI ANALYSIS"
+            : review.mode === "ai"
+              ? "AI REVIEW · SOURCE-VALIDATED"
+              : review.demo
+                ? "FICTIONAL EXAMPLE · FIXTURE FEEDBACK"
+                : "LOCAL RULE-BASED PREFLIGHT"}
         </span>
         <div>
           <button className="rc-secondary" onClick={onReset}>
@@ -185,9 +219,13 @@ export default function Results({ review, onReset }) {
           <span className="rc-eyebrow">YOUR FIRST READ</span>
           <h2 id="assessment-title">{review.assessment}</h2>
           <p>
-            {review.demo
-              ? "Explore a manually authored example. These comments demonstrate the experience; they are not AI analysis."
-              : "These checks can miss important issues. No AI analysis or readiness prediction was performed."}
+            {review.mode === "structured_simulation"
+              ? "This fictional response exercises the full structured pipeline. It was authored by us; no AI model was called."
+              : review.mode === "ai"
+                ? "AI feedback can be wrong. Check the source evidence and keep only accurate suggestions."
+                : review.demo
+                  ? "Explore a manually authored example. These comments demonstrate the experience; they are not AI analysis."
+                  : "These checks can miss important issues. No AI analysis or readiness prediction was performed."}
           </p>
         </div>
         <div className="rc-strengths">
@@ -197,6 +235,7 @@ export default function Results({ review, onReset }) {
               <details key={index}>
                 <summary>{strength.text}</summary>
                 <blockquote>{strength.quote}</blockquote>
+                {strength.explanation && <p>{strength.explanation}</p>}
               </details>
             ))
           ) : (
@@ -211,11 +250,20 @@ export default function Results({ review, onReset }) {
         <details className="rc-context">
           <summary>Optional context: {review.context.title}</summary>
           <p>
-            {review.context.source}. Automatic opportunity comparison is not
-            available in this local prototype. Confirm eligibility, required
-            materials, and application status with the official source.
+            {review.context.source}.{" "}
+            {review.comparison
+              ? "Comparison uses only the supplied context."
+              : "Automatic opportunity comparison is not available in this local prototype."}{" "}
+            Confirm eligibility, required materials, and application status with
+            the official source.
           </p>
           <blockquote>{review.context.text}</blockquote>
+          {review.comparison && (
+            <OpportunityFeedback
+              comparison={review.comparison}
+              simulated={review.mode === "structured_simulation"}
+            />
+          )}
           {review.context.url && (
             <a href={review.context.url} target="_blank" rel="noreferrer">
               Check official source

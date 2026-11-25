@@ -12,6 +12,7 @@ export default function Thread({
   setNotice,
   threadRef,
   demo,
+  mode,
 }) {
   const draft = state.drafts[comment.id] || "";
   const copy = async () => {
@@ -77,12 +78,35 @@ export default function Thread({
         <span aria-hidden="true">{expanded ? "−" : "+"}</span>
       </button>
       {expanded && (
-        <div id={`body-${comment.id}`} className="rc-thread-body">
+        <div
+          id={`body-${comment.id}`}
+          className="rc-thread-body"
+          onFocusCapture={(event) => {
+            const target = event.target;
+            requestAnimationFrame(() =>
+              target.scrollIntoView({
+                block: "nearest",
+                inline: "nearest",
+                behavior: "instant",
+              }),
+            );
+          }}
+        >
           <p className="rc-author">
             ApplyFirst Coach{" "}
-            <span>{demo ? "Fixture" : "Local rules"} · not AI</span>
+            <span>
+              {mode === "ai"
+                ? "AI"
+                : mode === "structured_simulation"
+                  ? "Simulation · not AI"
+                  : demo
+                    ? "Fixture · not AI"
+                    : "Local rules · not AI"}
+            </span>
           </p>
-          <blockquote>{comment.sourceQuote}</blockquote>
+          <blockquote aria-label="Original résumé excerpt">
+            {comment.sourceQuote}
+          </blockquote>
           <p>
             <strong>Observed</strong> {comment.observation}
           </p>
@@ -119,6 +143,9 @@ export default function Thread({
                 Keep original
               </button>
             </details>
+          )}
+          {comment.rewriteNotice && (
+            <p className="rc-thread-note">{comment.rewriteNotice}</p>
           )}
           {comment.replies.map((reply, index) => (
             <div className="rc-reply" key={index}>

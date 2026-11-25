@@ -29,6 +29,8 @@ const REPLACEMENTS = Object.freeze({
   header:'[CONTACT HEADER REMOVED]',
 });
 const EMAIL = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
+const OBFUSCATED_EMAIL = /\b[A-Z0-9._%+-]+\s*(?:\[at\]|\(at\))\s*[A-Z0-9.-]+\s*(?:\[dot\]|\(dot\))\s*[A-Z]{2,}\b/gi;
+const INTERNATIONAL_PHONE = /(?<![\w\d])\+\d{1,3}(?:[ .()-]*\d){7,12}(?!\d)/g;
 const PHONE = /(?<![\w\d])(?:\+?1[\s.()-]?)?(?:\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}(?:\s*(?:ext\.?|x)\s*\d{1,5})?(?!\d)/gi;
 const URL = /\b(?:https?:\/\/|www\.|linkedin\.com\/|github\.com\/)[^\s<>|,;)\]]+/gi;
 const STREET = /\b\d{1,6}\s+(?:(?:[A-Za-z0-9][A-Za-z0-9'.-]*\s+){1,6})(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Boulevard|Blvd|Lane|Ln|Court|Ct|Place|Pl|Parkway|Pkwy|Way)\b\.?(?:\s*,?\s*[A-Za-z][A-Za-z\s]{1,35},?\s*[A-Z]{2}\b)?(?:\s+\d{5}(?:-\d{4})?)?/gi;
@@ -59,7 +61,7 @@ export function maskContactDetails(text, {resumeHeader=false}={}) {
     // Remove header only when we see strong contact evidence and a section boundary.
     if(first>=0&&section>first&&section-first<=10){
       const chunk=lines.slice(first,section).join('\n');
-      const contacts=[EMAIL,PHONE,URL].some(pattern=>{pattern.lastIndex=0;return pattern.test(chunk)});
+      const contacts=[EMAIL,OBFUSCATED_EMAIL,PHONE,INTERNATIONAL_PHONE,URL].some(pattern=>{pattern.lastIndex=0;return pattern.test(chunk)});
       if(contacts){
         const prefix=lines.slice(0,first);
         result=[...prefix,REPLACEMENTS.header,...lines.slice(section)].join('\n');
@@ -67,11 +69,11 @@ export function maskContactDetails(text, {resumeHeader=false}={}) {
       }
     }
   }
-  const patterns=[['email',EMAIL],['phone',PHONE],['url',URL],['address',STREET]];
+  const patterns=[['email',EMAIL],['email',OBFUSCATED_EMAIL],['phone',INTERNATIONAL_PHONE],['phone',PHONE],['url',URL],['address',STREET]];
   for(const [kind,pattern] of patterns){
     pattern.lastIndex=0;
     const r=replaceCount(result,pattern,REPLACEMENTS[kind]);
-    result=r.text;counts[kind]=r.count;
+    result=r.text;counts[kind]+=r.count;
   }
   return Object.freeze({
     text:result,

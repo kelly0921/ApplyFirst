@@ -1,5 +1,7 @@
 # Résumé Coach Interactive V1
 
+V1.1 continuation: [quality audit, structured simulation and testing](RESUME_COACH_V1_1.md), plus the [provider/privacy readiness audit](RESUME_AI_READINESS_AUDIT.md). Historical V1 results below are retained; live AI remains disabled.
+
 This development-branch prototype is a working document commenter at `/resume-coach`. It is local only: no AI provider, deployment, résumé database, or saved review history. Draft PR #5 must remain unmerged.
 
 ## Run locally

@@ -384,6 +384,16 @@
   padding: 16px 0;
   font-size: 0.9rem;
 }
+.rc-criterion {
+  border-top: 1px solid #d7e2e9;
+  padding: 14px 0 4px;
+}
+.rc-criterion > strong {
+  color: #0b7186;
+}
+.rc-intro button {
+  margin-right: 8px;
+}
 .rc-review-tools {
   display: flex;
   justify-content: space-between;
@@ -593,6 +603,14 @@
 }
 .rc-thread-body {
   padding: 0 18px 16px;
+}
+@media (min-width: 801px) {
+  .rc-gutter .rc-thread-body {
+    max-height: min(62vh, 540px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
 }
 .rc-author {
   font-size: 0.75rem;

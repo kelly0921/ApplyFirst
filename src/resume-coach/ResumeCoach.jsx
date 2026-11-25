@@ -5,6 +5,11 @@ import { DEMO_RESUME } from "./fixtures.js";
 import { createLocalReview, sanitizeInput } from "./model.js";
 import { extractResume } from "./extract.js";
 import "./resume-coach.css";
+import { createReviewClient, RESUME_AI_FEATURE_ENABLED } from "./ai-client.js";
+import {
+  STRUCTURED_DEMO_INPUT,
+  STRUCTURED_DEMO_OUTPUT,
+} from "./structured-demo.js";
 
 function Mark() {
   return (
@@ -25,7 +30,7 @@ function Mark() {
 }
 
 // This route mounts independently of App, its workspace hooks, and its telemetry.
-export default function ResumeCoach() {
+export default function ResumeCoach({ reviewClient = null } = {}) {
   const [review, setReview] = useState(null);
   const [text, setText] = useState("");
   const [jd, setJd] = useState("");
@@ -33,10 +38,21 @@ export default function ResumeCoach() {
   const [sanitized, setSanitized] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const preview = sanitized ?? (text.trim() ? sanitizeInput(text, jd) : null);
+  let preview = sanitized;
+  try {
+    preview ??= text.trim() ? sanitizeInput(text, jd) : null;
+  } catch {
+    /* Review shows a bounded, content-free error. */
+  }
   const generation = useRef(0);
   const fileRef = useRef(null);
   const headingRef = useRef(null);
+  const processingRef = useRef(null);
+  const aiAvailable =
+    RESUME_AI_FEATURE_ENABLED &&
+    reviewClient?.availability?.enabled === true &&
+    !reviewClient.availability.simulated;
+  useEffect(() => () => processingRef.current?.abort(), []);
   useEffect(() => {
     document.title = "Résumé Coach · ApplyFirst";
   }, []);
@@ -44,10 +60,61 @@ export default function ResumeCoach() {
     if (review) headingRef.current?.focus();
   }, [review]);
   const invalidate = () => {
+    processingRef.current?.abort();
     generation.current++;
     setSanitized(null);
     setError("");
     setBusy(false);
+  };
+  const runStructured = async (simulated = false) => {
+    const version = ++generation.current;
+    const controller = new AbortController();
+    processingRef.current?.abort();
+    processingRef.current = controller;
+    setBusy(true);
+    setError("");
+    try {
+      const selected = opportunities.find((p) => p.id === programId);
+      const input = simulated
+        ? STRUCTURED_DEMO_INPUT
+        : {
+            resumeText: sanitized?.resumeText ?? text,
+            jobDescription: sanitized?.jobDescription ?? jd,
+            opportunity: selected
+              ? {
+                  kind: "applyfirst_program",
+                  programId: selected.id,
+                  title: selected.name,
+                  sourceText: selected.description,
+                }
+              : null,
+          };
+      const client = simulated
+        ? createReviewClient({
+            enabled: true,
+            simulated: true,
+            requestReview: async () => structuredClone(STRUCTURED_DEMO_OUTPUT),
+          })
+        : reviewClient;
+      if (!simulated && !aiAvailable) throw new Error("Processing disabled.");
+      const result = await client.review(input, {
+        consentToAI: true,
+        signal: controller.signal,
+      });
+      if (generation.current !== version || controller.signal.aborted) return;
+      setReview(result);
+      setText("");
+      setJd("");
+      setSanitized(null);
+      if (fileRef.current) fileRef.current.value = "";
+    } catch {
+      if (generation.current === version && !controller.signal.aborted)
+        setError(
+          "The structured review could not be verified. Your original résumé is unchanged.",
+        );
+    } finally {
+      if (generation.current === version) setBusy(false);
+    }
   };
   const context = () => {
     const program = opportunities.find((p) => p.id === programId);
@@ -121,7 +188,7 @@ export default function ResumeCoach() {
         <nav aria-label="ApplyFirst navigation">
           <a href="/">Programs</a>
           <a href="/resume-coach" aria-current="page">
-            Résumé Coach <span className="rc-beta">LOCAL V1</span>
+            Résumé Coach <span className="rc-beta">LOCAL V1.1</span>
           </a>
         </nav>
       </header>
@@ -134,7 +201,11 @@ export default function ResumeCoach() {
             </h1>
             <p>Make the value of your work easier to see.</p>
           </div>
-          <span className="rc-local">On your device · No account needed</span>
+          <span className="rc-local">
+            {aiAvailable
+              ? "Original file stays on your device"
+              : "On your device · No account needed"}
+          </span>
         </div>
         {review ? (
           <Results
@@ -162,6 +233,13 @@ export default function ResumeCoach() {
                 <button className="rc-secondary" onClick={() => run(true)}>
                   Try the fictional example
                 </button>
+                <button
+                  className="rc-secondary"
+                  disabled={busy}
+                  onClick={() => runStructured(true)}
+                >
+                  Try structured review simulation
+                </button>
               </div>
               <div className="rc-how">
                 <p>
@@ -174,8 +252,9 @@ export default function ResumeCoach() {
                   <strong>03</strong> Keep the changes you choose
                 </p>
                 <small>
-                  Local prototype · Rules and demonstration fixtures only. No AI
-                  provider is connected.
+                  {aiAvailable
+                    ? "AI processing uses sanitized text only after your request."
+                    : "Local prototype · Rules and demonstration fixtures only. No AI provider is connected."}
                 </small>
               </div>
             </section>
@@ -183,7 +262,8 @@ export default function ResumeCoach() {
               className="rc-input"
               onSubmit={(event) => {
                 event.preventDefault();
-                run();
+                if (aiAvailable) void runStructured();
+                else run();
               }}
             >
               <div className="rc-section-title">
@@ -235,22 +315,30 @@ export default function ResumeCoach() {
                     value={jd}
                     onChange={(event) => {
                       setError("");
-                      setSanitized(
-                        preview
-                          ? {
-                              ...preview,
-                              jobDescription: sanitizeInput(
-                                text,
-                                event.target.value,
-                              ).jobDescription,
-                            }
-                          : null,
-                      );
+                      try {
+                        setSanitized(
+                          preview
+                            ? {
+                                ...preview,
+                                jobDescription: sanitizeInput(
+                                  text,
+                                  event.target.value,
+                                ).jobDescription,
+                              }
+                            : null,
+                        );
+                      } catch {
+                        setSanitized(null);
+                        setError(
+                          "The optional context exceeds the review size limit.",
+                        );
+                      }
                       setJd(event.target.value);
                       setProgramId("");
                     }}
                     maxLength={15000}
                     rows={4}
+                    disabled={busy}
                   />
                 </label>
                 <label className="rc-field" htmlFor="program">
@@ -258,6 +346,7 @@ export default function ResumeCoach() {
                   <select
                     id="program"
                     value={programId}
+                    disabled={busy}
                     onChange={(event) => {
                       setError("");
                       setSanitized(
@@ -294,6 +383,7 @@ export default function ResumeCoach() {
                         value={preview.resumeText}
                         maxLength={40000}
                         rows={8}
+                        disabled={busy}
                         onChange={(event) =>
                           setSanitized({
                             ...preview,
@@ -310,6 +400,7 @@ export default function ResumeCoach() {
                           value={preview.jobDescription}
                           maxLength={15000}
                           rows={4}
+                          disabled={busy}
                           onChange={(event) =>
                             setSanitized({
                               ...preview,
@@ -334,7 +425,11 @@ export default function ResumeCoach() {
                 </p>
               )}
               <p role="status">
-                {busy ? "Extracting text on your device…" : ""}
+                {busy
+                  ? processingRef.current
+                    ? "Preparing review…"
+                    : "Extracting text on your device…"
+                  : ""}
               </p>
               <div className="rc-submit">
                 <button
@@ -342,12 +437,28 @@ export default function ResumeCoach() {
                   disabled={busy || !text.trim()}
                   type="submit"
                 >
-                  Review My Résumé
+                  {aiAvailable
+                    ? "Review My Résumé with AI"
+                    : "Review My Résumé"}
                 </button>
                 <p>
-                  Local rule-based preflight, not AI analysis. No résumé or job
-                  description is sent or saved.
+                  {aiAvailable
+                    ? reviewClient.availability.disclosure
+                    : "Local rule-based preflight, not AI analysis. No résumé or job description is sent or saved."}
                 </p>
+                {busy && processingRef.current && (
+                  <button
+                    type="button"
+                    className="rc-secondary"
+                    onClick={() => {
+                      processingRef.current.abort();
+                      generation.current++;
+                      setBusy(false);
+                    }}
+                  >
+                    Cancel review
+                  </button>
+                )}
               </div>
             </form>
           </>
@@ -362,8 +473,10 @@ export default function ResumeCoach() {
             <summary>Privacy details</summary>
             <p>
               Original files, extracted text, optional context, comments, and
-              replies stay in this tab's memory. No cloud storage, browser
-              storage, analytics, or AI processing is used by this coach.
+              replies stay in this tab's memory.{" "}
+              {aiAvailable
+                ? "Only sanitized résumé text and optional context are sent for the requested AI review; check the provider retention disclosure above."
+                : "No cloud storage, browser storage, analytics, or AI processing is used by this local coach."}
               Download and Copy are explicit actions. Masking can miss names,
               unusual contacts, and identifying achievements. PDF/DOCX parsing
               creates a text preview; complex layouts may need correction by

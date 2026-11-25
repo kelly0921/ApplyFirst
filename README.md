@@ -478,4 +478,6 @@ The first Phase 3 slice adds:
 
 ## Local Résumé Coach prototype
 
+V1.1 adds a complete structured-review simulation, conservative rewrite/source validation, synthetic quality benchmarks and a disabled provider boundary. See [V1.1 instructions and limitations](docs/RESUME_COACH_V1_1.md) and the [provider/privacy audit](docs/RESUME_AI_READINESS_AUDIT.md).
+
 The development branch includes a working coach at `/resume-coach`. See [run instructions, test results, screenshots, and release blockers](docs/RESUME_COACH_V1.md). Feedback is explicitly labelled as fictional fixtures or local rules; no AI provider is connected. Do not merge or deploy this draft feature.
