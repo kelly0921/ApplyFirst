@@ -6,7 +6,7 @@
 
 Existing deterministic evaluations check whether annotated evidence is handled consistently. They do NOT establish whether the agent resembles a thoughtful mentor who asks recruiting-context questions before blaming the résumé and recognizes when the student's actual bottleneck is elsewhere.
 
-An internal preliminary audit reviewed a selection of student résumé submissions, accessible Zoom 1:1 transcripts and AI summaries, and private mentorship journals. Those materials were read to generate generalized hypotheses, not copied into public source code. Application résumés may be earlier versions than those reviewed in the calls, and speech-recognition transcripts or automated summaries can contain errors.
+An internal preliminary audit reviewed student résumé submissions, accessible Zoom 1:1 transcripts and AI summaries, and private mentorship journals. Those materials were read to generate generalized hypotheses, not copied into public source code. The authoritative baseline for this calibration is the latest 1:1 onboarding résumé submitted before the actual review—not the older application PDF or a later post-review revision. Speech-recognition transcripts and AI summaries can contain errors. Individual identity-to-file mappings and source links remain in the private audit, not this public document.
 
 **Privacy boundary:** No public before/after examples, model-provider uploads, training/tuning or storage of private RSA source materials without appropriate permission and consent. Identifiable student documents must be isolated from public GitHub and the existing lightweight ApplyFirst invite-code workspaces. Fictional test cases must not retain unique student achievement combinations.
 
@@ -32,8 +32,8 @@ An internal preliminary audit reviewed a selection of student résumé submissio
 
 ## Before using RSA examples for human benchmarking
 
-1. Obtain separate, explicit participant consent for evaluation use, not merely general mentorship or recorded-meeting participation.
-2. Match the **exact résumé version displayed in the meeting** to its original transcript. A summarized meeting is not a verbatim gold label.
+1. Check the documented permission and purpose for the private human-reference evaluation. The RSA owner has confirmed permission for the current 1:1 calibration scope; record details privately. Do not assume this approves public examples, new retention destinations or unverified external AI-provider processing.
+2. **Baseline-selection rule:** use the **latest résumé submitted for the student's 1:1 before the mentor review**, normally the onboarding diagnostic's **Current Résumé** PDF. Never substitute the original RSA application résumé or a revised/referral attachment sent after the session. If a newer version was shared during the call, verify its timestamp and preserve the earlier and later versions separately. Pair the selected file with the transcript; an AI meeting summary is not verbatim evidence.
 3. Record the specific mentor question, evidence excerpt, missing context, explanation, supported recommended edit and **no-change** decision.
 4. Have a second reviewer adjudicate ambiguous transcript phrases and separate the participant's actual words from automatic summaries.
 5. Strip direct identifiers and unique combinations that could reveal participants. Keep consent metadata and a deletion path in protected storage.
