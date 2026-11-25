@@ -13,12 +13,19 @@ export function createDemo(vault, run) {
     participantId: `P-00${i + 1}`,
     split: i ? "development" : "held-out",
     resumeSource: "fictional-resume",
-    resumeCandidates: [{ source: "fictional-resume", version: "original-v1" }],
+    resumeCandidates: [
+      {
+        source: "fictional-resume",
+        version: "original-v1",
+        kind: "onboarding",
+        submittedAt: "2026-01-01T12:00:00Z",
+      },
+    ],
     meetingSource: "fictional-session",
     meetingCandidates: [
       {
         source: "fictional-session",
-        date: "fictional",
+        date: "2026-01-02T12:00:00Z",
         transcript: "available",
         summary: "not_listed",
       },

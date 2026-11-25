@@ -88,6 +88,51 @@ test("blocked case is checked before opening original or processing records", ()
   assert.deepEqual(reads, ["inventory.json"]);
 });
 
+test("select the latest pre-session onboarding revision or a verified in-call share", (t) => {
+  const { row } = fixture(t);
+  const original = row.resumeCandidates[0];
+  const later = {
+    ...original,
+    version: "v2",
+    submittedAt: "2026-01-02T10:00:00Z",
+  };
+  const candidate = {
+    ...row,
+    resumeCandidates: [original, later],
+    resumeVersion: original.version,
+  };
+  assert.ok(gaps(candidate).includes("latest_pre_review_onboarding_version"));
+  assert.deepEqual(gaps({ ...candidate, resumeVersion: "v2" }), []);
+  for (const kind of ["application", "referral", "post_review"]) {
+    assert.ok(
+      gaps({ ...row, resumeCandidates: [{ ...original, kind }] }).includes(
+        "latest_pre_review_onboarding_version",
+      ),
+    );
+  }
+  const inCall = {
+    ...later,
+    kind: "in_session",
+    session: row.meetingSource,
+    shareEvidence: "fictional attachment timestamp",
+    submittedAt: "2026-01-02T12:10:00Z",
+  };
+  const shared = {
+    ...row,
+    resumeCandidates: [inCall],
+    meetingCandidates: [
+      { ...row.meetingCandidates[0], endedAt: "2026-01-02T12:30:00Z" },
+    ],
+  };
+  assert.deepEqual(gaps(shared), []);
+  assert.ok(
+    gaps({
+      ...shared,
+      resumeCandidates: [{ ...inCall, shareEvidence: null }],
+    }).includes("latest_pre_review_onboarding_version"),
+  );
+});
+
 test("only reviewer policy differs between paired packets, with no mentor or later answers", (t) => {
   const { row, input, ref, audit } = fixture(t);
   const a = packet(input, row, audit),

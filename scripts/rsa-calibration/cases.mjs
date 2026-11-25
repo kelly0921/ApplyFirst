@@ -23,6 +23,30 @@ export const controls = [
   "approvedProcessingPath",
 ];
 
+// Candidate lists are compiled for this review occurrence. Dates are submission
+// times from the source, never the modification time of a downloaded file.
+function isReviewedBaseline(resume, meeting, candidates) {
+  const start = Date.parse(meeting.date);
+  const submitted = Date.parse(resume.submittedAt);
+  if (!Number.isFinite(start) || !Number.isFinite(submitted)) return false;
+  if (resume.kind === "in_session") {
+    return (
+      resume.session === meeting.source &&
+      present(resume.shareEvidence) &&
+      submitted >= start &&
+      submitted <= Date.parse(meeting.endedAt)
+    );
+  }
+  if (resume.kind !== "onboarding" || submitted >= start) return false;
+  return candidates.every((candidate) => {
+    if (candidate.kind === "in_session" && candidate.session === meeting.source)
+      return false;
+    if (candidate === resume || candidate.kind !== "onboarding") return true;
+    const other = Date.parse(candidate.submittedAt);
+    return Number.isFinite(other) && (other < submitted || other >= start);
+  });
+}
+
 export function gaps(row) {
   const missing = [];
   const revisions =
@@ -41,6 +65,12 @@ export function gaps(row) {
   if (!resume || !present(resume.version) || resume.version === "unknown")
     missing.push("original_resume_revision");
   if (!meeting) missing.push("confirmed_1_to_1");
+  if (
+    resume &&
+    meeting &&
+    !isReviewedBaseline(resume, meeting, row.resumeCandidates)
+  )
+    missing.push("latest_pre_review_onboarding_version");
   if (
     row.reviewedVersion !== "confirmed" ||
     !present(row.matchEvidence) ||

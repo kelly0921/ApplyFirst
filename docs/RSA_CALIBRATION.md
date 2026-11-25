@@ -39,7 +39,9 @@ Fill in the bracketed details with verified terms before sending this individual
 
 ## Independent review and human labels
 
-When one Drive file or submission has several revisions under the same source ID, set `resumeVersion` to the confirmed revision. Store any consent expiry in `permissionExpiresAt`. The matching report flags ambiguous revisions and expired permissions.
+Use the latest onboarding **Current Résumé** submitted before the 1:1. Record `kind: "onboarding"` and `submittedAt` from the submission, alongside the meeting start in `date`. For a verified in-call replacement use `kind: "in_session"`, the occurrence in `session`, `shareEvidence`, the actual sharing time and the meeting's `endedAt`. Preserve both versions privately. Application and post-session referral documents are ineligible baselines. Use timestamped evidence and explicit time zones. When one source has multiple revisions, set `resumeVersion` to the confirmed revision. Store any consent expiry in `permissionExpiresAt`. [Mentor calibration baseline](RESUME_MENTOR_CALIBRATION.md)
+
+The RSA owner confirmed the current private human-calibration scope. Check each participant against the private audit and its terms. External AI processing requires separately verified scope and processing controls. Use the opt-in draft only where permission is missing or ambiguous.
 
 In the case directory, `original.json` holds only `resumeText` and an optional verified `jobDescription`. Use the reviewed text in original order and record transcription/extraction provenance alongside the reviewed revision. Calculate `inputDigest` with the exported `digest(original)` helper after inspecting the version. It is SHA-256 of the UTF-8 bytes of JavaScript's `JSON.stringify(original)`. Preserve the same JSON key order. Keep student answers, revised bullets and reference labels out of both strings.
 
@@ -83,6 +85,6 @@ For withdrawal, mark all affected rows withdrawn first, stop any queued processi
 
 ## Evaluation status
 
-The November 25, 2026 rehearsal passed nine calibration tests on Windows, including the standalone CLI. Two fictional cases exercised separate participant splits, a no-change judgment, a paraphrased WHY observation, blinded comparison, an invented adoption claim, rejection of an unsupported citation, label revision and withdrawal. The four earlier résumé suites passed 606 assertions. The 27 V1.1 structured tests, 12 unit/service tests and production build also passed.
+The November 25, 2026 rehearsal passed ten calibration tests on Windows, including the standalone CLI. Two fictional cases exercised separate participant splits, a no-change judgment, a paraphrased WHY observation, blinded comparison, an invented adoption claim, rejection of an unsupported citation, label revision and withdrawal. The tests also cover pre-session version selection and verified in-call replacements. The four earlier résumé suites passed 606 assertions. The 27 V1.1 structured tests, 12 unit/service tests and production build also passed.
 
 The real inventory and source locators stay with the custodian. No student review was run. The pilot requires participant-specific evaluation permission, verified original revisions paired with primary feedback, and an independently approved processing path. Factual-error rates and reviewer preference for RSA participants are unmeasured.
