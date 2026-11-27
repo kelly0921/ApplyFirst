@@ -1019,19 +1019,13 @@ a {
 .product-preview img {
   display: block;
   width: 100%;
+  height: auto;
   background: var(--field);
-  object-fit: cover;
 }
 
-.product-preview-main img {
-  aspect-ratio: 36 / 25;
-  object-fit: contain;
-  object-position: top left;
-}
-
-.product-preview-status img {
-  aspect-ratio: 1 / 1.55;
-  object-position: top left;
+.product-preview-status {
+  width: 100%;
+  max-width: 384px;
 }
 
 .product-preview figcaption {
