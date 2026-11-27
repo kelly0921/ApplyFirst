@@ -2735,7 +2735,7 @@ function PrivacyDataUsePage() {
 
 function ProductPreviewSection() {
   return (
-    <section className="product-preview" aria-label="ApplyFirst product preview">
+    <section id="product-preview" className="product-preview" aria-label="ApplyFirst product preview">
       <div className="product-preview-heading">
         <span>Product Preview</span>
         <h2>Know What It Is. Know If It's Time.</h2>
@@ -2760,9 +2760,9 @@ function ProductPreviewSection() {
           <figure className="product-preview-status">
             <img
               src={programStatusMixScreenshot}
-              alt="ApplyFirst program rows showing Open Now, Watching, Deadline Soon, and Opening Soon status examples."
-              width="1232"
-              height="2454"
+              alt="Four Programs results showing one Deadline Soon label and three Open Now labels."
+              width="1191"
+              height="2406"
               loading="lazy"
               decoding="async"
             />
