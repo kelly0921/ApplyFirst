@@ -49,7 +49,7 @@ const sql = createD1SeedSql(sourceRows);
 assertRuntimeSchedulePreservation(sql);
 
 if (writeOutput) {
-  await mkdir(new URL('../cloudflare/d1/', import.meta.url), { recursive: true });
+  await mkdir(new URL('.', outputPath), { recursive: true });
   await writeFile(outputPath, sql);
   console.log(`Wrote ${sourceRows.length} official source rows to cloudflare/seeds/watch-seed.generated.sql`);
 } else {
@@ -446,6 +446,15 @@ function mapCuratedStatus(status) {
 }
 
 function applyVerifiedScheduleOverride(opportunity, inferredProfile) {
+  if (opportunity.category === 'Applied AI Experience' && !verifiedScheduleOverrides.has(opportunity.id)) {
+    return {
+      ...inferredProfile,
+      cycleFrequency: 'unknown',
+      expectedOpenMonths: [],
+      lastKnownOpenAt: null,
+      scheduleNote: 'Monitor the official source between cycles. Future opening dates and recurrence require confirmation.',
+    };
+  }
   const override = verifiedScheduleOverrides.get(opportunity.id);
 
   if (!override) {

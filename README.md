@@ -376,6 +376,10 @@ curl -X POST "https://applyfirst-watch.YOUR-SUBDOMAIN.workers.dev/watch/discover
 
 ### Weekly new-program radar
 
+Applied AI Experience covers paid implementation and advisor fellowships, forward-deployed work, sponsored industry projects, small-business adoption and nonprofit AI projects. Reviewers should identify the organizational partner, what participants build or deploy, evidence they can show afterward, and the training, mentorship, pay or industry access provided. Exclude ordinary jobs, standalone classes, certificates, webinars, affiliate marketing and promotional ambassador roles. Keep unverified leads in the research queue. Use Core for student or early-career programs and the existing reference scope (All Records) for broader audiences.
+
+The discovery Worker rotates one official-domain Applied AI search at noon UTC daily while scheduled discovery is enabled. Matches enter the existing new-program review queue as low-confidence leads. Review the official application route and distinguish an open form, future interest and a dated cohort before publishing. The four November 2026 records have source monitoring enabled and automatic delivery disabled because current profiles cannot establish the required experience, attendance or availability.
+
 The weekly research radar and the Worker source-discovery queue solve different problems. Source discovery finds a current-cycle URL for a program already in the library. The radar finds programs that are not yet in the library, or material new cycles and URLs that need a maintainer decision.
 
 Radar findings must be written to a JSON batch and validated before they enter D1. Preview a batch first:

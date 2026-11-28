@@ -80,6 +80,7 @@ const defaultAlertPrefs = {
   sendTiming: 'openAndDeadline',
 };
 const newProgramOpportunityTypes = [
+  'Applied AI Experience',
   'Discovery Program',
   'Fellowship',
   'Startup / VC Fellowship',
@@ -1149,6 +1150,8 @@ function App() {
         opportunity.name,
         opportunity.organization,
         opportunity.category,
+        opportunity.audienceLabel,
+        opportunity.eligibilitySummary,
         opportunity.why,
         opportunity.prep,
         opportunity.funding,
@@ -1196,6 +1199,7 @@ function App() {
   const alertPreviewMatches = useMemo(
     () =>
       opportunityRecords.filter((opportunity) => {
+        if (opportunity.deliveryEnabled === false) return false;
         const tracks = getOpportunityTracks(opportunity);
         const signal = getMonitorSignal(opportunity);
 
@@ -7519,7 +7523,7 @@ function OpportunityRecord({ opportunity, selected, saved, progress, onSelect, o
         </div>
         <div className="record-summary">
           <span>{primaryTrack}</span>
-          <span>{opportunity.classYears.join(', ')}</span>
+          <span>{opportunity.audienceLabel || opportunity.classYears.join(', ')}</span>
           <span>{opportunity.timing}</span>
         </div>
         <p className="record-timing-signal">{timingSignal}</p>
@@ -7584,12 +7588,13 @@ function OpportunityDetail({
         : 'review';
   const isCohortProgram = opportunity.programModel === 'cohort';
   const programHighlights = [
-    { label: 'Class Year', value: opportunity.classYears?.join(', ') || 'Not Listed Yet' },
+    { label: opportunity.audienceLabel ? 'Audience' : 'Class Year', value: opportunity.audienceLabel || opportunity.classYears?.join(', ') || 'Not Listed Yet' },
     ...(isCohortProgram
       ? [{ label: 'Format', value: getCohortProgramFormatText(opportunity) }]
       : [
           { label: 'Format', value: getProgramFormatText(opportunity) },
           { label: 'Duration', value: getProgramLengthText(opportunity) },
+          { label: 'Commitment', value: opportunity.weeklyCommitment },
         ]),
     { label: 'Pay / Funding', value: opportunity.funding },
     { label: 'Focus', value: tracks.join(' + ') },
@@ -8188,7 +8193,7 @@ function getOpportunityListingProfile(opportunity, tracks, monitorSignal, readin
 function getOpportunityListingSummary(opportunity, tracks, monitorSignal) {
   const category = formatDisplayLabel(opportunity.category);
   const trackText = formatTrackList(tracks).toLowerCase();
-  const audience = getSummaryAudienceText(opportunity.classYears);
+  const audience = opportunity.audienceLabel?.toLowerCase() || getSummaryAudienceText(opportunity.classYears);
   const timing =
     monitorSignal.alertReadiness === 'openNow'
       ? 'open or showing an application signal now'
@@ -8204,13 +8209,13 @@ function getOpportunityListingSummary(opportunity, tracks, monitorSignal) {
 }
 
 function getOpportunityFitSummary(opportunity, tracks) {
-  return `${getCompactAudienceText(opportunity.classYears)} / ${formatTrackList(tracks)}`;
+  return `${opportunity.audienceLabel || getCompactAudienceText(opportunity.classYears)} / ${formatTrackList(tracks)}`;
 }
 
 function getOpportunityDescription(opportunity, monitorSignal, readiness) {
   const category = formatDisplayLabel(opportunity.category).toLowerCase();
   const article = /^[aeiou]/i.test(category) ? 'an' : 'a';
-  const audience = formatAudienceText(opportunity.classYears);
+  const audience = opportunity.audienceLabel?.toLowerCase() || formatAudienceText(opportunity.classYears);
   const openingContext =
     monitorSignal.alertReadiness === 'openNow'
       ? 'The timing is the important part: confirm the official page is live before relying on alerts or applying.'

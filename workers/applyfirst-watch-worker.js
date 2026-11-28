@@ -1,3 +1,4 @@
+import { appliedAiSearchAt, isAppliedAiLead } from './applied-ai-radar.js';
 import {
   buildDeliveryCopyState,
   buildDeliveryDedupeKey,
@@ -182,6 +183,7 @@ const NEW_PROGRAM_DUPLICATE_TYPES = new Set([
   'low_confidence_lead',
 ]);
 const NEW_PROGRAM_OPPORTUNITY_TYPES = new Set([
+  'Applied AI Experience',
   'Discovery Program',
   'Fellowship',
   'Startup / VC Fellowship',
@@ -234,6 +236,10 @@ export default {
 
     if (shouldRunScheduledDiscoverySearch(env)) {
       ctx.waitUntil(runScheduledDiscoverySearch(env, controller).catch((error) => logScheduledDiscoveryError(error)));
+      const search = appliedAiSearchAt(controller.scheduledTime);
+      if (search && env.AUTO_DISCOVERY_SEARCH_DRY_RUN !== 'true') {
+        ctx.waitUntil(researchAppliedAiPrograms(env, search).catch(logScheduledDiscoveryError));
+      }
     }
 
     if (shouldRunScheduledProactiveDelivery(env)) {
@@ -274,6 +280,29 @@ async function runScheduledDiscoverySearch(env, controller) {
 
 function parseConfiguredProgramIds(value) {
   return uniqueStrings(String(value || '').split(','));
+}
+
+async function researchAppliedAiPrograms(env, search) {
+  const provider = normalizeDiscoverySearchProvider(env.DISCOVERY_SEARCH_PROVIDER || 'brave');
+  const key = getDiscoverySearchApiKey(env, provider);
+  if (!key) return;
+  const results = await searchDiscoveryProvider(env, provider, key, search.query, { country: 'US', maxResults: 5 });
+  for (const result of results) {
+    if (!isAppliedAiLead(result, search.domain)) continue;
+    const known = await env.DB.prepare(
+      `select 1 from official_sources where rtrim(url, '/') = rtrim(?1, '/') or rtrim(previous_url, '/') = rtrim(?1, '/')
+       union all select 1 from new_program_candidates where rtrim(official_url, '/') = rtrim(?1, '/')
+       limit 1`
+    ).bind(result.url).first();
+    if (known) continue;
+    await saveNewProgramCandidate(env, {
+      programName: result.title, organization: search.organization, officialUrl: result.url,
+      opportunityType: 'Applied AI Experience', duplicateType: 'low_confidence_lead', confidence: 'low',
+      source: 'scheduled_research', createdBy: 'applied-ai-radar',
+      evidenceDate: new Date().toISOString().slice(0, 10), evidenceNote: result.snippet || result.title,
+      fitReason: 'Review the official page for participant eligibility, selection, partner work, deliverables and support. Check for an existing program before promotion.',
+    });
+  }
 }
 
 function shouldRunScheduledDiscoverySearch(env) {
@@ -3954,6 +3983,8 @@ async function getSourcesForMonitoring(env, { limit, now, force, programIds = []
 
   const query = `select
       official_sources.*,
+      exists(select 1 from program_delivery_catalog catalog
+             where catalog.program_id = official_sources.program_id and catalog.delivery_enabled = 1) as delivery_enabled,
       source_schedule_profiles.cycle_frequency,
       source_schedule_profiles.expected_open_months_json,
       source_schedule_profiles.last_known_open_at,
@@ -4066,12 +4097,12 @@ async function checkOfficialSource(env, source, options = {}) {
   const openingDetected = analysis.reviewDecision === 'Alert Candidate' && analysis.suggestedStatus === 'open';
   const autoSendableOpening = isAutoSendableOpening(analysis);
   const previousStatus = previousAlertState?.status || '';
-  const openTransition = autoSendableOpening && previousStatus !== 'open';
+  const openTransition = autoSendableOpening && previousStatus !== 'open' && source.delivery_enabled !== 0;
   const openingNeedsReview =
     openingDetected && !autoSendableOpening && !['open', 'open_review'].includes(previousStatus);
   const reviewCandidate =
     openingNeedsReview || (changed && analysis.reviewDecision === 'Deadline Candidate');
-  const shouldCreateAlertCandidate = openTransition || reviewCandidate;
+  const shouldCreateAlertCandidate = source.delivery_enabled !== 0 && (openTransition || reviewCandidate);
   let candidateId = '';
   let autoSendResult = null;
   const newAlertCandidate = shouldCreateAlertCandidate;
