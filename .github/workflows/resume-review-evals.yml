@@ -1,0 +1,78 @@
+name: Resume review evaluation checks
+on:
+  pull_request:
+    paths:
+      - 'server/resume-*.js'
+      - 'tests/resume-structured*'
+      - '.env.example'
+      - 'src/resume-coach/**'
+      - 'src/main.jsx'
+      - 'server/resume-coach-adapter.js'
+      - 'tests/resume-coach*.test.js'
+      - 'tests/browser/**'
+      - 'playwright.config.js'
+      - 'playwright.preview.config.js'
+      - 'package-lock.json'
+      - 'src/resume-review/**'
+      - 'tests/resume-review-fixtures.js'
+      - 'tests/resume-opportunity-fixtures.js'
+      - 'tests/resume-mentor-context-fixtures.js'
+      - 'scripts/test-resume-review.mjs'
+      - 'scripts/test-resume-opportunities.mjs'
+      - 'scripts/test-resume-mentor-calibration.mjs'
+      - 'scripts/test-resume-privacy.mjs'
+      - 'docs/RESUME_REVIEW_ENGINE.md'
+      - 'docs/RESUME_COACH_UX_CONTRACT.md'
+      - 'docs/RESUME_MENTOR_CALIBRATION.md'
+      - 'docs/RESUME_OPPORTUNITY_REVIEW_CONTRACT.md'
+      - 'package.json'
+      - '.github/workflows/resume-review-evals.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'server/resume-*.js'
+      - 'tests/resume-structured*'
+      - '.env.example'
+      - 'src/resume-coach/**'
+      - 'server/resume-coach-adapter.js'
+      - 'tests/resume-coach*.test.js'
+      - 'tests/browser/**'
+      - 'playwright.config.js'
+      - 'playwright.preview.config.js'
+      - 'package-lock.json'
+      - 'src/resume-review/**'
+      - 'tests/resume-review-fixtures.js'
+      - 'tests/resume-opportunity-fixtures.js'
+      - 'tests/resume-mentor-context-fixtures.js'
+      - 'scripts/test-resume-review.mjs'
+      - 'scripts/test-resume-opportunities.mjs'
+      - 'scripts/test-resume-mentor-calibration.mjs'
+      - 'scripts/test-resume-privacy.mjs'
+      - 'package.json'
+jobs:
+  smoke-evals:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm run resume:eval
+  interactive-coach:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run resume:unit-test
+      - run: npm run resume:ui-test
+      - run: npm run frontend:http:test && npm run frontend:workspace:test && npm run frontend:observability:test && npm run frontend:scope:test && npm run frontend:status:test
+      - run: npm run build
